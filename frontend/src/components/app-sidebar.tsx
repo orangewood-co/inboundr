@@ -53,7 +53,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
               <div className="flex items-center pt-2 pl-1">
-                <img src="/orangewood.png" alt="logo" className="object-contain max-w-44" />
+                <img src="/logo.png" alt="logo" className="object-contain max-w-30" />
               </div>
           </SidebarMenuItem>
         </SidebarMenu>
