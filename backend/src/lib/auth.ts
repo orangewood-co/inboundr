@@ -1,6 +1,10 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { MongoClient } from "mongodb";
+import { createElement } from "react";
+import { ResetPasswordEmail } from "../emails/reset-password";
+import { VerifyEmail } from "../emails/verify-email";
+import { sendEmail } from "./email";
 
 const mongoUri = process.env.MONGODB_URI;
 
@@ -24,13 +28,27 @@ export const auth = betterAuth({
     requireEmailVerification: true,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      console.log(`[auth] Password reset link for ${user.email}: ${url}`);
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your BTSA password",
+        react: createElement(ResetPasswordEmail, {
+          name: user.name,
+          resetUrl: url,
+        }),
+      });
     },
   },
   emailVerification: {
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
-      console.log(`[auth] Email verification link for ${user.email}: ${url}`);
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your BTSA email address",
+        react: createElement(VerifyEmail, {
+          name: user.name,
+          verificationUrl: url,
+        }),
+      });
     },
   },
   socialProviders: {

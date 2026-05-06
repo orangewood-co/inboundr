@@ -5,16 +5,19 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch src/server.ts",
+    "email:dev": "email dev --dir src/emails",
     "start": "bun src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@react-email/ui": "^6.0.8",
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^6.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1043.0",
     "@google-cloud/pubsub": "^5.3.0",
     "@google-cloud/vertexai": "^1.10.4",
     "@langchain/core": "^1.1.39",
@@ -33,6 +36,9 @@
     "mongoose": "^9.4.1",
     "openai": "^6.33.0",
     "pg": "^8.20.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-email": "^6.0.8",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   }

@@ -9,6 +9,7 @@
   "scripts": {
     "dev:backend": "bun run --cwd backend dev",
     "dev:frontend": "bun run --cwd frontend dev",
+    "email:dev": "bun run --cwd backend email:dev",
     "build": "bun run --cwd frontend build",
     "build:frontend": "bun run --cwd frontend build",
     "lint": "bun run --cwd frontend lint",
