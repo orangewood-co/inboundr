@@ -1,12 +1,14 @@
 import express, {
   type Application,
-  type NextFunction,
   type Request,
   type Response,
 } from "express";
+import cors from "cors";
+import { toNodeHandler } from "better-auth/node";
 import emailRouter from "./routes/email.route";
 import rfqRouter from "./routes/rfq.route";
 import { connectDB, disconnectDB } from "./config/database.config";
+import { auth } from "./lib/auth";
 import {
   startWatch,
   scheduleWatchRenewal,
@@ -14,17 +16,18 @@ import {
 } from "./services/gmail-watcher.service";
 
 const app: Application = express();
+const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
-  next();
-});
+app.use(
+  cors({
+    origin: frontendOrigin,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  }),
+);
+
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 

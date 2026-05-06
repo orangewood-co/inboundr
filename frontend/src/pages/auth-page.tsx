@@ -1,10 +1,13 @@
+import { useState, type FormEvent } from "react"
 import { Link } from "@tanstack/react-router"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { signIn, signUp } from "@/lib/auth-client"
 
 type AuthPageProps = {
+  mode: "login" | "register"
   eyebrow: string
   title: string
   description: string
@@ -15,6 +18,7 @@ type AuthPageProps = {
 }
 
 export function AuthPage({
+  mode,
   eyebrow,
   title,
   description,
@@ -23,6 +27,48 @@ export function AuthPage({
   alternateLabel,
   alternateTo,
 }: AuthPageProps) {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const [status, setStatus] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    setStatus(null)
+    setIsSubmitting(true)
+
+    const callbackURL = `${window.location.origin}/`
+    const result =
+      mode === "login"
+        ? await signIn.email({ email, password, callbackURL })
+        : await signUp.email({ email, password, name, callbackURL })
+
+    setIsSubmitting(false)
+
+    if (result.error) {
+      setError(result.error.message ?? "Authentication failed. Please try again.")
+      return
+    }
+
+    if (mode === "register") {
+      setStatus("Account created. Check the backend console for your verification link before signing in.")
+      return
+    }
+
+    window.location.href = "/"
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null)
+    await signIn.social({
+      provider: "google",
+      callbackURL: `${window.location.origin}/`,
+    })
+  }
+
   return (
     <div className="grid min-h-svh bg-background lg:grid-cols-[1.05fr_0.95fr]">
       <section className="relative hidden overflow-hidden border-r bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.22),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))] p-8 lg:flex lg:flex-col lg:justify-between">
@@ -79,12 +125,22 @@ export function AuthPage({
             </div>
           </div>
 
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault()
-            }}
-          >
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            {mode === "register" ? (
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Tushar Gaurav"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
+              </div>
+            ) : null}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -92,33 +148,63 @@ export function AuthPage({
                 type="email"
                 autoComplete="email"
                 placeholder="name@company.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link
-                  to="/login"
-                  className="text-xs font-medium text-primary transition-opacity hover:opacity-80"
-                >
-                  Forgot password?
-                </Link>
+                {mode === "login" ? (
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-medium text-primary transition-opacity hover:opacity-80"
+                  >
+                    Forgot password?
+                  </Link>
+                ) : null}
               </div>
               <Input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={8}
+                required
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              {submitLabel}
+            {error ? (
+              <p className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            {status ? (
+              <p className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+                {status}
+              </p>
+            ) : null}
+
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Please wait..." : submitLabel}
             </Button>
           </form>
 
           <div className="space-y-4 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleGoogleSignIn}
+            >
+              Continue with Google
+            </Button>
+
             <p className="text-sm text-muted-foreground">
               {alternatePrompt}{" "}
               <Link
@@ -129,7 +215,7 @@ export function AuthPage({
               </Link>
             </p>
 
-            <Button asChild variant="outline" className="w-full">
+            <Button asChild variant="ghost" className="w-full">
               <Link to="/">Go to dashboard</Link>
             </Button>
           </div>
