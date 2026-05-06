@@ -1,0 +1,52 @@
+# dependencies
+node_modules
+
+# output
+out
+dist
+dist-ssr
+*.tgz
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# code coverage
+coverage
+*.lcov
+
+# service account keys
+service-account.json
+*.key.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+*.local
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.claude

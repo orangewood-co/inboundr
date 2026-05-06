@@ -1,0 +1,22 @@
+{
+  "name": "btsa",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "bun run --cwd backend dev",
+    "dev:frontend": "bun run --cwd frontend dev",
+    "build": "bun run --cwd frontend build",
+    "build:frontend": "bun run --cwd frontend build",
+    "lint": "bun run --cwd frontend lint",
+    "lint:frontend": "bun run --cwd frontend lint",
+    "format": "bun run --cwd frontend format",
+    "format:frontend": "bun run --cwd frontend format",
+    "typecheck": "bun run --cwd backend typecheck && bun run --cwd frontend typecheck",
+    "typecheck:backend": "bun run --cwd backend typecheck",
+    "typecheck:frontend": "bun run --cwd frontend typecheck"
+  }
+}
