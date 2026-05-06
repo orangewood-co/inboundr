@@ -18,7 +18,15 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, SparklesIcon, BadgeCheckIcon, CreditCardIcon, BellIcon, LogOutIcon } from "lucide-react"
+import { signOut } from "@/lib/auth-client"
+import {
+  BadgeCheckIcon,
+  BellIcon,
+  ChevronsUpDownIcon,
+  CreditCardIcon,
+  LogOutIcon,
+  SparklesIcon,
+} from "lucide-react"
 
 export function NavUser({
   user,
@@ -30,6 +38,12 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const fallback = getInitials(user.name || user.email)
+
+  async function handleSignOut() {
+    await signOut()
+    window.location.href = "/login"
+  }
 
   return (
     <SidebarMenu>
@@ -42,7 +56,7 @@ export function NavUser({
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarFallback className="rounded-lg">{fallback}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -61,7 +75,7 @@ export function NavUser({
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{fallback}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
@@ -96,7 +110,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
               <LogOutIcon
               />
               Log out
@@ -106,4 +120,11 @@ export function NavUser({
       </SidebarMenuItem>
     </SidebarMenu>
   )
+}
+
+function getInitials(value: string) {
+  const fallback = value.trim() || "User"
+  const parts = fallback.split(/\s+/).slice(0, 2)
+
+  return parts.map((part) => part[0]?.toUpperCase()).join("") || "U"
 }

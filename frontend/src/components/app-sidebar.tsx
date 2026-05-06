@@ -10,14 +10,10 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useSession } from "@/lib/auth-client"
 import { FileTextIcon, InboxIcon, PackageIcon, Settings2Icon } from "lucide-react"
 
 const data = {
-  user: {
-    name: "Tushar",
-    email: "tushar.g@orangewood.co",
-    avatar: "",
-  },
   navMain: [
     {
       title: "RFQ",
@@ -44,6 +40,13 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession()
+  const user = {
+    name: session?.user.name ?? "BTSA User",
+    email: session?.user.email ?? "Signed in",
+    avatar: session?.user.image ?? "",
+  }
+
   return (
     <Sidebar
       className="h-[calc(100svh)]!"
@@ -62,7 +65,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   )
