@@ -6,6 +6,7 @@ import express, {
 import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import emailRouter from "./routes/email.route";
+import productsRouter from "./routes/products.route";
 import rfqRouter from "./routes/rfq.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
@@ -39,6 +40,7 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 app.use("/api/v1/email", emailRouter);
+app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/rfq", rfqRouter);
 
 app.use((req: Request, res: Response) => {

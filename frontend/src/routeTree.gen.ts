@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProductsRouteImport } from './routes/products'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmailsRouteImport } from './routes/emails'
@@ -30,6 +31,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductsRoute = ProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/emails'
     | '/forgot-password'
     | '/login'
+    | '/products'
     | '/register'
     | '/reset-password'
     | '/settings'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/emails'
     | '/forgot-password'
     | '/login'
+    | '/products'
     | '/register'
     | '/reset-password'
     | '/settings'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/emails'
     | '/forgot-password'
     | '/login'
+    | '/products'
     | '/register'
     | '/reset-password'
     | '/settings'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ProductsRoute: typeof ProductsRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products': {
+      id: '/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof ProductsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ProductsRoute: ProductsRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
