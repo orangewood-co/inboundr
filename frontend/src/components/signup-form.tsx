@@ -69,13 +69,12 @@ export function SignupForm({
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
+  const [isAwaitingVerification, setIsAwaitingVerification] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
-    setStatus(null)
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.")
@@ -96,9 +95,7 @@ export function SignupForm({
       return
     }
 
-    setStatus(
-      "Account created. Check the backend console for your verification link before signing in.",
-    )
+    setIsAwaitingVerification(true)
   }
 
   async function handleGoogleSignIn() {
@@ -107,6 +104,40 @@ export function SignupForm({
       provider: "google",
       callbackURL: `${window.location.origin}/`,
     })
+  }
+
+  if (isAwaitingVerification) {
+    return (
+      <div className={cn("flex flex-col gap-6 text-center", className)}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <svg
+              aria-hidden="true"
+              className="size-6"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+              <rect width="20" height="16" x="2" y="4" rx="2" />
+            </svg>
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">Check your mail</h1>
+            <p className="text-sm text-balance text-muted-foreground">
+              We sent a verification link to {email}. Open it to activate your
+              account before signing in.
+            </p>
+          </div>
+        </div>
+        <Button asChild variant="outline">
+          <Link to="/login">Back to sign in</Link>
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -179,11 +210,6 @@ export function SignupForm({
         {error ? (
           <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
-          </p>
-        ) : null}
-        {status ? (
-          <p className="rounded-lg border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
-            {status}
           </p>
         ) : null}
         <Field>
