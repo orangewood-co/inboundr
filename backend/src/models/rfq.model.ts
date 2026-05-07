@@ -36,6 +36,8 @@ export interface IRFQSearchResult {
 }
 
 export interface IRFQ extends Document {
+  userId: string;
+  gmailAccountId: Types.ObjectId;
   emailId: Types.ObjectId;
   isRFQ: boolean;
   reason: string;
@@ -85,6 +87,13 @@ const rfqSearchResultSchema = new Schema<IRFQSearchResult>(
 
 const rfqSchema = new Schema<IRFQ>(
   {
+    userId: { type: String, required: true, index: true },
+    gmailAccountId: {
+      type: Schema.Types.ObjectId,
+      ref: "GmailAccount",
+      required: true,
+      index: true,
+    },
     emailId: {
       type: Schema.Types.ObjectId,
       ref: "Email",
@@ -119,6 +128,6 @@ const rfqSchema = new Schema<IRFQ>(
   { timestamps: true }
 );
 
-rfqSchema.index({ isRFQ: 1, createdAt: -1 });
+rfqSchema.index({ userId: 1, isRFQ: 1, createdAt: -1 });
 
 export const RFQ = mongoose.model<IRFQ>("RFQ", rfqSchema);

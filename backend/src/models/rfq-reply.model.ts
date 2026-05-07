@@ -13,12 +13,18 @@ export interface IRFQReplyProduct {
 }
 
 export interface IRFQReply extends Document {
+  userId: string;
+  gmailAccountId: Types.ObjectId;
   rfqId: Types.ObjectId;
   selectedProducts: IRFQReplyProduct[];
   subject: string;
   body: string;
   to: string;
   generatedAt: Date;
+  sendStatus: "draft" | "sending" | "sent" | "failed";
+  sentAt: Date | null;
+  gmailMessageId: string | null;
+  sendErrorMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +46,13 @@ const rfqReplyProductSchema = new Schema<IRFQReplyProduct>(
 
 const rfqReplySchema = new Schema<IRFQReply>(
   {
+    userId: { type: String, required: true, index: true },
+    gmailAccountId: {
+      type: Schema.Types.ObjectId,
+      ref: "GmailAccount",
+      required: true,
+      index: true,
+    },
     rfqId: {
       type: Schema.Types.ObjectId,
       ref: "RFQ",
@@ -51,6 +64,15 @@ const rfqReplySchema = new Schema<IRFQReply>(
     body: { type: String, required: true },
     to: { type: String, required: true },
     generatedAt: { type: Date, required: true },
+    sendStatus: {
+      type: String,
+      enum: ["draft", "sending", "sent", "failed"],
+      default: "draft",
+      index: true,
+    },
+    sentAt: { type: Date, default: null },
+    gmailMessageId: { type: String, default: null },
+    sendErrorMessage: { type: String, default: null },
   },
   { timestamps: true }
 );

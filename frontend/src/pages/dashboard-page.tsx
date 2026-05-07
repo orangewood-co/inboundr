@@ -29,7 +29,8 @@ import {
   SendIcon,
 } from "lucide-react"
 
-const API_BASE = "http://localhost:3000/api/v1/rfq"
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+const API_BASE = `${API_ORIGIN}/api/v1/rfq`
 
 interface RFQEmail {
   _id: string
@@ -111,6 +112,10 @@ interface RFQReply {
   body: string
   to: string
   generatedAt: string
+  sendStatus: "draft" | "sending" | "sent" | "failed"
+  sentAt: string | null
+  gmailMessageId: string | null
+  sendErrorMessage: string | null
 }
 
 function parseSender(from: string): { name: string; email: string } {
@@ -278,13 +283,16 @@ export function DashboardPage() {
   // Product selection: searchResultIndex -> matchIndex
   const [selectedProducts, setSelectedProducts] = useState<Record<number, number>>({})
   const [generating, setGenerating] = useState(false)
+  const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
 
   const fetchList = useCallback(async (p: number) => {
     setListLoading(true)
     setListError(null)
     try {
-      const res = await fetch(`${API_BASE}?page=${p}&limit=20`)
+      const res = await fetch(`${API_BASE}?page=${p}&limit=20`, {
+        credentials: "include",
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: ListResponse = await res.json()
       setRfqs(data.rfqs)
@@ -301,7 +309,7 @@ export function DashboardPage() {
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/${id}`)
+      const res = await fetch(`${API_BASE}/${id}`, { credentials: "include" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: RFQSummary = await res.json()
       setDetail(data)
@@ -318,7 +326,9 @@ export function DashboardPage() {
 
   const fetchReply = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/${id}/reply`)
+      const res = await fetch(`${API_BASE}/${id}/reply`, {
+        credentials: "include",
+      })
       if (res.ok) {
         const data: RFQReply = await res.json()
         setReply(data)
@@ -347,7 +357,10 @@ export function DashboardPage() {
   const handleRetry = async (id: string) => {
     setRetrying(true)
     try {
-      const res = await fetch(`${API_BASE}/${id}/retry`, { method: "POST" })
+      const res = await fetch(`${API_BASE}/${id}/retry`, {
+        method: "POST",
+        credentials: "include",
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setTimeout(async () => {
         await fetchList(page)
@@ -383,6 +396,7 @@ export function DashboardPage() {
       }))
       const res = await fetch(`${API_BASE}/${detail._id}/generate-quote`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ selectedProducts: selections }),
       })
@@ -396,6 +410,27 @@ export function DashboardPage() {
       console.error("Failed to generate quote:", err)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleSendQuote = async () => {
+    if (!detail || !reply) return
+    setSendingQuote(true)
+    try {
+      const res = await fetch(`${API_BASE}/${detail._id}/send-quote`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        if (data?.reply) setReply(data.reply)
+        throw new Error(data?.error || `HTTP ${res.status}`)
+      }
+      setReply(data)
+    } catch (err) {
+      console.error("Failed to send quote:", err)
+    } finally {
+      setSendingQuote(false)
     }
   }
 
@@ -808,8 +843,14 @@ export function DashboardPage() {
                     <div className="mb-3 flex items-center gap-2">
                       <SendIcon className="size-4 text-muted-foreground" />
                       <h2 className="text-sm font-semibold">Generated Quote</h2>
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                        Draft
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        reply.sendStatus === "sent"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : reply.sendStatus === "failed"
+                            ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        {reply.sendStatus}
                       </span>
                     </div>
                     <div className="rounded-lg border bg-muted/10">
@@ -825,6 +866,7 @@ export function DashboardPage() {
                         </div>
                         <div className="text-[11px] text-muted-foreground">
                           Generated {formatFullDate(reply.generatedAt)}
+                          {reply.sentAt && ` · Sent ${formatFullDate(reply.sentAt)}`}
                         </div>
                       </div>
                       {/* Email body */}
@@ -833,6 +875,32 @@ export function DashboardPage() {
                           {reply.body}
                         </pre>
                       </div>
+                    </div>
+                    {reply.sendErrorMessage && (
+                      <p className="mt-2 text-xs text-destructive">
+                        {reply.sendErrorMessage}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center gap-3">
+                      <Button
+                        onClick={handleSendQuote}
+                        disabled={sendingQuote || reply.sendStatus === "sent"}
+                        className="gap-2"
+                      >
+                        {sendingQuote || reply.sendStatus === "sending" ? (
+                          <LoaderIcon className="size-4 animate-spin" />
+                        ) : (
+                          <SendIcon className="size-4" />
+                        )}
+                        {reply.sendStatus === "sent"
+                          ? "Quote Sent"
+                          : sendingQuote || reply.sendStatus === "sending"
+                            ? "Sending..."
+                            : "Send Quote"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Sends from the connected Gmail account on the original thread.
+                      </p>
                     </div>
                   </div>
                 )}

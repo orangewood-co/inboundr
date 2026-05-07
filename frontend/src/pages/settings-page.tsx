@@ -1,4 +1,4 @@
-import { type CSSProperties } from "react"
+import { type CSSProperties, useCallback, useEffect, useState } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
@@ -21,6 +21,8 @@ import {
   UserIcon,
   UsersIcon,
 } from "lucide-react"
+
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
 // ─── Mock Data ───────────────────────────────────────────────
 
@@ -47,6 +49,17 @@ const MOCK_SESSIONS = [
   { device: "Safari on iPhone", location: "Mumbai, IN", lastActive: "2 hours ago", current: false },
   { device: "Firefox on macOS", location: "Bangalore, IN", lastActive: "3 days ago", current: false },
 ]
+
+interface GmailAccount {
+  _id: string
+  emailAddress: string
+  scope: string[]
+  watchExpiration: string | null
+  status: "connected" | "expired" | "revoked" | "error"
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 // ─── Sub-components ──────────────────────────────────────────
 
@@ -225,12 +238,150 @@ function ProfileTab() {
 }
 
 function AccountTab() {
+  const [accounts, setAccounts] = useState<GmailAccount[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(true)
+  const [connecting, setConnecting] = useState(false)
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
+  const [gmailError, setGmailError] = useState<string | null>(null)
+
+  const fetchGmailAccounts = useCallback(async () => {
+    setLoadingAccounts(true)
+    setGmailError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/gmail/accounts`, {
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data: { accounts: GmailAccount[] } = await res.json()
+      setAccounts(data.accounts)
+    } catch (err: any) {
+      setGmailError(err.message || "Failed to load Gmail accounts")
+    } finally {
+      setLoadingAccounts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchGmailAccounts()
+  }, [fetchGmailAccounts])
+
+  const handleConnectGmail = async () => {
+    setConnecting(true)
+    setGmailError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/gmail/connect`, {
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data: { url: string } = await res.json()
+      window.location.href = data.url
+    } catch (err: any) {
+      setGmailError(err.message || "Failed to start Gmail connection")
+      setConnecting(false)
+    }
+  }
+
+  const handleDisconnectGmail = async (id: string) => {
+    setDisconnectingId(id)
+    setGmailError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/gmail/accounts/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await fetchGmailAccounts()
+    } catch (err: any) {
+      setGmailError(err.message || "Failed to disconnect Gmail")
+    } finally {
+      setDisconnectingId(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Account"
         description="Manage your account security and preferences."
       />
+
+      <SettingsCard
+        title="Connected Gmail"
+        description="Authorize Gmail inboxes for RFQ processing and quote replies."
+        action={
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={handleConnectGmail}
+            disabled={connecting}
+          >
+            <MailIcon className="size-4" />
+            {connecting ? "Connecting..." : "Connect Gmail"}
+          </Button>
+        }
+      >
+        <div className="divide-y">
+          {gmailError && (
+            <div className="px-5 py-3 text-sm text-destructive">{gmailError}</div>
+          )}
+          {loadingAccounts ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">
+              Loading Gmail accounts...
+            </div>
+          ) : accounts.length === 0 ? (
+            <div className="flex items-center gap-3 px-5 py-5">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                <MailIcon className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">No Gmail account connected</p>
+                <p className="text-xs text-muted-foreground">
+                  Connect Gmail to process incoming RFQs and send quotes on the same thread.
+                </p>
+              </div>
+            </div>
+          ) : (
+            accounts.map((account) => (
+              <div key={account._id} className="flex items-center justify-between px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                    <MailIcon className="size-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{account.emailAddress}</p>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        account.status === "connected"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        {account.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {account.watchExpiration
+                        ? `Watch renews before ${new Date(account.watchExpiration).toLocaleDateString()}`
+                        : "Watch will start after Google authorization completes"}
+                    </p>
+                    {account.errorMessage && (
+                      <p className="text-xs text-destructive">{account.errorMessage}</p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => handleDisconnectGmail(account._id)}
+                  disabled={disconnectingId === account._id}
+                >
+                  {disconnectingId === account._id ? "Disconnecting..." : "Disconnect"}
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </SettingsCard>
 
       <SettingsCard title="Change Password" description="Update your password to keep your account secure.">
         <div className="space-y-4 p-5">

@@ -1,21 +1,22 @@
 import type { gmail_v1 } from "googleapis";
-import { getGmailClient } from "../config/gmail.config";
+import { getGmailClientForAccount } from "../config/gmail.config";
 import { Email } from "../models/email.model";
-import {
-  getStoredHistoryId,
-  updateStoredHistoryId,
-} from "./gmail-watcher.service";
 import type { ParsedEmail, EmailAttachment } from "../types/email.types";
 import { processEmailForRFQ } from "./rfq.service";
+import {
+  GmailAccount,
+  type IGmailAccount,
+} from "../models/gmail-account.model";
 
 export async function processHistoryUpdate(
+  account: IGmailAccount,
   newHistoryId: string
 ): Promise<void> {
-  const storedHistoryId = await getStoredHistoryId();
+  const storedHistoryId = account.historyId;
 
   if (!storedHistoryId) {
-    console.warn("No stored historyId found, skipping history update");
-    await updateStoredHistoryId(newHistoryId);
+    console.warn(`No stored historyId found for ${account.emailAddress}`);
+    await GmailAccount.updateOne({ _id: account._id }, { historyId: newHistoryId });
     return;
   }
 
@@ -24,7 +25,7 @@ export async function processHistoryUpdate(
     return;
   }
 
-  const gmail = getGmailClient();
+  const gmail = await getGmailClientForAccount(account);
 
   try {
     const res = await gmail.users.history.list({
@@ -46,23 +47,31 @@ export async function processHistoryUpdate(
     }
 
     for (const messageId of messageIds) {
-      const exists = await Email.exists({ messageId }).lean();
+      const exists = await Email.exists({
+        gmailAccountId: account._id,
+        messageId,
+      }).lean();
       if (exists) continue;
 
       try {
-        const parsed = await getEmailById(messageId);
-        const saved = await saveEmail(parsed);
+        const parsed = await getEmailById(account, messageId);
+        const saved = await saveEmail(account, parsed);
         console.log(`Saved email: ${parsed.subject} from ${parsed.from}`);
 
         if (saved) {
-          const emailDoc = await Email.findOne({ messageId }).lean();
+          const emailDoc = await Email.findOne({
+            gmailAccountId: account._id,
+            messageId,
+          }).lean();
           const rawBody = emailDoc?.bodyText || emailDoc?.bodyHtml;
           if (emailDoc && rawBody) {
             const body = `SENT FROM: ${emailDoc.from}, SENT TO: ${emailDoc.to}, DATE: ${emailDoc.date}\n${rawBody}`;
             processEmailForRFQ(
               emailDoc._id.toString(),
               body,
-              messageId
+              messageId,
+              account.userId,
+              account._id.toString()
             ).catch((err) =>
               console.error(`RFQ processing failed for ${messageId}:`, err)
             );
@@ -77,17 +86,20 @@ export async function processHistoryUpdate(
       console.warn(
         "History ID too old, fetching recent messages instead"
       );
-      await fetchRecentMessages();
+      await fetchRecentMessages(account);
     } else {
       throw err;
     }
   }
 
-  await updateStoredHistoryId(newHistoryId);
+  await GmailAccount.updateOne({ _id: account._id }, { historyId: newHistoryId });
 }
 
-export async function getEmailById(messageId: string): Promise<ParsedEmail> {
-  const gmail = getGmailClient();
+export async function getEmailById(
+  account: IGmailAccount,
+  messageId: string
+): Promise<ParsedEmail> {
+  const gmail = await getGmailClientForAccount(account);
 
   const res = await gmail.users.messages.get({
     userId: "me",
@@ -110,6 +122,9 @@ export async function getEmailById(messageId: string): Promise<ParsedEmail> {
     messageId: message.id!,
     threadId: message.threadId!,
     historyId: message.historyId!,
+    rfcMessageId: getHeader("Message-ID") || null,
+    references: getHeader("References") || null,
+    inReplyTo: getHeader("In-Reply-To") || null,
     from: getHeader("From"),
     to: getHeader("To"),
     cc: getHeader("Cc") || null,
@@ -172,10 +187,11 @@ function parseMessagePayload(
 }
 
 export async function getAttachment(
+  account: IGmailAccount,
   messageId: string,
   attachmentId: string
 ): Promise<Buffer> {
-  const gmail = getGmailClient();
+  const gmail = await getGmailClientForAccount(account);
 
   const res = await gmail.users.messages.attachments.get({
     userId: "me",
@@ -186,9 +202,14 @@ export async function getAttachment(
   return Buffer.from(res.data.data!, "base64url");
 }
 
-export async function saveEmail(parsed: ParsedEmail): Promise<boolean> {
+export async function saveEmail(
+  account: IGmailAccount,
+  parsed: ParsedEmail
+): Promise<boolean> {
   try {
     await Email.create({
+      userId: account.userId,
+      gmailAccountId: account._id,
       ...parsed,
       date: new Date(parsed.date),
       status: "received",
@@ -206,17 +227,21 @@ export async function saveEmail(parsed: ParsedEmail): Promise<boolean> {
 export async function updateEmailStatus(
   messageId: string,
   status: "processing" | "processed" | "failed",
-  errorMessage?: string
+  errorMessage?: string,
+  gmailAccountId?: string
 ): Promise<void> {
   const update: Record<string, any> = { status };
   if (status === "processed") update.processedAt = new Date();
   if (errorMessage) update.errorMessage = errorMessage;
 
-  await Email.updateOne({ messageId }, { $set: update });
+  await Email.updateOne(
+    gmailAccountId ? { messageId, gmailAccountId } : { messageId },
+    { $set: update }
+  );
 }
 
-async function fetchRecentMessages(): Promise<void> {
-  const gmail = getGmailClient();
+async function fetchRecentMessages(account: IGmailAccount): Promise<void> {
+  const gmail = await getGmailClientForAccount(account);
 
   const res = await gmail.users.messages.list({
     userId: "me",
@@ -226,13 +251,35 @@ async function fetchRecentMessages(): Promise<void> {
 
   for (const msg of res.data.messages ?? []) {
     if (!msg.id) continue;
-    const exists = await Email.exists({ messageId: msg.id }).lean();
+    const exists = await Email.exists({
+      gmailAccountId: account._id,
+      messageId: msg.id,
+    }).lean();
     if (exists) continue;
 
     try {
-      const parsed = await getEmailById(msg.id);
-      await saveEmail(parsed);
+      const parsed = await getEmailById(account, msg.id);
+      const saved = await saveEmail(account, parsed);
       console.log(`Saved recent email: ${parsed.subject} from ${parsed.from}`);
+      if (saved) {
+        const emailDoc = await Email.findOne({
+          gmailAccountId: account._id,
+          messageId: msg.id,
+        }).lean();
+        const rawBody = emailDoc?.bodyText || emailDoc?.bodyHtml;
+        if (emailDoc && rawBody) {
+          const body = `SENT FROM: ${emailDoc.from}, SENT TO: ${emailDoc.to}, DATE: ${emailDoc.date}\n${rawBody}`;
+          processEmailForRFQ(
+            emailDoc._id.toString(),
+            body,
+            msg.id,
+            account.userId,
+            account._id.toString()
+          ).catch((err) =>
+            console.error(`RFQ processing failed for ${msg.id}:`, err)
+          );
+        }
+      }
     } catch (err) {
       console.error(`Failed to fetch message ${msg.id}:`, err);
     }

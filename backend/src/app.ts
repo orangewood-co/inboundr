@@ -8,10 +8,11 @@ import { toNodeHandler } from "better-auth/node";
 import emailRouter from "./routes/email.route";
 import productsRouter from "./routes/products.route";
 import rfqRouter from "./routes/rfq.route";
+import gmailRouter from "./routes/gmail.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
-  startWatch,
+  startWatchesForConnectedAccounts,
   scheduleWatchRenewal,
   stopWatchRenewal,
 } from "./services/gmail-watcher.service";
@@ -40,6 +41,7 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 app.use("/api/v1/email", emailRouter);
+app.use("/api/v1/gmail", gmailRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/rfq", rfqRouter);
 
@@ -51,7 +53,7 @@ export async function initializeServices(): Promise<void> {
   await connectDB();
 
   try {
-    await startWatch();
+    await startWatchesForConnectedAccounts();
     scheduleWatchRenewal();
     console.log("Gmail watcher initialized");
   } catch (err) {

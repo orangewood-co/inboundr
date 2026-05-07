@@ -19,7 +19,8 @@ import {
   LoaderIcon,
 } from "lucide-react"
 
-const API_BASE = "http://localhost:3000/api/v1/email"
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+const API_BASE = `${API_ORIGIN}/api/v1/email`
 
 interface EmailSummary {
   _id: string
@@ -188,7 +189,9 @@ export function EmailsPage() {
     setListLoading(true)
     setListError(null)
     try {
-      const res = await fetch(`${API_BASE}?page=${p}&limit=20`)
+      const res = await fetch(`${API_BASE}?page=${p}&limit=20`, {
+        credentials: "include",
+      })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: ListResponse = await res.json()
       setEmails(data.emails)
@@ -205,7 +208,7 @@ export function EmailsPage() {
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/${id}`)
+      const res = await fetch(`${API_BASE}/${id}`, { credentials: "include" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: EmailDetail = await res.json()
       setDetail(data)

@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { processHistoryUpdate } from "../services/email.service";
 import { Email } from "../models/email.model";
+import { GmailAccount } from "../models/gmail-account.model";
+import type { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export const emailWebhookController = async (
   req: Request,
@@ -30,7 +32,22 @@ export const emailWebhookController = async (
       `Gmail Notification: ${emailAddress}, historyId: ${historyId}`
     );
 
-    await processHistoryUpdate(historyId);
+    if (!emailAddress) {
+      console.warn("Webhook message missing emailAddress");
+      return;
+    }
+
+    const account = await GmailAccount.findOne({
+      emailAddress: String(emailAddress).toLowerCase(),
+      status: "connected",
+    });
+
+    if (!account) {
+      console.warn(`No connected Gmail account found for ${emailAddress}`);
+      return;
+    }
+
+    await processHistoryUpdate(account, historyId);
   } catch (err) {
     console.error("Error processing Gmail webhook:", err);
   }
@@ -41,18 +58,20 @@ export const listEmails = async (
   res: Response
 ): Promise<void> => {
   try {
+    const authReq = req as AuthenticatedRequest;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
     const [emails, total] = await Promise.all([
       Email.find()
+        .where({ userId: authReq.user.id })
         .select("-bodyText -bodyHtml")
         .sort({ date: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Email.countDocuments(),
+      Email.countDocuments({ userId: authReq.user.id }),
     ]);
 
     res.json({ emails, total, page, limit, totalPages: Math.ceil(total / limit) });
@@ -67,7 +86,11 @@ export const getEmail = async (
   res: Response
 ): Promise<void> => {
   try {
-    const email = await Email.findById(req.params.id).lean();
+    const authReq = req as AuthenticatedRequest;
+    const email = await Email.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+    }).lean();
     if (!email) {
       res.status(404).json({ error: "Email not found" });
       return;

@@ -1,20 +1,19 @@
-import { getGmailClient } from "../config/gmail.config";
-import { GmailSyncState } from "../models/email.model";
+import { getGmailClientForAccount } from "../config/gmail.config";
+import {
+  GmailAccount,
+  type IGmailAccount,
+} from "../models/gmail-account.model";
 
 const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
 
 let renewalInterval: ReturnType<typeof setInterval> | null = null;
 
-export async function startWatch(): Promise<void> {
-  const gmail = getGmailClient();
+export async function startWatch(account: IGmailAccount): Promise<void> {
+  const gmail = await getGmailClientForAccount(account);
   const topic = process.env.GMAIL_PUBSUB_TOPIC;
-  const emailAddress = process.env.GMAIL_USER_EMAIL;
 
   if (!topic) {
     throw new Error("GMAIL_PUBSUB_TOPIC environment variable is not set");
-  }
-  if (!emailAddress) {
-    throw new Error("GMAIL_USER_EMAIL environment variable is not set");
   }
 
   const res = await gmail.users.watch({
@@ -32,18 +31,40 @@ export async function startWatch(): Promise<void> {
     throw new Error("Gmail watch response missing historyId");
   }
 
-  await GmailSyncState.findOneAndUpdate(
-    { emailAddress },
+  await GmailAccount.updateOne(
+    { _id: account._id },
     {
       historyId,
       watchExpiration: expiration ? new Date(Number(expiration)) : null,
+      status: "connected",
+      errorMessage: null,
     },
-    { upsert: true }
   );
 
   console.log(
-    `Gmail watch registered for ${emailAddress}, historyId: ${historyId}, expires: ${expiration}`
+    `Gmail watch registered for ${account.emailAddress}, historyId: ${historyId}, expires: ${expiration}`
   );
+}
+
+export async function startWatchForAccountId(accountId: string): Promise<void> {
+  const account = await GmailAccount.findById(accountId);
+  if (!account) throw new Error("Gmail account not found");
+  await startWatch(account);
+}
+
+export async function startWatchesForConnectedAccounts(): Promise<void> {
+  const accounts = await GmailAccount.find({ status: "connected" });
+  for (const account of accounts) {
+    try {
+      await startWatch(account);
+    } catch (err: any) {
+      console.error(`Failed to start Gmail watch for ${account.emailAddress}:`, err);
+      await GmailAccount.updateOne(
+        { _id: account._id },
+        { status: "error", errorMessage: err.message || "Failed to start watch" }
+      );
+    }
+  }
 }
 
 export function scheduleWatchRenewal(): void {
@@ -53,10 +74,10 @@ export function scheduleWatchRenewal(): void {
 
   renewalInterval = setInterval(async () => {
     try {
-      console.log("Renewing Gmail watch...");
-      await startWatch();
+      console.log("Renewing Gmail watches...");
+      await startWatchesForConnectedAccounts();
     } catch (err) {
-      console.error("Failed to renew Gmail watch:", err);
+      console.error("Failed to renew Gmail watches:", err);
     }
   }, SIX_DAYS_MS);
 }
@@ -68,17 +89,3 @@ export function stopWatchRenewal(): void {
   }
 }
 
-export async function getStoredHistoryId(): Promise<string | null> {
-  const emailAddress = process.env.GMAIL_USER_EMAIL;
-  const state = await GmailSyncState.findOne({ emailAddress }).lean();
-  return state?.historyId ?? null;
-}
-
-export async function updateStoredHistoryId(historyId: string): Promise<void> {
-  const emailAddress = process.env.GMAIL_USER_EMAIL;
-  await GmailSyncState.findOneAndUpdate(
-    { emailAddress },
-    { historyId },
-    { upsert: true }
-  );
-}

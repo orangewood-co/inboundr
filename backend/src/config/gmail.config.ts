@@ -1,33 +1,101 @@
-import fs from "fs";
-import path from "path";
 import { google, type gmail_v1 } from "googleapis";
-import { JWT } from "google-auth-library";
+import type { OAuth2Client } from "google-auth-library";
+import { GmailAccount, type IGmailAccount } from "../models/gmail-account.model";
+import { decryptSecret, encryptSecret } from "../lib/crypto";
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+export const GMAIL_SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+];
 
-let gmailClient: gmail_v1.Gmail | null = null;
+export function getGoogleOAuthClient(): OAuth2Client {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri =
+    process.env.GMAIL_OAUTH_REDIRECT_URI ||
+    `${process.env.API_ORIGIN ?? "http://localhost:3000"}/api/v1/gmail/callback`;
 
-export function getGmailClient(): gmail_v1.Gmail {
-  if (gmailClient) return gmailClient;
-
-  const keyFilePath =
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.resolve(process.cwd(), "service-account.json");
-  const userEmail = process.env.GMAIL_USER_EMAIL;
-
-  if (!userEmail) {
-    throw new Error("GMAIL_USER_EMAIL environment variable is not set");
+  if (!clientId || !clientSecret) {
+    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
   }
 
-  const keyFileContent = JSON.parse(fs.readFileSync(keyFilePath, "utf-8"));
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+}
 
-  const auth = new JWT({
-    email: keyFileContent.client_email,
-    key: keyFileContent.private_key,
-    scopes: SCOPES,
-    subject: userEmail,
+export function getGmailAuthUrl(state: string): string {
+  return getGoogleOAuthClient().generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: GMAIL_SCOPES,
+    state,
+  });
+}
+
+export async function getGmailClientForAccount(
+  account: IGmailAccount
+): Promise<gmail_v1.Gmail> {
+  const oauth = getGoogleOAuthClient();
+  oauth.setCredentials({
+    access_token: account.accessToken
+      ? decryptSecret(account.accessToken)
+      : undefined,
+    refresh_token: decryptSecret(account.refreshToken),
+    expiry_date: account.tokenExpiry?.getTime(),
   });
 
-  gmailClient = google.gmail({ version: "v1", auth });
-  return gmailClient;
+  oauth.on("tokens", async (tokens) => {
+    const update: Record<string, unknown> = {};
+    if (tokens.access_token) update.accessToken = encryptSecret(tokens.access_token);
+    if (tokens.refresh_token) update.refreshToken = encryptSecret(tokens.refresh_token);
+    if (tokens.expiry_date) update.tokenExpiry = new Date(tokens.expiry_date);
+
+    if (Object.keys(update).length > 0) {
+      await GmailAccount.updateOne({ _id: account._id }, { $set: update });
+    }
+  });
+
+  return google.gmail({ version: "v1", auth: oauth });
+}
+
+export async function exchangeGmailCode(code: string): Promise<{
+  accessToken: string | null;
+  refreshToken: string;
+  scope: string[];
+  tokenExpiry: Date | null;
+}> {
+  const oauth = getGoogleOAuthClient();
+  const { tokens } = await oauth.getToken(code);
+
+  if (!tokens.refresh_token) {
+    throw new Error(
+      "Google did not return a refresh token. Disconnect the app in Google Account permissions and try again."
+    );
+  }
+
+  return {
+    accessToken: tokens.access_token ? encryptSecret(tokens.access_token) : null,
+    refreshToken: encryptSecret(tokens.refresh_token),
+    scope: tokens.scope?.split(" ").filter(Boolean) ?? GMAIL_SCOPES,
+    tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+  };
+}
+
+export async function getGmailProfileEmail(tokens: {
+  accessToken: string | null;
+  refreshToken: string;
+  tokenExpiry: Date | null;
+}): Promise<string> {
+  const oauth = getGoogleOAuthClient();
+  oauth.setCredentials({
+    access_token: tokens.accessToken ? decryptSecret(tokens.accessToken) : undefined,
+    refresh_token: decryptSecret(tokens.refreshToken),
+    expiry_date: tokens.tokenExpiry?.getTime(),
+  });
+
+  const gmail = google.gmail({ version: "v1", auth: oauth });
+  const profile = await gmail.users.getProfile({ userId: "me" });
+  if (!profile.data.emailAddress) {
+    throw new Error("Could not read Gmail profile email address");
+  }
+  return profile.data.emailAddress;
 }

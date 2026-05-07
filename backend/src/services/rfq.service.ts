@@ -6,14 +6,18 @@ import { generateRFQ } from "../agents/generate_rfq";
 export async function processEmailForRFQ(
   emailId: string,
   emailBody: string,
-  messageId: string
+  messageId: string,
+  userId: string,
+  gmailAccountId: string
 ): Promise<void> {
-  await updateEmailStatus(messageId, "processing");
+  await updateEmailStatus(messageId, "processing", undefined, gmailAccountId);
 
   try {
     const { isRFQemail, reason } = await classifyEmail(emailBody);
 
     const rfqDoc = await RFQ.create({
+      userId,
+      gmailAccountId,
       emailId,
       isRFQ: isRFQemail,
       reason,
@@ -21,7 +25,7 @@ export async function processEmailForRFQ(
     });
 
     if (!isRFQemail) {
-      await updateEmailStatus(messageId, "processed");
+      await updateEmailStatus(messageId, "processed", undefined, gmailAccountId);
       console.log(`Email ${messageId} classified as non-RFQ: ${reason}`);
       return;
     }
@@ -43,7 +47,7 @@ export async function processEmailForRFQ(
       }
     );
 
-    await updateEmailStatus(messageId, "processed");
+    await updateEmailStatus(messageId, "processed", undefined, gmailAccountId);
     console.log(
       `RFQ processed for email ${messageId}: ${queryProducts.length} products found`
     );
@@ -60,6 +64,6 @@ export async function processEmailForRFQ(
       }
     );
 
-    await updateEmailStatus(messageId, "failed", err.message);
+    await updateEmailStatus(messageId, "failed", err.message, gmailAccountId);
   }
 }
