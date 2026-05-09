@@ -8,6 +8,15 @@ import type { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { GmailAccount } from "../models/gmail-account.model";
 import { sendQuoteOnGmailThread } from "../services/gmail-send.service";
 
+function extractEmailAddress(value: string | null | undefined): string {
+  if (!value) return "";
+
+  const angleMatch = value.match(/<([^>]+)>/);
+  const email = angleMatch?.[1] ?? value;
+
+  return email.trim().replace(/^mailto:/i, "");
+}
+
 export const listRFQs = async (
   req: Request,
   res: Response
@@ -151,7 +160,8 @@ export const generateQuote = async (
     });
 
     const email = rfq.emailId as any;
-    const customerEmail = rfq.customer.email || email?.from || "";
+    const originalSenderEmail = extractEmailAddress(email?.from);
+    const customerEmail = rfq.customer.email || originalSenderEmail;
 
     const { subject, body } = await generateQuoteReply({
       customerName: rfq.customer.name,
@@ -180,7 +190,7 @@ export const generateQuote = async (
         selectedProducts: products,
         subject,
         body,
-        to: customerEmail,
+        to: originalSenderEmail,
         generatedAt: new Date(),
         sendStatus: "draft",
         sentAt: null,

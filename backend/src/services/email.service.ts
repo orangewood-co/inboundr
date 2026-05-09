@@ -8,6 +8,26 @@ import {
   type IGmailAccount,
 } from "../models/gmail-account.model";
 
+function extractEmailAddress(value: string | null | undefined): string {
+  if (!value) return "";
+
+  const angleMatch = value.match(/<([^>]+)>/);
+  const email = angleMatch?.[1] ?? value;
+
+  return email.trim().replace(/^mailto:/i, "").toLowerCase();
+}
+
+function isSelfSentEmail(
+  account: IGmailAccount,
+  parsed: Pick<ParsedEmail, "from" | "labels">
+): boolean {
+  const fromAddress = extractEmailAddress(parsed.from);
+  const accountAddress = account.emailAddress.toLowerCase();
+  const labels = new Set(parsed.labels);
+
+  return fromAddress === accountAddress || (labels.has("SENT") && !labels.has("INBOX"));
+}
+
 export async function processHistoryUpdate(
   account: IGmailAccount,
   newHistoryId: string
@@ -55,6 +75,13 @@ export async function processHistoryUpdate(
 
       try {
         const parsed = await getEmailById(account, messageId);
+        if (isSelfSentEmail(account, parsed)) {
+          console.log(
+            `Skipping self-sent Gmail message ${messageId} from ${parsed.from}`
+          );
+          continue;
+        }
+
         const saved = await saveEmail(account, parsed);
         console.log(`Saved email: ${parsed.subject} from ${parsed.from}`);
 
@@ -259,6 +286,13 @@ async function fetchRecentMessages(account: IGmailAccount): Promise<void> {
 
     try {
       const parsed = await getEmailById(account, msg.id);
+      if (isSelfSentEmail(account, parsed)) {
+        console.log(
+          `Skipping self-sent recent Gmail message ${msg.id} from ${parsed.from}`
+        );
+        continue;
+      }
+
       const saved = await saveEmail(account, parsed);
       console.log(`Saved recent email: ${parsed.subject} from ${parsed.from}`);
       if (saved) {
