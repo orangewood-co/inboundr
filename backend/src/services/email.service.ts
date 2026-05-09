@@ -141,7 +141,9 @@ export async function getEmailById(
     headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ??
     "";
 
-  const { bodyText, bodyHtml, attachments } = parseMessagePayload(
+  const { bodyText, bodyHtml, attachments } = await parseMessagePayload(
+    gmail,
+    message.id!,
     message.payload
   );
 
@@ -172,16 +174,40 @@ interface PayloadParseResult {
   attachments: EmailAttachment[];
 }
 
-function parseMessagePayload(
+async function parseMessagePayload(
+  gmail: gmail_v1.Gmail,
+  messageId: string,
   payload: gmail_v1.Schema$MessagePart | undefined
-): PayloadParseResult {
-  let bodyText: string | null = null;
-  let bodyHtml: string | null = null;
+): Promise<PayloadParseResult> {
+  const textCandidates: string[] = [];
+  const htmlCandidates: string[] = [];
   const attachments: EmailAttachment[] = [];
 
-  if (!payload) return { bodyText, bodyHtml, attachments };
+  if (!payload) {
+    return { bodyText: null, bodyHtml: null, attachments };
+  }
 
-  function walk(part: gmail_v1.Schema$MessagePart): void {
+  async function readPartBody(
+    part: gmail_v1.Schema$MessagePart
+  ): Promise<string | null> {
+    if (part.body?.data) {
+      return Buffer.from(part.body.data, "base64url").toString("utf-8");
+    }
+
+    if (!part.body?.attachmentId) return null;
+
+    const res = await gmail.users.messages.attachments.get({
+      userId: "me",
+      messageId,
+      id: part.body.attachmentId,
+    });
+
+    return res.data.data
+      ? Buffer.from(res.data.data, "base64url").toString("utf-8")
+      : null;
+  }
+
+  async function walk(part: gmail_v1.Schema$MessagePart): Promise<void> {
     const mimeType = part.mimeType ?? "";
 
     if (part.filename && part.body?.attachmentId) {
@@ -194,23 +220,38 @@ function parseMessagePayload(
       return;
     }
 
-    if (mimeType === "text/plain" && part.body?.data && !bodyText) {
-      bodyText = Buffer.from(part.body.data, "base64url").toString("utf-8");
+    if (mimeType === "text/plain") {
+      const body = await readPartBody(part);
+      if (body) textCandidates.push(body);
     }
 
-    if (mimeType === "text/html" && part.body?.data && !bodyHtml) {
-      bodyHtml = Buffer.from(part.body.data, "base64url").toString("utf-8");
+    if (mimeType === "text/html") {
+      const body = await readPartBody(part);
+      if (body) htmlCandidates.push(body);
     }
 
     if (part.parts) {
       for (const child of part.parts) {
-        walk(child);
+        await walk(child);
       }
     }
   }
 
-  walk(payload);
-  return { bodyText, bodyHtml, attachments };
+  await walk(payload);
+
+  return {
+    bodyText: chooseBestBody(textCandidates),
+    bodyHtml: chooseBestBody(htmlCandidates),
+    attachments,
+  };
+}
+
+function chooseBestBody(candidates: string[]): string | null {
+  if (candidates.length === 0) return null;
+
+  return candidates.reduce((best, candidate) =>
+    candidate.trim().length > best.trim().length ? candidate : best
+  );
 }
 
 export async function getAttachment(

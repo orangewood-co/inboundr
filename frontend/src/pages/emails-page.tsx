@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -48,6 +48,69 @@ interface ListResponse {
   page: number
   limit: number
   totalPages: number
+}
+
+const EMAIL_VIEWER_STYLE = `
+  <style>
+    :root {
+      color-scheme: light;
+      background: #ffffff;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: #ffffff;
+    }
+
+    body {
+      padding: 16px;
+      color: #1a1a1a;
+      overflow-wrap: anywhere;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+  </style>
+`
+
+function buildEmailDocument(bodyHtml: string): string {
+  const trimmed = bodyHtml.trim()
+  const hasHtmlDocument = /<(?:!doctype|html|head|body)\b/i.test(trimmed)
+
+  if (!hasHtmlDocument) {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  ${EMAIL_VIEWER_STYLE}
+</head>
+<body>${bodyHtml}</body>
+</html>`
+  }
+
+  const withCharset = /<head\b[^>]*>/i.test(trimmed)
+    ? trimmed.replace(/<head\b[^>]*>/i, (match) => `${match}\n<meta charset="utf-8">\n${EMAIL_VIEWER_STYLE}`)
+    : trimmed.replace(/<html\b[^>]*>/i, (match) => `${match}\n<head>\n<meta charset="utf-8">\n${EMAIL_VIEWER_STYLE}\n</head>`)
+
+  if (withCharset !== trimmed) return withCharset
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  ${EMAIL_VIEWER_STYLE}
+</head>
+${trimmed}
+</html>`
 }
 
 function parseSender(from: string): { name: string; email: string } {
@@ -183,7 +246,10 @@ export function EmailsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const [refreshing, setRefreshing] = useState(false)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const emailDocument = useMemo(
+    () => (detail?.bodyHtml ? buildEmailDocument(detail.bodyHtml) : null),
+    [detail?.bodyHtml]
+  )
 
   const fetchList = useCallback(async (p: number) => {
     setListLoading(true)
@@ -224,40 +290,6 @@ export function EmailsPage() {
   useEffect(() => {
     if (selectedId) fetchDetail(selectedId)
   }, [selectedId, fetchDetail])
-
-  // Write HTML content into the iframe for safe rendering
-  useEffect(() => {
-    if (!detail?.bodyHtml || !iframeRef.current) return
-    const doc = iframeRef.current.contentDocument
-    if (!doc) return
-    doc.open()
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #1a1a1a;
-            margin: 0;
-            padding: 16px;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-          }
-          img { max-width: 100%; height: auto; }
-          a { color: #2563eb; }
-          table { max-width: 100%; }
-          pre { white-space: pre-wrap; overflow-x: auto; }
-        </style>
-      </head>
-      <body>${detail.bodyHtml}</body>
-      </html>
-    `)
-    doc.close()
-  }, [detail?.bodyHtml])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -486,12 +518,12 @@ export function EmailsPage() {
 
                 {/* Email body */}
                 <div className="flex-1 overflow-hidden">
-                  {detail.bodyHtml ? (
+                  {emailDocument ? (
                     <iframe
-                      ref={iframeRef}
                       title="Email content"
-                      className="size-full border-0"
+                      className="size-full border-0 bg-white"
                       sandbox="allow-same-origin"
+                      srcDoc={emailDocument}
                     />
                   ) : detail.bodyText ? (
                     <div className="h-full overflow-y-auto p-6">
