@@ -30,7 +30,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
-const API_BASE = "http://localhost:3000/api/v1/products"
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 
 interface Product {

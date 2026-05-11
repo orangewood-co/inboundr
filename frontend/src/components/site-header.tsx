@@ -10,10 +10,20 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
+import { Link, useLocation } from "@tanstack/react-router"
 import { PanelLeftIcon } from "lucide-react"
+
+const pageTitles: Record<string, string> = {
+  "/": "RFQ",
+  "/emails": "Inbox",
+  "/products": "Products",
+  "/settings": "Settings",
+}
 
 export function SiteHeader() {
   const { toggleSidebar } = useSidebar()
+  const { pathname } = useLocation()
+  const pageTitle = pageTitles[pathname] ?? "Dashboard"
 
   return (
     <header className="sticky top-0 z-50 flex w-full items-center border-b bg-background">
@@ -34,11 +44,13 @@ export function SiteHeader() {
         <Breadcrumb className="hidden sm:block">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="#">Build Your Application</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link to="/">inboundr.</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+              <BreadcrumbPage>{pageTitle}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
