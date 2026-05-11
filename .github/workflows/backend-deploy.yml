@@ -35,7 +35,7 @@ jobs:
     needs: typecheck
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
+  environment: production
 
     steps:
       - name: Configure SSH
@@ -49,7 +49,7 @@ jobs:
           chmod 600 ~/.ssh/ec2_deploy_key
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
           {
-            echo "Host btsa-ec2"
+            echo "Host inboundr-ec2"
             echo "  HostName $EC2_HOST"
             echo "  User $EC2_USER"
             echo "  IdentityFile ~/.ssh/ec2_deploy_key"
@@ -58,9 +58,9 @@ jobs:
 
       - name: Deploy over SSH
         env:
-          APP_DIR: ${{ vars.EC2_APP_DIR || '/home/ubuntu/btsa' }}
+          APP_DIR: ${{ vars.EC2_APP_DIR || '/home/ubuntu/inboundr' }}
           BRANCH: main
-          SERVICE_NAME: ${{ vars.EC2_SERVICE_NAME || 'btsa-backend' }}
+          SERVICE_NAME: ${{ vars.EC2_SERVICE_NAME || 'inboundr-backend' }}
           HEALTH_URL: ${{ secrets.API_HEALTH_URL }}
         run: |
-          ssh btsa-ec2 "APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' HEALTH_URL='$HEALTH_URL' bash '$APP_DIR/scripts/deploy/ec2-deploy.sh'"
+          ssh inboundr-ec2 "APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' HEALTH_URL='$HEALTH_URL' bash '$APP_DIR/scripts/deploy/ec2-deploy.sh'"
