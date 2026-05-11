@@ -11,7 +11,9 @@
   },
   "devDependencies": {
     "@react-email/ui": "^6.0.8",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
   },
   "peerDependencies": {
     "typescript": "^6.0.2"

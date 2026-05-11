@@ -67,6 +67,15 @@ function parsePositiveInt(value: unknown, fallback: number, max?: number): numbe
   return max ? Math.min(max, normalized) : normalized;
 }
 
+function parseProductId(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizeProductInput(body: Record<string, unknown>): ProductInput {
   const input: Record<string, unknown> = {};
 
@@ -146,8 +155,8 @@ export const getProduct = async (
   res: Response
 ): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) {
+    const id = parseProductId(req.params.id);
+    if (id === null) {
       res.status(400).json({ error: "Invalid product id" });
       return;
     }
@@ -208,8 +217,8 @@ export const updateProduct = async (
   res: Response
 ): Promise<void> => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) {
+    const id = parseProductId(req.params.id);
+    if (id === null) {
       res.status(400).json({ error: "Invalid product id" });
       return;
     }

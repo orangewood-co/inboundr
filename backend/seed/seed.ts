@@ -4,6 +4,9 @@ import { Pool } from "pg";
 import { GeminiProductEmbedder } from "../src/embeddings";
 import type { DatabaseConfig } from "../src/types";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COLUMN_MAP: Record<string, string> = {
   Brand: "brand",
@@ -88,7 +91,7 @@ async function seedProducts() {
   };
 
   // 1. Parse Excel file
-  const xlsxPath = path.join(import.meta.dir, "products.xlsx");
+  const xlsxPath = path.join(__dirname, "products.xlsx");
   console.log(`Reading ${xlsxPath}...`);
   const products = parseExcel(xlsxPath);
   console.log(`Parsed ${products.length} products from XLSX`);
