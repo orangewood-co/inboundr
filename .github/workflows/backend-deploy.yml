@@ -35,7 +35,7 @@ jobs:
     needs: typecheck
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  environment: production
+    environment: production
 
     steps:
       - name: Configure SSH
