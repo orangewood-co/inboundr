@@ -4,9 +4,23 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - "backend/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/backend-deploy.yml"
+      - "scripts/deploy/**"
+      - "docs/deployment/**"
   push:
     branches:
       - main
+    paths:
+      - "backend/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/backend-deploy.yml"
+      - "scripts/deploy/**"
+      - "docs/deployment/**"
 
 concurrency:
   group: backend-deploy-${{ github.ref }}
