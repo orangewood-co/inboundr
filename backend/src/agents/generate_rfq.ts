@@ -56,11 +56,11 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
 
   const response = await model.withStructuredOutput(customer).invoke([
     new SystemMessage(
-      `You are a customer support agent.
-You work for Bombay Tools Supplying Agency Pvt. Ltd.
+       `You are a customer support agent.
+        You work for Bombay Tools Supplying Agency Pvt. Ltd.
 
-You are given a email from a potential customer asking for a quote for the products they are interested in.
-Your task is to identify the customer from the email and return the customer details in the structured output format.`
+        You are given a email from a potential customer asking for a quote for the products they are interested in.
+        Your task is to identify the customer from the email and return the customer details in the structured output format.`
     ),
     new HumanMessage(state.emailBody),
   ]);

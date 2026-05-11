@@ -1,0 +1,20 @@
+[Unit]
+Description=inboundr Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/inboundr/backend
+EnvironmentFile=/home/ubuntu/inboundr/backend/.env
+ExecStart=/home/ubuntu/.bun/bin/bun src/server.ts
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+SyslogIdentifier=inboundr-backend
+
+[Install]
+WantedBy=multi-user.target

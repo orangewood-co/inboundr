@@ -1,0 +1,66 @@
+name: Backend CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: backend-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck backend
+        run: bun run typecheck:backend
+
+  deploy:
+    name: Deploy backend to EC2
+    needs: typecheck
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ec2_deploy_key
+          chmod 600 ~/.ssh/ec2_deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          {
+            echo "Host btsa-ec2"
+            echo "  HostName $EC2_HOST"
+            echo "  User $EC2_USER"
+            echo "  IdentityFile ~/.ssh/ec2_deploy_key"
+            echo "  IdentitiesOnly yes"
+          } >> ~/.ssh/config
+
+      - name: Deploy over SSH
+        env:
+          APP_DIR: ${{ vars.EC2_APP_DIR || '/home/ubuntu/btsa' }}
+          BRANCH: main
+          SERVICE_NAME: ${{ vars.EC2_SERVICE_NAME || 'btsa-backend' }}
+          HEALTH_URL: ${{ secrets.API_HEALTH_URL }}
+        run: |
+          ssh btsa-ec2 "APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' HEALTH_URL='$HEALTH_URL' bash '$APP_DIR/scripts/deploy/ec2-deploy.sh'"

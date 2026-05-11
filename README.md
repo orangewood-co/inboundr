@@ -47,3 +47,7 @@ Lint and format the frontend:
 bun run lint
 bun run format
 ```
+
+## Deployment
+
+For the EC2 backend deployment runbook, see [`docs/deployment/ec2-backend.md`](docs/deployment/ec2-backend.md).
