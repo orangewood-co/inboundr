@@ -100,6 +100,38 @@ export const listCustomers = async (
   }
 };
 
+export const createCustomer = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const input = normalizeCustomerInput(req.body ?? {});
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+    const validationError = validateCustomerInput(input);
+
+    if (!input.name || !input.company || !input.email) {
+      res.status(400).json({ error: "Name, company, and email are required" });
+      return;
+    }
+
+    if (validationError) {
+      res.status(400).json({ error: validationError });
+      return;
+    }
+
+    const customer = await Customer.create({
+      ...input,
+      organizationId: organization._id,
+    });
+
+    res.status(201).json(customer);
+  } catch (err) {
+    console.error("Error creating customer:", err);
+    res.status(500).json({ error: "Failed to create customer" });
+  }
+};
+
 export const updateCustomer = async (
   req: Request,
   res: Response
