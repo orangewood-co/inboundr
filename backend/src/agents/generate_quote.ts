@@ -55,6 +55,8 @@ export interface QuoteInput {
   customerName: string;
   customerCompany: string;
   customerEmail: string;
+  customerNotes?: string | null;
+  specialDiscountPercentage?: number | null;
   originalSubject: string;
   products: {
     queryName: string;
@@ -84,9 +86,25 @@ export async function generateQuoteReply(
     )
     .join("\n\n");
 
+  const hasCustomerNotes = Boolean(input.customerNotes?.trim());
+  const hasSpecialDiscount =
+    typeof input.specialDiscountPercentage === "number" &&
+    input.specialDiscountPercentage > 0;
+  const customerContext =
+    hasCustomerNotes || hasSpecialDiscount
+      ? `Customer context:
+${hasSpecialDiscount ? `- Special discount context: ${input.specialDiscountPercentage}%` : "- Special discount context: none"}
+${hasCustomerNotes ? `- Internal customer notes: ${input.customerNotes}` : "- Internal customer notes: none"}
+
+Use this customer context only when it is relevant to tone, terms, relationship, or special handling.
+Do not recalculate or alter product prices/totals from the discount context unless explicit discounted prices are provided.`
+      : "Customer context: No special customer notes or discount context.";
+
   const prompt = `Customer: ${input.customerName} from ${input.customerCompany}
 Customer Email: ${input.customerEmail}
 Original Subject: ${input.originalSubject}
+
+${customerContext}
 
 Products to quote:
 ${productLines}

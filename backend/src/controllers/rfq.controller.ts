@@ -7,6 +7,7 @@ import { generateQuoteReply } from "../agents/generate_quote";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { GmailAccount } from "../models/gmail-account.model";
 import { sendQuoteOnGmailThread } from "../services/gmail-send.service";
+import { Customer } from "../models/customer.model";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -161,12 +162,17 @@ export const generateQuote = async (
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
-    const customerEmail = rfq.customer.email || originalSenderEmail;
+    const customerEmail = extractEmailAddress(rfq.customer.email) || originalSenderEmail;
+    const savedCustomer = customerEmail
+      ? await Customer.findOne({ email: customerEmail }).lean()
+      : null;
 
     const { subject, body } = await generateQuoteReply({
-      customerName: rfq.customer.name,
-      customerCompany: rfq.customer.company,
+      customerName: savedCustomer?.name || rfq.customer.name,
+      customerCompany: savedCustomer?.company || rfq.customer.company,
       customerEmail,
+      customerNotes: savedCustomer?.notes ?? null,
+      specialDiscountPercentage: savedCustomer?.specialDiscountPercentage ?? null,
       originalSubject: email?.subject || "",
       products: products.map((p) => ({
         queryName: p.queryName,
