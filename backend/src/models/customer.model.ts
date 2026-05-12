@@ -6,6 +6,8 @@ export interface ICustomer extends Document {
   email: string;
   contactNumber: string;
   address: string;
+  notes: string | null;
+  specialDiscountPercentage: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +19,8 @@ const customerSchema = new Schema<ICustomer>(
     email: { type: String, required: true, index: true },
     contactNumber: { type: String, required: true },
     address: { type: String, required: true },
+    notes: { type: String, default: null },
+    specialDiscountPercentage: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

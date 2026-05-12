@@ -40,6 +40,8 @@ interface Customer {
   email: string
   contactNumber: string
   address: string
+  notes: string | null
+  specialDiscountPercentage: number
   createdAt: string
   updatedAt: string
 }
@@ -58,6 +60,8 @@ type CustomerFormState = {
   email: string
   contactNumber: string
   address: string
+  notes: string
+  specialDiscountPercentage: string
 }
 
 const emptyForm: CustomerFormState = {
@@ -66,6 +70,8 @@ const emptyForm: CustomerFormState = {
   email: "",
   contactNumber: "",
   address: "",
+  notes: "",
+  specialDiscountPercentage: "0",
 }
 
 function customerToForm(customer: Customer): CustomerFormState {
@@ -75,16 +81,24 @@ function customerToForm(customer: Customer): CustomerFormState {
     email: customer.email ?? "",
     contactNumber: customer.contactNumber ?? "",
     address: customer.address ?? "",
+    notes: customer.notes ?? "",
+    specialDiscountPercentage: customer.specialDiscountPercentage?.toString() ?? "0",
   }
 }
 
 function formToPayload(form: CustomerFormState) {
+  const specialDiscountPercentage = Number(form.specialDiscountPercentage)
+
   return {
     name: form.name.trim(),
     company: form.company.trim(),
     email: form.email.trim(),
     contactNumber: form.contactNumber.trim(),
     address: form.address.trim(),
+    notes: form.notes.trim() || null,
+    specialDiscountPercentage: Number.isFinite(specialDiscountPercentage)
+      ? specialDiscountPercentage
+      : 0,
   }
 }
 
@@ -95,6 +109,35 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date)
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000)
+  const divisions = [
+    { amount: 60, unit: "second" },
+    { amount: 60, unit: "minute" },
+    { amount: 24, unit: "hour" },
+    { amount: 7, unit: "day" },
+    { amount: 4.345, unit: "week" },
+    { amount: 12, unit: "month" },
+    { amount: Number.POSITIVE_INFINITY, unit: "year" },
+  ] as const
+
+  let duration = diffInSeconds
+  for (const division of divisions) {
+    if (Math.abs(duration) < division.amount) {
+      return new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" }).format(
+        Math.round(duration),
+        division.unit
+      )
+    }
+    duration /= division.amount
+  }
+
+  return "-"
 }
 
 function CustomerTableSkeleton() {
@@ -178,6 +221,32 @@ function CustomerForm({
           placeholder="Customer billing or office address"
         />
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="specialDiscountPercentage">Special discount percentage</Label>
+          <Input
+            id="specialDiscountPercentage"
+            type="number"
+            min="0"
+            max="100"
+            value={form.specialDiscountPercentage}
+            onChange={(event) => onChange("specialDiscountPercentage", event.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="notes">Notes</Label>
+        <textarea
+          id="notes"
+          rows={5}
+          value={form.notes}
+          onChange={(event) => onChange("notes", event.target.value)}
+          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          placeholder="Pricing preferences, follow-up context, or internal notes"
+        />
+      </div>
     </div>
   )
 }
@@ -216,16 +285,31 @@ function CustomerDetails({ customer }: { customer: Customer }) {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Created</p>
-          <p>{formatDate(customer.createdAt)}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Updated</p>
-          <p>{formatDate(customer.updatedAt)}</p>
-        </div>
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Special discount</p>
+        <p className="font-medium">{customer.specialDiscountPercentage ?? 0}%</p>
       </div>
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Notes</p>
+        <p className="whitespace-pre-wrap rounded-xl border bg-muted/30 p-3 leading-6">
+          {customer.notes || "No notes saved"}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function CustomerMetadata({ customer }: { customer: Customer }) {
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <span title={formatDate(customer.updatedAt)}>
+        Updated <span className="text-foreground/70">{formatRelativeTime(customer.updatedAt)}</span>
+      </span>
+      <span className="text-border">·</span>
+      <span title={formatDate(customer.createdAt)}>
+        Created <span className="text-foreground/70">{formatRelativeTime(customer.createdAt)}</span>
+      </span>
     </div>
   )
 }
@@ -314,6 +398,10 @@ export default function CustomersPage() {
     const payload = formToPayload(form)
     if (!payload.name || !payload.company || !payload.email) {
       setSaveError("Name, company, and email are required")
+      return
+    }
+    if (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100) {
+      setSaveError("Special discount must be between 0 and 100")
       return
     }
 
@@ -472,11 +560,14 @@ export default function CustomersPage() {
             <SheetTitle className="text-xl">
               {sheetMode === "view" ? "Customer details" : "Edit customer"}
             </SheetTitle>
-            <SheetDescription>
-              {sheetMode === "view"
-                ? "Review the full customer record saved from identified RFQs."
-                : "Update the shared customer directory entry saved from identified RFQs."}
-            </SheetDescription>
+            {sheetMode === "view" && editingCustomer && (
+              <CustomerMetadata customer={editingCustomer} />
+            )}
+            {sheetMode === "edit" && (
+              <SheetDescription>
+                Update the shared customer directory entry saved from identified RFQs.
+              </SheetDescription>
+            )}
           </SheetHeader>
           <Separator />
           {sheetMode === "view" && editingCustomer ? (

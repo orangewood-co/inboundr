@@ -2,8 +2,16 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
 
-const SEARCH_FIELDS = ["name", "company", "email", "contactNumber", "address"] as const;
-const EDITABLE_FIELDS = ["name", "company", "email", "contactNumber", "address"] as const;
+const SEARCH_FIELDS = ["name", "company", "email", "contactNumber", "address", "notes"] as const;
+const EDITABLE_FIELDS = [
+  "name",
+  "company",
+  "email",
+  "contactNumber",
+  "address",
+  "notes",
+  "specialDiscountPercentage",
+] as const;
 
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
   const parsed = parseInt(String(value ?? ""), 10);
@@ -11,22 +19,38 @@ function parsePositiveInt(value: unknown, fallback: number, max?: number): numbe
   return max ? Math.min(max, normalized) : normalized;
 }
 
-function normalizeCustomerInput(body: Record<string, unknown>): Record<string, string> {
-  const input: Record<string, string> = {};
+function normalizeCustomerInput(body: Record<string, unknown>): Record<string, string | number | null> {
+  const input: Record<string, string | number | null> = {};
 
   for (const field of EDITABLE_FIELDS) {
     if (field in body) {
-      input[field] = String(body[field] ?? "").trim();
+      if (field === "specialDiscountPercentage") {
+        const value = Number(body[field] ?? 0);
+        input[field] = Number.isFinite(value) ? value : 0;
+      } else if (field === "notes") {
+        const value = String(body[field] ?? "").trim();
+        input[field] = value || null;
+      } else {
+        input[field] = String(body[field] ?? "").trim();
+      }
     }
   }
 
   return input;
 }
 
-function validateCustomerInput(input: Record<string, string>): string | null {
+function validateCustomerInput(input: Record<string, string | number | null>): string | null {
   if ("name" in input && !input.name) return "Customer name is required";
   if ("company" in input && !input.company) return "Company is required";
   if ("email" in input && !input.email) return "Email is required";
+  if (
+    "specialDiscountPercentage" in input &&
+    (typeof input.specialDiscountPercentage !== "number" ||
+      input.specialDiscountPercentage < 0 ||
+      input.specialDiscountPercentage > 100)
+  ) {
+    return "Special discount must be between 0 and 100";
+  }
   return null;
 }
 
