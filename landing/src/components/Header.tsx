@@ -38,10 +38,10 @@ export default function Header() {
             </Link>
           </div>
           <Link
-            to="/contact"
-            className="border border-border bg-surface px-4 py-1.5 text-[13px] font-medium transition hover:border-text/20 hover:bg-surface-raised"
+            to="https://app.inboundr.co/"
+            className="border border-border bg-green px-4 py-1.5 text-[13px] font-medium transition hover:border-text/20 hover:bg-surface-raised"
           >
-            Get access
+            Login 
           </Link>
         </div>
       </nav>
