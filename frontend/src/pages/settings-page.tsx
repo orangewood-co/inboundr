@@ -693,7 +693,7 @@ export function SettingsPage() {
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-6 py-8 lg:px-8">
+          <div className="max-w-3xl px-6 py-8 lg:px-8">
             <Tabs defaultValue="profile">
               <TabsList className="mb-6">
                 <TabsTrigger value="profile" className="gap-1.5">

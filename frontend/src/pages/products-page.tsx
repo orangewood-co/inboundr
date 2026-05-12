@@ -9,7 +9,6 @@ import {
   PackagePlusIcon,
   RefreshCwIcon,
   SearchIcon,
-  SparklesIcon,
 } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -174,18 +173,15 @@ function ProductTableSkeleton() {
 
 function EmptyState({ search }: { search: string }) {
   return (
-    <div className="flex min-h-[340px] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <div className="relative">
-        <div className="absolute inset-0 rounded-3xl bg-primary/20 blur-2xl" />
-        <div className="relative rounded-3xl border bg-background/80 p-6 shadow-sm">
-          <BoxIcon className="size-10 text-muted-foreground" />
-        </div>
+    <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
+      <div className="flex size-10 items-center justify-center rounded-full bg-muted">
+        <BoxIcon className="size-5 text-muted-foreground" />
       </div>
       <div className="space-y-1">
-        <h3 className="text-base font-semibold">
+        <h3 className="text-sm font-semibold">
           {search ? "No products match that search" : "No products in the catalog yet"}
         </h3>
-        <p className="max-w-md text-sm text-muted-foreground">
+        <p className="max-w-sm text-sm text-muted-foreground">
           {search
             ? "Try a product code, brand, HSN code, or a shorter description fragment."
             : "Add the first catalog item and it will appear in this table immediately."}
@@ -382,164 +378,146 @@ export default function ProductsPage() {
 
   return (
     <SidebarProvider
+      defaultOpen
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
+          "--header-height": "4rem",
+          "--sidebar-width": "18rem",
         } as CSSProperties
       }
     >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
+      <AppSidebar collapsible="icon" variant="inset" />
+      <SidebarInset className="overflow-hidden">
         <SiteHeader />
-        <main className="relative flex flex-1 flex-col overflow-hidden bg-muted/30">
-          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 md:p-6">
-            <section className="overflow-hidden rounded-[2rem] border bg-background shadow-sm">
-              <div className="p-6 md:p-8">
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="max-w-2xl space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
-                      <SparklesIcon className="size-3.5 text-primary" />
-                      Live catalog controls
-                    </div>
-                    <div>
-                      <h1 className="text-3xl font-black tracking-tight md:text-5xl">
-                        Products command center
-                      </h1>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground md:text-base">
-                        Search, tune, and extend the BTSA catalog without leaving the workflow.
-                        Every edit writes back to the products database.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:flex">
-                    <div className="rounded-2xl border bg-muted/35 px-4 py-3">
-                      <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Rows</p>
-                      <p className="mt-1 text-2xl font-black">{total.toLocaleString("en-IN")}</p>
-                    </div>
-                    <Button className="h-auto rounded-2xl px-5 py-3 font-semibold shadow-sm" onClick={openCreateSheet}>
-                      <PackagePlusIcon className="size-4" />
-                      Add Product
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border bg-background shadow-sm">
-              <div className="flex flex-col gap-4 border-b p-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative max-w-xl flex-1">
-                  <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search brand, product code, HSN, description..."
-                    className="h-11 rounded-2xl bg-muted/35 pl-10"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>
-                    Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
-                    <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
-                  </span>
-                  <Button variant="outline" size="icon-sm" onClick={() => void fetchProducts()} disabled={loading}>
-                    <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-                  </Button>
-                </div>
-              </div>
-
-              {error ? (
-                <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 p-10 text-center">
-                  <div className="rounded-2xl bg-destructive/10 p-4 text-destructive">
-                    <AlertCircleIcon className="size-8" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Products could not load</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-                  </div>
-                  <Button variant="outline" onClick={() => void fetchProducts()}>
-                    Try again
-                  </Button>
-                </div>
-              ) : loading ? (
-                <ProductTableSkeleton />
-              ) : products.length === 0 ? (
-                <EmptyState search={debouncedSearch} />
-              ) : (
-                <div className="overflow-auto">
-                  <table className="w-full min-w-[980px] text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/45 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                        <th className="px-5 py-3">Code</th>
-                        <th className="px-5 py-3">Product</th>
-                        <th className="px-5 py-3">Brand</th>
-                        <th className="px-5 py-3">Price</th>
-                        <th className="px-5 py-3">GST</th>
-                        <th className="px-5 py-3">Margin</th>
-                        <th className="w-14 px-4 py-3" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((product) => (
-                        <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-primary/[0.035]">
-                          <td className="px-5 py-4 align-top">
-                            <div className="inline-flex rounded-lg border bg-muted/40 px-2.5 py-1 font-mono text-xs font-bold text-foreground">
-                              {product.productcode || `#${product.id}`}
-                            </div>
-                          </td>
-                          <td className="max-w-xl px-5 py-4 align-top">
-                            <p className="line-clamp-2 font-semibold leading-5">{product.productdescription || "Untitled product"}</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              <span>{product.hsncode || "No HSN"}</span>
-                              <span className="text-border">/</span>
-                              <span>{product.unit || "Unit not set"}</span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 align-top font-medium">{product.brand || "-"}</td>
-                          <td className="px-5 py-4 align-top font-bold">{toCurrency(product.unitprice)}</td>
-                          <td className="px-5 py-4 align-top">{toPercent(product.gstrate)}</td>
-                          <td className="px-5 py-4 align-top">
-                            <div className="space-y-1 text-xs">
-                              <p>
-                                Discount <span className="font-semibold text-foreground">{toPercent(product.maxdiscount)}</span>
-                              </p>
-                              <p>
-                                Upsell <span className="font-semibold text-foreground">{toPercent(product.maxupsell)}</span>
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 align-top">
-                            <Button variant="ghost" size="icon-sm" className="opacity-70 group-hover:opacity-100" onClick={() => openEditSheet(product)}>
-                              <Edit3Icon className="size-4" />
-                              <span className="sr-only">Edit product</span>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <BoxIcon className="size-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Products</h2>
+              {!loading && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                  {total.toLocaleString("en-IN")}
+                </span>
               )}
-
-              <div className="mt-auto flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Page <span className="font-semibold text-foreground">{page}</span> of{" "}
-                  <span className="font-semibold text-foreground">{totalPages}</span>
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
-                    <ChevronLeftIcon className="size-4" />
-                    Previous
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
-                    Next
-                    <ChevronRightIcon className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </section>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => void fetchProducts()}
+                disabled={loading}
+              >
+                <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+              </Button>
+              <Button size="sm" onClick={openCreateSheet}>
+                <PackagePlusIcon className="size-4" />
+                Add Product
+              </Button>
+            </div>
           </div>
-        </main>
+
+          <div className="flex items-center gap-4 border-b px-4 py-3">
+            <div className="relative max-w-xl flex-1">
+              <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search brand, product code, HSN, description..."
+                className="pl-10"
+              />
+            </div>
+            <span className="shrink-0 text-sm text-muted-foreground">
+              Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
+              <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
+            </span>
+          </div>
+
+          {error ? (
+            <div className="flex flex-col items-center gap-2 p-8 text-center">
+              <AlertCircleIcon className="size-5 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
+              <Button variant="outline" size="sm" onClick={() => void fetchProducts()}>
+                Try again
+              </Button>
+            </div>
+          ) : loading ? (
+            <ProductTableSkeleton />
+          ) : products.length === 0 ? (
+            <EmptyState search={debouncedSearch} />
+          ) : (
+            <div className="flex-1 overflow-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-5 py-2.5">Code</th>
+                    <th className="px-5 py-2.5">Product</th>
+                    <th className="px-5 py-2.5">Brand</th>
+                    <th className="px-5 py-2.5">Price</th>
+                    <th className="px-5 py-2.5">GST</th>
+                    <th className="px-5 py-2.5">Margin</th>
+                    <th className="w-10 px-3 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
+                      <td className="px-5 py-3.5 align-top">
+                        <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
+                          {product.productcode || `#${product.id}`}
+                        </span>
+                      </td>
+                      <td className="max-w-xl px-5 py-3.5 align-top">
+                        <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>{product.hsncode || "No HSN"}</span>
+                          <span className="text-border">/</span>
+                          <span>{product.unit || "Unit not set"}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 align-top font-medium">{product.brand || "-"}</td>
+                      <td className="px-5 py-3.5 align-top font-semibold">{toCurrency(product.unitprice)}</td>
+                      <td className="px-5 py-3.5 align-top">{toPercent(product.gstrate)}</td>
+                      <td className="px-5 py-3.5 align-top">
+                        <div className="space-y-0.5 text-xs">
+                          <p>
+                            Discount <span className="font-semibold text-foreground">{toPercent(product.maxdiscount)}</span>
+                          </p>
+                          <p>
+                            Upsell <span className="font-semibold text-foreground">{toPercent(product.maxupsell)}</span>
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 align-top">
+                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(product)}>
+                          <Edit3Icon className="size-4" />
+                          <span className="sr-only">Edit product</span>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Page <span className="font-semibold text-foreground">{page}</span> of{" "}
+              <span className="font-semibold text-foreground">{totalPages}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
+                <ChevronLeftIcon className="size-4" />
+                Previous
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
+                Next
+                <ChevronRightIcon className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </SidebarInset>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
