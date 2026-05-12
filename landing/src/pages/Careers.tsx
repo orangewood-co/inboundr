@@ -1,4 +1,5 @@
 import { FadeIn } from "@/components/FadeIn"
+import { PageHeader } from "@/components/PageHeader"
 import { ArrowUpRight } from "lucide-react"
 
 const values = [
@@ -37,20 +38,11 @@ const roles = [
 export default function Careers() {
   return (
     <>
-      <section className="noise grid-lines relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]" />
-        <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
-          <FadeIn>
-            <p className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright">Company</p>
-            <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-[-0.03em] sm:text-5xl lg:text-6xl">
-              Join Inboundr
-            </h1>
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg">
-              We're building the AI revenue engine for inbound sales. Small team, hard problems, massive impact. If you're excited about shipping fast and solving real problems — we'd love to talk.
-            </p>
-          </FadeIn>
-        </div>
-      </section>
+      <PageHeader
+        label="Company"
+        title="Join Inboundr"
+        description="We're building the AI revenue engine for inbound sales. Small team, hard problems, massive impact. If you're excited about shipping fast and solving real problems — we'd love to talk."
+      />
 
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">

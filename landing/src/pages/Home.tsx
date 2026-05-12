@@ -71,7 +71,7 @@ export default function Home() {
     <>
       {/* ── Hero ── */}
       <AuroraBackground className="noise overflow-hidden">
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-24 pt-28 sm:pb-36 sm:pt-40 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-24 pt-28 text-center sm:pb-36 sm:pt-40 lg:px-8">
           <motion.p
             className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright"
             initial={{ opacity: 0 }}
@@ -81,7 +81,7 @@ export default function Home() {
             Inbound, handled.
           </motion.p>
           <motion.h1
-            className="max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] leading-[0.95] tracking-[-0.045em]"
+            className="mx-auto max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] leading-[0.95] tracking-[-0.045em]"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
@@ -91,7 +91,7 @@ export default function Home() {
             into revenue.
           </motion.h1>
           <motion.p
-            className="mt-8 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg"
+            className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
@@ -100,7 +100,7 @@ export default function Home() {
             and close deals — automatically.
           </motion.p>
           <motion.div
-            className="mt-10 flex gap-3"
+            className="mt-10 flex justify-center gap-3"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.45 }}
@@ -166,11 +166,12 @@ export default function Home() {
                 Your reps focus on closing.
               </p>
               <a
-                href="mailto:hello@inboundr.ai?subject=Try Inboundr"
+                href="https://app.inboundr.co/"
                 className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-green-bright transition hover:text-text"
               >
                 See it in action <ArrowUpRight className="size-3.5" />
               </a>
+         
             </FadeIn>
           </div>
         </div>

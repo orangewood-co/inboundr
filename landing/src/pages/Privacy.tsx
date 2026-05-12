@@ -1,4 +1,5 @@
 import { FadeIn } from "@/components/FadeIn"
+import { PageHeader } from "@/components/PageHeader"
 
 const sections = [
   {
@@ -69,18 +70,9 @@ Response time: Within 5 business days`,
 export default function Privacy() {
   return (
     <>
-      <section className="noise grid-lines relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]" />
-        <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
-          <FadeIn>
-            <p className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright">Legal</p>
-            <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-[-0.03em] sm:text-5xl lg:text-6xl">
-              Privacy Policy
-            </h1>
-            <p className="mt-6 font-mono text-[13px] text-text-dim">Last updated: May 1, 2026</p>
-          </FadeIn>
-        </div>
-      </section>
+      <PageHeader label="Legal" title="Privacy Policy">
+        <p className="mt-6 font-mono text-[13px] text-text-dim">Last updated: May 1, 2026</p>
+      </PageHeader>
 
       <section className="px-6 py-16 sm:py-24 lg:px-8">
         <div className="mx-auto max-w-3xl">

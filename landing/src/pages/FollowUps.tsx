@@ -1,4 +1,5 @@
 import { FadeIn } from "@/components/FadeIn"
+import { PageHeader } from "@/components/PageHeader"
 import { ArrowRight } from "lucide-react"
 
 const steps = [
@@ -10,20 +11,11 @@ const steps = [
 export default function FollowUps() {
   return (
     <>
-      <section className="noise grid-lines relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]" />
-        <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
-          <FadeIn>
-            <p className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright">Product</p>
-            <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-[-0.03em] sm:text-5xl lg:text-6xl">
-              AI Follow-ups
-            </h1>
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg">
-              Relentless, intelligent follow-up that never annoys. AI sequences across email, WhatsApp, and SMS until the deal moves.
-            </p>
-          </FadeIn>
-        </div>
-      </section>
+      <PageHeader
+        label="Product"
+        title="AI Follow-ups"
+        description="Relentless, intelligent follow-up that never annoys. AI sequences across email, WhatsApp, and SMS until the deal moves."
+      />
 
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
