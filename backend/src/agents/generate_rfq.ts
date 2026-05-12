@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-search";
+import { Customer } from "../models/customer.model";
 
 const model = new ChatOpenAI({
   model: "gpt-4o-mini",
@@ -66,6 +67,29 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
   ]);
 
   console.log("RESPONSE: ", response);
+
+  // Check if the customer already exists
+  const existingCustomer = await Customer.findOne({ email: response.email });
+  if (existingCustomer) {
+    return {
+      customer: {
+        name: response.name,
+        company: response.company,
+        email: response.email ?? "",
+        contactNumber: response.contactNumber ?? null,
+        address: response.address ?? "",
+      },
+    };
+  }
+  else {
+    await Customer.create({
+      name: response.name,
+      company: response.company,
+      email: response.email ?? "",
+      contactNumber: response.contactNumber ?? undefined,
+      address: response.address ?? "",
+    });
+  }
 
   return {
     customer: response,
