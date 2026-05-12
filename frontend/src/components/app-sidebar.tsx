@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
-import { FileTextIcon, InboxIcon, PackageIcon, Settings2Icon } from "lucide-react"
+import { FileTextIcon, InboxIcon, PackageIcon, Settings2Icon, UsersIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -30,6 +30,11 @@ const data = {
       title: "Products",
       url: "/products",
       icon: <PackageIcon />,
+    },
+    {
+      title: "Customers",
+      url: "/customers",
+      icon: <UsersIcon />,
     },
     {
       title: "Settings",

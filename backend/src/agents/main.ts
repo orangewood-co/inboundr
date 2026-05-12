@@ -5,7 +5,11 @@ import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-search";
+
+import { connectDB, disconnectDB } from "../config/database.config";
 import { generateRFQ } from "./generate_rfq";
+
+
 
 const EMAIL_RAW_TEXT = `From: industrial innovators <insquar@gmail.com>
 Date: Fri, Apr 3, 2026 at 4:30 PM
@@ -50,9 +54,16 @@ Chennai - 600 032.
 Contact No: 9585223382`
 
 
+try {
+       await connectDB();
 
-const { customer, queryProducts, searchResults } = await generateRFQ(EMAIL_RAW_TEXT);
+       const { customer, queryProducts, searchResults } = await generateRFQ(EMAIL_RAW_TEXT);
 
-console.log("FINAL SEARCH RESULTS:", JSON.stringify(searchResults, null, 2));
-console.log("CUSTOMER:", JSON.stringify(customer, null, 2));
-console.log("QUERY PRODUCTS:", JSON.stringify(queryProducts, null, 2));
+       console.log("FINAL SEARCH RESULTS:", JSON.stringify(searchResults, null, 2));
+       console.log("CUSTOMER:", JSON.stringify(customer, null, 2));
+       console.log("QUERY PRODUCTS:", JSON.stringify(queryProducts, null, 2));
+} catch (error) {
+       console.error("ERROR:", error);
+} finally {
+       await disconnectDB();
+}
