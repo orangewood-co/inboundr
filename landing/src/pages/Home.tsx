@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import { motion, useScroll, useTransform } from "motion/react"
-import { ArrowRight, ArrowUpRight } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
+import { AuroraBackground } from "@/components/AuroraBackground"
 import { FadeIn } from "@/components/FadeIn"
 
 const features = [
@@ -69,9 +70,8 @@ export default function Home() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="noise grid-lines relative overflow-hidden">
-        <div className="hero-glow absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_0%,rgba(47,93,80,0.22),transparent)]" />
-        <div className="relative mx-auto max-w-7xl px-6 pb-24 pt-28 sm:pb-36 sm:pt-40 lg:px-8">
+      <AuroraBackground className="noise overflow-hidden">
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-24 pt-28 sm:pb-36 sm:pt-40 lg:px-8">
           <motion.p
             className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright"
             initial={{ opacity: 0 }}
@@ -119,7 +119,7 @@ export default function Home() {
             </a>
           </motion.div>
         </div>
-      </section>
+      </AuroraBackground>
 
       {/* ── Feature strip ── */}
       <section id="features" className="border-y border-border">

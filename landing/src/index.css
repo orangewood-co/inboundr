@@ -65,20 +65,17 @@
   }
 }
 
-@utility hero-glow {
-  animation: hero-glow-pulse 6s ease-in-out infinite;
+@keyframes aurora {
+  from {
+    background-position: 50% 50%, 50% 50%;
+  }
+  to {
+    background-position: 350% 50%, 350% 50%;
+  }
 }
 
-@keyframes hero-glow-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(1.08);
-  }
+@utility animate-aurora {
+  animation: aurora 60s linear infinite;
 }
 
 @utility grid-lines {
