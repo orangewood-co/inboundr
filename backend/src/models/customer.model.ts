@@ -1,6 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 export interface ICustomer extends Document {
+  organizationId: mongoose.Types.ObjectId;
   name: string;
   company: string;
   email: string;
@@ -14,6 +15,12 @@ export interface ICustomer extends Document {
 
 const customerSchema = new Schema<ICustomer>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: false,
+      index: true,
+    },
     name: { type: String, required: true },
     company: { type: String, required: true },
     email: { type: String, required: true, index: true },
@@ -26,5 +33,7 @@ const customerSchema = new Schema<ICustomer>(
 );
 
 customerSchema.index({ company: 1, email: 1 });
+customerSchema.index({ organizationId: 1, email: 1 });
+customerSchema.index({ organizationId: 1, company: 1 });
 
 export const Customer = mongoose.model<ICustomer>("Customer", customerSchema);

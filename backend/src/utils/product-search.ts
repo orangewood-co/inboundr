@@ -123,6 +123,8 @@ const TEXT_SEARCH_SQL = `
       ), 0) AS dimension_score
     FROM products p
     WHERE
+      p.organization_id = $10
+      AND
       (
         ($4 <> '' AND lower(COALESCE(p.productdescription, '')) LIKE $5)
         OR EXISTS (
@@ -196,6 +198,7 @@ export class TextProductSearcher {
 
   async searchProduct(
     query: { name: string; quantity: number },
+    organizationId: string,
     limit: number = 5
   ): Promise<ProductSearchGroup> {
     const parts = this.buildSearchQuery(query.name);
@@ -224,6 +227,7 @@ export class TextProductSearcher {
         parts.dimensionTokens,
         this.getMinimumScore(parts),
         limit,
+        organizationId,
       ]);
 
       const matches = result.rows.map((row) => ({

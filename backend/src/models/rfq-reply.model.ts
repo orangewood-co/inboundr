@@ -14,6 +14,7 @@ export interface IRFQReplyProduct {
 
 export interface IRFQReply extends Document {
   userId: string;
+  organizationId: Types.ObjectId;
   gmailAccountId: Types.ObjectId;
   rfqId: Types.ObjectId;
   selectedProducts: IRFQReplyProduct[];
@@ -47,6 +48,12 @@ const rfqReplyProductSchema = new Schema<IRFQReplyProduct>(
 const rfqReplySchema = new Schema<IRFQReply>(
   {
     userId: { type: String, required: true, index: true },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: false,
+      index: true,
+    },
     gmailAccountId: {
       type: Schema.Types.ObjectId,
       ref: "GmailAccount",
@@ -76,5 +83,7 @@ const rfqReplySchema = new Schema<IRFQReply>(
   },
   { timestamps: true }
 );
+
+rfqReplySchema.index({ organizationId: 1, sendStatus: 1, createdAt: -1 });
 
 export const RFQReply = mongoose.model<IRFQReply>("RFQReply", rfqReplySchema);

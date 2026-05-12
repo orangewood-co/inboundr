@@ -1,5 +1,6 @@
 export interface Product {
   id: number;
+  organization_id: string;
   brand: string;
   maxdiscount: number;
   productdescription: string;

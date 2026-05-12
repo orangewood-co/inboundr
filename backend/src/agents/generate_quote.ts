@@ -24,7 +24,7 @@ const generateQuoteNode: GraphNode<typeof State> = async (state) => {
 
   const response = await model.withStructuredOutput(quoteOutput).invoke([
     new SystemMessage(
-      `You are a professional sales representative for Bombay Tools Supplying Agency Pvt. Ltd. (BTSA).
+      `You are a professional sales representative for the organization provided in the quote context.
 
 Your task is to write a quotation email reply to a customer who has requested prices for specific products.
 
@@ -35,8 +35,8 @@ Guidelines:
 - Include HSN codes where available
 - Add a subtotal and mention GST applicability
 - Mention that prices are subject to availability and may vary
-- Include standard terms: delivery timeline, payment terms, validity of quote
-- Sign off as "BTSA Sales Team" with contact info
+- Include standard terms from the organization context when provided
+- Sign off as the organization's sales team with the provided contact info when available
 - Use plain text formatting (no HTML or markdown)`
     ),
     new HumanMessage(state.input),
@@ -57,6 +57,11 @@ export interface QuoteInput {
   customerEmail: string;
   customerNotes?: string | null;
   specialDiscountPercentage?: number | null;
+  organizationName?: string | null;
+  organizationContactName?: string | null;
+  organizationContactEmail?: string | null;
+  organizationContactPhone?: string | null;
+  organizationDefaultTerms?: string | null;
   originalSubject: string;
   products: {
     queryName: string;
@@ -103,6 +108,13 @@ Do not recalculate or alter product prices/totals from the discount context unle
   const prompt = `Customer: ${input.customerName} from ${input.customerCompany}
 Customer Email: ${input.customerEmail}
 Original Subject: ${input.originalSubject}
+
+Organization context:
+- Name: ${input.organizationName || "Bombay Tools Supplying Agency Pvt. Ltd. (BTSA)"}
+- Default contact: ${input.organizationContactName || "BTSA Sales Team"}
+- Contact email: ${input.organizationContactEmail || "N/A"}
+- Contact phone: ${input.organizationContactPhone || "N/A"}
+- Default terms: ${input.organizationDefaultTerms || "Use standard quotation terms including delivery timeline, payment terms, validity, availability, and GST applicability."}
 
 ${customerContext}
 

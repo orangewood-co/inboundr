@@ -303,7 +303,9 @@ export default function ProductsPage() {
       })
       if (debouncedSearch) params.set("search", debouncedSearch)
 
-      const response = await fetch(`${API_BASE}?${params}`)
+      const response = await fetch(`${API_BASE}?${params}`, {
+        credentials: "include",
+      })
       if (!response.ok) throw new Error("Unable to fetch products")
 
       const data = (await response.json()) as ProductsResponse
@@ -358,6 +360,7 @@ export default function ProductsPage() {
     try {
       const response = await fetch(editingProduct ? `${API_BASE}/${editingProduct.id}` : API_BASE, {
         method: editingProduct ? "PUT" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formToPayload(form)),
       })

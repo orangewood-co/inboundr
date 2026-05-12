@@ -47,6 +47,7 @@ const searchResult = z.object({
 
 const State = new StateSchema({
   emailBody: z.string(),
+  organizationId: z.string().nullable(),
   customer: customer,
   queryProducts: z.array(queryProduct),
   searchResults: z.array(searchResult).nullable(),
@@ -69,7 +70,11 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
   console.log("RESPONSE: ", response);
 
   // Check if the customer already exists
-  const existingCustomer = await Customer.findOne({ email: response.email });
+  const customerFilter = {
+    email: response.email ?? "",
+    ...(state.organizationId ? { organizationId: state.organizationId } : {}),
+  };
+  const existingCustomer = await Customer.findOne(customerFilter);
   if (existingCustomer) {
     return {
       customer: {
@@ -83,6 +88,7 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
   }
   else {
     await Customer.create({
+      ...(state.organizationId ? { organizationId: state.organizationId } : {}),
       name: response.name,
       company: response.company,
       email: response.email ?? "",
@@ -130,7 +136,11 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
     const searchResults = [];
 
     for (const product of state.queryProducts) {
-      const result = await searcher.searchProduct(product, 5);
+      if (!state.organizationId) {
+        throw new Error("Organization context is required for product search");
+      }
+
+      const result = await searcher.searchProduct(product, state.organizationId, 5);
       console.log(`SEARCH QUERY: ${product.name}`);
       console.log(
         "SEARCH RESPONSE:",
@@ -162,12 +172,12 @@ const graph = new StateGraph(State)
   .addEdge("searchProducts", END)
   .compile();
 
-export async function generateRFQ(emailBody: string): Promise<{
+export async function generateRFQ(emailBody: string, organizationId?: string): Promise<{
   customer: z.infer<typeof customer>;
   queryProducts: z.infer<typeof queryProduct>[];
   searchResults: z.infer<typeof searchResult>[];
 }> {
-  const result = await graph.invoke({ emailBody });
+  const result = await graph.invoke({ emailBody, organizationId: organizationId ?? null });
   return {
     customer: result.customer,
     queryProducts: result.queryProducts,

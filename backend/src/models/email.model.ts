@@ -11,6 +11,7 @@ export interface IEmailAttachment {
 
 export interface IEmail extends Document {
   userId: string;
+  organizationId: mongoose.Types.ObjectId;
   gmailAccountId: mongoose.Types.ObjectId;
   messageId: string;
   threadId: string;
@@ -49,6 +50,12 @@ const emailAttachmentSchema = new Schema<IEmailAttachment>(
 const emailSchema = new Schema<IEmail>(
   {
     userId: { type: String, required: true, index: true },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: false,
+      index: true,
+    },
     gmailAccountId: {
       type: Schema.Types.ObjectId,
       ref: "GmailAccount",
@@ -86,6 +93,8 @@ const emailSchema = new Schema<IEmail>(
 
 emailSchema.index({ userId: 1, status: 1, createdAt: -1 });
 emailSchema.index({ userId: 1, from: 1, createdAt: -1 });
+emailSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+emailSchema.index({ organizationId: 1, from: 1, createdAt: -1 });
 emailSchema.index({ gmailAccountId: 1, messageId: 1 }, { unique: true });
 
 export const Email = mongoose.model<IEmail>("Email", emailSchema);

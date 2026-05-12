@@ -1,12 +1,15 @@
 import { Router } from "express";
-import { listCustomers, updateCustomer } from "../controllers/customer.controller";
+import {
+  getMyOrganization,
+  updateMyOrganization,
+} from "../controllers/organization.controller";
 import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
-router.get("/", listCustomers);
-router.put("/:id", updateCustomer);
+router.get("/me", getMyOrganization);
+router.put("/me", updateMyOrganization);
 
 export default router;

@@ -8,7 +8,8 @@ export async function processEmailForRFQ(
   emailBody: string,
   messageId: string,
   userId: string,
-  gmailAccountId: string
+  gmailAccountId: string,
+  organizationId?: string
 ): Promise<void> {
   await updateEmailStatus(messageId, "processing", undefined, gmailAccountId);
 
@@ -17,6 +18,7 @@ export async function processEmailForRFQ(
 
     const rfqDoc = await RFQ.create({
       userId,
+      ...(organizationId ? { organizationId } : {}),
       gmailAccountId,
       emailId,
       isRFQ: isRFQemail,
@@ -33,7 +35,7 @@ export async function processEmailForRFQ(
     console.log(`Email ${messageId} classified as RFQ: ${reason}`);
 
     const { customer, queryProducts, searchResults } =
-      await generateRFQ(emailBody);
+      await generateRFQ(emailBody, organizationId);
 
     await RFQ.updateOne(
       { _id: rfqDoc._id },
@@ -55,7 +57,7 @@ export async function processEmailForRFQ(
     console.error(`RFQ processing failed for email ${messageId}:`, err);
 
     await RFQ.updateOne(
-      { emailId },
+      { emailId, ...(organizationId ? { organizationId } : {}) },
       {
         $set: {
           isProcessed: true,

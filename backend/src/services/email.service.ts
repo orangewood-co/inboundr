@@ -98,7 +98,8 @@ export async function processHistoryUpdate(
               body,
               messageId,
               account.userId,
-              account._id.toString()
+              account._id.toString(),
+              account.organizationId?.toString()
             ).catch((err) =>
               console.error(`RFQ processing failed for ${messageId}:`, err)
             );
@@ -277,6 +278,7 @@ export async function saveEmail(
   try {
     await Email.create({
       userId: account.userId,
+      ...(account.organizationId ? { organizationId: account.organizationId } : {}),
       gmailAccountId: account._id,
       ...parsed,
       date: new Date(parsed.date),
@@ -349,7 +351,8 @@ async function fetchRecentMessages(account: IGmailAccount): Promise<void> {
             body,
             msg.id,
             account.userId,
-            account._id.toString()
+            account._id.toString(),
+            account.organizationId?.toString()
           ).catch((err) =>
             console.error(`RFQ processing failed for ${msg.id}:`, err)
           );

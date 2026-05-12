@@ -4,7 +4,7 @@ import { getGmailAuthUrl, exchangeGmailCode, getGmailProfileEmail } from "../con
 import { GmailAccount } from "../models/gmail-account.model";
 import { createGmailOAuthState, verifyGmailOAuthState } from "../lib/oauth-state";
 import { startWatch } from "../services/gmail-watcher.service";
-import type { AuthenticatedRequest } from "../middleware/auth.middleware";
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { decryptSecret } from "../lib/crypto";
 
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
@@ -12,7 +12,8 @@ const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 export async function connectGmail(req: Request, res: Response): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest;
-    const state = createGmailOAuthState(authReq.user.id);
+    const organization = (req as OrganizationRequest).organization;
+    const state = createGmailOAuthState(authReq.user.id, organization._id.toString());
     res.json({ url: getGmailAuthUrl(state) });
   } catch (err: any) {
     console.error("Failed to create Gmail auth URL:", err);
@@ -30,7 +31,7 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { userId } = verifyGmailOAuthState(state);
+    const { userId, organizationId } = verifyGmailOAuthState(state);
     const tokens = await exchangeGmailCode(code);
     const emailAddress = (await getGmailProfileEmail(tokens)).toLowerCase();
 
@@ -38,6 +39,7 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
       { userId, emailAddress },
       {
         userId,
+        ...(organizationId ? { organizationId } : {}),
         emailAddress,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -60,7 +62,11 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
 export async function listGmailAccounts(req: Request, res: Response): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest;
-    const accounts = await GmailAccount.find({ userId: authReq.user.id })
+    const organization = (req as OrganizationRequest).organization;
+    const accounts = await GmailAccount.find({
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
       .select("-accessToken -refreshToken")
       .sort({ createdAt: -1 })
       .lean();
@@ -78,9 +84,11 @@ export async function disconnectGmailAccount(
 ): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const account = await GmailAccount.findOne({
       _id: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     });
 
     if (!account) {

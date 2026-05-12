@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
+import type { OrganizationRequest } from "../middleware/auth.middleware";
 
 const SEARCH_FIELDS = ["name", "company", "email", "contactNumber", "address", "notes"] as const;
 const EDITABLE_FIELDS = [
@@ -59,18 +60,23 @@ export const listCustomers = async (
   res: Response
 ): Promise<void> => {
   try {
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
     const page = parsePositiveInt(req.query.page, 1);
     const limit = parsePositiveInt(req.query.limit, 20, 50);
     const skip = (page - 1) * limit;
     const search = String(req.query.search ?? "").trim();
 
-    const filter = search
-      ? {
+    const filter = {
+      organizationId: organization._id,
+      ...(search
+        ? {
           $or: SEARCH_FIELDS.map((field) => ({
             [field]: { $regex: search, $options: "i" },
           })),
         }
-      : {};
+        : {}),
+    };
 
     const [customers, total] = await Promise.all([
       Customer.find(filter)
@@ -105,6 +111,8 @@ export const updateCustomer = async (
     }
 
     const input = normalizeCustomerInput(req.body ?? {});
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
     const validationError = validateCustomerInput(input);
 
     if (validationError) {
@@ -112,10 +120,14 @@ export const updateCustomer = async (
       return;
     }
 
-    const customer = await Customer.findByIdAndUpdate(req.params.id, input, {
-      new: true,
-      runValidators: true,
-    }).lean();
+    const customer = await Customer.findOneAndUpdate(
+      { _id: req.params.id, organizationId: organization._id },
+      input,
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).lean();
 
     if (!customer) {
       res.status(404).json({ error: "Customer not found" });

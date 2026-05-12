@@ -8,6 +8,7 @@ import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-
 
 import { connectDB, disconnectDB } from "../config/database.config";
 import { generateRFQ } from "./generate_rfq";
+import { generateQuoteReply } from "./generate_quote";
 
 
 
@@ -62,6 +63,27 @@ try {
        console.log("FINAL SEARCH RESULTS:", JSON.stringify(searchResults, null, 2));
        console.log("CUSTOMER:", JSON.stringify(customer, null, 2));
        console.log("QUERY PRODUCTS:", JSON.stringify(queryProducts, null, 2));
+
+       const quoteReply = await generateQuoteReply({
+        customerName: customer.name,
+        customerCompany: customer.company,
+        customerEmail: customer.email ?? "",
+        customerNotes: null,
+        specialDiscountPercentage: 0,
+        originalSubject: "Mitutoyo vernier caliper",
+        products: queryProducts.map((product) => ({
+          queryName: product.name,
+          quantity: product.quantity,
+          brand: null,
+          description: null,
+          code: null,
+          price: null,
+          hsnCode: null,
+          gstRate: null,
+        })),
+       });
+
+       console.log("QUOTE REPLY:", JSON.stringify(quoteReply, null, 2));
 } catch (error) {
        console.error("ERROR:", error);
 } finally {

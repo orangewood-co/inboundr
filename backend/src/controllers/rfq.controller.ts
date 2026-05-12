@@ -4,7 +4,7 @@ import { Email } from "../models/email.model";
 import { RFQReply } from "../models/rfq-reply.model";
 import { processEmailForRFQ } from "../services/rfq.service";
 import { generateQuoteReply } from "../agents/generate_quote";
-import type { AuthenticatedRequest } from "../middleware/auth.middleware";
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { GmailAccount } from "../models/gmail-account.model";
 import { sendQuoteOnGmailThread } from "../services/gmail-send.service";
 import { Customer } from "../models/customer.model";
@@ -24,18 +24,19 @@ export const listRFQs = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
     const [rfqs, total] = await Promise.all([
-      RFQ.find({ userId: authReq.user.id, isRFQ: true })
+      RFQ.find({ userId: authReq.user.id, organizationId: organization._id, isRFQ: true })
         .populate("emailId", "subject from date snippet status")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      RFQ.countDocuments({ userId: authReq.user.id, isRFQ: true }),
+      RFQ.countDocuments({ userId: authReq.user.id, organizationId: organization._id, isRFQ: true }),
     ]);
 
     res.json({ rfqs, total, page, limit, totalPages: Math.ceil(total / limit) });
@@ -51,7 +52,12 @@ export const getRFQ = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
-    const rfq = await RFQ.findOne({ _id: req.params.id, userId: authReq.user.id })
+    const organization = (req as OrganizationRequest).organization;
+    const rfq = await RFQ.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
       .populate("emailId")
       .lean();
 
@@ -73,9 +79,11 @@ export const retryRFQ = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const rfq = await RFQ.findOne({
       _id: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
@@ -85,6 +93,7 @@ export const retryRFQ = async (
     const email = await Email.findOne({
       _id: rfq.emailId,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).lean();
     if (!email) {
       res.status(404).json({ error: "Associated email not found" });
@@ -101,7 +110,8 @@ export const retryRFQ = async (
       body,
       email.messageId,
       authReq.user.id,
-      email.gmailAccountId.toString()
+      email.gmailAccountId.toString(),
+      organization._id.toString()
     ).catch(
       (err) => console.error(`RFQ retry failed for ${email.messageId}:`, err)
     );
@@ -119,9 +129,11 @@ export const generateQuote = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const rfq = await RFQ.findOne({
       _id: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).populate("emailId").lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
@@ -164,7 +176,10 @@ export const generateQuote = async (
     const originalSenderEmail = extractEmailAddress(email?.from);
     const customerEmail = extractEmailAddress(rfq.customer.email) || originalSenderEmail;
     const savedCustomer = customerEmail
-      ? await Customer.findOne({ email: customerEmail }).lean()
+      ? await Customer.findOne({
+          email: customerEmail,
+          organizationId: organization._id,
+        }).lean()
       : null;
 
     const { subject, body } = await generateQuoteReply({
@@ -173,6 +188,11 @@ export const generateQuote = async (
       customerEmail,
       customerNotes: savedCustomer?.notes ?? null,
       specialDiscountPercentage: savedCustomer?.specialDiscountPercentage ?? null,
+      organizationName: organization.name,
+      organizationContactName: organization.defaultContact?.name,
+      organizationContactEmail: organization.defaultContact?.email,
+      organizationContactPhone: organization.defaultContact?.phoneNumber,
+      organizationDefaultTerms: organization.preferences?.defaultTerms,
       originalSubject: email?.subject || "",
       products: products.map((p) => ({
         queryName: p.queryName,
@@ -191,6 +211,7 @@ export const generateQuote = async (
       { rfqId: rfq._id },
       {
         userId: authReq.user.id,
+        organizationId: organization._id,
         gmailAccountId: rfq.gmailAccountId,
         rfqId: rfq._id,
         selectedProducts: products,
@@ -219,9 +240,11 @@ export const getQuoteReply = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const reply = await RFQReply.findOne({
       rfqId: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).lean();
     if (!reply) {
       res.status(404).json({ error: "No reply found for this RFQ" });
@@ -241,9 +264,11 @@ export const sendQuoteReply = async (
   const authReq = req as AuthenticatedRequest;
 
   try {
+    const organization = (req as OrganizationRequest).organization;
     const rfq = await RFQ.findOne({
       _id: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
@@ -251,13 +276,22 @@ export const sendQuoteReply = async (
     }
 
     const [email, account, reply] = await Promise.all([
-      Email.findOne({ _id: rfq.emailId, userId: authReq.user.id }),
+      Email.findOne({
+        _id: rfq.emailId,
+        userId: authReq.user.id,
+        organizationId: organization._id,
+      }),
       GmailAccount.findOne({
         _id: rfq.gmailAccountId,
         userId: authReq.user.id,
+        organizationId: organization._id,
         status: "connected",
       }),
-      RFQReply.findOne({ rfqId: rfq._id, userId: authReq.user.id }),
+      RFQReply.findOne({
+        rfqId: rfq._id,
+        userId: authReq.user.id,
+        organizationId: organization._id,
+      }),
     ]);
 
     if (!email) {

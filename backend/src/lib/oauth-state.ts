@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 
 interface GmailOAuthState {
   userId: string;
+  organizationId?: string;
   nonce: string;
   exp: number;
 }
@@ -10,12 +11,13 @@ function getStateSecret(): string {
   return process.env.OAUTH_STATE_SECRET || process.env.TOKEN_ENCRYPTION_SECRET || "";
 }
 
-export function createGmailOAuthState(userId: string): string {
+export function createGmailOAuthState(userId: string, organizationId?: string): string {
   const secret = getStateSecret();
   if (!secret) throw new Error("OAUTH_STATE_SECRET or TOKEN_ENCRYPTION_SECRET must be set");
 
   const payload: GmailOAuthState = {
     userId,
+    organizationId,
     nonce: randomUUID(),
     exp: Date.now() + 10 * 60 * 1000,
   };

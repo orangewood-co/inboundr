@@ -4,6 +4,7 @@ export type GmailAccountStatus = "connected" | "expired" | "revoked" | "error";
 
 export interface IGmailAccount extends Document {
   userId: string;
+  organizationId: mongoose.Types.ObjectId;
   emailAddress: string;
   accessToken: string | null;
   refreshToken: string;
@@ -20,6 +21,12 @@ export interface IGmailAccount extends Document {
 const gmailAccountSchema = new Schema<IGmailAccount>(
   {
     userId: { type: String, required: true, index: true },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: false,
+      index: true,
+    },
     emailAddress: { type: String, required: true, lowercase: true, trim: true },
     accessToken: { type: String, default: null },
     refreshToken: { type: String, required: true },
@@ -39,6 +46,7 @@ const gmailAccountSchema = new Schema<IGmailAccount>(
 );
 
 gmailAccountSchema.index({ userId: 1, emailAddress: 1 }, { unique: true });
+gmailAccountSchema.index({ organizationId: 1, emailAddress: 1 });
 gmailAccountSchema.index({ emailAddress: 1, status: 1 });
 
 export const GmailAccount = mongoose.model<IGmailAccount>(

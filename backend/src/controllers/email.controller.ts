@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { processHistoryUpdate } from "../services/email.service";
 import { Email } from "../models/email.model";
 import { GmailAccount } from "../models/gmail-account.model";
-import type { AuthenticatedRequest } from "../middleware/auth.middleware";
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 
 export const emailWebhookController = async (
   req: Request,
@@ -59,19 +59,20 @@ export const listEmails = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
     const [emails, total] = await Promise.all([
       Email.find()
-        .where({ userId: authReq.user.id })
+        .where({ userId: authReq.user.id, organizationId: organization._id })
         .select("-bodyText -bodyHtml")
         .sort({ date: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Email.countDocuments({ userId: authReq.user.id }),
+      Email.countDocuments({ userId: authReq.user.id, organizationId: organization._id }),
     ]);
 
     res.json({ emails, total, page, limit, totalPages: Math.ceil(total / limit) });
@@ -87,9 +88,11 @@ export const getEmail = async (
 ): Promise<void> => {
   try {
     const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
     const email = await Email.findOne({
       _id: req.params.id,
       userId: authReq.user.id,
+      organizationId: organization._id,
     }).lean();
     if (!email) {
       res.status(404).json({ error: "Email not found" });

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Building2Icon,
   CameraIcon,
   EllipsisVerticalIcon,
   KeyIcon,
@@ -59,6 +60,45 @@ interface GmailAccount {
   errorMessage: string | null
   createdAt: string
   updatedAt: string
+}
+
+interface Organization {
+  _id: string
+  name: string
+  defaultContact: {
+    name: string
+    email: string
+    phoneNumber: string
+  }
+  website: string
+  logoUrl: string
+  address: string
+  preferences: {
+    primaryColor: string
+    theme: "dark" | "light"
+    pricing: string
+    defaultTerms: string
+  }
+}
+
+type OrganizationFormState = Omit<Organization, "_id">
+
+const emptyOrganizationForm: OrganizationFormState = {
+  name: "",
+  defaultContact: {
+    name: "",
+    email: "",
+    phoneNumber: "",
+  },
+  website: "",
+  logoUrl: "",
+  address: "",
+  preferences: {
+    primaryColor: "#f5b400",
+    theme: "dark",
+    pricing: "INR",
+    defaultTerms: "",
+  },
 }
 
 // ─── Sub-components ──────────────────────────────────────────
@@ -176,6 +216,216 @@ function ApiTable({ items }: { items: typeof MOCK_PUBLIC_APIS }) {
 }
 
 // ─── Tab Content ─────────────────────────────────────────────
+
+function OrganizationTab() {
+  const [form, setForm] = useState<OrganizationFormState>(emptyOrganizationForm)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchOrganization = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
+        credentials: "include",
+      })
+      const data: { organization: Organization } = await res.json()
+      if (!res.ok) throw new Error((data as any)?.error || "Failed to load organization")
+
+      setForm({
+        name: data.organization.name ?? "",
+        defaultContact: {
+          name: data.organization.defaultContact?.name ?? "",
+          email: data.organization.defaultContact?.email ?? "",
+          phoneNumber: data.organization.defaultContact?.phoneNumber ?? "",
+        },
+        website: data.organization.website ?? "",
+        logoUrl: data.organization.logoUrl ?? "",
+        address: data.organization.address ?? "",
+        preferences: {
+          primaryColor: data.organization.preferences?.primaryColor ?? "#f5b400",
+          theme: data.organization.preferences?.theme ?? "dark",
+          pricing: data.organization.preferences?.pricing ?? "INR",
+          defaultTerms: data.organization.preferences?.defaultTerms ?? "",
+        },
+      })
+    } catch (err: any) {
+      setError(err.message || "Failed to load organization")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchOrganization()
+  }, [fetchOrganization])
+
+  const saveOrganization = async () => {
+    setSaving(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save organization")
+      setMessage("Organization settings saved")
+    } catch (err: any) {
+      setError(err.message || "Failed to save organization")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updateForm = (field: keyof OrganizationFormState, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const updateContact = (field: keyof OrganizationFormState["defaultContact"], value: string) => {
+    setForm((current) => ({
+      ...current,
+      defaultContact: { ...current.defaultContact, [field]: value },
+    }))
+  }
+
+  const updatePreference = (field: keyof OrganizationFormState["preferences"], value: string) => {
+    setForm((current) => ({
+      ...current,
+      preferences: { ...current.preferences, [field]: value },
+    }))
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Organization"
+        description="Customize your organization profile and quotation defaults."
+      />
+
+      <SettingsCard
+        title="Organization Profile"
+        description="These details identify your workspace across customer-facing flows."
+      >
+        <div className="space-y-5 p-5">
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading organization settings...</p>
+          ) : (
+            <>
+              {error && <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+              {message && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400">{message}</div>}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="organizationName">Organization name</Label>
+                  <Input id="organizationName" value={form.name} onChange={(event) => updateForm("name", event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="website">Website</Label>
+                  <Input id="website" value={form.website} onChange={(event) => updateForm("website", event.target.value)} placeholder="https://example.com" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="logoUrl">Logo URL</Label>
+                <Input id="logoUrl" value={form.logoUrl} onChange={(event) => updateForm("logoUrl", event.target.value)} placeholder="https://example.com/logo.png" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="organizationAddress">Address</Label>
+                <textarea
+                  id="organizationAddress"
+                  rows={4}
+                  value={form.address}
+                  onChange={(event) => updateForm("address", event.target.value)}
+                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </SettingsCard>
+
+      {!loading && (
+        <>
+          <SettingsCard
+            title="Default Contact"
+            description="Primary person shown for organization-level communication."
+          >
+            <div className="grid gap-4 p-5 sm:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="contactName">Name</Label>
+                <Input id="contactName" value={form.defaultContact.name} onChange={(event) => updateContact("name", event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="contactEmail">Email</Label>
+                <Input id="contactEmail" type="email" value={form.defaultContact.email} onChange={(event) => updateContact("email", event.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="contactPhone">Phone number</Label>
+                <Input id="contactPhone" value={form.defaultContact.phoneNumber} onChange={(event) => updateContact("phoneNumber", event.target.value)} />
+              </div>
+            </div>
+          </SettingsCard>
+
+          <SettingsCard
+            title="Preferences"
+            description="Defaults that can be used by quoting and presentation flows."
+          >
+            <div className="space-y-5 p-5">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="primaryColor">Primary color</Label>
+                  <Input id="primaryColor" value={form.preferences.primaryColor} onChange={(event) => updatePreference("primaryColor", event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="theme">Theme</Label>
+                  <select
+                    id="theme"
+                    value={form.preferences.theme}
+                    onChange={(event) => updatePreference("theme", event.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  >
+                    <option value="dark">Dark</option>
+                    <option value="light">Light</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="pricing">Pricing currency</Label>
+                  <Input id="pricing" value={form.preferences.pricing} onChange={(event) => updatePreference("pricing", event.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="defaultTerms">Default terms</Label>
+                <textarea
+                  id="defaultTerms"
+                  rows={5}
+                  value={form.preferences.defaultTerms}
+                  onChange={(event) => updatePreference("defaultTerms", event.target.value)}
+                  placeholder="Payment terms, quote validity, delivery terms..."
+                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+
+              <div className="flex">
+                <Button onClick={saveOrganization} disabled={saving || !form.name.trim()}>
+                  {saving ? "Saving..." : "Save Organization"}
+                </Button>
+              </div>
+            </div>
+          </SettingsCard>
+        </>
+      )}
+    </div>
+  )
+}
 
 function ProfileTab() {
   return (
@@ -696,6 +946,10 @@ export function SettingsPage() {
           <div className="max-w-3xl px-6 py-8 lg:px-8">
             <Tabs defaultValue="profile">
               <TabsList className="mb-6">
+                <TabsTrigger value="organization" className="gap-1.5">
+                  <Building2Icon className="size-3.5" />
+                  Organization
+                </TabsTrigger>
                 <TabsTrigger value="profile" className="gap-1.5">
                   <UserIcon className="size-3.5" />
                   Profile
@@ -716,6 +970,9 @@ export function SettingsPage() {
                 </TabsTrigger>
               </TabsList>
 
+              <TabsContent value="organization">
+                <OrganizationTab />
+              </TabsContent>
               <TabsContent value="profile">
                 <ProfileTab />
               </TabsContent>

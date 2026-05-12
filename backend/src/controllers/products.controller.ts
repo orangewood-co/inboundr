@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import type { Request, Response } from "express";
 import type { DatabaseConfig, Product } from "../types";
+import type { OrganizationRequest } from "../middleware/auth.middleware";
 
 type ProductInput = Omit<
   Product,
@@ -11,6 +12,7 @@ type ProductInput = Omit<
 
 const PRODUCT_COLUMNS = [
   "id",
+  "organization_id",
   "brand",
   "maxdiscount",
   "productdescription",
@@ -100,19 +102,21 @@ export const listProducts = async (
   res: Response
 ): Promise<void> => {
   try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
     const page = parsePositiveInt(req.query.page, 1);
     const limit = parsePositiveInt(req.query.limit, 20, 50);
     const offset = (page - 1) * limit;
     const search = String(req.query.search ?? "").trim();
-    const values: unknown[] = [];
+    const values: unknown[] = [organizationId];
 
-    let whereClause = "";
+    let whereClause = "WHERE organization_id = $1";
     if (search) {
       values.push(`%${search.toLowerCase()}%`);
+      const searchParam = values.length;
       const searchConditions = SEARCH_COLUMNS.map(
-        (column) => `lower(COALESCE(${column}::text, '')) LIKE $1`
+        (column) => `lower(COALESCE(${column}::text, '')) LIKE $${searchParam}`
       );
-      whereClause = `WHERE ${searchConditions.join(" OR ")}`;
+      whereClause += ` AND (${searchConditions.join(" OR ")})`;
     }
 
     values.push(limit, offset);
@@ -132,7 +136,7 @@ export const listProducts = async (
         `SELECT COUNT(*)::text AS count
          FROM products
          ${whereClause}`,
-        search ? values.slice(0, 1) : []
+        values.slice(0, search ? 2 : 1)
       ),
     ]);
 
@@ -155,6 +159,7 @@ export const getProduct = async (
   res: Response
 ): Promise<void> => {
   try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
     const id = parseProductId(req.params.id);
     if (id === null) {
       res.status(400).json({ error: "Invalid product id" });
@@ -164,8 +169,8 @@ export const getProduct = async (
     const result = await pool.query<Product>(
       `SELECT ${PRODUCT_COLUMNS.join(", ")}
        FROM products
-       WHERE id = $1`,
-      [id]
+       WHERE id = $1 AND organization_id = $2`,
+      [id, organizationId]
     );
 
     const product = result.rows[0];
@@ -186,6 +191,7 @@ export const createProduct = async (
   res: Response
 ): Promise<void> => {
   try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
     const input = normalizeProductInput(req.body ?? {});
     const validationError = validateRequiredProductFields(input);
 
@@ -194,8 +200,10 @@ export const createProduct = async (
       return;
     }
 
-    const columns = EDITABLE_COLUMNS.filter((column) => column in input);
-    const values = columns.map((column) => input[column]);
+    const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+    const values = columns.map((column) =>
+      column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+    );
     const placeholders = columns.map((_, index) => `$${index + 1}`);
 
     const result = await pool.query<Product>(
@@ -217,6 +225,7 @@ export const updateProduct = async (
   res: Response
 ): Promise<void> => {
   try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
     const id = parseProductId(req.params.id);
     if (id === null) {
       res.status(400).json({ error: "Invalid product id" });
@@ -233,12 +242,12 @@ export const updateProduct = async (
 
     const values = columns.map((column) => input[column]);
     const assignments = columns.map((column, index) => `${column} = $${index + 1}`);
-    values.push(id);
+    values.push(id, organizationId);
 
     const result = await pool.query<Product>(
       `UPDATE products
        SET ${assignments.join(", ")}
-       WHERE id = $${values.length}
+       WHERE id = $${values.length - 1} AND organization_id = $${values.length}
        RETURNING ${PRODUCT_COLUMNS.join(", ")}`,
       values
     );
