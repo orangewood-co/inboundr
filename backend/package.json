@@ -19,7 +19,9 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1045.0",
     "@aws-sdk/client-ses": "^3.1043.0",
+    "@aws-sdk/s3-request-presigner": "^3.1045.0",
     "@google-cloud/pubsub": "^5.3.0",
     "@google-cloud/vertexai": "^1.10.4",
     "@langchain/core": "^1.1.39",

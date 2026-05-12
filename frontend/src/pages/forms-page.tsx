@@ -25,8 +25,9 @@ import { cn } from "@/lib/utils"
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
 const CUSTOMERS_API_BASE = `${API_ORIGIN}/api/v1/customers`
+const UPLOADS_API_BASE = `${API_ORIGIN}/api/v1/uploads`
 
-type FieldType = "short_text" | "long_text" | "email" | "phone" | "number" | "dropdown" | "checkbox" | "date"
+type FieldType = "short_text" | "long_text" | "email" | "phone" | "number" | "dropdown" | "checkbox" | "date" | "file"
 
 type FormField = {
   id: string
@@ -35,6 +36,9 @@ type FormField = {
   required: boolean
   placeholder?: string | null
   options?: string[]
+  maxFileSizeMb?: number
+  allowedMimeTypes?: string[]
+  multiple?: boolean
 }
 
 type ManagedForm = {
@@ -58,6 +62,16 @@ type FormSubmission = {
   createdAt: string
 }
 
+type UploadedFileValue = {
+  key: string
+  bucket?: string
+  originalName: string
+  contentType?: string
+  size?: number
+  uploadedAt?: string | null
+  url?: string | null
+}
+
 const starterField = (): FormField => ({
   id: `field_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
   label: "Customer email",
@@ -65,6 +79,9 @@ const starterField = (): FormField => ({
   required: true,
   placeholder: "name@company.com",
   options: [],
+  maxFileSizeMb: 10,
+  allowedMimeTypes: [],
+  multiple: false,
 })
 
 const defaultDraft = (): Partial<ManagedForm> => ({
@@ -91,6 +108,64 @@ function publicUrl(slug: string) {
 
 function embedSnippet(slug: string) {
   return `<iframe src="${publicUrl(slug)}?embed=1" width="100%" height="720" style="border:0;border-radius:16px;overflow:hidden" loading="lazy"></iframe>`
+}
+
+function formatResponseValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        item && typeof item === "object" && "originalName" in item
+          ? String((item as { originalName: unknown }).originalName)
+          : String(item)
+      )
+      .join(", ")
+  }
+  if (value && typeof value === "object" && "originalName" in value) {
+    return String((value as { originalName: unknown }).originalName)
+  }
+  return String(value ?? "-")
+}
+
+function isUploadedFileValue(value: unknown): value is UploadedFileValue {
+  return Boolean(value && typeof value === "object" && "key" in value && "originalName" in value)
+}
+
+function ResponseValue({ value }: { value: unknown }) {
+  const files = Array.isArray(value) ? value.filter(isUploadedFileValue) : isUploadedFileValue(value) ? [value] : []
+
+  async function openFile(file: UploadedFileValue) {
+    if (file.url) {
+      window.open(file.url, "_blank", "noopener,noreferrer")
+      return
+    }
+
+    const response = await fetch(`${UPLOADS_API_BASE}/view?key=${encodeURIComponent(file.key)}`, {
+      credentials: "include",
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || !payload?.url) return
+    window.open(payload.url, "_blank", "noopener,noreferrer")
+  }
+
+  if (files.length > 0) {
+    return (
+      <div className="mt-1 grid gap-1">
+        {files.map((file) => (
+          <button
+            key={file.key}
+            type="button"
+            onClick={() => void openFile(file)}
+            className="w-fit break-all text-left font-medium text-primary underline-offset-4 hover:underline"
+            title={file.key}
+          >
+            {file.originalName}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  return <p className="mt-1 break-words">{formatResponseValue(value)}</p>
 }
 
 export default function FormsPage() {
@@ -376,6 +451,7 @@ export default function FormsPage() {
                             <option value="dropdown">Dropdown</option>
                             <option value="checkbox">Checkbox</option>
                             <option value="date">Date</option>
+                            <option value="file">File upload</option>
                           </select>
                           <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" checked={field.required} onChange={(event) => updateField(index, { required: event.target.checked })} />
@@ -402,6 +478,39 @@ export default function FormsPage() {
                             onChange={(event) => updateField(index, { options: event.target.value.split(",").map((option) => option.trim()).filter(Boolean) })}
                             placeholder="Options, separated by commas"
                           />
+                        )}
+                        {field.type === "file" && (
+                          <div className="mt-3 grid gap-3 sm:grid-cols-[10rem_1fr_8rem]">
+                            <div className="grid gap-2">
+                              <Label>Max size MB</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="50"
+                                value={field.maxFileSizeMb ?? 10}
+                                onChange={(event) => updateField(index, { maxFileSizeMb: Number(event.target.value) })}
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label>Allowed MIME types</Label>
+                              <Input
+                                value={(field.allowedMimeTypes ?? []).join(", ")}
+                                onChange={(event) =>
+                                  updateField(index, {
+                                    allowedMimeTypes: event.target.value
+                                      .split(",")
+                                      .map((mime) => mime.trim().toLowerCase())
+                                      .filter(Boolean),
+                                  })
+                                }
+                                placeholder="application/pdf, image/png"
+                              />
+                            </div>
+                            <label className="flex items-end gap-2 pb-2 text-sm">
+                              <input type="checkbox" checked={Boolean(field.multiple)} onChange={(event) => updateField(index, { multiple: event.target.checked })} />
+                              Multiple files
+                            </label>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -504,7 +613,7 @@ export default function FormsPage() {
                         {fields.map((field) => (
                           <div key={field.id} className="rounded-xl bg-muted/40 p-3 text-sm">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{field.label}</p>
-                            <p className="mt-1 break-words">{Array.isArray(submission.values[field.id]) ? (submission.values[field.id] as string[]).join(", ") : String(submission.values[field.id] ?? "-")}</p>
+                            <ResponseValue value={submission.values[field.id]} />
                           </div>
                         ))}
                       </div>

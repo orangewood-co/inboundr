@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { Form, type FormFieldType, type IFormField } from "../models/form.model";
 import { FormSubmission } from "../models/form-submission.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
+import { keyBelongsToPrefix } from "../services/storage.service";
 
 const FIELD_TYPES: FormFieldType[] = [
   "short_text",
@@ -14,6 +15,7 @@ const FIELD_TYPES: FormFieldType[] = [
   "dropdown",
   "checkbox",
   "date",
+  "file",
 ];
 
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
@@ -55,6 +57,11 @@ function normalizeFields(value: unknown): IFormField[] {
         required: Boolean(source.required),
         placeholder: String(source.placeholder ?? "").trim().slice(0, 180) || null,
         options: type === "dropdown" || type === "checkbox" ? options : [],
+        maxFileSizeMb: Math.max(1, Math.min(Number(source.maxFileSizeMb ?? 10), 50)),
+        allowedMimeTypes: Array.isArray(source.allowedMimeTypes)
+          ? source.allowedMimeTypes.map((mime) => String(mime).trim().toLowerCase()).filter(Boolean).slice(0, 20)
+          : [],
+        multiple: Boolean(source.multiple),
       };
     })
     .filter((field) => field.label);
@@ -329,11 +336,26 @@ export async function exportSubmissionsCsv(req: Request, res: Response): Promise
       .sort({ createdAt: -1 })
       .lean();
     const headers = ["submittedAt", "status", "source", ...form.fields.map((field) => field.label)];
+    const formatSubmissionValue = (value: unknown): string => {
+      if (Array.isArray(value)) {
+        return value
+          .map((item) =>
+            item && typeof item === "object" && "originalName" in item
+              ? `${(item as any).originalName} (${(item as any).key})`
+              : String(item)
+          )
+          .join("; ");
+      }
+      if (value && typeof value === "object" && "originalName" in value) {
+        return `${(value as any).originalName} (${(value as any).key})`;
+      }
+      return String(value ?? "");
+    };
     const rows = submissions.map((submission) => [
       submission.createdAt.toISOString(),
       submission.status,
       submission.source,
-      ...form.fields.map((field) => submission.values?.[field.id] ?? ""),
+      ...form.fields.map((field) => formatSubmissionValue(submission.values?.[field.id])),
     ]);
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
@@ -348,7 +370,13 @@ export async function exportSubmissionsCsv(req: Request, res: Response): Promise
   }
 }
 
-function validateSubmission(fields: IFormField[], values: Record<string, unknown>) {
+function isUploadedFileMetadata(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const file = value as Record<string, unknown>;
+  return Boolean(file.key && file.bucket && file.originalName && file.contentType && file.size);
+}
+
+function validateSubmission(fields: IFormField[], values: Record<string, unknown>, form: { _id: unknown; organizationId: unknown }) {
   const errors: Record<string, string> = {};
   const sanitized: Record<string, unknown> = {};
 
@@ -377,6 +405,41 @@ function validateSubmission(fields: IFormField[], values: Record<string, unknown
     if (field.type === "checkbox") {
       const selected = Array.isArray(value) ? value.map(String) : [String(value)];
       sanitized[field.id] = selected.filter((option) => field.options?.includes(option));
+      continue;
+    }
+    if (field.type === "file") {
+      const files = Array.isArray(value) ? value : [value];
+      const validFiles = files.filter(isUploadedFileMetadata);
+      if (field.required && validFiles.length === 0) {
+        errors[field.id] = "This field is required";
+        continue;
+      }
+      if (!field.multiple && validFiles.length > 1) {
+        errors[field.id] = "Only one file is allowed";
+        continue;
+      }
+      const expectedPrefix = ["form", String(form.organizationId), String(form._id), field.id];
+      const invalidFile = validFiles.find((file) => {
+        const key = String(file.key ?? "");
+        const contentType = String(file.contentType ?? "").toLowerCase();
+        const size = Number(file.size ?? 0);
+        const maxBytes = Math.max(1, Math.min(Number(field.maxFileSizeMb ?? 10), 50)) * 1024 * 1024;
+        return (
+          !keyBelongsToPrefix(key, expectedPrefix) ||
+          size <= 0 ||
+          size > maxBytes ||
+          Boolean(field.allowedMimeTypes?.length && !field.allowedMimeTypes.includes(contentType))
+        );
+      });
+      if (invalidFile) {
+        errors[field.id] = "Uploaded file is not valid for this form";
+        continue;
+      }
+      if (validFiles.length > 0) {
+        sanitized[field.id] = field.multiple
+          ? validFiles.map((file) => ({ ...file, uploadedAt: file.uploadedAt ?? new Date().toISOString() }))
+          : { ...validFiles[0], uploadedAt: validFiles[0]?.uploadedAt ?? new Date().toISOString() };
+      }
       continue;
     }
     sanitized[field.id] = field.type === "number" ? Number(text) : String(text).slice(0, 5000);
@@ -410,7 +473,7 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
       res.status(404).json({ error: "Form not found" });
       return;
     }
-    const { errors, sanitized } = validateSubmission(form.fields, (req.body?.values ?? {}) as Record<string, unknown>);
+    const { errors, sanitized } = validateSubmission(form.fields, (req.body?.values ?? {}) as Record<string, unknown>, form);
     if (Object.keys(errors).length > 0) {
       res.status(400).json({ error: "Please fix the highlighted fields", errors });
       return;

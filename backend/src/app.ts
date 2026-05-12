@@ -13,6 +13,7 @@ import customerRouter from "./routes/customer.route";
 import organizationRouter from "./routes/organization.route";
 import formsRouter from "./routes/forms.route";
 import publicFormsRouter from "./routes/public-forms.route";
+import uploadsRouter from "./routes/uploads.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -51,6 +52,7 @@ app.use("/api/v1/rfq", rfqRouter);
 app.use("/api/v1/customers", customerRouter);
 app.use("/api/v1/organization", organizationRouter);
 app.use("/api/v1/forms", formsRouter);
+app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 
 app.use((req: Request, res: Response) => {

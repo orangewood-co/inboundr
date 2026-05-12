@@ -8,7 +8,8 @@ export type FormFieldType =
   | "number"
   | "dropdown"
   | "checkbox"
-  | "date";
+  | "date"
+  | "file";
 
 export interface IFormField {
   id: string;
@@ -17,6 +18,9 @@ export interface IFormField {
   required: boolean;
   placeholder?: string | null;
   options?: string[];
+  maxFileSizeMb?: number;
+  allowedMimeTypes?: string[];
+  multiple?: boolean;
 }
 
 export interface IForm extends Document {
@@ -46,11 +50,14 @@ const formFieldSchema = new Schema<IFormField>(
     type: {
       type: String,
       required: true,
-      enum: ["short_text", "long_text", "email", "phone", "number", "dropdown", "checkbox", "date"],
+      enum: ["short_text", "long_text", "email", "phone", "number", "dropdown", "checkbox", "date", "file"],
     },
     required: { type: Boolean, default: false },
     placeholder: { type: String, default: null },
     options: { type: [String], default: [] },
+    maxFileSizeMb: { type: Number, default: 10 },
+    allowedMimeTypes: { type: [String], default: [] },
+    multiple: { type: Boolean, default: false },
   },
   { _id: false }
 );

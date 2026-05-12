@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
-type FieldType = "short_text" | "long_text" | "email" | "phone" | "number" | "dropdown" | "checkbox" | "date"
+type FieldType = "short_text" | "long_text" | "email" | "phone" | "number" | "dropdown" | "checkbox" | "date" | "file"
 
 type PublicField = {
   id: string
@@ -17,6 +17,19 @@ type PublicField = {
   required: boolean
   placeholder?: string | null
   options?: string[]
+  maxFileSizeMb?: number
+  allowedMimeTypes?: string[]
+  multiple?: boolean
+}
+
+type UploadedFile = {
+  key: string
+  bucket: string
+  originalName: string
+  contentType: string
+  size: number
+  uploadedAt: string | null
+  url: string | null
 }
 
 type PublicForm = {
@@ -33,11 +46,15 @@ function FieldInput({
   value,
   error,
   onChange,
+  onUpload,
+  uploading,
 }: {
   field: PublicField
   value: unknown
   error?: string
   onChange: (value: unknown) => void
+  onUpload?: (files: FileList) => Promise<void>
+  uploading?: boolean
 }) {
   const id = `public-${field.id}`
   const baseClass = error ? "border-destructive focus-visible:ring-destructive/20" : ""
@@ -48,7 +65,32 @@ function FieldInput({
         {field.label}
         {field.required && <span className="ml-1 text-destructive">*</span>}
       </Label>
-      {field.type === "long_text" ? (
+      {field.type === "file" ? (
+        <div className={`rounded-xl border bg-white/70 p-3 shadow-sm ${baseClass}`}>
+          <input
+            id={id}
+            type="file"
+            multiple={Boolean(field.multiple)}
+            accept={(field.allowedMimeTypes ?? []).join(",")}
+            onChange={(event) => event.target.files && onUpload?.(event.target.files)}
+            className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-stone-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Max {field.maxFileSizeMb ?? 10}MB{field.allowedMimeTypes?.length ? ` · ${field.allowedMimeTypes.join(", ")}` : ""}
+          </p>
+          {uploading && <p className="mt-2 text-xs font-medium">Uploading...</p>}
+          {Array.isArray(value) && value.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs">
+              {(value as UploadedFile[]).map((file) => (
+                <li key={file.key}>{file.originalName}</li>
+              ))}
+            </ul>
+          )}
+          {!Array.isArray(value) && value && typeof value === "object" && "originalName" in value && (
+            <p className="mt-2 text-xs">{String((value as UploadedFile).originalName)}</p>
+          )}
+        </div>
+      ) : field.type === "long_text" ? (
         <textarea
           id={id}
           rows={5}
@@ -116,6 +158,7 @@ export default function PublicFormPage() {
   const [submitting, setSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [fatalError, setFatalError] = useState<string | null>(null)
+  const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -158,6 +201,56 @@ export default function PublicFormPage() {
       setFatalError(error instanceof Error ? error.message : "Unable to submit form")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function uploadFiles(field: PublicField, files: FileList) {
+    if (!form) return
+    setUploadingFieldId(field.id)
+    setErrors((current) => ({ ...current, [field.id]: "" }))
+    setFatalError(null)
+
+    try {
+      const uploaded: UploadedFile[] = []
+      for (const file of Array.from(files)) {
+        if (file.size > (field.maxFileSizeMb ?? 10) * 1024 * 1024) {
+          throw new Error(`${file.name} is larger than ${field.maxFileSizeMb ?? 10}MB`)
+        }
+        if (field.allowedMimeTypes?.length && !field.allowedMimeTypes.includes(file.type)) {
+          throw new Error(`${file.name} is not an allowed file type`)
+        }
+        const presignResponse = await fetch(`${API_ORIGIN}/api/v1/public/forms/${form.slug}/uploads/presign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fieldId: field.id,
+            fileName: file.name,
+            contentType: file.type || "application/octet-stream",
+            size: file.size,
+          }),
+        })
+        const presign = await presignResponse.json().catch(() => null)
+        if (!presignResponse.ok) throw new Error(presign?.error ?? "Unable to prepare upload")
+
+        const uploadResponse = await fetch(presign.uploadUrl, {
+          method: presign.method,
+          headers: presign.headers,
+          body: file,
+        })
+        if (!uploadResponse.ok) throw new Error(`Unable to upload ${file.name}`)
+        uploaded.push({ ...presign.file, uploadedAt: new Date().toISOString() })
+      }
+
+      setValues((current) => ({
+        ...current,
+        [field.id]: field.multiple ? uploaded : uploaded[0],
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to upload file"
+      setErrors((current) => ({ ...current, [field.id]: message }))
+      setFatalError(message)
+    } finally {
+      setUploadingFieldId(null)
     }
   }
 
@@ -205,6 +298,8 @@ export default function PublicFormPage() {
                     value={values[field.id]}
                     error={errors[field.id]}
                     onChange={(value) => setValues((current) => ({ ...current, [field.id]: value }))}
+                    onUpload={(files) => uploadFiles(field, files)}
+                    uploading={uploadingFieldId === field.id}
                   />
                 ))}
                 {fatalError && (
