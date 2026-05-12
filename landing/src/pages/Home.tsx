@@ -70,7 +70,7 @@ export default function Home() {
     <>
       {/* ── Hero ── */}
       <section className="noise grid-lines relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_0%,rgba(47,93,80,0.22),transparent)]" />
+        <div className="hero-glow absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_0%,rgba(47,93,80,0.22),transparent)]" />
         <div className="relative mx-auto max-w-7xl px-6 pb-24 pt-28 sm:pb-36 sm:pt-40 lg:px-8">
           <motion.p
             className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright"
@@ -81,7 +81,7 @@ export default function Home() {
             Inbound, handled.
           </motion.p>
           <motion.h1
-            className="max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] font-bold leading-[0.95] tracking-[-0.045em]"
+            className="max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] leading-[0.95] tracking-[-0.045em]"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1 }}
