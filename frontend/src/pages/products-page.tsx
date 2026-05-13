@@ -1,14 +1,19 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
+  ArrowLeftIcon,
   BoxIcon,
+  CalendarPlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   Edit3Icon,
+  IndianRupeeIcon,
   LoaderIcon,
   PackagePlusIcon,
   RefreshCwIcon,
   SearchIcon,
+  TagIcon,
+  TableIcon,
 } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -56,6 +61,13 @@ interface ProductsResponse {
   page: number
   limit: number
   totalPages: number
+}
+
+interface ProductStats {
+  totalProducts: number
+  uniqueBrands: number
+  avgUnitPrice: number
+  recentlyAdded: number
 }
 
 type ProductFormState = {
@@ -277,7 +289,202 @@ function ProductForm({
   )
 }
 
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  loading,
+}: {
+  label: string
+  value: string
+  icon: typeof BoxIcon
+  loading: boolean
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/30 px-4 py-3.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <Icon className="size-3.5" />
+        {label}
+      </div>
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-20" />
+      ) : (
+        <p className="mt-1.5 text-2xl font-bold tabular-nums">{value}</p>
+      )}
+    </div>
+  )
+}
+
+function DashboardView({
+  stats,
+  statsLoading,
+  recentProducts,
+  recentLoading,
+  onViewCatalog,
+  onAddProduct,
+}: {
+  stats: ProductStats | null
+  statsLoading: boolean
+  recentProducts: Product[]
+  recentLoading: boolean
+  onViewCatalog: () => void
+  onAddProduct: () => void
+}) {
+  return (
+    <div className="flex flex-1 flex-col overflow-y-auto">
+      <div className="flex items-center justify-between border-b px-6 py-4">
+        <div>
+          <h1 className="text-lg font-semibold">Products</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Manage your product catalog, add new items, and track inventory stats.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-6 p-6">
+        {/* Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Total Products"
+            value={stats?.totalProducts.toLocaleString("en-IN") ?? "0"}
+            icon={BoxIcon}
+            loading={statsLoading}
+          />
+          <StatCard
+            label="Unique Brands"
+            value={stats?.uniqueBrands.toLocaleString("en-IN") ?? "0"}
+            icon={TagIcon}
+            loading={statsLoading}
+          />
+          <StatCard
+            label="Avg. Unit Price"
+            value={
+              stats?.avgUnitPrice
+                ? new Intl.NumberFormat("en-IN", {
+                    style: "currency",
+                    currency: "INR",
+                    maximumFractionDigits: 0,
+                  }).format(stats.avgUnitPrice)
+                : "—"
+            }
+            icon={IndianRupeeIcon}
+            loading={statsLoading}
+          />
+          <StatCard
+            label="Added This Month"
+            value={stats?.recentlyAdded.toLocaleString("en-IN") ?? "0"}
+            icon={CalendarPlusIcon}
+            loading={statsLoading}
+          />
+        </div>
+
+        {/* Action cards */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onViewCatalog}
+            className="group flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/5"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+              <TableIcon className="size-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">View Catalog</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Browse, search, and edit all products in the catalog table.
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddProduct}
+            className="group flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/5"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+              <PackagePlusIcon className="size-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Add Product</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create a new catalog entry for future quotes and matching.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Recent products */}
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <BoxIcon className="size-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold">Recently Added</h2>
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            {recentLoading ? (
+              <div className="divide-y">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-4 px-4 py-3">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 flex-1" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))}
+              </div>
+            ) : recentProducts.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 p-8 text-center">
+                <BoxIcon className="size-5 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">No products yet</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Code
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Description
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Brand
+                    </th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Price
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentProducts.map((product) => (
+                    <tr key={product.id} className="border-b last:border-0">
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex rounded-md border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-bold">
+                          {product.productcode || `#${product.id}`}
+                        </span>
+                      </td>
+                      <td className="max-w-xs truncate px-4 py-2.5 font-medium">
+                        {product.productdescription || "Untitled product"}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground">
+                        {product.brand || "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                        {toCurrency(product.unitprice)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProductsPage() {
+  const [view, setView] = useState<"dashboard" | "table">("dashboard")
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -291,6 +498,44 @@ export default function ProductsPage() {
   const [form, setForm] = useState<ProductFormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [stats, setStats] = useState<ProductStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [recentProducts, setRecentProducts] = useState<Product[]>([])
+  const [recentLoading, setRecentLoading] = useState(true)
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/stats`, { credentials: "include" })
+      if (!res.ok) throw new Error("Failed to fetch stats")
+      const data: ProductStats = await res.json()
+      setStats(data)
+    } catch {
+      setStats(null)
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
+
+  const fetchRecentProducts = useCallback(async () => {
+    setRecentLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}?page=1&limit=5`, { credentials: "include" })
+      if (!res.ok) throw new Error("Failed to fetch recent products")
+      const data: ProductsResponse = await res.json()
+      setRecentProducts(data.products)
+    } catch {
+      setRecentProducts([])
+    } finally {
+      setRecentLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchStats()
+    void fetchRecentProducts()
+  }, [fetchStats, fetchRecentProducts])
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -329,8 +574,10 @@ export default function ProductsPage() {
   }, [search])
 
   useEffect(() => {
-    void fetchProducts()
-  }, [fetchProducts])
+    if (view === "table") {
+      void fetchProducts()
+    }
+  }, [fetchProducts, view])
 
   const visibleRange = useMemo(() => {
     if (total === 0) return "0"
@@ -371,7 +618,11 @@ export default function ProductsPage() {
       }
 
       setSheetOpen(false)
-      await fetchProducts()
+      if (view === "table") {
+        await fetchProducts()
+      }
+      void fetchStats()
+      void fetchRecentProducts()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save product")
     } finally {
@@ -393,133 +644,154 @@ export default function ProductsPage() {
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-2">
-              <BoxIcon className="size-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Products</h2>
-              {!loading && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                  {total.toLocaleString("en-IN")}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={() => void fetchProducts()}
-                disabled={loading}
-              >
-                <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-              </Button>
-              <Button size="sm" onClick={openCreateSheet}>
-                <PackagePlusIcon className="size-4" />
-                Add Product
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 border-b px-4 py-3">
-            <div className="relative max-w-xl flex-1">
-              <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search brand, product code, HSN, description..."
-                className="pl-10"
-              />
-            </div>
-            <span className="shrink-0 text-sm text-muted-foreground">
-              Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
-              <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
-            </span>
-          </div>
-
-          {error ? (
-            <div className="flex flex-col items-center gap-2 p-8 text-center">
-              <AlertCircleIcon className="size-5 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void fetchProducts()}>
-                Try again
-              </Button>
-            </div>
-          ) : loading ? (
-            <ProductTableSkeleton />
-          ) : products.length === 0 ? (
-            <EmptyState search={debouncedSearch} />
+          {view === "dashboard" ? (
+            <DashboardView
+              stats={stats}
+              statsLoading={statsLoading}
+              recentProducts={recentProducts}
+              recentLoading={recentLoading}
+              onViewCatalog={() => setView("table")}
+              onAddProduct={openCreateSheet}
+            />
           ) : (
-            <div className="flex-1 overflow-auto">
-              <table className="w-full min-w-[980px] text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <th className="px-5 py-2.5">Code</th>
-                    <th className="px-5 py-2.5">Product</th>
-                    <th className="px-5 py-2.5">Brand</th>
-                    <th className="px-5 py-2.5">Price</th>
-                    <th className="px-5 py-2.5">GST</th>
-                    <th className="px-5 py-2.5">Margin</th>
-                    <th className="w-10 px-3 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
-                      <td className="px-5 py-3.5 align-top">
-                        <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
-                          {product.productcode || `#${product.id}`}
-                        </span>
-                      </td>
-                      <td className="max-w-xl px-5 py-3.5 align-top">
-                        <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
-                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <span>{product.hsncode || "No HSN"}</span>
-                          <span className="text-border">/</span>
-                          <span>{product.unit || "Unit not set"}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 align-top font-medium">{product.brand || "-"}</td>
-                      <td className="px-5 py-3.5 align-top font-semibold">{toCurrency(product.unitprice)}</td>
-                      <td className="px-5 py-3.5 align-top">{toPercent(product.gstrate)}</td>
-                      <td className="px-5 py-3.5 align-top">
-                        <div className="space-y-0.5 text-xs">
-                          <p>
-                            Discount <span className="font-semibold text-foreground">{toPercent(product.maxdiscount)}</span>
-                          </p>
-                          <p>
-                            Upsell <span className="font-semibold text-foreground">{toPercent(product.maxupsell)}</span>
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3.5 align-top">
-                        <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(product)}>
-                          <Edit3Icon className="size-4" />
-                          <span className="sr-only">Edit product</span>
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+            <>
+              <div className="flex items-center justify-between border-b px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => setView("dashboard")}
+                  >
+                    <ArrowLeftIcon className="size-4" />
+                  </Button>
+                  <BoxIcon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Products</h2>
+                  {!loading && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                      {total.toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => void fetchProducts()}
+                    disabled={loading}
+                  >
+                    <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                  </Button>
+                  <Button size="sm" onClick={openCreateSheet}>
+                    <PackagePlusIcon className="size-4" />
+                    Add Product
+                  </Button>
+                </div>
+              </div>
 
-          <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-muted-foreground">
-              Page <span className="font-semibold text-foreground">{page}</span> of{" "}
-              <span className="font-semibold text-foreground">{totalPages}</span>
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
-                <ChevronLeftIcon className="size-4" />
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
-                Next
-                <ChevronRightIcon className="size-4" />
-              </Button>
-            </div>
-          </div>
+              <div className="flex items-center gap-4 border-b px-4 py-3">
+                <div className="relative max-w-xl flex-1">
+                  <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search brand, product code, HSN, description..."
+                    className="pl-10"
+                  />
+                </div>
+                <span className="shrink-0 text-sm text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
+                  <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
+                </span>
+              </div>
+
+              {error ? (
+                <div className="flex flex-col items-center gap-2 p-8 text-center">
+                  <AlertCircleIcon className="size-5 text-destructive" />
+                  <p className="text-sm text-destructive">{error}</p>
+                  <Button variant="outline" size="sm" onClick={() => void fetchProducts()}>
+                    Try again
+                  </Button>
+                </div>
+              ) : loading ? (
+                <ProductTableSkeleton />
+              ) : products.length === 0 ? (
+                <EmptyState search={debouncedSearch} />
+              ) : (
+                <div className="flex-1 overflow-auto">
+                  <table className="w-full min-w-[980px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        <th className="px-5 py-2.5">Code</th>
+                        <th className="px-5 py-2.5">Product</th>
+                        <th className="px-5 py-2.5">Brand</th>
+                        <th className="px-5 py-2.5">Price</th>
+                        <th className="px-5 py-2.5">GST</th>
+                        <th className="px-5 py-2.5">Margin</th>
+                        <th className="w-10 px-3 py-2.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((product) => (
+                        <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
+                          <td className="px-5 py-3.5 align-top">
+                            <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
+                              {product.productcode || `#${product.id}`}
+                            </span>
+                          </td>
+                          <td className="max-w-xl px-5 py-3.5 align-top">
+                            <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              <span>{product.hsncode || "No HSN"}</span>
+                              <span className="text-border">/</span>
+                              <span>{product.unit || "Unit not set"}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 align-top font-medium">{product.brand || "-"}</td>
+                          <td className="px-5 py-3.5 align-top font-semibold">{toCurrency(product.unitprice)}</td>
+                          <td className="px-5 py-3.5 align-top">{toPercent(product.gstrate)}</td>
+                          <td className="px-5 py-3.5 align-top">
+                            <div className="space-y-0.5 text-xs">
+                              <p>
+                                Discount <span className="font-semibold text-foreground">{toPercent(product.maxdiscount)}</span>
+                              </p>
+                              <p>
+                                Upsell <span className="font-semibold text-foreground">{toPercent(product.maxupsell)}</span>
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3.5 align-top">
+                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(product)}>
+                              <Edit3Icon className="size-4" />
+                              <span className="sr-only">Edit product</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  Page <span className="font-semibold text-foreground">{page}</span> of{" "}
+                  <span className="font-semibold text-foreground">{totalPages}</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
+                    <ChevronLeftIcon className="size-4" />
+                    Previous
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
+                    Next
+                    <ChevronRightIcon className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </SidebarInset>
 

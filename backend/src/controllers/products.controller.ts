@@ -264,3 +264,39 @@ export const updateProduct = async (
     res.status(500).json({ error: "Failed to update product" });
   }
 };
+
+export const getProductStats = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+
+    const result = await pool.query<{
+      total_products: string;
+      unique_brands: string;
+      avg_unit_price: string | null;
+      recently_added: string;
+    }>(
+      `SELECT
+         COUNT(*)::text AS total_products,
+         COUNT(DISTINCT brand)::text AS unique_brands,
+         ROUND(AVG(unitprice)::numeric, 2)::text AS avg_unit_price,
+         COUNT(*) FILTER (WHERE addedtime > now() - interval '30 days')::text AS recently_added
+       FROM products
+       WHERE organization_id = $1`,
+      [organizationId]
+    );
+
+    const row = result.rows[0];
+    res.json({
+      totalProducts: parseInt(row?.total_products ?? "0", 10),
+      uniqueBrands: parseInt(row?.unique_brands ?? "0", 10),
+      avgUnitPrice: row?.avg_unit_price ? parseFloat(row.avg_unit_price) : 0,
+      recentlyAdded: parseInt(row?.recently_added ?? "0", 10),
+    });
+  } catch (err) {
+    console.error("Error fetching product stats:", err);
+    res.status(500).json({ error: "Failed to fetch product stats" });
+  }
+};
