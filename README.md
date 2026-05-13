@@ -1,12 +1,11 @@
+<img src="/banner.png" alt="Inboundr banner" width="100%" />
 <div align="center">
-
-<img src="https://inboundr.co/logo.png" alt="Inboundr" width="100" height="auto" />
-
 # Inboundr
 
 ### Turn inbound into revenue.
 
 AI that replies to inquiries, generates quotes, follows up, and closes deals — automatically.
+
 
 [![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun&logoColor=000)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=fff)](https://typescriptlang.org)
