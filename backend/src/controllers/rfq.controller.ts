@@ -18,6 +18,59 @@ function extractEmailAddress(value: string | null | undefined): string {
   return email.trim().replace(/^mailto:/i, "");
 }
 
+type SelectedRFQProduct = { searchResultIndex: number; matchIndex: number };
+type ManualQuoteProduct = {
+  queryName?: unknown;
+  quantity?: unknown;
+  productId?: unknown;
+  brand?: unknown;
+  description?: unknown;
+  code?: unknown;
+  price?: unknown;
+  hsnCode?: unknown;
+  gstRate?: unknown;
+};
+
+function nullableString(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function positiveNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function resolveManualProduct(product: ManualQuoteProduct) {
+  const queryName = nullableString(product.queryName);
+  const quantity = positiveNumber(product.quantity);
+  const description = nullableString(product.description);
+  const code = nullableString(product.code);
+
+  if (!queryName || !quantity || (!description && !code)) {
+    throw new Error("Manual products require a name, quantity, and description or code");
+  }
+
+  return {
+    queryName,
+    quantity,
+    productId: nullableNumber(product.productId) ?? 0,
+    brand: nullableString(product.brand),
+    description,
+    code,
+    price: nullableNumber(product.price),
+    hsnCode: nullableString(product.hsnCode),
+    gstRate: nullableNumber(product.gstRate),
+  };
+}
+
 export const listRFQs = async (
   req: Request,
   res: Response
@@ -146,15 +199,19 @@ export const generateQuote = async (
     }
 
     // selectedProducts: [{ searchResultIndex, matchIndex }]
-    const selections: { searchResultIndex: number; matchIndex: number }[] =
-      req.body?.selectedProducts;
+    const selections: SelectedRFQProduct[] = Array.isArray(req.body?.selectedProducts)
+      ? req.body.selectedProducts
+      : [];
+    const manualProducts: ManualQuoteProduct[] = Array.isArray(req.body?.manualProducts)
+      ? req.body.manualProducts
+      : [];
 
-    if (!selections || !Array.isArray(selections) || selections.length === 0) {
+    if (selections.length === 0 && manualProducts.length === 0) {
       res.status(400).json({ error: "No products selected" });
       return;
     }
 
-    const products = selections.map((sel) => {
+    const selectedProducts = selections.map((sel) => {
       const sr = rfq.searchResults[sel.searchResultIndex];
       if (!sr) throw new Error(`Invalid searchResultIndex: ${sel.searchResultIndex}`);
       const match = sr.matches[sel.matchIndex];
@@ -171,6 +228,7 @@ export const generateQuote = async (
         gstRate: match.gstRate,
       };
     });
+    const products = [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);

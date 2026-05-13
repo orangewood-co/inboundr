@@ -112,10 +112,14 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
   const response = await model.withStructuredOutput(extractedProducts).invoke([
     new SystemMessage(
       `You are a product support agent.
-You work for Bombay Tools Supplying Agency Pvt. Ltd.
+       You work for Bombay Tools Supplying Agency Pvt. Ltd.
 
-You are given a email from a potential customer asking for a quote for the products they are interested in.
-Your task is to identify the products from the email and return the products details in the structured output format.`
+       You are given a email from a potential customer asking for a quote for the products they are interested in.
+       Your task is to identify the products from the email and return the products details in the structured output format.
+       
+       Pay attention to the product make and specification if given and include them in the product name.
+       `
+
     ),
     new HumanMessage(state.emailBody),
   ]);

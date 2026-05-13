@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   FileTextIcon,
@@ -27,10 +28,13 @@ import {
   CircleIcon,
   SparklesIcon,
   SendIcon,
+  PlusIcon,
+  Trash2Icon,
 } from "lucide-react"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
+const PRODUCTS_API_BASE = `${API_ORIGIN}/api/v1/products`
 
 interface RFQEmail {
   _id: string
@@ -118,6 +122,39 @@ interface RFQReply {
   sendErrorMessage: string | null
 }
 
+interface CatalogProduct {
+  id: number
+  brand: string | null
+  productdescription: string | null
+  productcode: string | null
+  unitprice: number | string | null
+  hsncode: string | null
+  gstrate: number | string | null
+}
+
+interface ProductsResponse {
+  products: CatalogProduct[]
+}
+
+interface ManualProduct {
+  id: string
+  queryName: string
+  quantity: string
+  productId: number
+  brand: string
+  description: string
+  code: string
+  price: string
+  hsnCode: string
+  gstRate: string
+  source: "catalog" | "custom"
+}
+
+type ManualProductField = keyof Pick<
+  ManualProduct,
+  "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "hsnCode" | "gstRate"
+>
+
 function parseSender(from: string): { name: string; email: string } {
   const match = from.match(/^"?(.+?)"?\s*<(.+)>$/)
   if (match) return { name: match[1].trim(), email: match[2] }
@@ -145,6 +182,28 @@ function formatFullDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+function numberInputValue(value: number | string | null | undefined): string {
+  if (value == null) return ""
+  const number = Number(value)
+  return Number.isFinite(number) ? String(number) : ""
+}
+
+function catalogProductToManual(product: CatalogProduct): ManualProduct {
+  return {
+    id: `${product.id}-${Date.now()}`,
+    queryName: product.productdescription || product.productcode || "Catalog product",
+    quantity: "1",
+    productId: product.id,
+    brand: product.brand ?? "",
+    description: product.productdescription ?? "",
+    code: product.productcode ?? "",
+    price: numberInputValue(product.unitprice),
+    hsnCode: product.hsncode ?? "",
+    gstRate: numberInputValue(product.gstrate),
+    source: "catalog",
+  }
 }
 
 type ProcessingStatus = "processing" | "processed" | "failed"
@@ -282,6 +341,25 @@ export function DashboardPage() {
 
   // Product selection: searchResultIndex -> matchIndex
   const [selectedProducts, setSelectedProducts] = useState<Record<number, number>>({})
+  const [manualProducts, setManualProducts] = useState<ManualProduct[]>([])
+  const [showManualProductPanel, setShowManualProductPanel] = useState(false)
+  const [productSearch, setProductSearch] = useState("")
+  const [productResults, setProductResults] = useState<CatalogProduct[]>([])
+  const [productSearchLoading, setProductSearchLoading] = useState(false)
+  const [productSearchError, setProductSearchError] = useState<string | null>(null)
+  const [customProduct, setCustomProduct] = useState<ManualProduct>({
+    id: "custom-draft",
+    queryName: "",
+    quantity: "1",
+    productId: 0,
+    brand: "",
+    description: "",
+    code: "",
+    price: "",
+    hsnCode: "",
+    gstRate: "",
+    source: "custom",
+  })
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
@@ -299,8 +377,10 @@ export function DashboardPage() {
       setTotal(data.total)
       setPage(data.page)
       setTotalPages(data.totalPages)
+      return data
     } catch (err: any) {
       setListError(err.message || "Failed to load RFQs")
+      return null
     } finally {
       setListLoading(false)
     }
@@ -345,6 +425,11 @@ export function DashboardPage() {
       fetchDetail(selectedId)
       fetchReply(selectedId)
       setSelectedProducts({})
+      setManualProducts([])
+      setShowManualProductPanel(false)
+      setProductSearch("")
+      setProductResults([])
+      setProductSearchError(null)
     }
   }, [selectedId, fetchDetail, fetchReply])
 
@@ -363,9 +448,17 @@ export function DashboardPage() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setTimeout(async () => {
-        await fetchList(page)
+        const list = await fetchList(page)
         if (selectedId === id) {
-          await fetchDetail(id)
+          const refreshed = list?.rfqs.find((rfq) => rfq.emailId._id === detail?.emailId._id)
+          if (refreshed) {
+            setSelectedId(refreshed._id)
+            await fetchDetail(refreshed._id)
+          } else {
+            setSelectedId(null)
+            setDetail(null)
+            setReply(null)
+          }
         }
         setRetrying(false)
       }, 2000)
@@ -386,6 +479,80 @@ export function DashboardPage() {
     })
   }
 
+  const handleSearchProducts = async () => {
+    const search = productSearch.trim()
+    if (!search) {
+      setProductResults([])
+      return
+    }
+
+    setProductSearchLoading(true)
+    setProductSearchError(null)
+    try {
+      const res = await fetch(`${PRODUCTS_API_BASE}?page=1&limit=8&search=${encodeURIComponent(search)}`, {
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data: ProductsResponse = await res.json()
+      setProductResults(data.products)
+    } catch (err: any) {
+      setProductSearchError(err.message || "Failed to search products")
+      setProductResults([])
+    } finally {
+      setProductSearchLoading(false)
+    }
+  }
+
+  const handleAddCatalogProduct = (product: CatalogProduct) => {
+    setManualProducts((prev) => [...prev, catalogProductToManual(product)])
+  }
+
+  const handleManualProductChange = (
+    id: string,
+    field: ManualProductField,
+    value: string
+  ) => {
+    setManualProducts((prev) =>
+      prev.map((product) => (product.id === id ? { ...product, [field]: value } : product))
+    )
+  }
+
+  const handleRemoveManualProduct = (id: string) => {
+    setManualProducts((prev) => prev.filter((product) => product.id !== id))
+  }
+
+  const handleCustomProductChange = (field: ManualProductField, value: string) => {
+    setCustomProduct((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleAddCustomProduct = () => {
+    if (!customProduct.queryName.trim() || !customProduct.quantity.trim()) return
+    if (!customProduct.description.trim() && !customProduct.code.trim()) return
+
+    setManualProducts((prev) => [
+      ...prev,
+      {
+        ...customProduct,
+        id: `custom-${Date.now()}`,
+        source: "custom",
+        productId: 0,
+      },
+    ])
+    setCustomProduct({
+      id: "custom-draft",
+      queryName: "",
+      quantity: "1",
+      productId: 0,
+      brand: "",
+      description: "",
+      code: "",
+      price: "",
+      hsnCode: "",
+      gstRate: "",
+      source: "custom",
+    })
+  }
+
   const handleGenerateQuote = async () => {
     if (!detail) return
     setGenerating(true)
@@ -394,11 +561,22 @@ export function DashboardPage() {
         searchResultIndex: Number(sri),
         matchIndex: mi,
       }))
+      const manualSelections = manualProducts.map((product) => ({
+        queryName: product.queryName.trim(),
+        quantity: Number(product.quantity),
+        productId: product.productId,
+        brand: product.brand.trim() || null,
+        description: product.description.trim() || null,
+        code: product.code.trim() || null,
+        price: product.price.trim() === "" ? null : Number(product.price),
+        hsnCode: product.hsnCode.trim() || null,
+        gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
+      }))
       const res = await fetch(`${API_BASE}/${detail._id}/generate-quote`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedProducts: selections }),
+        body: JSON.stringify({ selectedProducts: selections, manualProducts: manualSelections }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -434,7 +612,7 @@ export function DashboardPage() {
     }
   }
 
-  const hasSelections = Object.keys(selectedProducts).length > 0
+  const hasSelections = Object.keys(selectedProducts).length > 0 || manualProducts.length > 0
 
   return (
     <SidebarProvider
@@ -814,6 +992,251 @@ export function DashboardPage() {
                       ))}
                     </div>
 
+                    <div className="mt-5 rounded-xl border border-dashed bg-muted/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">Need another product?</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Add from catalog or type a custom quote line.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => setShowManualProductPanel((prev) => !prev)}
+                        >
+                          <PlusIcon className="size-3.5" />
+                          Add other product
+                        </Button>
+                      </div>
+
+                      {showManualProductPanel && (
+                        <div className="mt-4 space-y-4">
+                          <div className="rounded-lg border bg-background/70 p-3">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Search catalog
+                            </p>
+                            <div className="flex gap-2">
+                              <Input
+                                value={productSearch}
+                                onChange={(event) => setProductSearch(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault()
+                                    handleSearchProducts()
+                                  }
+                                }}
+                                placeholder="Search product code, brand, HSN..."
+                              />
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={handleSearchProducts}
+                                disabled={productSearchLoading}
+                              >
+                                {productSearchLoading ? "Searching..." : "Search"}
+                              </Button>
+                            </div>
+                            {productSearchError && (
+                              <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
+                            )}
+                            {productResults.length > 0 && (
+                              <div className="mt-3 grid gap-2">
+                                {productResults.map((product) => (
+                                  <div
+                                    key={product.id}
+                                    className="flex items-start justify-between gap-3 rounded-lg border bg-muted/10 p-2.5"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium">
+                                        {product.productdescription || product.productcode || "Catalog product"}
+                                      </p>
+                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                        {product.brand && <span>{product.brand}</span>}
+                                        {product.productcode && (
+                                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                                            {product.productcode}
+                                          </span>
+                                        )}
+                                        {product.unitprice != null && (
+                                          <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="shrink-0"
+                                      onClick={() => handleAddCatalogProduct(product)}
+                                    >
+                                      Add
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="rounded-lg border bg-background/70 p-3">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              Custom line
+                            </p>
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <Input
+                                value={customProduct.queryName}
+                                onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
+                                placeholder="Line name"
+                              />
+                              <Input
+                                value={customProduct.quantity}
+                                onChange={(event) => handleCustomProductChange("quantity", event.target.value)}
+                                placeholder="Quantity"
+                                type="number"
+                                min="1"
+                              />
+                              <Input
+                                value={customProduct.description}
+                                onChange={(event) => handleCustomProductChange("description", event.target.value)}
+                                placeholder="Description"
+                              />
+                              <Input
+                                value={customProduct.code}
+                                onChange={(event) => handleCustomProductChange("code", event.target.value)}
+                                placeholder="Code"
+                              />
+                              <Input
+                                value={customProduct.brand}
+                                onChange={(event) => handleCustomProductChange("brand", event.target.value)}
+                                placeholder="Brand"
+                              />
+                              <Input
+                                value={customProduct.price}
+                                onChange={(event) => handleCustomProductChange("price", event.target.value)}
+                                placeholder="Price"
+                                type="number"
+                                min="0"
+                              />
+                              <Input
+                                value={customProduct.hsnCode}
+                                onChange={(event) => handleCustomProductChange("hsnCode", event.target.value)}
+                                placeholder="HSN"
+                              />
+                              <Input
+                                value={customProduct.gstRate}
+                                onChange={(event) => handleCustomProductChange("gstRate", event.target.value)}
+                                placeholder="GST %"
+                                type="number"
+                                min="0"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="mt-3 gap-1.5"
+                              onClick={handleAddCustomProduct}
+                            >
+                              <PlusIcon className="size-3.5" />
+                              Add custom line
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {manualProducts.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Added products
+                          </p>
+                          {manualProducts.map((product) => (
+                            <div key={product.id} className="rounded-lg border bg-background/70 p-3">
+                              <div className="mb-2 flex items-center justify-between gap-3">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {product.source === "catalog" ? "Catalog" : "Custom"}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-7 text-muted-foreground"
+                                  onClick={() => handleRemoveManualProduct(product.id)}
+                                >
+                                  <Trash2Icon className="size-3.5" />
+                                </Button>
+                              </div>
+                              <div className="grid gap-2 md:grid-cols-2">
+                                <Input
+                                  value={product.queryName}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "queryName", event.target.value)
+                                  }
+                                  placeholder="Line name"
+                                />
+                                <Input
+                                  value={product.quantity}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "quantity", event.target.value)
+                                  }
+                                  placeholder="Quantity"
+                                  type="number"
+                                  min="1"
+                                />
+                                <Input
+                                  value={product.description}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "description", event.target.value)
+                                  }
+                                  placeholder="Description"
+                                />
+                                <Input
+                                  value={product.code}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "code", event.target.value)
+                                  }
+                                  placeholder="Code"
+                                />
+                                <Input
+                                  value={product.brand}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "brand", event.target.value)
+                                  }
+                                  placeholder="Brand"
+                                />
+                                <Input
+                                  value={product.price}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "price", event.target.value)
+                                  }
+                                  placeholder="Price"
+                                  type="number"
+                                  min="0"
+                                />
+                                <Input
+                                  value={product.hsnCode}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "hsnCode", event.target.value)
+                                  }
+                                  placeholder="HSN"
+                                />
+                                <Input
+                                  value={product.gstRate}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "gstRate", event.target.value)
+                                  }
+                                  placeholder="GST %"
+                                  type="number"
+                                  min="0"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Generate Quote Button */}
                     <div className="mt-5 flex items-center gap-3">
                       <Button
@@ -907,9 +1330,23 @@ export function DashboardPage() {
 
                 {/* Classification Reason */}
                 <div className="border-b px-6 py-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <FileTextIcon className="size-4 text-muted-foreground" />
-                    <h2 className="text-sm font-semibold">Classification</h2>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <FileTextIcon className="size-4 text-muted-foreground" />
+                      <h2 className="text-sm font-semibold">Classification</h2>
+                    </div>
+                    {detail.isProcessed && !detail.errorMessage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground opacity-35 hover:opacity-100"
+                        disabled={retrying}
+                        onClick={() => handleRetry(detail._id)}
+                      >
+                        <RotateCcwIcon className={`size-3 ${retrying ? "animate-spin" : ""}`} />
+                        {retrying ? "Rerunning..." : "Rerun processing"}
+                      </Button>
+                    )}
                   </div>
                   <p className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
                     {detail.reason}

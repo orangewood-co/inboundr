@@ -4,51 +4,65 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 const model = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0.3,
+  model: "gpt-5.4-mini",
+  temperature: 0.2,
+});
+
+const emailOutput = z.object({
+  subject: z
+    .string()
+    .describe(
+      "The email subject line. Prefer 'Quotation: <original subject>' or 'Re: <original subject>'."
+    ),
+  body: z
+    .string()
+    .describe(
+      "The full email body for the quotation reply. Plain text only (no HTML, no markdown)."
+    ),
 });
 
 const State = new StateSchema({
-  input: z.string(),
+  prompt: z.string(),
   subject: z.string(),
   body: z.string(),
 });
 
-const quoteOutput = z.object({
-  subject: z.string().describe("The email subject line for the quotation reply."),
-  body: z.string().describe("The full email body for the quotation reply. Use plain text formatting."),
-});
+const generateEmailReply: GraphNode<typeof State> = async (state) => {
+  console.log("NODE: Generate Email Reply");
 
-const generateQuoteNode: GraphNode<typeof State> = async (state) => {
-  console.log("NODE: Generate Quote Reply");
-
-  const response = await model.withStructuredOutput(quoteOutput).invoke([
+  const response = await model.withStructuredOutput(emailOutput).invoke([
     new SystemMessage(
-      `You are a professional sales representative for the organization provided in the quote context.
+      `You are a professional B2B sales representative for the organization given in the prompt.
+You write quotation email replies to customers who have asked for prices.
 
-Your task is to write a quotation email reply to a customer who has requested prices for specific products.
+Hard rules:
+- Output plain text only. No HTML, no markdown, no asterisks, no bullets using "*". Use "-" or numbered lines if a list is needed.
+- All amounts are in Indian Rupees and must be shown with the "Rs." prefix (e.g. "Rs. 1,250.00"). Do not use any other currency symbol.
+- Use ONLY the numbers provided in the "Pricing summary" block of the prompt. Never recompute, round differently, or invent prices, GST, discounts, or totals.
+- For any line whose unit price is "Price on request", do NOT make up a number. Mark it clearly as "Price on request" in the line, and exclude it from the totals (the totals block already excludes it).
+- Address the customer by first name where possible. Keep tone professional, courteous, and concise.
+- Subject format: prefer "Quotation: <original subject>". If the original subject already starts with "Re:" or "Quotation:", keep it as-is or use "Re: <original subject>".
+- Body structure:
+  1) Greeting referencing the customer.
+  2) One short line thanking them for the enquiry and confirming the quote below.
+  3) An itemised table-like list of products. For each item include: serial number, product description, brand, product code, HSN code, GST rate, quantity, unit price, line total. Use aligned plain-text columns or a clean numbered list — pick whichever renders cleanly in plain text.
+  4) Pricing summary: subtotal, discount (only if non-zero), GST total, grand total. Use the exact values from the "Pricing summary" block.
+  5) Standard terms — use the organization's default terms verbatim if provided; otherwise mention: prices subject to availability, validity 15 days from quote date, payment terms as per discussion, GST extra as applicable, delivery timeline to be confirmed on order.
+  6) A short closing line inviting questions.
+  7) Sign-off using the organization's contact name, organization name, email and phone when provided. Do not invent contact details.
 
-Guidelines:
-- Be professional, courteous, and concise
-- Address the customer by name
-- List each product with its code, description, brand, quantity, unit price, GST rate, and total
-- Include HSN codes where available
-- Add a subtotal and mention GST applicability
-- Mention that prices are subject to availability and may vary
-- Include standard terms from the organization context when provided
-- Sign off as the organization's sales team with the provided contact info when available
-- Use plain text formatting (no HTML or markdown)`
+Never include internal customer notes, discount metadata, or any field the customer would not expect to see.`
     ),
-    new HumanMessage(state.input),
+    new HumanMessage(state.prompt),
   ]);
 
   return { subject: response.subject, body: response.body };
 };
 
 const graph = new StateGraph(State)
-  .addNode("generateQuote", generateQuoteNode)
-  .addEdge(START, "generateQuote")
-  .addEdge("generateQuote", END)
+  .addNode("generateEmailReply", generateEmailReply)
+  .addEdge(START, "generateEmailReply")
+  .addEdge("generateEmailReply", END)
   .compile();
 
 export interface QuoteInput {
@@ -75,54 +89,176 @@ export interface QuoteInput {
   }[];
 }
 
+interface PricedLine {
+  index: number;
+  description: string;
+  brand: string;
+  code: string;
+  hsnCode: string;
+  quantity: number;
+  unitPriceText: string;
+  gstRateText: string;
+  lineTotalText: string;
+  hasPrice: boolean;
+}
+
+interface PricingSummary {
+  lines: PricedLine[];
+  subtotal: number;
+  discountPercentage: number;
+  discountAmount: number;
+  subtotalAfterDiscount: number;
+  gstTotal: number;
+  grandTotal: number;
+  hasAnyMissingPrice: boolean;
+}
+
+const INR = new Intl.NumberFormat("en-IN", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function formatINR(n: number): string {
+  return `Rs. ${INR.format(n)}`;
+}
+
+function computePricing(input: QuoteInput): PricingSummary {
+  const discountPercentage =
+    typeof input.specialDiscountPercentage === "number" && input.specialDiscountPercentage > 0
+      ? input.specialDiscountPercentage
+      : 0;
+
+  let subtotal = 0;
+  let gstTotal = 0;
+  let hasAnyMissingPrice = false;
+
+  const lines: PricedLine[] = input.products.map((p, i) => {
+    const hasPrice = typeof p.price === "number" && p.price > 0;
+    const quantity = p.quantity > 0 ? p.quantity : 1;
+    const gstRate = typeof p.gstRate === "number" ? p.gstRate : 0;
+
+    let lineSubtotal = 0;
+    let lineDiscount = 0;
+    let lineGst = 0;
+    let lineTotal = 0;
+
+    if (hasPrice) {
+      lineSubtotal = (p.price as number) * quantity;
+      lineDiscount = lineSubtotal * (discountPercentage / 100);
+      const lineAfterDiscount = lineSubtotal - lineDiscount;
+      lineGst = lineAfterDiscount * (gstRate / 100);
+      lineTotal = lineAfterDiscount + lineGst;
+
+      subtotal += lineSubtotal;
+      gstTotal += lineGst;
+    } else {
+      hasAnyMissingPrice = true;
+    }
+
+    return {
+      index: i + 1,
+      description: p.description || p.queryName,
+      brand: p.brand || "N/A",
+      code: p.code || "N/A",
+      hsnCode: p.hsnCode || "N/A",
+      quantity,
+      unitPriceText: hasPrice ? formatINR(p.price as number) : "Price on request",
+      gstRateText: typeof p.gstRate === "number" ? `${p.gstRate}%` : "N/A",
+      lineTotalText: hasPrice ? formatINR(lineTotal) : "Price on request",
+      hasPrice,
+    };
+  });
+
+  const discountAmount = subtotal * (discountPercentage / 100);
+  const subtotalAfterDiscount = subtotal - discountAmount;
+  const grandTotal = subtotalAfterDiscount + gstTotal;
+
+  return {
+    lines,
+    subtotal,
+    discountPercentage,
+    discountAmount,
+    subtotalAfterDiscount,
+    gstTotal,
+    grandTotal,
+    hasAnyMissingPrice,
+  };
+}
+
+function renderProductLines(pricing: PricingSummary): string {
+  return pricing.lines
+    .map(
+      (l) =>
+        `${l.index}. ${l.description}
+   Brand: ${l.brand}
+   Code: ${l.code}
+   HSN Code: ${l.hsnCode}
+   Quantity: ${l.quantity}
+   Unit Price: ${l.unitPriceText}
+   GST Rate: ${l.gstRateText}
+   Line Total: ${l.lineTotalText}`
+    )
+    .join("\n\n");
+}
+
+function renderPricingSummary(pricing: PricingSummary): string {
+  const lines: string[] = [];
+  lines.push(`Subtotal: ${formatINR(pricing.subtotal)}`);
+  if (pricing.discountPercentage > 0) {
+    lines.push(
+      `Discount (${pricing.discountPercentage}%): -${formatINR(pricing.discountAmount)}`
+    );
+    lines.push(`Subtotal after discount: ${formatINR(pricing.subtotalAfterDiscount)}`);
+  }
+  lines.push(`GST total: ${formatINR(pricing.gstTotal)}`);
+  lines.push(`Grand total: ${formatINR(pricing.grandTotal)}`);
+  if (pricing.hasAnyMissingPrice) {
+    lines.push(
+      `Note: One or more items are "Price on request" and are NOT included in the totals above.`
+    );
+  }
+  return lines.join("\n");
+}
+
 export async function generateQuoteReply(
   input: QuoteInput
 ): Promise<{ subject: string; body: string }> {
-  const productLines = input.products
-    .map(
-      (p, i) =>
-        `${i + 1}. Product: ${p.description || p.queryName}
-   Brand: ${p.brand || "N/A"}
-   Code: ${p.code || "N/A"}
-   Quantity: ${p.quantity}
-   Unit Price: ${p.price != null ? `₹${p.price}` : "Price on request"}
-   HSN Code: ${p.hsnCode || "N/A"}
-   GST Rate: ${p.gstRate != null ? `${p.gstRate}%` : "N/A"}`
-    )
-    .join("\n\n");
+  console.log(
+    `INPUT: ${input.customerName} (${input.customerCompany}) — ${input.products.length} products, discount=${input.specialDiscountPercentage ?? 0}%`
+  );
+
+  const pricing = computePricing(input);
+  const productLines = renderProductLines(pricing);
+  const pricingSummary = renderPricingSummary(pricing);
 
   const hasCustomerNotes = Boolean(input.customerNotes?.trim());
-  const hasSpecialDiscount =
-    typeof input.specialDiscountPercentage === "number" &&
-    input.specialDiscountPercentage > 0;
-  const customerContext =
-    hasCustomerNotes || hasSpecialDiscount
-      ? `Customer context:
-${hasSpecialDiscount ? `- Special discount context: ${input.specialDiscountPercentage}%` : "- Special discount context: none"}
-${hasCustomerNotes ? `- Internal customer notes: ${input.customerNotes}` : "- Internal customer notes: none"}
+  const customerContext = hasCustomerNotes
+    ? `Internal customer notes (do NOT quote verbatim, use only to adjust tone/relationship): ${input.customerNotes}`
+    : "No internal customer notes.";
 
-Use this customer context only when it is relevant to tone, terms, relationship, or special handling.
-Do not recalculate or alter product prices/totals from the discount context unless explicit discounted prices are provided.`
-      : "Customer context: No special customer notes or discount context.";
+  const prompt = `Customer:
+- Name: ${input.customerName}
+- Company: ${input.customerCompany}
+- Email: ${input.customerEmail}
+- Original subject: ${input.originalSubject}
 
-  const prompt = `Customer: ${input.customerName} from ${input.customerCompany}
-Customer Email: ${input.customerEmail}
-Original Subject: ${input.originalSubject}
-
-Organization context:
+Organization:
 - Name: ${input.organizationName || "Bombay Tools Supplying Agency Pvt. Ltd. (BTSA)"}
-- Default contact: ${input.organizationContactName || "BTSA Sales Team"}
+- Contact name: ${input.organizationContactName || "BTSA Sales Team"}
 - Contact email: ${input.organizationContactEmail || "N/A"}
 - Contact phone: ${input.organizationContactPhone || "N/A"}
-- Default terms: ${input.organizationDefaultTerms || "Use standard quotation terms including delivery timeline, payment terms, validity, availability, and GST applicability."}
+- Default terms: ${input.organizationDefaultTerms || "Prices subject to availability. Validity 15 days from quote date. Payment terms as per discussion. GST extra as applicable. Delivery timeline to be confirmed on order."}
 
 ${customerContext}
 
 Products to quote:
 ${productLines}
 
-Write a professional quotation email reply for these products.`;
+Pricing summary (authoritative — use these exact numbers, do NOT recompute):
+${pricingSummary}
 
-  const result = await graph.invoke({ input: prompt });
+Write the quotation email reply now.`;
+
+  const result = await graph.invoke({ prompt });
   return { subject: result.subject, body: result.body };
 }
