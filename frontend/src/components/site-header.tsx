@@ -12,18 +12,35 @@ import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 import { Link, useLocation } from "@tanstack/react-router"
 import { PanelLeftIcon } from "lucide-react"
+import { Fragment } from "react"
+
+export type BreadcrumbSegment = {
+  label: string
+  href?: string
+}
 
 const pageTitles: Record<string, string> = {
   "/": "RFQ",
   "/emails": "Inbox",
   "/products": "Products",
   "/settings": "Settings",
+  "/forms": "Forms",
+  "/customers": "Customers",
 }
 
-export function SiteHeader() {
+export function SiteHeader({
+  breadcrumbs,
+  actions,
+}: {
+  breadcrumbs?: BreadcrumbSegment[]
+  actions?: React.ReactNode
+} = {}) {
   const { toggleSidebar } = useSidebar()
   const { pathname } = useLocation()
-  const pageTitle = pageTitles[pathname] ?? "Dashboard"
+
+  const segments: BreadcrumbSegment[] = breadcrumbs ?? [
+    { label: pageTitles[pathname] ?? "Dashboard" },
+  ]
 
   return (
     <header className="sticky top-0 z-50 flex w-full items-center border-b bg-background">
@@ -34,8 +51,7 @@ export function SiteHeader() {
           size="icon"
           onClick={toggleSidebar}
         >
-          <PanelLeftIcon
-          />
+          <PanelLeftIcon />
         </Button>
         <Separator
           orientation="vertical"
@@ -48,13 +64,27 @@ export function SiteHeader() {
                 <Link to="/">inboundr.</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{pageTitle}</BreadcrumbPage>
-            </BreadcrumbItem>
+            {segments.map((segment, i) => (
+              <Fragment key={i}>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  {segment.href ? (
+                    <BreadcrumbLink asChild>
+                      <Link to={segment.href}>{segment.label}</Link>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>{segment.label}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
+            ))}
           </BreadcrumbList>
         </Breadcrumb>
-        <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        {actions ? (
+          <div className="ml-auto flex items-center gap-2">{actions}</div>
+        ) : (
+          <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+        )}
       </div>
     </header>
   )

@@ -147,18 +147,33 @@ function formatFullDate(iso: string): string {
 }
 
 const statusConfig = {
-  received: { icon: MailIcon, label: "Received", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  processing: { icon: LoaderIcon, label: "Processing", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  processed: { icon: CheckCircle2Icon, label: "Processed", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  failed: { icon: AlertCircleIcon, label: "Failed", className: "bg-red-500/10 text-red-600 dark:text-red-400" },
+  received: {
+    label: "Received",
+    dotClass: "bg-blue-500",
+    pillClass: "bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+  },
+  processing: {
+    label: "Processing",
+    dotClass: "bg-amber-500 animate-pulse",
+    pillClass: "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+  },
+  processed: {
+    label: "Processed",
+    dotClass: "bg-emerald-500",
+    pillClass: "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+  },
+  failed: {
+    label: "Failed",
+    dotClass: "bg-red-500",
+    pillClass: "bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-400",
+  },
 }
 
 function StatusBadge({ status }: { status: EmailSummary["status"] }) {
   const config = statusConfig[status]
-  const Icon = config.icon
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${config.className}`}>
-      <Icon className={`size-3 ${status === "processing" ? "animate-spin" : ""}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${config.pillClass}`}>
+      <span className={`size-1.5 rounded-full ${config.dotClass}`} />
       {config.label}
     </span>
   )
@@ -166,13 +181,13 @@ function StatusBadge({ status }: { status: EmailSummary["status"] }) {
 
 function EmptyState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
-      <div className="rounded-2xl border border-dashed border-muted-foreground/25 bg-muted/30 p-6">
-        <InboxIcon className="size-10 text-muted-foreground/50" />
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center animate-in fade-in-0 duration-500">
+      <div className="surface-raised rounded-2xl p-6">
+        <InboxIcon className="size-10 text-muted-foreground/40" />
       </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-muted-foreground">No emails yet</p>
-        <p className="text-xs text-muted-foreground/60">
+      <div className="space-y-1.5">
+        <p className="font-heading text-[13px] font-semibold text-muted-foreground">No emails yet</p>
+        <p className="text-[11px] text-muted-foreground/60">
           Incoming emails will appear here once the Gmail watcher picks them up.
         </p>
       </div>
@@ -182,9 +197,9 @@ function EmptyState() {
 
 function ListSkeleton() {
   return (
-    <div className="space-y-0.5 p-1">
+    <div className="space-y-1 p-2">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex flex-col gap-2 rounded-lg p-3">
+        <div key={i} className="flex flex-col gap-2.5 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-4 w-32" />
             <Skeleton className="h-3 w-12" />
@@ -199,18 +214,17 @@ function ListSkeleton() {
 
 function DetailSkeleton() {
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-8 p-8">
       <div className="space-y-3">
         <Skeleton className="h-6 w-2/3" />
         <div className="flex items-center gap-3">
-          <Skeleton className="size-10 rounded-full" />
+          <Skeleton className="size-9 rounded-lg" />
           <div className="space-y-1">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-3 w-24" />
           </div>
         </div>
       </div>
-      <Skeleton className="h-px w-full" />
       <div className="space-y-3">
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-5/6" />
@@ -224,11 +238,11 @@ function DetailSkeleton() {
 
 function DetailPlaceholder() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
-      <div className="rounded-xl bg-muted/40 p-4">
-        <MailOpenIcon className="size-8 text-muted-foreground/40" />
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
+      <div className="surface-raised rounded-2xl p-6">
+        <MailOpenIcon className="size-8 text-muted-foreground/30" />
       </div>
-      <p className="text-sm text-muted-foreground/60">Select an email to read</p>
+      <p className="text-[13px] text-muted-foreground/50">Select an email to read</p>
     </div>
   )
 }
@@ -307,8 +321,8 @@ export function EmailsPage() {
       defaultOpen
       style={
         {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
+          "--header-height": "3.5rem",
+          "--sidebar-width": "16rem",
         } as CSSProperties
       }
     >
@@ -317,14 +331,12 @@ export function EmailsPage() {
         <SiteHeader />
         <div className="flex flex-1 overflow-hidden">
           {/* ── Email List Panel ── */}
-          <div className="flex w-full flex-col border-r md:w-[380px] md:min-w-[380px]">
-            {/* List header */}
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <div className="flex items-center gap-2">
-                <InboxIcon className="size-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Inbox</h2>
+          <div className="flex w-full flex-col border-r border-border/50 bg-surface md:w-[360px] md:min-w-[360px]">
+            <div className="flex items-center justify-between px-4 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <h2 className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Inbox</h2>
                 {!listLoading && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary dark:bg-primary/20">
                     {total}
                   </span>
                 )}
@@ -332,22 +344,21 @@ export function EmailsPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8"
+                className="size-7"
                 onClick={handleRefresh}
                 disabled={refreshing}
               >
-                <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+                <RefreshCwIcon className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
               </Button>
             </div>
 
-            {/* List body */}
             <div className="flex-1 overflow-y-auto">
               {listLoading ? (
                 <ListSkeleton />
               ) : listError ? (
-                <div className="flex flex-col items-center gap-2 p-8 text-center">
+                <div className="flex flex-col items-center gap-3 p-8 text-center">
                   <AlertCircleIcon className="size-5 text-destructive" />
-                  <p className="text-sm text-destructive">{listError}</p>
+                  <p className="text-[13px] text-destructive">{listError}</p>
                   <Button variant="outline" size="sm" onClick={() => fetchList(page)}>
                     Retry
                   </Button>
@@ -355,7 +366,7 @@ export function EmailsPage() {
               ) : emails.length === 0 ? (
                 <EmptyState />
               ) : (
-                <div className="space-y-0.5 p-1">
+                <div className="space-y-0.5 px-2 pb-2">
                   {emails.map((email) => {
                     const { name } = parseSender(email.from)
                     const isSelected = selectedId === email._id
@@ -363,41 +374,47 @@ export function EmailsPage() {
                       <button
                         key={email._id}
                         onClick={() => setSelectedId(email._id)}
-                        className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                        className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-all duration-150 ${
                           isSelected
-                            ? "bg-primary/8 ring-1 ring-primary/20"
-                            : "hover:bg-muted/60"
+                            ? "surface-raised glow-primary"
+                            : "hover:bg-card/80 dark:hover:bg-card/60"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 overflow-hidden">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            <div
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold ${
+                                isSelected
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
                               {senderInitial(email.from)}
                             </div>
-                            <span className="truncate text-sm font-semibold">{name}</span>
+                            <span className="truncate text-[13px] font-medium">{name}</span>
                           </div>
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
                             {formatDate(email.date)}
                           </span>
                         </div>
-                        <div className="flex items-start justify-between gap-2 pl-[42px]">
+                        <div className="flex items-start justify-between gap-2 pl-[38px]">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium leading-snug">
+                            <p className="truncate text-[13px] leading-snug text-foreground/80">
                               {email.subject || "(no subject)"}
                             </p>
                             {email.snippet && (
-                              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                              <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground/60">
                                 {email.snippet}
                               </p>
                             )}
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
                             {email.attachments.length > 0 && (
-                              <PaperclipIcon className="size-3 text-muted-foreground" />
+                              <PaperclipIcon className="size-3 text-muted-foreground/40" />
                             )}
                           </div>
                         </div>
-                        <div className="pl-[42px]">
+                        <div className="pl-[38px]">
                           <StatusBadge status={email.status} />
                         </div>
                       </button>
@@ -407,30 +424,17 @@ export function EmailsPage() {
               )}
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t px-4 py-2">
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  Page {page} of {totalPages}
+              <div className="flex items-center justify-between border-t border-border/50 px-4 py-2">
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {page} / {totalPages}
                 </span>
                 <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    disabled={page <= 1}
-                    onClick={() => fetchList(page - 1)}
-                  >
-                    <ChevronLeftIcon className="size-4" />
+                  <Button variant="ghost" size="icon" className="size-7" disabled={page <= 1} onClick={() => fetchList(page - 1)}>
+                    <ChevronLeftIcon className="size-3.5" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    disabled={page >= totalPages}
-                    onClick={() => fetchList(page + 1)}
-                  >
-                    <ChevronRightIcon className="size-4" />
+                  <Button variant="ghost" size="icon" className="size-7" disabled={page >= totalPages} onClick={() => fetchList(page + 1)}>
+                    <ChevronRightIcon className="size-3.5" />
                   </Button>
                 </div>
               </div>
@@ -445,16 +449,15 @@ export function EmailsPage() {
               <DetailPlaceholder />
             ) : (
               <>
-                {/* Detail header */}
-                <div className="space-y-4 border-b px-6 py-5">
+                <div className="space-y-4 px-8 pt-7 pb-6">
                   <div className="flex items-start justify-between gap-4">
-                    <h1 className="text-lg font-semibold leading-snug">
+                    <h1 className="font-heading text-lg font-semibold leading-snug tracking-tight">
                       {detail.subject || "(no subject)"}
                     </h1>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-7 shrink-0"
+                      className="size-7 shrink-0 text-muted-foreground/50 hover:text-foreground"
                       onClick={() => {
                         setSelectedId(null)
                         setDetail(null)
@@ -465,34 +468,34 @@ export function EmailsPage() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-[13px] font-semibold text-muted-foreground">
                       {senderInitial(detail.from)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[13px] font-semibold">
                           {parseSender(detail.from).name}
                         </span>
                         <StatusBadge status={detail.status} />
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">
+                      <p className="truncate text-[11px] text-muted-foreground/60">
                         {parseSender(detail.from).email}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground/60">
                       <ClockIcon className="size-3" />
                       {formatFullDate(detail.date)}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
                     <span>
-                      <span className="font-medium text-foreground/70">To:</span>{" "}
+                      <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">To</span>{" "}
                       {detail.to}
                     </span>
                     {detail.cc && (
                       <span>
-                        <span className="font-medium text-foreground/70">Cc:</span>{" "}
+                        <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cc</span>{" "}
                         {detail.cc}
                       </span>
                     )}
@@ -503,11 +506,11 @@ export function EmailsPage() {
                       {detail.attachments.map((att, i) => (
                         <span
                           key={i}
-                          className="inline-flex items-center gap-1.5 rounded-lg border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+                          className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground"
                         >
                           <PaperclipIcon className="size-3" />
                           {att.filename}
-                          <span className="text-[10px] opacity-60">
+                          <span className="text-[10px] opacity-50">
                             ({(att.size / 1024).toFixed(0)}KB)
                           </span>
                         </span>
@@ -516,8 +519,7 @@ export function EmailsPage() {
                   )}
                 </div>
 
-                {/* Email body */}
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden border-t border-border/30">
                   {emailDocument ? (
                     <iframe
                       title="Email content"
@@ -526,13 +528,13 @@ export function EmailsPage() {
                       srcDoc={emailDocument}
                     />
                   ) : detail.bodyText ? (
-                    <div className="h-full overflow-y-auto p-6">
-                      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground/90">
+                    <div className="h-full overflow-y-auto p-8">
+                      <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-foreground/85">
                         {detail.bodyText}
                       </pre>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center p-12 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-center p-12 text-[13px] text-muted-foreground/50">
                       No content available
                     </div>
                   )}

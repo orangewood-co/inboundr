@@ -26,9 +26,18 @@ function RootRouteComponent() {
   })
 
   useEffect(() => {
-    const pageTitle = PAGE_TITLES[pathname]
+    const exactTitle = PAGE_TITLES[pathname]
+    if (exactTitle) {
+      document.title = `${exactTitle} | ${APP_TITLE}`
+      return
+    }
 
-    document.title = pageTitle ? `${pageTitle} | ${APP_TITLE}` : APP_TITLE
+    if (pathname.startsWith("/forms/")) {
+      document.title = `Form Editor | ${APP_TITLE}`
+      return
+    }
+
+    document.title = APP_TITLE
   }, [pathname])
 
   return <Outlet />

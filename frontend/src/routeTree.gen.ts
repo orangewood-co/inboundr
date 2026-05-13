@@ -19,6 +19,8 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 import { Route as FSlugRouteImport } from './routes/f.$slug'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -71,6 +73,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FormsIndexRoute = FormsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FormsRoute,
+} as any)
+const FormsSlugRoute = FormsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => FormsRoute,
+} as any)
 const FSlugRoute = FSlugRouteImport.update({
   id: '/f/$slug',
   path: '/f/$slug',
@@ -82,26 +94,29 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/forms': typeof FormsRoute
+  '/forms': typeof FormsRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/f/$slug': typeof FSlugRoute
+  '/forms/$slug': typeof FormsSlugRoute
+  '/forms/': typeof FormsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/forms': typeof FormsRoute
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/f/$slug': typeof FSlugRoute
+  '/forms/$slug': typeof FormsSlugRoute
+  '/forms': typeof FormsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -109,13 +124,15 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/forms': typeof FormsRoute
+  '/forms': typeof FormsRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/f/$slug': typeof FSlugRoute
+  '/forms/$slug': typeof FormsSlugRoute
+  '/forms/': typeof FormsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,19 +148,22 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/settings'
     | '/f/$slug'
+    | '/forms/$slug'
+    | '/forms/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/customers'
     | '/emails'
     | '/forgot-password'
-    | '/forms'
     | '/login'
     | '/products'
     | '/register'
     | '/reset-password'
     | '/settings'
     | '/f/$slug'
+    | '/forms/$slug'
+    | '/forms'
   id:
     | '__root__'
     | '/'
@@ -157,6 +177,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/settings'
     | '/f/$slug'
+    | '/forms/$slug'
+    | '/forms/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -164,7 +186,7 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRoute
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
-  FormsRoute: typeof FormsRoute
+  FormsRoute: typeof FormsRouteWithChildren
   LoginRoute: typeof LoginRoute
   ProductsRoute: typeof ProductsRoute
   RegisterRoute: typeof RegisterRoute
@@ -245,6 +267,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forms/': {
+      id: '/forms/'
+      path: '/'
+      fullPath: '/forms/'
+      preLoaderRoute: typeof FormsIndexRouteImport
+      parentRoute: typeof FormsRoute
+    }
+    '/forms/$slug': {
+      id: '/forms/$slug'
+      path: '/$slug'
+      fullPath: '/forms/$slug'
+      preLoaderRoute: typeof FormsSlugRouteImport
+      parentRoute: typeof FormsRoute
+    }
     '/f/$slug': {
       id: '/f/$slug'
       path: '/f/$slug'
@@ -255,12 +291,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface FormsRouteChildren {
+  FormsSlugRoute: typeof FormsSlugRoute
+  FormsIndexRoute: typeof FormsIndexRoute
+}
+
+const FormsRouteChildren: FormsRouteChildren = {
+  FormsSlugRoute: FormsSlugRoute,
+  FormsIndexRoute: FormsIndexRoute,
+}
+
+const FormsRouteWithChildren = FormsRoute._addFileChildren(FormsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CustomersRoute: CustomersRoute,
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
-  FormsRoute: FormsRoute,
+  FormsRoute: FormsRouteWithChildren,
   LoginRoute: LoginRoute,
   ProductsRoute: ProductsRoute,
   RegisterRoute: RegisterRoute,
