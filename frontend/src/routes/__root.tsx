@@ -14,6 +14,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/register": "Register",
   "/reset-password": "Reset Password",
   "/settings": "Settings",
+  "/stats": "Stats",
 }
 
 export const Route = createRootRoute({

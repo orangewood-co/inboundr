@@ -14,6 +14,7 @@ import organizationRouter from "./routes/organization.route";
 import formsRouter from "./routes/forms.route";
 import publicFormsRouter from "./routes/public-forms.route";
 import uploadsRouter from "./routes/uploads.route";
+import statsRouter from "./routes/stats.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -55,6 +56,7 @@ app.use("/api/v1/organization", organizationRouter);
 app.use("/api/v1/forms", formsRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
+app.use("/api/v1/stats", statsRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });

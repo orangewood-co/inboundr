@@ -26,6 +26,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Settings",
   "/forms": "Forms",
   "/customers": "Customers",
+  "/stats": "Stats",
 }
 
 export function SiteHeader({

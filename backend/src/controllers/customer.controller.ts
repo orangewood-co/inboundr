@@ -137,7 +137,8 @@ export const updateCustomer = async (
   res: Response
 ): Promise<void> => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid customer id" });
       return;
     }
@@ -153,7 +154,7 @@ export const updateCustomer = async (
     }
 
     const customer = await Customer.findOneAndUpdate(
-      { _id: req.params.id, organizationId: organization._id },
+      { _id: id, organizationId: organization._id },
       input,
       {
         new: true,

@@ -170,12 +170,13 @@ export async function createForm(req: Request, res: Response): Promise<void> {
 
 export async function getForm(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
     const { organization } = req as OrganizationRequest;
-    const form = await Form.findOne({ _id: req.params.id, organizationId: organization._id }).lean();
+    const form = await Form.findOne({ _id: id, organizationId: organization._id }).lean();
     if (!form) {
       res.status(404).json({ error: "Form not found" });
       return;
@@ -189,7 +190,8 @@ export async function getForm(req: Request, res: Response): Promise<void> {
 
 export async function updateForm(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
@@ -201,7 +203,7 @@ export async function updateForm(req: Request, res: Response): Promise<void> {
     }
     const { organization } = req as OrganizationRequest;
     const form = await Form.findOneAndUpdate(
-      { _id: req.params.id, organizationId: organization._id },
+      { _id: id, organizationId: organization._id },
       input,
       { new: true, runValidators: true }
     ).lean();
@@ -222,12 +224,13 @@ export async function updateForm(req: Request, res: Response): Promise<void> {
 
 export async function duplicateForm(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
     const { organization } = req as OrganizationRequest;
-    const form = await Form.findOne({ _id: req.params.id, organizationId: organization._id }).lean();
+    const form = await Form.findOne({ _id: id, organizationId: organization._id }).lean();
     if (!form) {
       res.status(404).json({ error: "Form not found" });
       return;
@@ -251,13 +254,14 @@ export async function duplicateForm(req: Request, res: Response): Promise<void> 
 
 export async function archiveForm(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
     const { organization } = req as OrganizationRequest;
     const form = await Form.findOneAndUpdate(
-      { _id: req.params.id, organizationId: organization._id },
+      { _id: id, organizationId: organization._id },
       { status: "archived" },
       { new: true }
     ).lean();
@@ -274,7 +278,8 @@ export async function archiveForm(req: Request, res: Response): Promise<void> {
 
 export async function listSubmissions(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
@@ -282,7 +287,7 @@ export async function listSubmissions(req: Request, res: Response): Promise<void
     const page = parsePositiveInt(req.query.page, 1);
     const limit = parsePositiveInt(req.query.limit, 20, 100);
     const skip = (page - 1) * limit;
-    const filter = { formId: new mongoose.Types.ObjectId(req.params.id), organizationId: organization._id };
+    const filter = { formId: new mongoose.Types.ObjectId(id), organizationId: organization._id };
 
     const [submissions, total] = await Promise.all([
       FormSubmission.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
@@ -298,7 +303,8 @@ export async function listSubmissions(req: Request, res: Response): Promise<void
 
 export async function updateSubmissionStatus(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.submissionId)) {
+    const submissionId = String(req.params.submissionId ?? "");
+    if (!mongoose.Types.ObjectId.isValid(submissionId)) {
       res.status(400).json({ error: "Invalid submission id" });
       return;
     }
@@ -309,7 +315,7 @@ export async function updateSubmissionStatus(req: Request, res: Response): Promi
     }
     const { organization } = req as OrganizationRequest;
     const submission = await FormSubmission.findOneAndUpdate(
-      { _id: req.params.submissionId, organizationId: organization._id },
+      { _id: submissionId, organizationId: organization._id },
       { status },
       { new: true }
     ).lean();
@@ -326,12 +332,13 @@ export async function updateSubmissionStatus(req: Request, res: Response): Promi
 
 export async function exportSubmissionsCsv(req: Request, res: Response): Promise<void> {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid form id" });
       return;
     }
     const { organization } = req as OrganizationRequest;
-    const form = await Form.findOne({ _id: req.params.id, organizationId: organization._id }).lean();
+    const form = await Form.findOne({ _id: id, organizationId: organization._id }).lean();
     if (!form) {
       res.status(404).json({ error: "Form not found" });
       return;
