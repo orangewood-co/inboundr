@@ -1,4 +1,4 @@
-<img src="/banner.png" alt="Inboundr banner" width="100%" />
+<img src="https://inboundr.co/banner.png" alt="Inboundr banner" width="100%" />
 <div align="center">
 # Inboundr
 
