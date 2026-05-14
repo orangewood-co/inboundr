@@ -78,7 +78,7 @@ export default function Home() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
-            Inbound, handled.
+            AI-native sales infrastructure
           </motion.p>
           <motion.h1
             className="mx-auto max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] leading-[0.95] tracking-[-0.045em]"
@@ -91,13 +91,12 @@ export default function Home() {
             into revenue.
           </motion.h1>
           <motion.p
-            className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg"
+            className="mx-auto mt-8 max-w-xl leading-relaxed text-text-muted sm:text-lg"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
           >
-            Respond to inquiries, generate quotes, follow up, call leads,
-            and close deals — automatically.
+          Inboundr combines AI automation, inbound qualification, quote generation, form infrastructure, and outreach into a single sales operating system.
           </motion.p>
           <motion.div
             className="mt-10 flex justify-center gap-3"
@@ -109,13 +108,13 @@ export default function Home() {
               href="mailto:hello@inboundr.ai?subject=Try Inboundr"
               className="bg-text px-6 py-3 text-sm font-semibold text-base transition hover:bg-text/90"
             >
-              Start free
+              Try Now
             </a>
             <a
               href="mailto:hello@inboundr.ai?subject=Contact Sales"
               className="border border-border px-6 py-3 text-sm font-medium transition hover:border-text/20 hover:bg-surface"
             >
-              Talk to sales
+              Book a Demo
             </a>
           </motion.div>
         </div>
