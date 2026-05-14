@@ -24,7 +24,7 @@ export default function Header() {
             <Logo />
           </Link>
           <div className="hidden gap-8 text-[13px] text-text-muted md:flex">
-            <Link to="/#features" className="transition hover:text-text">
+            <Link to="/features" className="transition hover:text-text">
               Features
             </Link>
             <Link to="/#proof" className="transition hover:text-text">
