@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
+import type { IResult } from "ua-parser-js";
+
+const UAParser: (ua: string) => IResult = require("ua-parser-js");
 import { Form, type FormFieldType, type IFormField } from "../models/form.model";
 import { FormSubmission } from "../models/form-submission.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
@@ -70,9 +73,9 @@ function normalizeFields(value: unknown): IFormField[] {
 function normalizeFormInput(body: Record<string, unknown>) {
   const title = String(body.title ?? "").trim();
   const slug = slugify(String(body.slug ?? title));
-  const status = ["draft", "published", "archived"].includes(String(body.status))
-    ? String(body.status)
-    : "draft";
+  const rawStatus = String(body.status);
+  const status: "draft" | "published" | "archived" =
+    rawStatus === "published" ? "published" : rawStatus === "archived" ? "archived" : "draft";
   const branding = (body.branding ?? {}) as Record<string, unknown>;
   const settings = (body.settings ?? {}) as Record<string, unknown>;
 
@@ -92,6 +95,7 @@ function normalizeFormInput(body: Record<string, unknown>) {
         String(settings.successMessage ?? "Thanks. Your response has been submitted.").trim() ||
         "Thanks. Your response has been submitted.",
       notifyOnSubmission: Boolean(settings.notifyOnSubmission ?? true),
+      collectDeviceInfo: Boolean(settings.collectDeviceInfo ?? false),
     },
   };
 }
@@ -335,7 +339,8 @@ export async function exportSubmissionsCsv(req: Request, res: Response): Promise
     const submissions = await FormSubmission.find({ formId: form._id, organizationId: organization._id })
       .sort({ createdAt: -1 })
       .lean();
-    const headers = ["submittedAt", "status", "source", ...form.fields.map((field) => field.label)];
+    const deviceHeaders = form.settings.collectDeviceInfo ? ["device", "os", "browser"] : [];
+    const headers = ["submittedAt", "status", "source", ...deviceHeaders, ...form.fields.map((field) => field.label)];
     const formatSubmissionValue = (value: unknown): string => {
       if (Array.isArray(value)) {
         return value
@@ -351,12 +356,18 @@ export async function exportSubmissionsCsv(req: Request, res: Response): Promise
       }
       return String(value ?? "");
     };
-    const rows = submissions.map((submission) => [
-      submission.createdAt.toISOString(),
-      submission.status,
-      submission.source,
-      ...form.fields.map((field) => formatSubmissionValue(submission.values?.[field.id])),
-    ]);
+    const rows = submissions.map((submission) => {
+      const deviceCols = form.settings.collectDeviceInfo
+        ? [submission.metadata?.device ?? "", submission.metadata?.os ?? "", submission.metadata?.browser ?? ""]
+        : [];
+      return [
+        submission.createdAt.toISOString(),
+        submission.status,
+        submission.source,
+        ...deviceCols,
+        ...form.fields.map((field) => formatSubmissionValue(submission.values?.[field.id])),
+      ];
+    });
     const csv = [headers, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n");
@@ -479,15 +490,30 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
       return;
     }
     const ip = req.ip || req.socket.remoteAddress || "";
+    const ua = req.get("user-agent") ?? null;
+
+    let device: string | null = null;
+    let os: string | null = null;
+    let browser: string | null = null;
+    if (form.settings.collectDeviceInfo && ua) {
+      const parsed = UAParser(ua);
+      device = parsed.device.model || parsed.device.type || "Desktop";
+      os = [parsed.os.name, parsed.os.version].filter(Boolean).join(" ") || null;
+      browser = [parsed.browser.name, parsed.browser.version].filter(Boolean).join(" ") || null;
+    }
+
     const submission = await FormSubmission.create({
       organizationId: form.organizationId,
       formId: form._id,
       values: sanitized,
       source: req.body?.source === "embed" ? "embed" : "link",
       metadata: {
-        userAgent: req.get("user-agent") ?? null,
+        userAgent: ua,
         referrer: req.get("referer") ?? null,
         ipHash: ip ? crypto.createHash("sha256").update(ip).digest("hex") : null,
+        device,
+        os,
+        browser,
       },
     });
 

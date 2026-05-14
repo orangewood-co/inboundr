@@ -10,6 +10,9 @@ export interface IFormSubmission extends Document {
     userAgent: string | null;
     referrer: string | null;
     ipHash: string | null;
+    device: string | null;
+    os: string | null;
+    browser: string | null;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -48,6 +51,9 @@ const formSubmissionSchema = new Schema<IFormSubmission>(
       userAgent: { type: String, default: null },
       referrer: { type: String, default: null },
       ipHash: { type: String, default: null },
+      device: { type: String, default: null },
+      os: { type: String, default: null },
+      browser: { type: String, default: null },
     },
   },
   { timestamps: true }

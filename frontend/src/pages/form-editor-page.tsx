@@ -18,6 +18,8 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import {
   ArchiveIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   CalendarIcon,
   CheckSquareIcon,
   ChevronDownIcon,
@@ -32,6 +34,7 @@ import {
   LoaderIcon,
   MailIcon,
   MessageSquareTextIcon,
+  MonitorSmartphoneIcon,
   PartyPopperIcon,
   PhoneIcon,
   PlusIcon,
@@ -39,6 +42,7 @@ import {
   SparklesIcon,
   Trash2Icon,
   TypeIcon,
+  XIcon,
 } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -47,8 +51,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
@@ -92,6 +100,7 @@ type ManagedForm = {
     submitButtonLabel: string
     successMessage: string
     notifyOnSubmission: boolean
+    collectDeviceInfo: boolean
   }
   submissionCount: number
   updatedAt: string
@@ -103,6 +112,12 @@ type FormSubmission = {
   status: "new" | "reviewed" | "archived"
   source: "link" | "embed"
   createdAt: string
+  metadata?: {
+    device?: string | null
+    os?: string | null
+    browser?: string | null
+    referrer?: string | null
+  }
 }
 
 type UploadedFileValue = {
@@ -250,6 +265,9 @@ export default function FormEditorPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [selected, setSelected] = useState<SelectedItem>("welcome")
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
+  const [sortKey, setSortKey] = useState<string>("createdAt")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const fetchForm = useCallback(async () => {
     setLoading(true)
@@ -280,6 +298,30 @@ export default function FormEditorPage() {
     selected !== "welcome" && selected !== "ending" ? fields.find((f) => f.id === selected) ?? null : null,
     [selected, fields])
   const selectedFieldIndex = useMemo(() => (selectedField ? fields.indexOf(selectedField) : -1), [selectedField, fields])
+
+  const collectDeviceInfo = draft.settings?.collectDeviceInfo ?? false
+
+  const sortedSubmissions = useMemo(() => {
+    const copy = [...submissions]
+    copy.sort((a, b) => {
+      let cmp = 0
+      if (sortKey === "createdAt") cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      else if (sortKey === "status") cmp = a.status.localeCompare(b.status)
+      else if (sortKey === "source") cmp = a.source.localeCompare(b.source)
+      return sortDir === "desc" ? -cmp : cmp
+    })
+    return copy
+  }, [submissions, sortKey, sortDir])
+
+  const detailSubmission = useMemo(
+    () => (detailId ? submissions.find((s) => s._id === detailId) ?? null : null),
+    [detailId, submissions],
+  )
+
+  function toggleSort(key: string) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    else { setSortKey(key); setSortDir("desc") }
+  }
 
   function updateDraft<K extends keyof ManagedForm>(key: K, value: ManagedForm[K]) {
     setDraft((cur) => ({ ...cur, [key]: value }))
@@ -519,6 +561,8 @@ export default function FormEditorPage() {
                       </FieldRow>
                       <ToggleRow label="Email notifications" description="Get notified when someone submits."
                         checked={draft.settings?.notifyOnSubmission ?? true} onCheckedChange={(v) => patchSettings({ notifyOnSubmission: v })} />
+                      <ToggleRow label="Collect device information" description="Record the respondent's device, OS, and browser."
+                        checked={draft.settings?.collectDeviceInfo ?? false} onCheckedChange={(v) => patchSettings({ collectDeviceInfo: v })} />
                     </div>
                     <div className="space-y-3">
                       <p className="text-[13px] font-medium text-muted-foreground">Preview</p>
@@ -669,7 +713,7 @@ export default function FormEditorPage() {
 
           {/* ---- RESPONSES ---- */}
           <TabsContent value="responses" className="mt-0 min-h-0 flex-1 overflow-y-auto bg-background">
-            <div className="mx-auto max-w-2xl space-y-6 px-6 py-10 lg:px-8">
+            <div className="space-y-4 p-6 lg:px-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold">Responses</h2>
@@ -687,34 +731,120 @@ export default function FormEditorPage() {
                   <p className="text-sm text-muted-foreground">No responses yet. Share your form to start collecting data.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {submissions.map((sub) => (
-                    <div key={sub._id} className="rounded-lg border p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{formatDate(sub.createdAt)}</span>
-                          <span className="text-muted-foreground">via {sub.source}</span>
-                          <Badge variant="outline" className="text-[10px]">{sub.status}</Badge>
-                        </div>
-                        <div className="flex gap-1.5">
-                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void createCustomerFromSubmission(sub)}>Create customer</Button>
-                          <Button size="sm" variant={sub.status === "reviewed" ? "default" : "outline"} className="h-7 text-xs" onClick={() => void updateSubmissionStatus(sub._id, "reviewed")}>Reviewed</Button>
-                          <Button size="sm" variant="ghost" className="h-7" onClick={() => void updateSubmissionStatus(sub._id, "archived")}><ArchiveIcon className="size-3.5" /></Button>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
-                        {fields.map((field) => (
-                          <div key={field.id} className="rounded bg-muted/40 px-3 py-2 text-sm">
-                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{field.label}</p>
-                            <ResponseValue value={sub.values[field.id]} />
-                          </div>
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-8 text-center">#</TableHead>
+                        <SortableHead label="Submitted" sortKey="createdAt" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                        <SortableHead label="Status" sortKey="status" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                        <SortableHead label="Source" sortKey="source" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                        {collectDeviceInfo && <TableHead>Device</TableHead>}
+                        {fields.map((f) => (
+                          <TableHead key={f.id} className="max-w-[180px]">{f.label}</TableHead>
                         ))}
-                      </div>
-                    </div>
-                  ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedSubmissions.map((sub, i) => (
+                        <TableRow key={sub._id} className="cursor-pointer" onClick={() => setDetailId(sub._id)}>
+                          <TableCell className="text-center text-xs text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="text-[13px]">{formatDate(sub.createdAt)}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-[10px] capitalize">{sub.status}</Badge></TableCell>
+                          <TableCell className="text-[13px] text-muted-foreground">{sub.source}</TableCell>
+                          {collectDeviceInfo && (
+                            <TableCell className="text-[13px] text-muted-foreground">
+                              {sub.metadata?.device ?? "-"}
+                            </TableCell>
+                          )}
+                          {fields.map((f) => (
+                            <TableCell key={f.id} className="max-w-[180px] truncate text-[13px]">
+                              {formatResponseValue(sub.values[f.id])}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </div>
+
+            {/* Detail sheet */}
+            <Sheet open={detailId !== null} onOpenChange={(open) => { if (!open) setDetailId(null) }}>
+              <SheetContent className="overflow-y-auto sm:max-w-md">
+                <SheetHeader>
+                  <SheetTitle>Submission details</SheetTitle>
+                </SheetHeader>
+                {detailSubmission && (
+                  <div className="space-y-5 px-4 pb-8">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Submitted</p>
+                        <p className="mt-0.5 font-medium">{formatDate(detailSubmission.createdAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Source</p>
+                        <p className="mt-0.5">{detailSubmission.source}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+                        <Badge variant="outline" className="mt-0.5 capitalize">{detailSubmission.status}</Badge>
+                      </div>
+                      {detailSubmission.metadata?.referrer && (
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Referrer</p>
+                          <p className="mt-0.5 truncate text-xs">{detailSubmission.metadata.referrer}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {collectDeviceInfo && (detailSubmission.metadata?.device || detailSubmission.metadata?.os || detailSubmission.metadata?.browser) && (
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          <MonitorSmartphoneIcon className="size-3" /> Device info
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Device</p>
+                            <p>{detailSubmission.metadata.device ?? "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">OS</p>
+                            <p>{detailSubmission.metadata.os ?? "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Browser</p>
+                            <p>{detailSubmission.metadata.browser ?? "-"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Field values</p>
+                      {fields.map((field) => (
+                        <div key={field.id} className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{field.label}</p>
+                          <ResponseValue value={detailSubmission.values[field.id]} />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 border-t pt-4">
+                      <Button size="sm" variant="outline" onClick={() => void createCustomerFromSubmission(detailSubmission)}>Create customer</Button>
+                      <Button size="sm" variant={detailSubmission.status === "reviewed" ? "default" : "outline"}
+                        onClick={() => void updateSubmissionStatus(detailSubmission._id, "reviewed")}>
+                        Reviewed
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => void updateSubmissionStatus(detailSubmission._id, "archived")}>
+                        <ArchiveIcon className="size-3.5" /> Archive
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </SheetContent>
+            </Sheet>
             </TabsContent>
           </div>
         </Tabs>
@@ -829,5 +959,20 @@ function ToggleRow({ label, description, checked, onCheckedChange }: {
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>
+  )
+}
+
+function SortableHead({ label, sortKey, currentKey, dir, onToggle }: {
+  label: string; sortKey: string; currentKey: string; dir: "asc" | "desc"; onToggle: (key: string) => void
+}) {
+  const active = currentKey === sortKey
+  return (
+    <TableHead>
+      <button type="button" onClick={() => onToggle(sortKey)}
+        className="inline-flex items-center gap-1 font-medium transition-colors hover:text-foreground">
+        {label}
+        {active && (dir === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+      </button>
+    </TableHead>
   )
 }

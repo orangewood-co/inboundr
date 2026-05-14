@@ -38,6 +38,7 @@ export interface IForm extends Document {
     submitButtonLabel: string;
     successMessage: string;
     notifyOnSubmission: boolean;
+    collectDeviceInfo: boolean;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -88,6 +89,7 @@ const formSchema = new Schema<IForm>(
       submitButtonLabel: { type: String, default: "Submit" },
       successMessage: { type: String, default: "Thanks. Your response has been submitted." },
       notifyOnSubmission: { type: Boolean, default: true },
+      collectDeviceInfo: { type: Boolean, default: false },
     },
   },
   { timestamps: true }
