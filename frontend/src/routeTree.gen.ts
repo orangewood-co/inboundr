@@ -21,7 +21,6 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
-import { Route as FSlugRouteImport } from './routes/f.$slug'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -83,11 +82,6 @@ const FormsSlugRoute = FormsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => FormsRoute,
 } as any)
-const FSlugRoute = FSlugRouteImport.update({
-  id: '/f/$slug',
-  path: '/f/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,7 +94,6 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/f/$slug': typeof FSlugRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/forms/': typeof FormsIndexRoute
 }
@@ -114,7 +107,6 @@ export interface FileRoutesByTo {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/f/$slug': typeof FSlugRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/forms': typeof FormsIndexRoute
 }
@@ -130,7 +122,6 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
-  '/f/$slug': typeof FSlugRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/forms/': typeof FormsIndexRoute
 }
@@ -147,7 +138,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/settings'
-    | '/f/$slug'
     | '/forms/$slug'
     | '/forms/'
   fileRoutesByTo: FileRoutesByTo
@@ -161,7 +151,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/settings'
-    | '/f/$slug'
     | '/forms/$slug'
     | '/forms'
   id:
@@ -176,7 +165,6 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/settings'
-    | '/f/$slug'
     | '/forms/$slug'
     | '/forms/'
   fileRoutesById: FileRoutesById
@@ -192,7 +180,6 @@ export interface RootRouteChildren {
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
-  FSlugRoute: typeof FSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -281,13 +268,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsSlugRouteImport
       parentRoute: typeof FormsRoute
     }
-    '/f/$slug': {
-      id: '/f/$slug'
-      path: '/f/$slug'
-      fullPath: '/f/$slug'
-      preLoaderRoute: typeof FSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -314,7 +294,6 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
-  FSlugRoute: FSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

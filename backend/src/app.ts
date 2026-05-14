@@ -24,10 +24,11 @@ import {
 
 const app: Application = express();
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
 
 app.use(
   cors({
-    origin: frontendOrigin,
+    origin: [frontendOrigin, embedOrigin],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

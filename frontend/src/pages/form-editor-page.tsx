@@ -151,8 +151,10 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
 }
 
+const EMBED_ORIGIN = import.meta.env.VITE_EMBED_URL ?? "http://localhost:5175"
+
 function publicUrl(slug: string) {
-  return `${window.location.origin}/f/${slug}`
+  return `${EMBED_ORIGIN}/form/${slug}`
 }
 
 function embedSnippet(slug: string) {
@@ -650,7 +652,7 @@ export default function FormEditorPage() {
                     <CopyIcon className="size-3.5" /> Copy
                   </Button>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={draft.slug ? `/f/${draft.slug}` : "#"} target="_blank" rel="noreferrer"><EyeIcon className="size-3.5" /> Preview</a>
+                    <a href={draft.slug ? publicUrl(draft.slug) : "#"} target="_blank" rel="noreferrer"><EyeIcon className="size-3.5" /> Preview</a>
                   </Button>
                 </div>
               </div>
