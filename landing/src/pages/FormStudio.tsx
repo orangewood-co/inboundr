@@ -167,7 +167,7 @@ export default function FormStudio() {
 
       {/* ── Features grid ── */}
       <section className="px-6 py-20 sm:py-28 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-4xl">
           <FadeIn>
             <p className="mb-4 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
               What's included
@@ -176,7 +176,7 @@ export default function FormStudio() {
               Everything you need to build, share, and manage forms.
             </h2>
           </FadeIn>
-          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-4 sm:grid-cols-2">
             {features.map((f, i) => (
               <FadeIn key={f.title} delay={i * 0.06}>
                 <div className="group flex h-full flex-col border border-border p-7 transition-colors hover:border-text/10 sm:p-8">
@@ -196,7 +196,7 @@ export default function FormStudio() {
 
       {/* ── How it works ── */}
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
-        <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-4xl">
           <FadeIn>
             <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
               How it works
@@ -223,7 +223,7 @@ export default function FormStudio() {
       {/* ── Highlight banner ── */}
       <section className="px-6 py-20 sm:py-28 lg:px-8">
         <FadeIn>
-          <div className="noise relative mx-auto max-w-5xl overflow-hidden bg-green p-10 sm:p-14">
+          <div className="noise relative mx-auto max-w-4xl overflow-hidden bg-green p-10 sm:p-14">
             <div className="relative z-10 grid items-center gap-8 lg:grid-cols-[1fr_auto]">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-text-muted">
