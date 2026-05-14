@@ -4,6 +4,10 @@ import { Email } from "../models/email.model";
 import type { ParsedEmail, EmailAttachment } from "../types/email.types";
 import { processEmailForRFQ } from "./rfq.service";
 import {
+  buildRFQProcessingInput,
+  hasRFQProcessableContent,
+} from "./rfq-input.service";
+import {
   GmailAccount,
   type IGmailAccount,
 } from "../models/gmail-account.model";
@@ -90,9 +94,8 @@ export async function processHistoryUpdate(
             gmailAccountId: account._id,
             messageId,
           }).lean();
-          const rawBody = emailDoc?.bodyText || emailDoc?.bodyHtml;
-          if (emailDoc && rawBody) {
-            const body = `SENT FROM: ${emailDoc.from}, SENT TO: ${emailDoc.to}, DATE: ${emailDoc.date}\n${rawBody}`;
+          if (emailDoc && hasRFQProcessableContent(emailDoc)) {
+            const body = await buildRFQProcessingInput(account, emailDoc);
             processEmailForRFQ(
               emailDoc._id.toString(),
               body,
@@ -343,9 +346,8 @@ async function fetchRecentMessages(account: IGmailAccount): Promise<void> {
           gmailAccountId: account._id,
           messageId: msg.id,
         }).lean();
-        const rawBody = emailDoc?.bodyText || emailDoc?.bodyHtml;
-        if (emailDoc && rawBody) {
-          const body = `SENT FROM: ${emailDoc.from}, SENT TO: ${emailDoc.to}, DATE: ${emailDoc.date}\n${rawBody}`;
+        if (emailDoc && hasRFQProcessableContent(emailDoc)) {
+          const body = await buildRFQProcessingInput(account, emailDoc);
           processEmailForRFQ(
             emailDoc._id.toString(),
             body,

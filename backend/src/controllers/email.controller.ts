@@ -2,7 +2,18 @@ import type { Request, Response } from "express";
 import { processHistoryUpdate } from "../services/email.service";
 import { Email } from "../models/email.model";
 import { GmailAccount } from "../models/gmail-account.model";
+import { RFQ } from "../models/rfq.model";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
+
+function attachClassification(email: any, rfq: any | undefined) {
+  return {
+    ...email,
+    rfqId: rfq?._id ?? null,
+    isRFQ: rfq?.isRFQ ?? null,
+    classificationReason: rfq?.reason ?? null,
+    rfqErrorMessage: rfq?.errorMessage ?? null,
+  };
+}
 
 export const emailWebhookController = async (
   req: Request,
@@ -75,7 +86,25 @@ export const listEmails = async (
       Email.countDocuments({ userId: authReq.user.id, organizationId: organization._id }),
     ]);
 
-    res.json({ emails, total, page, limit, totalPages: Math.ceil(total / limit) });
+    const emailIds = emails.map((email) => email._id);
+    const rfqs = await RFQ.find({
+      userId: authReq.user.id,
+      organizationId: organization._id,
+      emailId: { $in: emailIds },
+    })
+      .select("emailId isRFQ reason errorMessage")
+      .lean();
+    const rfqByEmailId = new Map(rfqs.map((rfq) => [rfq.emailId.toString(), rfq]));
+
+    res.json({
+      emails: emails.map((email) =>
+        attachClassification(email, rfqByEmailId.get(email._id.toString()))
+      ),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
     console.error("Error listing emails:", err);
     res.status(500).json({ error: "Failed to fetch emails" });
@@ -98,7 +127,15 @@ export const getEmail = async (
       res.status(404).json({ error: "Email not found" });
       return;
     }
-    res.json(email);
+    const rfq = await RFQ.findOne({
+      emailId: email._id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
+      .select("emailId isRFQ reason errorMessage")
+      .lean();
+
+    res.json(attachClassification(email, rfq));
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });

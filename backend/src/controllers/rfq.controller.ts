@@ -8,6 +8,10 @@ import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/au
 import { GmailAccount } from "../models/gmail-account.model";
 import { sendQuoteOnGmailThread } from "../services/gmail-send.service";
 import { Customer } from "../models/customer.model";
+import {
+  buildRFQProcessingInput,
+  hasRFQProcessableContent,
+} from "../services/rfq-input.service";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -153,10 +157,25 @@ export const retryRFQ = async (
       return;
     }
 
+    const account = await GmailAccount.findOne({
+      _id: email.gmailAccountId,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+    if (!account) {
+      res.status(404).json({ error: "Associated Gmail account not found" });
+      return;
+    }
+
+    if (!hasRFQProcessableContent(email)) {
+      res.status(400).json({ error: "Email has no processable body or supported attachments" });
+      return;
+    }
+
     // Reset the RFQ for reprocessing
     await RFQ.deleteOne({ _id: rfq._id });
 
-    const body = `SENT FROM: ${email.from}, SENT TO: ${email.to}, DATE: ${email.date}\n${email.bodyText || email.bodyHtml}`;
+    const body = await buildRFQProcessingInput(account, email);
 
     processEmailForRFQ(
       email._id.toString(),

@@ -33,6 +33,10 @@ interface EmailSummary {
   status: "received" | "processing" | "processed" | "failed"
   labels: string[]
   attachments: { filename: string; mimeType: string; size: number }[]
+  rfqId: string | null
+  isRFQ: boolean | null
+  classificationReason: string | null
+  rfqErrorMessage: string | null
 }
 
 interface EmailDetail extends EmailSummary {
@@ -177,6 +181,42 @@ function StatusBadge({ status }: { status: EmailSummary["status"] }) {
       {config.label}
     </span>
   )
+}
+
+function ClassificationBadge({ email }: { email: EmailSummary }) {
+  if (email.status === "failed" || email.rfqErrorMessage) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-500/20 dark:text-red-400">
+        RFQ failed
+      </span>
+    )
+  }
+
+  if (email.isRFQ === true) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+        RFQ
+      </span>
+    )
+  }
+
+  if (email.isRFQ === false) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        Not RFQ
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+      Pending
+    </span>
+  )
+}
+
+function isRFQSupportedAttachment(att: EmailSummary["attachments"][number]) {
+  return att.mimeType === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(att.mimeType)
 }
 
 function EmptyState() {
@@ -414,8 +454,9 @@ export function EmailsPage() {
                             )}
                           </div>
                         </div>
-                        <div className="pl-[38px]">
+                        <div className="flex items-center gap-1.5 pl-[38px]">
                           <StatusBadge status={email.status} />
+                          <ClassificationBadge email={email} />
                         </div>
                       </button>
                     )
@@ -513,8 +554,27 @@ export function EmailsPage() {
                           <span className="text-[10px] opacity-50">
                             ({(att.size / 1024).toFixed(0)}KB)
                           </span>
+                          {isRFQSupportedAttachment(att) && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                              RFQ scan
+                            </span>
+                          )}
                         </span>
                       ))}
+                    </div>
+                  )}
+
+                  {(detail.classificationReason || detail.rfqErrorMessage || detail.isRFQ !== null) && (
+                    <div className="surface-inset rounded-xl border border-border/40 p-3">
+                      <div className="mb-1.5 flex items-center gap-2">
+                        <ClassificationBadge email={detail} />
+                        <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Classification
+                        </span>
+                      </div>
+                      <p className="text-[12px] leading-relaxed text-muted-foreground">
+                        {detail.rfqErrorMessage || detail.classificationReason || "RFQ classification is pending."}
+                      </p>
                     </div>
                   )}
                 </div>
