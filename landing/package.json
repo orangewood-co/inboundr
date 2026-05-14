@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fontsource-variable/sora": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
     "@tailwindcss/vite": "^4.2.1",
     "lucide-react": "^1.14.0",
     "motion": "^12.38.0",

@@ -71,50 +71,52 @@ export default function Home() {
     <>
       {/* ── Hero ── */}
       <AuroraBackground className="noise overflow-hidden">
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-24 pt-28 text-center sm:pb-36 sm:pt-40 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-5xl px-6 pb-32 pt-36 text-center sm:pb-44 sm:pt-48 lg:px-8">
           <motion.p
-            className="mb-5 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright"
+            className="mb-8 text-[12px] font-medium uppercase tracking-[0.35em] text-green-bright"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.8 }}
           >
             AI-native sales infrastructure
           </motion.p>
           <motion.h1
-            className="mx-auto max-w-4xl text-[clamp(2.8rem,7vw,6.5rem)] leading-[0.95] tracking-[-0.045em]"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
+            transition={{ duration: 1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
           >
-            Turn inbound
-            <br />
-            into revenue.
+            <span className="block text-[clamp(3rem,8vw,6rem)] font-light leading-[0.95] tracking-[-0.04em] text-text">
+              Turn inbound
+            </span>
+            <span className="block font-display text-[clamp(3.5rem,10vw,8rem)] italic leading-[0.9] tracking-[-0.02em] text-gold">
+              into revenue.
+            </span>
           </motion.h1>
           <motion.p
-            className="mx-auto mt-8 max-w-xl leading-relaxed text-text-muted sm:text-lg"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-          Inboundr combines AI automation, inbound qualification, quote generation, form infrastructure, and outreach into a single sales operating system.
-          </motion.p>
-          <motion.div
-            className="mt-10 flex justify-center gap-3"
+            className="mx-auto mt-8 max-w-md text-[17px] leading-relaxed text-text-muted"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.45 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+          >
+            AI that replies, quotes, follows up, and closes — automatically.
+          </motion.p>
+          <motion.div
+            className="mt-10 flex items-center justify-center gap-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.55 }}
           >
             <a
               href="mailto:hello@inboundr.ai?subject=Try Inboundr"
-              className="bg-text px-6 py-3 text-sm font-semibold text-base transition hover:bg-text/90"
+              className="bg-text px-8 py-3.5 text-sm font-semibold text-base shadow-[0_0_20px_rgba(62,207,142,0.12)] transition hover:shadow-[0_0_30px_rgba(62,207,142,0.2)]"
             >
-              Try Now
+              Start free
             </a>
             <a
               href="mailto:hello@inboundr.ai?subject=Contact Sales"
-              className="border border-border px-6 py-3 text-sm font-medium transition hover:border-text/20 hover:bg-surface"
+              className="px-6 py-3.5 text-sm font-medium text-text-muted transition hover:text-text"
             >
-              Book a Demo
+              Book a demo →
             </a>
           </motion.div>
         </div>
