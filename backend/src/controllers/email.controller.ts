@@ -1,9 +1,29 @@
 import type { Request, Response } from "express";
-import { processHistoryUpdate } from "../services/email.service";
+import { getAttachment, processHistoryUpdate } from "../services/email.service";
 import { Email } from "../models/email.model";
 import { GmailAccount } from "../models/gmail-account.model";
 import { RFQ } from "../models/rfq.model";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
+
+const INLINE_ATTACHMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+function sanitizeAttachmentFilename(filename: string): string {
+  return filename.replace(/[\r\n"\\]/g, "_").trim() || "attachment";
+}
+
+function buildContentDisposition(filename: string, forceDownload: boolean): string {
+  const disposition = forceDownload ? "attachment" : "inline";
+  const safeFilename = sanitizeAttachmentFilename(filename);
+  const encodedFilename = encodeURIComponent(safeFilename);
+
+  return `${disposition}; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`;
+}
 
 function attachClassification(email: any, rfq: any | undefined) {
   return {
@@ -139,5 +159,60 @@ export const getEmail = async (
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });
+  }
+};
+
+export const getEmailAttachment = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const forceDownload = req.path.endsWith("/download");
+
+    const email = await Email.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    }).lean();
+    if (!email) {
+      res.status(404).json({ error: "Email not found" });
+      return;
+    }
+
+    const attachment = email.attachments.find(
+      (item) => item.attachmentId === req.params.attachmentId
+    );
+    if (!attachment) {
+      res.status(404).json({ error: "Attachment not found" });
+      return;
+    }
+
+    const account = await GmailAccount.findOne({
+      _id: email.gmailAccountId,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+    if (!account) {
+      res.status(404).json({ error: "Gmail account not found" });
+      return;
+    }
+
+    const data = await getAttachment(account, email.messageId, attachment.attachmentId);
+    const shouldDownload =
+      forceDownload || !INLINE_ATTACHMENT_MIME_TYPES.has(attachment.mimeType);
+
+    res.setHeader("Content-Type", attachment.mimeType || "application/octet-stream");
+    res.setHeader("Content-Length", data.byteLength);
+    res.setHeader(
+      "Content-Disposition",
+      buildContentDisposition(attachment.filename, shouldDownload)
+    );
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.send(data);
+  } catch (err) {
+    console.error("Error fetching email attachment:", err);
+    res.status(500).json({ error: "Failed to fetch attachment" });
   }
 };

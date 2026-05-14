@@ -16,6 +16,9 @@ import {
   AlertCircleIcon,
   CheckCircle2Icon,
   ClockIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
+  EyeIcon,
   LoaderIcon,
 } from "lucide-react"
 
@@ -32,7 +35,7 @@ interface EmailSummary {
   date: string
   status: "received" | "processing" | "processed" | "failed"
   labels: string[]
-  attachments: { filename: string; mimeType: string; size: number }[]
+  attachments: { filename: string; mimeType: string; size: number; attachmentId: string }[]
   rfqId: string | null
   isRFQ: boolean | null
   classificationReason: string | null
@@ -219,6 +222,15 @@ function isRFQSupportedAttachment(att: EmailSummary["attachments"][number]) {
   return att.mimeType === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(att.mimeType)
 }
 
+function isPreviewableAttachment(att: EmailSummary["attachments"][number]) {
+  return att.mimeType === "application/pdf" || ["image/gif", "image/jpeg", "image/png", "image/webp"].includes(att.mimeType)
+}
+
+function buildAttachmentUrl(emailId: string, attachmentId: string, download = false) {
+  const path = `${API_BASE}/${emailId}/attachments/${encodeURIComponent(attachmentId)}`
+  return download ? `${path}/download` : path
+}
+
 function EmptyState() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center animate-in fade-in-0 duration-500">
@@ -298,6 +310,7 @@ export function EmailsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [selectedAttachment, setSelectedAttachment] = useState<EmailDetail["attachments"][number] | null>(null)
 
   const [refreshing, setRefreshing] = useState(false)
   const emailDocument = useMemo(
@@ -344,6 +357,10 @@ export function EmailsPage() {
   useEffect(() => {
     if (selectedId) fetchDetail(selectedId)
   }, [selectedId, fetchDetail])
+
+  useEffect(() => {
+    setSelectedAttachment(null)
+  }, [selectedId])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -545,9 +562,11 @@ export function EmailsPage() {
                   {detail.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {detail.attachments.map((att, i) => (
-                        <span
+                        <button
                           key={i}
-                          className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground"
+                          type="button"
+                          className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                          onClick={() => setSelectedAttachment(att)}
                         >
                           <PaperclipIcon className="size-3" />
                           {att.filename}
@@ -559,7 +578,12 @@ export function EmailsPage() {
                               RFQ scan
                             </span>
                           )}
-                        </span>
+                          {isPreviewableAttachment(att) ? (
+                            <EyeIcon className="size-3 opacity-60" />
+                          ) : (
+                            <ExternalLinkIcon className="size-3 opacity-60" />
+                          )}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -603,6 +627,66 @@ export function EmailsPage() {
             )}
           </div>
         </div>
+        {detail && selectedAttachment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm">
+            <div className="flex h-full max-h-[860px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+              <div className="flex items-center justify-between gap-4 border-b border-border/50 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold">{selectedAttachment.filename}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedAttachment.mimeType || "Unknown type"} · {(selectedAttachment.size / 1024).toFixed(0)}KB
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={buildAttachmentUrl(detail._id, selectedAttachment.attachmentId, true)}>
+                      <DownloadIcon className="mr-1.5 size-3.5" />
+                      Download
+                    </a>
+                  </Button>
+                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setSelectedAttachment(null)}>
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/30">
+                {selectedAttachment.mimeType === "application/pdf" ? (
+                  <iframe
+                    title={selectedAttachment.filename}
+                    className="size-full border-0 bg-white"
+                    src={buildAttachmentUrl(detail._id, selectedAttachment.attachmentId)}
+                  />
+                ) : selectedAttachment.mimeType.startsWith("image/") && isPreviewableAttachment(selectedAttachment) ? (
+                  <div className="size-full overflow-auto p-6 text-center">
+                    <img
+                      src={buildAttachmentUrl(detail._id, selectedAttachment.attachmentId)}
+                      alt={selectedAttachment.filename}
+                      className="mx-auto max-h-full max-w-full rounded-lg object-contain shadow-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 p-10 text-center">
+                    <div className="surface-raised rounded-2xl p-5">
+                      <PaperclipIcon className="size-8 text-muted-foreground/50" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[13px] font-semibold">Preview not available</p>
+                      <p className="max-w-sm text-[12px] text-muted-foreground">
+                        This attachment type is available to download, but it is not shown inline for safety.
+                      </p>
+                    </div>
+                    <Button asChild>
+                      <a href={buildAttachmentUrl(detail._id, selectedAttachment.attachmentId, true)}>
+                        <DownloadIcon className="mr-2 size-4" />
+                        Download attachment
+                      </a>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </SidebarInset>
     </SidebarProvider>
   )
