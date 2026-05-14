@@ -7,13 +7,14 @@ export default function Header() {
     <>
       {/* ── Banner ── */}
       <div className="noise relative z-50 overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide">
-        <span className="relative z-10 text-text-muted">AI Revenue Engine</span>
+        <span className="relative z-10 mr-2 inline-block rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-base">New</span>
+        <span className="relative z-10 text-text-muted">Form Studio — build beautiful forms, your way</span>
         <span className="relative z-10 mx-2 text-text-dim">|</span>
         <Link
-          to="/#features"
+          to="/features/forms"
           className="relative z-10 font-medium text-text transition hover:text-gold"
         >
-          See what it does <ArrowRight className="mb-px inline size-3" />
+          Learn more <ArrowRight className="mb-px inline size-3" />
         </Link>
       </div>
 

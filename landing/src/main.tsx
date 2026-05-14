@@ -18,6 +18,7 @@ const Contact = lazy(() => import("./pages/Contact"))
 const Privacy = lazy(() => import("./pages/Privacy"))
 const Terms = lazy(() => import("./pages/Terms"))
 const Security = lazy(() => import("./pages/Security"))
+const FormStudio = lazy(() => import("./pages/FormStudio"))
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -38,6 +39,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="privacy" element={<Privacy />} />
             <Route path="terms" element={<Terms />} />
             <Route path="security" element={<Security />} />
+            <Route path="features/forms" element={<FormStudio />} />
           </Route>
         </Routes>
       </Suspense>
