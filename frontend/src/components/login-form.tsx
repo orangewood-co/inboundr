@@ -13,6 +13,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { signIn } from "@/lib/auth-client"
 
+function getInviteToken(): string | null {
+  return new URLSearchParams(window.location.search).get("inviteToken")
+}
+
+function getPostAuthPath(): string {
+  const inviteToken = getInviteToken()
+  return inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : "/"
+}
+
 export function LoginForm({
   className,
   ...props
@@ -27,7 +36,7 @@ export function LoginForm({
     setError(null)
     setIsSubmitting(true)
 
-    const callbackURL = `${window.location.origin}/`
+    const callbackURL = `${window.location.origin}${getPostAuthPath()}`
     const result = await signIn.email({ email, password, callbackURL })
 
     setIsSubmitting(false)
@@ -39,14 +48,14 @@ export function LoginForm({
       return
     }
 
-    window.location.href = "/"
+    window.location.href = getPostAuthPath()
   }
 
   async function handleGoogleSignIn() {
     setError(null)
     await signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: `${window.location.origin}${getPostAuthPath()}`,
     })
   }
 
@@ -123,6 +132,7 @@ export function LoginForm({
             Don&apos;t have an account?{" "}
             <Link
               to="/register"
+              search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
               className="underline underline-offset-4"
             >
               Sign up

@@ -9,6 +9,8 @@ export interface IOrganizationInvitation extends Document {
   role: OrganizationRole;
   tokenHash: string;
   invitedByUserId: string;
+  invitedByName: string;
+  invitedByEmail: string;
   status: OrganizationInvitationStatus;
   expiresAt: Date;
   acceptedAt?: Date;
@@ -33,6 +35,8 @@ const organizationInvitationSchema = new Schema<IOrganizationInvitation>(
     },
     tokenHash: { type: String, required: true, unique: true, index: true },
     invitedByUserId: { type: String, required: true, index: true },
+    invitedByName: { type: String, default: "" },
+    invitedByEmail: { type: String, default: "", lowercase: true, trim: true },
     status: {
       type: String,
       enum: ["pending", "accepted", "cancelled"],

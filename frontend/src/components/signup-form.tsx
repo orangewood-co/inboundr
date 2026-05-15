@@ -13,6 +13,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { signIn, signUp } from "@/lib/auth-client"
 
+function getInviteToken(): string | null {
+  return new URLSearchParams(window.location.search).get("inviteToken")
+}
+
+function getPostAuthPath(): string {
+  const inviteToken = getInviteToken()
+  return inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : "/"
+}
+
 const STRENGTH_CONFIG = [
   { label: "Too short", color: "bg-destructive" },
   { label: "Weak", color: "bg-orange-500" },
@@ -83,7 +92,7 @@ export function SignupForm({
 
     setIsSubmitting(true)
 
-    const callbackURL = `${window.location.origin}/`
+    const callbackURL = `${window.location.origin}${getPostAuthPath()}`
     const result = await signUp.email({ email, password, name, callbackURL })
 
     setIsSubmitting(false)
@@ -102,7 +111,7 @@ export function SignupForm({
     setError(null)
     await signIn.social({
       provider: "google",
-      callbackURL: `${window.location.origin}/`,
+      callbackURL: `${window.location.origin}${getPostAuthPath()}`,
     })
   }
 
@@ -134,7 +143,12 @@ export function SignupForm({
           </div>
         </div>
         <Button asChild variant="outline">
-          <Link to="/login">Back to sign in</Link>
+          <Link
+            to="/login"
+            search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
+          >
+            Back to sign in
+          </Link>
         </Button>
       </div>
     )
@@ -236,6 +250,7 @@ export function SignupForm({
             Already have an account?{" "}
             <Link
               to="/login"
+              search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
               className="underline underline-offset-4"
             >
               Sign in

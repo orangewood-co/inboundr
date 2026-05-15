@@ -6,6 +6,7 @@ import {
   inviteOrganizationMember,
   listOrganizationInvitations,
   listOrganizationMembers,
+  previewOrganizationInvitation,
   removeOrganizationMember,
   updateMyOrganization,
   updateOrganizationMemberRole,
@@ -18,6 +19,7 @@ import {
 
 const router = Router();
 
+router.get("/invitations/preview", previewOrganizationInvitation);
 router.use(requireAuth);
 router.post("/invitations/accept", acceptOrganizationInvitation);
 router.use(requireOrganization);

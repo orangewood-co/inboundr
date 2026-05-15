@@ -9,6 +9,7 @@ import {
   OrganizationMember,
   type OrganizationRole,
 } from "../models/organization-member.model";
+import { Organization } from "../models/organization.model";
 import { sendEmail } from "../lib/email";
 
 function stringValue(value: unknown): string {
@@ -175,11 +176,13 @@ export async function inviteOrganizationMember(
       role,
       tokenHash: tokenHash(rawToken),
       invitedByUserId: authReq.user.id,
+      invitedByName: authReq.user.name ?? "",
+      invitedByEmail: authReq.user.email ?? "",
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     });
 
     const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
-    const inviteUrl = `${frontendOrigin}/settings?inviteToken=${encodeURIComponent(rawToken)}`;
+    const inviteUrl = `${frontendOrigin}/invite/${encodeURIComponent(rawToken)}`;
     await sendEmail({
       to: email,
       subject: `Join ${organization.name} on BTSA`,
@@ -194,6 +197,60 @@ export async function inviteOrganizationMember(
   } catch (err) {
     console.error("Error inviting organization member:", err);
     res.status(500).json({ error: "Failed to invite organization member" });
+  }
+}
+
+export async function previewOrganizationInvitation(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const token = stringValue(req.query.token);
+    if (!token) {
+      res.status(400).json({ error: "Invitation token is required" });
+      return;
+    }
+
+    const invitation = await OrganizationInvitation.findOne({
+      tokenHash: tokenHash(token),
+    }).lean();
+
+    if (!invitation) {
+      res.status(404).json({ error: "Invitation not found" });
+      return;
+    }
+
+    const organization = await Organization.findById(invitation.organizationId)
+      .select("name")
+      .lean();
+
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    res.json({
+      invitation: {
+        email: invitation.email,
+        role: invitation.role,
+        status:
+          invitation.status === "pending" && invitation.expiresAt.getTime() < Date.now()
+            ? "expired"
+            : invitation.status,
+        expiresAt: invitation.expiresAt,
+        organization: {
+          _id: organization._id,
+          name: organization.name,
+        },
+        inviter: {
+          name: invitation.invitedByName,
+          email: invitation.invitedByEmail,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Error previewing organization invitation:", err);
+    res.status(500).json({ error: "Failed to preview organization invitation" });
   }
 }
 
