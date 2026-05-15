@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { setActiveOrganizationId } from "@/lib/organization-context"
 import {
   Building2Icon,
@@ -93,6 +94,14 @@ interface OrganizationInvitation {
   role: OrganizationRole
   expiresAt: string
   createdAt: string
+}
+
+interface PresignedUpload {
+  uploadUrl: string
+  headers: Record<string, string>
+  file: {
+    url: string | null
+  }
 }
 
 const emptyOrganizationForm: OrganizationFormState = {
@@ -192,6 +201,10 @@ function toRoleLabel(role: OrganizationRole): "Owner" | "Admin" | "Member" {
   return role === "owner" ? "Owner" : role === "admin" ? "Admin" : "Member"
 }
 
+function colorInputValue(value: string) {
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : "#f5b400"
+}
+
 function ApiTable({ items }: { items: typeof MOCK_PUBLIC_APIS }) {
   return (
     <div className="overflow-hidden">
@@ -237,6 +250,7 @@ function OrganizationTab() {
   const [form, setForm] = useState<OrganizationFormState>(emptyOrganizationForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -293,6 +307,7 @@ function OrganizationTab() {
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to save organization")
       setMessage("Organization settings saved")
+      notifyOrganizationBrandingChanged()
     } catch (err: any) {
       setError(err.message || "Failed to save organization")
     } finally {
@@ -309,6 +324,62 @@ function OrganizationTab() {
       ...current,
       defaultContact: { ...current.defaultContact, [field]: value },
     }))
+  }
+
+  const uploadLogo = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload an image file.")
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Logo must be 2MB or smaller.")
+      return
+    }
+
+    setUploadingLogo(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const presignRes = await fetch(`${API_ORIGIN}/api/v1/uploads/presign`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope: "branding",
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        }),
+      })
+      const presign: PresignedUpload | { error?: string } = await presignRes.json()
+
+      if (!presignRes.ok || !("uploadUrl" in presign)) {
+        throw new Error((presign as { error?: string }).error || "Failed to prepare logo upload")
+      }
+
+      const uploadRes = await fetch(presign.uploadUrl, {
+        method: "PUT",
+        headers: presign.headers,
+        body: file,
+      })
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload logo")
+      }
+
+      if (!presign.file.url) {
+        throw new Error("Logo uploaded, but no public URL was returned")
+      }
+
+      updateForm("logoUrl", presign.file.url)
+      setMessage("Logo uploaded. Save organization settings to publish it.")
+    } catch (err: any) {
+      setError(err.message || "Failed to upload logo")
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   const updatePreference = (field: keyof OrganizationFormState["preferences"], value: string) => {
@@ -348,9 +419,37 @@ function OrganizationTab() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="logoUrl">Logo URL</Label>
-                <Input id="logoUrl" value={form.logoUrl} onChange={(event) => updateForm("logoUrl", event.target.value)} placeholder="https://example.com/logo.png" />
+              <div className="space-y-3">
+                <Label htmlFor="organizationLogo">Organization logo</Label>
+                <div className="flex flex-col gap-4 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
+                  <div className="flex h-20 w-36 items-center justify-center overflow-hidden rounded-lg border bg-background">
+                    {form.logoUrl ? (
+                      <img src={form.logoUrl} alt={`${form.name || "Organization"} logo`} className="max-h-16 max-w-28 object-contain" />
+                    ) : (
+                      <Building2Icon className="size-7 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      id="organizationLogo"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      disabled={uploadingLogo}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) void uploadLogo(file)
+                        event.target.value = ""
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB. Save organization settings after upload.</p>
+                    {form.logoUrl && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => updateForm("logoUrl", "")}>
+                        Remove logo
+                      </Button>
+                    )}
+                  </div>
+                  {uploadingLogo && <p className="text-sm text-muted-foreground">Uploading...</p>}
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -398,7 +497,20 @@ function OrganizationTab() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="primaryColor">Primary color</Label>
-                  <Input id="primaryColor" value={form.preferences.primaryColor} onChange={(event) => updatePreference("primaryColor", event.target.value)} />
+                  <div className="flex gap-2">
+                    <Input
+                      id="primaryColor"
+                      type="color"
+                      value={colorInputValue(form.preferences.primaryColor)}
+                      onChange={(event) => updatePreference("primaryColor", event.target.value)}
+                      className="w-12 p-1"
+                    />
+                    <Input
+                      value={form.preferences.primaryColor}
+                      onChange={(event) => updatePreference("primaryColor", event.target.value)}
+                      placeholder="#f5b400"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="theme">Theme</Label>

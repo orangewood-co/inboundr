@@ -14,7 +14,9 @@ const DEFAULT_ALLOWED_MIME_TYPES = [
   "application/vnd.ms-excel",
 ];
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
-const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support"] as const;
+const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding"] as const;
 
 function normalizeUploadRequest(body: Record<string, unknown>) {
   return {
@@ -50,13 +52,22 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
       return;
     }
 
-    const validationError = validateUploadBasics(input);
+    const validationError = validateUploadBasics(
+      input,
+      input.scope === "branding" ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES,
+      input.scope === "branding" ? BRANDING_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE
+    );
     if (validationError) {
       res.status(400).json({ error: validationError });
       return;
     }
 
-    const prefixParts = input.scope === "form" && input.formId ? [input.formId] : [];
+    const prefixParts =
+      input.scope === "form" && input.formId
+        ? [input.formId]
+        : input.scope === "branding"
+          ? ["logo"]
+          : [];
     const presigned = await createPresignedUpload({
       scope: input.scope,
       organizationId: String(orgReq.organization._id),

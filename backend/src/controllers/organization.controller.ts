@@ -16,6 +16,16 @@ function stringValue(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function normalizeHexColor(value: unknown): string {
+  const color = stringValue(value);
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(color)) {
+    const [, r, g, b] = color;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return "#f5b400";
+}
+
 function normalizeOrganizationInput(body: Record<string, unknown>) {
   const defaultContact = body.defaultContact as Record<string, unknown> | undefined;
   const preferences = body.preferences as Record<string, unknown> | undefined;
@@ -37,7 +47,7 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
     ...(preferences
       ? {
           preferences: {
-            primaryColor: stringValue(preferences.primaryColor) || "#f5b400",
+            primaryColor: normalizeHexColor(preferences.primaryColor),
             theme: preferences.theme === "light" ? "light" : "dark",
             pricing: stringValue(preferences.pricing) || "INR",
             defaultTerms: stringValue(preferences.defaultTerms),

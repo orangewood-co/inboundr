@@ -6,6 +6,7 @@ import "./index.css"
 import { router } from "./router"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { OrganizationBrandingProvider } from "@/lib/organization-branding"
 import { installOrganizationFetchContext } from "@/lib/organization-context"
 
 installOrganizationFetchContext(import.meta.env.VITE_API_URL ?? "http://localhost:3000")
@@ -13,9 +14,11 @@ installOrganizationFetchContext(import.meta.env.VITE_API_URL ?? "http://localhos
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
-      <TooltipProvider>
-        <RouterProvider router={router} />
-      </TooltipProvider>
+      <OrganizationBrandingProvider>
+        <TooltipProvider>
+          <RouterProvider router={router} />
+        </TooltipProvider>
+      </OrganizationBrandingProvider>
     </ThemeProvider>
   </StrictMode>
 )
