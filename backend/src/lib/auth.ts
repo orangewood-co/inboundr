@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { organization } from "better-auth/plugins";
 import { MongoClient } from "mongodb";
 import { createElement } from "react";
 import { ResetPasswordEmail } from "../emails/reset-password";
@@ -57,6 +58,11 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     },
   },
+  plugins: [
+    organization({
+      organizationLimit: Number(process.env.ORGANIZATION_LIMIT ?? 5),
+    }),
+  ],
 });
 
 export type Session = typeof auth.$Infer.Session;

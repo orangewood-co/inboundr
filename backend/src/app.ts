@@ -32,8 +32,8 @@ const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
 app.use(
   cors({
     origin: [frontendOrigin, embedOrigin],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-organization-id"],
     credentials: true,
   }),
 );

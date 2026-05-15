@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { setActiveOrganizationId } from "@/lib/organization-context"
 import {
   Building2Icon,
   CameraIcon,
@@ -37,13 +38,6 @@ const MOCK_PUBLIC_APIS = [
 const MOCK_PRIVATE_APIS = [
   { name: "Internal Service Key", created: "Oct 1, 2024 9:30 am", status: "active" as const },
   { name: "Staging Environment", created: "Nov 15, 2024 4:12 pm", status: "active" as const },
-]
-
-const MOCK_MEMBERS = [
-  { name: "Tushar Gaurav", email: "tushar@btsa.dev", role: "Owner" as const, avatar: "T" },
-  { name: "Priya Sharma", email: "priya@btsa.dev", role: "Admin" as const, avatar: "P" },
-  { name: "Rahul Verma", email: "rahul@btsa.dev", role: "Member" as const, avatar: "R" },
-  { name: "Ananya Patel", email: "ananya@btsa.dev", role: "Member" as const, avatar: "A" },
 ]
 
 const MOCK_SESSIONS = [
@@ -83,6 +77,23 @@ interface Organization {
 }
 
 type OrganizationFormState = Omit<Organization, "_id">
+
+type OrganizationRole = "owner" | "admin" | "member"
+
+interface OrganizationMember {
+  _id: string
+  userId: string
+  role: OrganizationRole
+  createdAt: string
+}
+
+interface OrganizationInvitation {
+  _id: string
+  email: string
+  role: OrganizationRole
+  expiresAt: string
+  createdAt: string
+}
 
 const emptyOrganizationForm: OrganizationFormState = {
   name: "",
@@ -175,6 +186,10 @@ function RoleBadge({ role }: { role: "Owner" | "Admin" | "Member" }) {
       {role}
     </span>
   )
+}
+
+function toRoleLabel(role: OrganizationRole): "Owner" | "Admin" | "Member" {
+  return role === "owner" ? "Owner" : role === "admin" ? "Admin" : "Member"
 }
 
 function ApiTable({ items }: { items: typeof MOCK_PUBLIC_APIS }) {
@@ -873,37 +888,205 @@ function ApiTab() {
 }
 
 function MembersTab() {
+  const [members, setMembers] = useState<OrganizationMember[]>([])
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
+  const [email, setEmail] = useState("")
+  const [role, setRole] = useState<OrganizationRole>("member")
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [accepting, setAccepting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchMembers = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [membersRes, invitationsRes] = await Promise.all([
+        fetch(`${API_ORIGIN}/api/v1/organization/members`, {
+          credentials: "include",
+        }),
+        fetch(`${API_ORIGIN}/api/v1/organization/invitations`, {
+          credentials: "include",
+        }),
+      ])
+
+      const membersData = await membersRes.json()
+      if (!membersRes.ok) throw new Error(membersData?.error || "Failed to load members")
+      setMembers(membersData.members ?? [])
+
+      if (invitationsRes.ok) {
+        const invitationsData = await invitationsRes.json()
+        setInvitations(invitationsData.invitations ?? [])
+      } else if (invitationsRes.status !== 403) {
+        const invitationsData = await invitationsRes.json().catch(() => null)
+        throw new Error(invitationsData?.error || "Failed to load invitations")
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to load organization members")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchMembers()
+  }, [fetchMembers])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get("inviteToken")
+    if (!token) return
+
+    const acceptInvitation = async () => {
+      setAccepting(true)
+      setError(null)
+      setMessage(null)
+      try {
+        const res = await fetch(`${API_ORIGIN}/api/v1/organization/invitations/accept`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(data?.error || "Failed to accept invitation")
+        if (data?.organizationId) setActiveOrganizationId(String(data.organizationId))
+        setMessage("Invitation accepted. You now have access to this organization.")
+        window.history.replaceState(null, "", window.location.pathname)
+        await fetchMembers()
+      } catch (err: any) {
+        setError(err.message || "Failed to accept invitation")
+      } finally {
+        setAccepting(false)
+      }
+    }
+
+    void acceptInvitation()
+  }, [fetchMembers])
+
+  const inviteMember = async () => {
+    setSubmitting(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/invitations`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to send invitation")
+      setEmail("")
+      setRole("member")
+      setMessage("Invitation sent")
+      await fetchMembers()
+    } catch (err: any) {
+      setError(err.message || "Failed to send invitation")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const cancelInvitation = async (id: string) => {
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/invitations/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to cancel invitation")
+      await fetchMembers()
+    } catch (err: any) {
+      setError(err.message || "Failed to cancel invitation")
+    }
+  }
+
+  const removeMember = async (id: string) => {
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/members/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to remove member")
+      }
+      await fetchMembers()
+    } catch (err: any) {
+      setError(err.message || "Failed to remove member")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Members"
         description="Manage your team members and their roles."
-        action={
-          <Button className="gap-1.5">
-            <PlusIcon className="size-4" />
-            Invite Member
-          </Button>
-        }
       />
 
-      <SettingsCard title="Team Members" description={`${MOCK_MEMBERS.length} members in your workspace.`}>
+      {(error || message || accepting) && (
+        <div className={`rounded-lg border px-3 py-2 text-sm ${
+          error
+            ? "border-destructive/20 bg-destructive/10 text-destructive"
+            : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+        }`}>
+          {error || (accepting ? "Accepting invitation..." : message)}
+        </div>
+      )}
+
+      <SettingsCard title="Invite Member" description="Send an email invitation to add a teammate to this organization.">
+        <div className="grid gap-3 p-5 sm:grid-cols-[1fr_140px_auto]">
+          <Input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="teammate@example.com"
+          />
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value as OrganizationRole)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          <Button className="gap-1.5" onClick={inviteMember} disabled={submitting || !email.trim()}>
+            <PlusIcon className="size-4" />
+            {submitting ? "Sending..." : "Invite"}
+          </Button>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard title="Team Members" description={`${members.length} members in your workspace.`}>
         <div className="divide-y">
-          {MOCK_MEMBERS.map((member) => (
-            <div key={member.email} className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/30">
+          {loading ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">Loading members...</div>
+          ) : members.length === 0 ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">No members found.</div>
+          ) : members.map((member) => (
+            <div key={member._id} className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/30">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {member.avatar}
+                  {member.userId.slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{member.name}</p>
-                  <p className="text-xs text-muted-foreground">{member.email}</p>
+                  <p className="text-sm font-medium">{member.userId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Joined {new Date(member.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <RoleBadge role={member.role} />
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
-                  <EllipsisVerticalIcon className="size-4" />
-                </Button>
+                <RoleBadge role={toRoleLabel(member.role)} />
+                {member.role !== "owner" && (
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => removeMember(member._id)}>
+                    Remove
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -911,17 +1094,38 @@ function MembersTab() {
       </SettingsCard>
 
       <SettingsCard title="Pending Invitations" description="Invitations that haven't been accepted yet.">
-        <div className="flex flex-col items-center justify-center gap-3 px-5 py-8">
-          <div className="flex size-12 items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/30">
-            <MailIcon className="size-5 text-muted-foreground/40" />
+        {invitations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-5 py-8">
+            <div className="flex size-12 items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/30">
+              <MailIcon className="size-5 text-muted-foreground/40" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-muted-foreground">No pending invitations</p>
+              <p className="text-xs text-muted-foreground/60">
+                Invite team members to collaborate in your workspace.
+              </p>
+            </div>
           </div>
-          <div className="text-center">
-            <p className="text-sm font-medium text-muted-foreground">No pending invitations</p>
-            <p className="text-xs text-muted-foreground/60">
-              Invite team members to collaborate in your workspace.
-            </p>
+        ) : (
+          <div className="divide-y">
+            {invitations.map((invitation) => (
+              <div key={invitation._id} className="flex items-center justify-between px-5 py-3.5">
+                <div>
+                  <p className="text-sm font-medium">{invitation.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Expires {new Date(invitation.expiresAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <RoleBadge role={toRoleLabel(invitation.role)} />
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => cancelInvitation(invitation._id)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </SettingsCard>
     </div>
   )

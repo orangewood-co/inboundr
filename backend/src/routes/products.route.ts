@@ -6,7 +6,11 @@ import {
   listProducts,
   updateProduct,
 } from "../controllers/products.controller";
-import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
+import {
+  requireAuth,
+  requireOrganization,
+  requireOrganizationRole,
+} from "../middleware/auth.middleware";
 
 const router = Router();
 
@@ -15,7 +19,7 @@ router.use(requireOrganization);
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
 router.get("/:id", getProduct);
-router.post("/", createProduct);
-router.put("/:id", updateProduct);
+router.post("/", requireOrganizationRole(["owner", "admin"]), createProduct);
+router.put("/:id", requireOrganizationRole(["owner", "admin"]), updateProduct);
 
 export default router;

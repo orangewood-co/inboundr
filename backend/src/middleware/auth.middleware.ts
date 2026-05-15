@@ -5,10 +5,29 @@ import {
   getOrganizationContextForUser,
   type OrganizationContext,
 } from "../services/organization.service";
+import type { OrganizationRole } from "../models/organization-member.model";
 
 export interface AuthenticatedRequest extends Request {
   user: Session["user"];
   session: Session["session"];
+}
+
+export function requireOrganizationRole(roles: OrganizationRole[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const membership = (req as OrganizationRequest).organizationMembership;
+
+    if (!membership) {
+      res.status(401).json({ error: "Organization context is required" });
+      return;
+    }
+
+    if (!roles.includes(membership.role)) {
+      res.status(403).json({ error: "Insufficient organization permissions" });
+      return;
+    }
+
+    next();
+  };
 }
 
 export interface OrganizationRequest extends AuthenticatedRequest {
