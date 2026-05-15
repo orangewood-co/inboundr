@@ -112,6 +112,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@fontsource-variable/sora": "^5.2.8",
+        "@fontsource/instrument-serif": "^5.2.8",
         "@tailwindcss/vite": "^4.2.1",
         "lucide-react": "^1.14.0",
         "motion": "^12.38.0",
@@ -410,6 +411,8 @@
     "@fontsource-variable/plus-jakarta-sans": ["@fontsource-variable/plus-jakarta-sans@5.2.8", "", {}, "sha512-iQecBizIdZxezODNHzOn4SvvRMrZL/S8k4MEXGDynCmUrImVW0VmX+tIAMqnADwH4haXlHSXqMgU6+kcfBQJdw=="],
 
     "@fontsource-variable/sora": ["@fontsource-variable/sora@5.2.8", "", {}, "sha512-sP+ILTfi5r3cqmMBntI4ooQNxFI+LyHyD5hcPbWwwL4uh4kKFAkOz0w2veCXjz18fKRdva6OG0dY+5yQ02f30w=="],
+
+    "@fontsource/instrument-serif": ["@fontsource/instrument-serif@5.2.8", "", {}, "sha512-s+bkz+syj2rO00Rmq9g0P+PwuLig33DR1xDR8pTWmovH1pUjwnncrFk++q9mmOex8fUQ7oW80gPpPDaw7V1MMw=="],
 
     "@google-cloud/paginator": ["@google-cloud/paginator@6.0.0", "", { "dependencies": { "extend": "^3.0.2" } }, "sha512-g5nmMnzC+94kBxOKkLGpK1ikvolTFCC3s2qtE4F+1EuArcJ7HHC23RDQVt3Ra3CqpUYZ+oXNKZ8n5Cn5yug8DA=="],
 

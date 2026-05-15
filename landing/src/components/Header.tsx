@@ -7,13 +7,13 @@ export default function Header() {
     <>
       {/* ── Banner ── */}
       <div className="noise relative z-50 overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide">
-        <span className="relative z-10 text-text-muted">AI Revenue Engine</span>
+        <span className="relative z-10 text-text-muted">Introducing Form Studio</span>
         <span className="relative z-10 mx-2 text-text-dim">|</span>
         <Link
-          to="/#features"
+          to="/features/forms"
           className="relative z-10 font-medium text-text transition hover:text-gold"
         >
-          See what it does <ArrowRight className="mb-px inline size-3" />
+          Learn more <ArrowRight className="mb-px inline size-3" />
         </Link>
       </div>
 
@@ -24,7 +24,7 @@ export default function Header() {
             <Logo />
           </Link>
           <div className="hidden gap-8 text-[13px] text-text-muted md:flex">
-            <Link to="/#features" className="transition hover:text-text">
+            <Link to="/features" className="transition hover:text-text">
               Features
             </Link>
             <Link to="/#proof" className="transition hover:text-text">

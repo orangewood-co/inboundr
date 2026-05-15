@@ -11,6 +11,9 @@ importers:
       '@fontsource-variable/sora':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource/instrument-serif':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@tailwindcss/vite':
         specifier: ^4.2.1
         version: 4.3.0(vite@7.3.3(@types/node@24.12.3)(jiti@2.7.0)(lightningcss@1.32.0))
@@ -357,6 +360,9 @@ packages:
 
   '@fontsource-variable/sora@5.2.8':
     resolution: {integrity: sha512-sP+ILTfi5r3cqmMBntI4ooQNxFI+LyHyD5hcPbWwwL4uh4kKFAkOz0w2veCXjz18fKRdva6OG0dY+5yQ02f30w==}
+
+  '@fontsource/instrument-serif@5.2.8':
+    resolution: {integrity: sha512-s+bkz+syj2rO00Rmq9g0P+PwuLig33DR1xDR8pTWmovH1pUjwnncrFk++q9mmOex8fUQ7oW80gPpPDaw7V1MMw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1684,6 +1690,8 @@ snapshots:
       levn: 0.4.1
 
   '@fontsource-variable/sora@5.2.8': {}
+
+  '@fontsource/instrument-serif@5.2.8': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
