@@ -17,6 +17,18 @@ function getInviteToken(): string | null {
   return new URLSearchParams(window.location.search).get("inviteToken")
 }
 
+function getInviteEmail(): string {
+  return new URLSearchParams(window.location.search).get("email") ?? ""
+}
+
+function getInviteSearch(): { inviteToken: string; email?: string } | undefined {
+  const inviteToken = getInviteToken()
+  if (!inviteToken) return undefined
+
+  const email = getInviteEmail()
+  return email ? { inviteToken, email } : { inviteToken }
+}
+
 function getPostAuthPath(): string {
   const inviteToken = getInviteToken()
   return inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : "/"
@@ -26,7 +38,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(getInviteEmail)
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -132,7 +144,7 @@ export function LoginForm({
             Don&apos;t have an account?{" "}
             <Link
               to="/register"
-              search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
+              search={getInviteSearch()}
               className="underline underline-offset-4"
             >
               Sign up

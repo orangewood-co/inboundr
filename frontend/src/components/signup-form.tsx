@@ -17,6 +17,18 @@ function getInviteToken(): string | null {
   return new URLSearchParams(window.location.search).get("inviteToken")
 }
 
+function getInviteEmail(): string {
+  return new URLSearchParams(window.location.search).get("email") ?? ""
+}
+
+function getInviteSearch(): { inviteToken: string; email?: string } | undefined {
+  const inviteToken = getInviteToken()
+  if (!inviteToken) return undefined
+
+  const email = getInviteEmail()
+  return email ? { inviteToken, email } : { inviteToken }
+}
+
 function getPostAuthPath(): string {
   const inviteToken = getInviteToken()
   return inviteToken ? `/invite/${encodeURIComponent(inviteToken)}` : "/"
@@ -74,7 +86,7 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"form">) {
   const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(getInviteEmail)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -145,7 +157,7 @@ export function SignupForm({
         <Button asChild variant="outline">
           <Link
             to="/login"
-            search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
+            search={getInviteSearch()}
           >
             Back to sign in
           </Link>
@@ -250,7 +262,7 @@ export function SignupForm({
             Already have an account?{" "}
             <Link
               to="/login"
-              search={getInviteToken() ? { inviteToken: getInviteToken() } : undefined}
+              search={getInviteSearch()}
               className="underline underline-offset-4"
             >
               Sign in
