@@ -2,19 +2,34 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "r
 import {
   AlertCircleIcon,
   BarChart3Icon,
+  CalendarIcon,
+  CheckCircle2Icon,
   InboxIcon,
-  LoaderIcon,
   PackageIcon,
   RefreshCwIcon,
+  TrendingUpIcon,
   UsersIcon,
 } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -98,8 +113,17 @@ const mailChartConfig = {
   nonRfqs: { label: "Non-RFQs", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
-const productChartConfig = {
+const trendChartConfig = {
+  rfqs: { label: "RFQs", color: "var(--chart-2)" },
   products: { label: "Products", color: "var(--chart-4)" },
+} satisfies ChartConfig
+
+const DONUT_COLORS = ["var(--chart-2)", "var(--chart-3)", "var(--chart-5)"]
+
+const matchChartConfig = {
+  matched: { label: "Matched", color: "var(--chart-2)" },
+  ambiguous: { label: "Ambiguous", color: "var(--chart-3)" },
+  noMatch: { label: "No Match", color: "var(--chart-5)" },
 } satisfies ChartConfig
 
 function formatCompact(value: number) {
@@ -110,6 +134,13 @@ function formatDayLabel(value: string) {
   return new Date(`${value}T00:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric" })
 }
 
+function formatRangeLabel(from: string, to: string) {
+  const f = new Date(`${from}T00:00:00Z`)
+  const t = new Date(`${to}T00:00:00Z`)
+  const fmt = new Intl.DateTimeFormat([], { month: "short", day: "numeric", year: "numeric" })
+  return `${fmt.format(f)} \u2013 ${fmt.format(t)}`
+}
+
 function StatCard({
   title,
   value,
@@ -117,19 +148,19 @@ function StatCard({
   icon: Icon,
 }: {
   title: string
-  value: number
+  value: string
   helper: string
   icon: typeof InboxIcon
 }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-xs">
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
+    <div className="rounded-xl border bg-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1.5">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="text-3xl font-semibold tracking-tight tabular-nums">{value.toLocaleString("en-IN")}</p>
+          <p className="text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
         </div>
-        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="size-5" />
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+          <Icon className="size-5 text-muted-foreground" />
         </div>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">{helper}</p>
@@ -139,15 +170,19 @@ function StatCard({
 
 function StatsSkeleton() {
   return (
-    <div className="grid gap-4 p-4 lg:p-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-32 rounded-2xl" />
+    <div className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-[130px] rounded-xl" />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Skeleton className="h-96 rounded-2xl" />
-        <Skeleton className="h-96 rounded-2xl" />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Skeleton className="h-[440px] rounded-xl" />
+        <Skeleton className="h-[440px] rounded-xl" />
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Skeleton className="h-[380px] rounded-xl" />
+        <Skeleton className="h-[380px] rounded-xl" />
       </div>
     </div>
   )
@@ -155,7 +190,7 @@ function StatsSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed bg-muted/20 p-10 text-center">
+    <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed bg-muted/20 p-10 text-center">
       <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
         <BarChart3Icon className="size-6 text-muted-foreground" />
       </div>
@@ -209,8 +244,19 @@ export function StatsPage() {
 
   const hasData = (data?.totals.emails ?? 0) > 0 || (data?.totals.rfqs ?? 0) > 0
   const rfqRate = data?.totals.emails ? Math.round((data.totals.rfqs / data.totals.emails) * 100) : 0
+  const matchTotal = data ? data.matchQuality.matched + data.matchQuality.ambiguous + data.matchQuality.noMatch : 0
+  const matchRate = matchTotal > 0 ? Math.round((data!.matchQuality.matched / matchTotal) * 100) : 0
   const filterMembers = useMemo(() => data?.byMember.filter((item) => item.emails || item.rfqs || item.products) ?? [], [data])
   const filterAccounts = useMemo(() => data?.byGmailAccount ?? [], [data])
+
+  const donutData = useMemo(() => {
+    if (!data) return []
+    return [
+      { name: "Matched", value: data.matchQuality.matched },
+      { name: "Ambiguous", value: data.matchQuality.ambiguous },
+      { name: "No Match", value: data.matchQuality.noMatch },
+    ].filter((item) => item.value > 0)
+  }, [data])
 
   return (
     <SidebarProvider
@@ -232,21 +278,23 @@ export function StatsPage() {
             </Button>
           }
         />
-        <main className="flex flex-1 flex-col gap-4 overflow-auto p-4 lg:p-6">
-          <div className="flex flex-col gap-4 rounded-2xl border bg-card p-4 shadow-xs md:flex-row md:items-center md:justify-between">
+        <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-5">
+          {/* Header: title + inline filters */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Stats</h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 Organization activity across inbound mail, RFQs, and requested products.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="flex rounded-lg border bg-background p-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex rounded-lg border bg-muted/40 p-0.5">
                 {rangeOptions.map((option) => (
                   <Button
                     key={option.value}
                     variant={range === option.value ? "secondary" : "ghost"}
                     size="sm"
+                    className="h-7 px-3 text-xs"
                     onClick={() => setRange(option.value)}
                   >
                     {option.label}
@@ -256,7 +304,7 @@ export function StatsPage() {
               <select
                 value={member}
                 onChange={(event) => setMember(event.target.value)}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
+                className="h-8 rounded-md border bg-background px-2.5 text-xs"
               >
                 <option value="all">All members</option>
                 {filterMembers.map((item) => (
@@ -268,7 +316,7 @@ export function StatsPage() {
               <select
                 value={gmailAccount}
                 onChange={(event) => setGmailAccount(event.target.value)}
-                className="h-10 rounded-md border bg-background px-3 text-sm"
+                className="h-8 rounded-md border bg-background px-2.5 text-xs"
               >
                 <option value="all">All mailboxes</option>
                 {filterAccounts.map((item) => (
@@ -283,7 +331,7 @@ export function StatsPage() {
           {loading ? (
             <StatsSkeleton />
           ) : error ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-2xl border bg-card p-10 text-center">
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl border bg-card p-10 text-center">
               <AlertCircleIcon className="size-6 text-destructive" />
               <p className="text-sm font-medium text-destructive">{error}</p>
               <Button variant="outline" size="sm" onClick={handleRefresh}>Retry</Button>
@@ -292,26 +340,49 @@ export function StatsPage() {
             <EmptyState />
           ) : (
             <>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <StatCard title="Emails" value={data.totals.emails} helper={`${data.range.from} to ${data.range.to}`} icon={InboxIcon} />
-                <StatCard title="RFQs" value={data.totals.rfqs} helper={`${rfqRate}% of received mail`} icon={BarChart3Icon} />
-                <StatCard title="Non-RFQs" value={data.totals.nonRfqs} helper="Classified as not requiring a quote" icon={InboxIcon} />
-                <StatCard title="Products" value={data.totals.products} helper="Requested RFQ line items" icon={PackageIcon} />
-                <StatCard title="Failures" value={data.totals.failed} helper="RFQ processing errors" icon={AlertCircleIcon} />
+              {/* ── Stat Cards ── */}
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  title="Total Emails"
+                  value={data.totals.emails.toLocaleString("en-IN")}
+                  helper={`${data.totals.nonRfqs.toLocaleString("en-IN")} non-RFQs this period`}
+                  icon={InboxIcon}
+                />
+                <StatCard
+                  title="RFQs Received"
+                  value={data.totals.rfqs.toLocaleString("en-IN")}
+                  helper={`${rfqRate}% of received mail`}
+                  icon={BarChart3Icon}
+                />
+                <StatCard
+                  title="Products Requested"
+                  value={data.totals.products.toLocaleString("en-IN")}
+                  helper="Line items extracted from RFQs"
+                  icon={PackageIcon}
+                />
+                <StatCard
+                  title="Match Rate"
+                  value={`${matchRate}%`}
+                  helper={`${data.matchQuality.matched.toLocaleString("en-IN")} of ${matchTotal.toLocaleString("en-IN")} product lookups`}
+                  icon={CheckCircle2Icon}
+                />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-                <section className="rounded-2xl border bg-card p-4 shadow-xs">
-                  <div className="mb-4">
+              {/* ── Charts Row ── */}
+              <div className="grid gap-6 xl:grid-cols-2">
+                {/* Bar chart: daily mail & RFQs */}
+                <section className="rounded-xl border bg-card p-5">
+                  <div className="mb-5">
                     <h2 className="text-base font-semibold">Daily Mail and RFQs</h2>
-                    <p className="text-sm text-muted-foreground">Inbound volume split by RFQ classification.</p>
+                    <p className="text-sm text-muted-foreground">Comparing inbound volume against RFQ classification.</p>
                   </div>
-                  <ChartContainer config={mailChartConfig} className="h-[300px] w-full">
+                  <ChartContainer config={mailChartConfig} className="h-[340px] w-full">
                     <BarChart accessibilityLayer data={data.daily}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tickFormatter={formatDayLabel} />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} width={40} />
                       <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="emails" fill="var(--color-emails)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="rfqs" fill="var(--color-rfqs)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="nonRfqs" fill="var(--color-nonRfqs)" radius={[4, 4, 0, 0]} />
@@ -319,26 +390,74 @@ export function StatsPage() {
                   </ChartContainer>
                 </section>
 
-                <section className="rounded-2xl border bg-card p-4 shadow-xs">
-                  <div className="mb-4">
-                    <h2 className="text-base font-semibold">Requested Products</h2>
-                    <p className="text-sm text-muted-foreground">Daily line items extracted from RFQs.</p>
+                {/* Dual-line chart: RFQ activity trends */}
+                <section className="rounded-xl border bg-card p-5">
+                  <div className="mb-5 flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-semibold">RFQ Activity Trends</h2>
+                      <p className="text-sm text-muted-foreground">Track RFQs and product requests over time.</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                      <CalendarIcon className="size-3" />
+                      {formatRangeLabel(data.range.from, data.range.to)}
+                    </span>
                   </div>
-                  <ChartContainer config={productChartConfig} className="h-[300px] w-full">
+                  <ChartContainer config={trendChartConfig} className="h-[340px] w-full">
                     <LineChart accessibilityLayer data={data.daily}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tickFormatter={formatDayLabel} />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} width={40} />
                       <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Line type="monotone" dataKey="rfqs" stroke="var(--color-rfqs)" strokeWidth={2} dot={false} />
                       <Line type="monotone" dataKey="products" stroke="var(--color-products)" strokeWidth={2} dot={false} />
                     </LineChart>
                   </ChartContainer>
                 </section>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-3">
-                <section className="rounded-2xl border bg-card p-4 shadow-xs xl:col-span-2">
-                  <div className="mb-4 flex items-center gap-2">
+              {/* ── Bottom Row: Donut + Member table ── */}
+              <div className="grid gap-6 xl:grid-cols-2">
+                {/* Donut chart: match quality */}
+                <section className="rounded-xl border bg-card p-5">
+                  <div className="mb-5">
+                    <h2 className="text-base font-semibold">Match Quality Breakdown</h2>
+                    <p className="text-sm text-muted-foreground">Product search accuracy across RFQ line items.</p>
+                  </div>
+                  {donutData.length > 0 ? (
+                    <ChartContainer config={matchChartConfig} className="mx-auto h-[300px] max-w-md">
+                      <PieChart accessibilityLayer>
+                        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                        <Pie
+                          data={donutData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={110}
+                          strokeWidth={2}
+                          stroke="var(--background)"
+                          label={({ name, percent }) => `${name}: ${Math.round(percent * 100)}%`}
+                          labelLine={false}
+                        >
+                          {donutData.map((_, index) => (
+                            <Cell key={index} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </PieChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className="flex h-[300px] items-center justify-center">
+                      <p className="text-sm text-muted-foreground">No product matches recorded yet.</p>
+                    </div>
+                  )}
+                </section>
+
+                {/* Member breakdown table */}
+                <section className="rounded-xl border bg-card p-5">
+                  <div className="mb-5 flex items-center gap-2">
                     <UsersIcon className="size-4 text-muted-foreground" />
                     <h2 className="text-base font-semibold">Member Breakdown</h2>
                   </div>
@@ -356,7 +475,6 @@ export function StatsPage() {
                         <TableRow key={item.userId}>
                           <TableCell>
                             <div className="font-medium">{item.email || item.name || item.userId}</div>
-                            <div className="text-xs text-muted-foreground">{item.userId}</div>
                           </TableCell>
                           <TableCell className="text-right tabular-nums">{item.emails}</TableCell>
                           <TableCell className="text-right tabular-nums">{item.rfqs}</TableCell>
@@ -366,20 +484,13 @@ export function StatsPage() {
                     </TableBody>
                   </Table>
                 </section>
-
-                <section className="rounded-2xl border bg-card p-4 shadow-xs">
-                  <h2 className="mb-4 text-base font-semibold">Match Quality</h2>
-                  <div className="grid gap-3">
-                    <StatRow label="Matched" value={data.matchQuality.matched} />
-                    <StatRow label="Ambiguous" value={data.matchQuality.ambiguous} />
-                    <StatRow label="No match" value={data.matchQuality.noMatch} />
-                  </div>
-                </section>
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
+              {/* ── Breakdown tables ── */}
+              <div className="grid gap-6 xl:grid-cols-2">
                 <BreakdownTable
                   title="Mailboxes"
+                  subtitle="Email volume by connected Gmail account."
                   rows={data.byGmailAccount.map((item) => ({
                     key: item.id,
                     name: item.emailAddress,
@@ -391,6 +502,7 @@ export function StatsPage() {
                 />
                 <BreakdownTable
                   title="Top Requested Products"
+                  subtitle="Most frequently requested items across RFQs."
                   rows={data.productBreakdown.map((item) => ({
                     key: item.name,
                     name: item.name,
@@ -409,29 +521,25 @@ export function StatsPage() {
   )
 }
 
-function StatRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-3 py-2.5">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="font-semibold tabular-nums">{value.toLocaleString("en-IN")}</span>
-    </div>
-  )
-}
-
 function BreakdownTable({
   title,
+  subtitle,
   rows,
   firstLabel,
   secondLabel,
 }: {
   title: string
+  subtitle: string
   rows: Array<{ key: string; name: string; first: number; second: number }>
   firstLabel: string
   secondLabel: string
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-4 shadow-xs">
-      <h2 className="mb-4 text-base font-semibold">{title}</h2>
+    <section className="rounded-xl border bg-card p-5">
+      <div className="mb-5">
+        <h2 className="text-base font-semibold">{title}</h2>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      </div>
       {rows.length ? (
         <Table>
           <TableHeader>
