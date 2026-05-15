@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Building2Icon,
@@ -968,6 +969,10 @@ export function SettingsPage() {
                   <UsersIcon className="size-3.5" />
                   Members
                 </TabsTrigger>
+                <TabsTrigger value="notifications" className="gap-1.5">
+                  <MailIcon className="size-3.5" />
+                  Notifications
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="organization">
@@ -988,11 +993,186 @@ export function SettingsPage() {
               <TabsContent value="members">
                 <MembersTab />
               </TabsContent>
+              <TabsContent value="notifications">
+                <NotificationsTab />
+              </TabsContent>
             </Tabs>
           </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+// ─── Notifications Tab ───────────────────────────────────────
+
+interface DigestPreferences {
+  enabled: boolean
+  sections: {
+    emailVolume: boolean
+    rfqBreakdown: boolean
+    productRequests: boolean
+    matchQuality: boolean
+  }
+  sendHourUtc: number
+}
+
+const DIGEST_SECTIONS = [
+  { key: "emailVolume" as const, label: "Email Volume", description: "Total received emails, RFQ vs non-RFQ split" },
+  { key: "rfqBreakdown" as const, label: "RFQ Breakdown", description: "Processed and failed RFQ counts" },
+  { key: "productRequests" as const, label: "Product Requests", description: "Requested line items and top products" },
+  { key: "matchQuality" as const, label: "Match Quality", description: "Product search match rate and distribution" },
+]
+
+function NotificationsTab() {
+  const [prefs, setPrefs] = useState<DigestPreferences>({
+    enabled: false,
+    sections: { emailVolume: true, rfqBreakdown: true, productRequests: true, matchQuality: true },
+    sendHourUtc: 8,
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
+  const [testSent, setTestSent] = useState(false)
+
+  useEffect(() => {
+    fetch(`${API_ORIGIN}/api/v1/digest/preferences`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        setPrefs({
+          enabled: data.enabled ?? false,
+          sections: {
+            emailVolume: data.sections?.emailVolume ?? true,
+            rfqBreakdown: data.sections?.rfqBreakdown ?? true,
+            productRequests: data.sections?.productRequests ?? true,
+            matchQuality: data.sections?.matchQuality ?? true,
+          },
+          sendHourUtc: data.sendHourUtc ?? 8,
+        })
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    try {
+      await fetch(`${API_ORIGIN}/api/v1/digest/preferences`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prefs),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSendTest = async () => {
+    setSendingTest(true)
+    setTestSent(false)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/digest/test`, {
+        method: "POST",
+        credentials: "include",
+      })
+      if (res.ok) {
+        setTestSent(true)
+        setTimeout(() => setTestSent(false), 4000)
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSendingTest(false)
+    }
+  }
+
+  const toggleSection = (key: keyof DigestPreferences["sections"]) => {
+    setPrefs((prev) => ({
+      ...prev,
+      sections: { ...prev.sections, [key]: !prev.sections[key] },
+    }))
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="h-40 animate-pulse rounded-xl bg-muted" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Notifications"
+        description="Configure how and when you receive updates from Inboundr."
+      />
+
+      <SettingsCard
+        title="Daily Stats Digest"
+        description="Receive a summary of your organization's activity every day."
+        action={
+          <Switch
+            checked={prefs.enabled}
+            onCheckedChange={(checked) => setPrefs((prev) => ({ ...prev, enabled: checked }))}
+          />
+        }
+      >
+        <div className="space-y-4 px-5 py-4">
+          <p className="text-[13px] text-muted-foreground">
+            Choose which sections to include in your daily email. The digest is sent at{" "}
+            <strong>{prefs.sendHourUtc.toString().padStart(2, "0")}:00 UTC</strong> each day.
+          </p>
+
+          <div className="space-y-3">
+            {DIGEST_SECTIONS.map((section) => (
+              <label
+                key={section.key}
+                className="flex cursor-pointer items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40"
+              >
+                <div>
+                  <p className="text-sm font-medium">{section.label}</p>
+                  <p className="text-xs text-muted-foreground">{section.description}</p>
+                </div>
+                <Switch
+                  size="sm"
+                  checked={prefs.sections[section.key]}
+                  onCheckedChange={() => toggleSection(section.key)}
+                  disabled={!prefs.enabled}
+                />
+              </label>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : saved ? "Saved" : "Save preferences"}
+            </Button>
+            <Button variant="outline" onClick={handleSendTest} disabled={sendingTest}>
+              {sendingTest ? "Sending..." : testSent ? "Sent!" : "Send test email"}
+            </Button>
+            {saved && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                Preferences updated
+              </span>
+            )}
+            {testSent && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                Check your inbox
+              </span>
+            )}
+          </div>
+        </div>
+      </SettingsCard>
+    </div>
   )
 }
 

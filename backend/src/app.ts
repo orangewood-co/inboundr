@@ -15,6 +15,7 @@ import formsRouter from "./routes/forms.route";
 import publicFormsRouter from "./routes/public-forms.route";
 import uploadsRouter from "./routes/uploads.route";
 import statsRouter from "./routes/stats.route";
+import digestRouter from "./routes/digest.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -22,6 +23,7 @@ import {
   scheduleWatchRenewal,
   stopWatchRenewal,
 } from "./services/gmail-watcher.service";
+import { startDigestCron } from "./jobs/digest-cron";
 
 const app: Application = express();
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
@@ -57,6 +59,7 @@ app.use("/api/v1/forms", formsRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/stats", statsRouter);
+app.use("/api/v1/digest", digestRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });
@@ -73,6 +76,8 @@ export async function initializeServices(): Promise<void> {
     console.error("Failed to initialize Gmail watcher:", err);
     console.warn("Server will continue without Gmail watch — set up GCP credentials and retry");
   }
+
+  startDigestCron();
 }
 
 async function shutdown(): Promise<void> {
