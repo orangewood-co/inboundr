@@ -64,7 +64,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     avatar: session?.user.image ?? "",
   }
   const organizationName = branding?.name?.trim() || "Inboundr"
-  const logoUrl = branding?.logoUrl?.trim()
+  const logoUrl = branding?.logoDisplayUrl?.trim()
 
   return (
     <Sidebar

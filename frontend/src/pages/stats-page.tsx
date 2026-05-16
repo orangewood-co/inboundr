@@ -37,6 +37,13 @@ import {
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -301,30 +308,38 @@ export function StatsPage() {
                   </Button>
                 ))}
               </div>
-              <select
+              <Select
                 value={member}
-                onChange={(event) => setMember(event.target.value)}
-                className="h-8 rounded-md border bg-background px-2.5 text-xs"
+                onValueChange={setMember}
               >
-                <option value="all">All members</option>
-                {filterMembers.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.email || item.name || item.userId}
-                  </option>
-                ))}
-              </select>
-              <select
+                <SelectTrigger size="sm" className="w-full bg-background text-xs sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All members</SelectItem>
+                  {filterMembers.map((item) => (
+                    <SelectItem key={item.userId} value={item.userId}>
+                      {item.email || item.name || item.userId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
                 value={gmailAccount}
-                onChange={(event) => setGmailAccount(event.target.value)}
-                className="h-8 rounded-md border bg-background px-2.5 text-xs"
+                onValueChange={setGmailAccount}
               >
-                <option value="all">All mailboxes</option>
-                {filterAccounts.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.emailAddress}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger size="sm" className="w-full bg-background text-xs sm:w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All mailboxes</SelectItem>
+                  {filterAccounts.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.emailAddress}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

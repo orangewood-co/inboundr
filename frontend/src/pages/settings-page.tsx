@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
@@ -100,6 +107,7 @@ interface PresignedUpload {
   uploadUrl: string
   headers: Record<string, string>
   file: {
+    key: string
     url: string | null
   }
 }
@@ -205,6 +213,24 @@ function colorInputValue(value: string) {
   return /^#[0-9a-f]{6}$/i.test(value) ? value : "#f5b400"
 }
 
+async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
+  const source = logoUrl.trim()
+  if (!source || /^https?:\/\//i.test(source)) {
+    return source
+  }
+
+  const res = await fetch(`${API_ORIGIN}/api/v1/uploads/view?key=${encodeURIComponent(source)}`, {
+    credentials: "include",
+  })
+  const data: { url?: string; error?: string } = await res.json().catch(() => ({}))
+
+  if (!res.ok || !data.url) {
+    throw new Error(data.error || "Failed to load organization logo")
+  }
+
+  return data.url
+}
+
 function ApiTable({ items }: { items: typeof MOCK_PUBLIC_APIS }) {
   return (
     <div className="overflow-hidden">
@@ -251,6 +277,7 @@ function OrganizationTab() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("")
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -291,6 +318,27 @@ function OrganizationTab() {
   useEffect(() => {
     void fetchOrganization()
   }, [fetchOrganization])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!form.logoUrl) {
+      setLogoPreviewUrl("")
+      return
+    }
+
+    void resolveLogoDisplayUrl(form.logoUrl)
+      .then((url) => {
+        if (!cancelled) setLogoPreviewUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setLogoPreviewUrl("")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [form.logoUrl])
 
   const saveOrganization = async () => {
     setSaving(true)
@@ -369,11 +417,8 @@ function OrganizationTab() {
         throw new Error("Failed to upload logo")
       }
 
-      if (!presign.file.url) {
-        throw new Error("Logo uploaded, but no public URL was returned")
-      }
-
-      updateForm("logoUrl", presign.file.url)
+      updateForm("logoUrl", presign.file.key)
+      setLogoPreviewUrl(await resolveLogoDisplayUrl(presign.file.key))
       setMessage("Logo uploaded. Save organization settings to publish it.")
     } catch (err: any) {
       setError(err.message || "Failed to upload logo")
@@ -423,8 +468,8 @@ function OrganizationTab() {
                 <Label htmlFor="organizationLogo">Organization logo</Label>
                 <div className="flex flex-col gap-4 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
                   <div className="flex h-20 w-36 items-center justify-center overflow-hidden rounded-lg border bg-background">
-                    {form.logoUrl ? (
-                      <img src={form.logoUrl} alt={`${form.name || "Organization"} logo`} className="max-h-16 max-w-28 object-contain" />
+                    {logoPreviewUrl ? (
+                      <img src={logoPreviewUrl} alt={`${form.name || "Organization"} logo`} className="max-h-16 max-w-28 object-contain" />
                     ) : (
                       <Building2Icon className="size-7 text-muted-foreground" />
                     )}
@@ -514,15 +559,18 @@ function OrganizationTab() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="theme">Theme</Label>
-                  <select
-                    id="theme"
+                  <Select
                     value={form.preferences.theme}
-                    onChange={(event) => updatePreference("theme", event.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    onValueChange={(value) => updatePreference("theme", value)}
                   >
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                  </select>
+                    <SelectTrigger id="theme" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="light">Light</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pricing">Pricing currency</Label>
@@ -1158,14 +1206,18 @@ function MembersTab() {
             onChange={(event) => setEmail(event.target.value)}
             placeholder="teammate@example.com"
           />
-          <select
+          <Select
             value={role}
-            onChange={(event) => setRole(event.target.value as OrganizationRole)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            onValueChange={(value) => setRole(value as OrganizationRole)}
           >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
           <Button className="gap-1.5" onClick={inviteMember} disabled={submitting || !email.trim()}>
             <PlusIcon className="size-4" />
             {submitting ? "Sending..." : "Invite"}

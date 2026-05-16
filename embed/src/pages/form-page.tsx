@@ -4,6 +4,13 @@ import { AlertCircleIcon, CheckCircle2Icon, LoaderIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
@@ -92,15 +99,17 @@ function FieldInput({
           className={`w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 outline-none transition focus-visible:ring-2 focus-visible:ring-stone-300 ${errorRing}`}
         />
       ) : field.type === "dropdown" ? (
-        <select
-          id={id}
+        <Select
           value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-          className={`h-10 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-900 outline-none focus-visible:ring-2 focus-visible:ring-stone-300 ${errorRing}`}
+          onValueChange={onChange}
         >
-          <option value="">Choose an option</option>
-          {(field.options ?? []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
+          <SelectTrigger id={id} className={errorRing}>
+            <SelectValue placeholder="Choose an option" />
+          </SelectTrigger>
+          <SelectContent>
+            {(field.options ?? []).map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+          </SelectContent>
+        </Select>
       ) : field.type === "checkbox" ? (
         <div className={`grid gap-2 rounded-xl border border-stone-200 bg-white p-3 ${errorRing}`}>
           {(field.options ?? []).map((opt) => {
