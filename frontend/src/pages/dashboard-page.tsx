@@ -3,6 +3,7 @@ import { type CSSProperties, useCallback, useEffect, useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -679,9 +680,9 @@ export function DashboardPage() {
       <AppSidebar collapsible="icon" variant="inset" />
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
-        <div className="flex flex-1 overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1">
           {/* ── RFQ List Panel ── */}
-          <div className="flex w-full flex-col overflow-hidden border-r md:w-[380px] md:min-w-[380px]">
+          <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2">
                 <FileTextIcon className="size-4 text-muted-foreground" />
@@ -826,10 +827,12 @@ export function DashboardPage() {
                 </div>
               </div>
             )}
-          </div>
+          </ResizablePanel>
+
+          <ResizableHandle />
 
           {/* ── RFQ Detail Panel ── */}
-          <div className="hidden flex-1 flex-col overflow-hidden md:flex">
+          <ResizablePanel defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
             {detailLoading ? (
               <DetailSkeleton />
             ) : !detail ? (
@@ -1497,8 +1500,8 @@ export function DashboardPage() {
                 )}
               </div>
             )}
-          </div>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </SidebarInset>
     </SidebarProvider>
   )

@@ -2,6 +2,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState }
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -487,9 +488,9 @@ export function EmailsPage() {
       <AppSidebar collapsible="icon" variant="inset" />
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
-        <div className="flex flex-1 overflow-hidden">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1">
           {/* ── Email List Panel ── */}
-          <div className="flex w-full flex-col overflow-hidden border-r border-border/50 bg-surface md:w-[360px] md:min-w-[360px]">
+          <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden bg-surface">
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-2.5">
                 <h2 className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Inbox</h2>
@@ -626,10 +627,12 @@ export function EmailsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </ResizablePanel>
+
+          <ResizableHandle />
 
           {/* ── Email Detail Panel ── */}
-          <div className="hidden flex-1 flex-col overflow-hidden md:flex">
+          <ResizablePanel defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
             {detailLoading ? (
               <DetailSkeleton />
             ) : !detail ? (
@@ -784,8 +787,8 @@ export function EmailsPage() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
         {detail && selectedAttachment && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm animate-in fade-in-0 duration-200">
             <div className="flex h-full max-h-[860px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl animate-in zoom-in-95 duration-200">
