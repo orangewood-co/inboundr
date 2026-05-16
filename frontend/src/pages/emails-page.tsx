@@ -451,6 +451,7 @@ export function EmailsPage() {
   return (
     <SidebarProvider
       defaultOpen
+      className="h-svh"
       style={
         {
           "--header-height": "3.5rem",
@@ -463,7 +464,7 @@ export function EmailsPage() {
         <SiteHeader />
         <div className="flex flex-1 overflow-hidden">
           {/* ── Email List Panel ── */}
-          <div className="flex w-full flex-col border-r border-border/50 bg-surface md:w-[360px] md:min-w-[360px]">
+          <div className="flex w-full flex-col overflow-hidden border-r border-border/50 bg-surface md:w-[360px] md:min-w-[360px]">
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-2.5">
                 <h2 className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Inbox</h2>

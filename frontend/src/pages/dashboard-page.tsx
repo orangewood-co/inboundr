@@ -668,6 +668,7 @@ export function DashboardPage() {
   return (
     <SidebarProvider
       defaultOpen
+      className="h-svh"
       style={
         {
           "--header-height": "4rem",
@@ -680,7 +681,7 @@ export function DashboardPage() {
         <SiteHeader />
         <div className="flex flex-1 overflow-hidden">
           {/* ── RFQ List Panel ── */}
-          <div className="flex w-full flex-col border-r md:w-[380px] md:min-w-[380px]">
+          <div className="flex w-full flex-col overflow-hidden border-r md:w-[380px] md:min-w-[380px]">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2">
                 <FileTextIcon className="size-4 text-muted-foreground" />
