@@ -22,7 +22,9 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 
@@ -91,10 +93,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LinksIndexRoute = LinksIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LinksRoute,
+} as any)
 const FormsIndexRoute = FormsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => FormsRoute,
+} as any)
+const LinksCreateRoute = LinksCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => LinksRoute,
 } as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
@@ -113,7 +125,7 @@ export interface FileRoutesByFullPath {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
-  '/links': typeof LinksRoute
+  '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
@@ -123,14 +135,15 @@ export interface FileRoutesByFullPath {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/create': typeof LinksCreateRoute
   '/forms/': typeof FormsIndexRoute
+  '/links/': typeof LinksIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/links': typeof LinksRoute
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
@@ -140,7 +153,9 @@ export interface FileRoutesByTo {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/create': typeof LinksCreateRoute
   '/forms': typeof FormsIndexRoute
+  '/links': typeof LinksIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -149,7 +164,7 @@ export interface FileRoutesById {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
-  '/links': typeof LinksRoute
+  '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
@@ -159,7 +174,9 @@ export interface FileRoutesById {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/create': typeof LinksCreateRoute
   '/forms/': typeof FormsIndexRoute
+  '/links/': typeof LinksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -179,14 +196,15 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/create'
     | '/forms/'
+    | '/links/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/customers'
     | '/emails'
     | '/forgot-password'
-    | '/links'
     | '/login'
     | '/products'
     | '/register'
@@ -196,7 +214,9 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/create'
     | '/forms'
+    | '/links'
   id:
     | '__root__'
     | '/'
@@ -214,7 +234,9 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/create'
     | '/forms/'
+    | '/links/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -223,7 +245,7 @@ export interface RootRouteChildren {
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FormsRoute: typeof FormsRouteWithChildren
-  LinksRoute: typeof LinksRoute
+  LinksRoute: typeof LinksRouteWithChildren
   LoginRoute: typeof LoginRoute
   ProductsRoute: typeof ProductsRoute
   RegisterRoute: typeof RegisterRoute
@@ -327,12 +349,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/links/': {
+      id: '/links/'
+      path: '/'
+      fullPath: '/links/'
+      preLoaderRoute: typeof LinksIndexRouteImport
+      parentRoute: typeof LinksRoute
+    }
     '/forms/': {
       id: '/forms/'
       path: '/'
       fullPath: '/forms/'
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
+    }
+    '/links/create': {
+      id: '/links/create'
+      path: '/create'
+      fullPath: '/links/create'
+      preLoaderRoute: typeof LinksCreateRouteImport
+      parentRoute: typeof LinksRoute
     }
     '/invite/$token': {
       id: '/invite/$token'
@@ -363,13 +399,25 @@ const FormsRouteChildren: FormsRouteChildren = {
 
 const FormsRouteWithChildren = FormsRoute._addFileChildren(FormsRouteChildren)
 
+interface LinksRouteChildren {
+  LinksCreateRoute: typeof LinksCreateRoute
+  LinksIndexRoute: typeof LinksIndexRoute
+}
+
+const LinksRouteChildren: LinksRouteChildren = {
+  LinksCreateRoute: LinksCreateRoute,
+  LinksIndexRoute: LinksIndexRoute,
+}
+
+const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CustomersRoute: CustomersRoute,
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FormsRoute: FormsRouteWithChildren,
-  LinksRoute: LinksRoute,
+  LinksRoute: LinksRouteWithChildren,
   LoginRoute: LoginRoute,
   ProductsRoute: ProductsRoute,
   RegisterRoute: RegisterRoute,
