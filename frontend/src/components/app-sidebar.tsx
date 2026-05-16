@@ -62,7 +62,7 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
-  const { branding } = useOrganizationBranding()
+  const { branding, loading } = useOrganizationBranding()
   const user = {
     name: session?.user.name ?? "BTSA User",
     email: session?.user.email ?? "Signed in",
@@ -95,6 +95,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     />
                   </div>
                 </>
+              ) : loading ? (
+                <div className="h-6 w-24 animate-pulse rounded bg-sidebar-accent" />
               ) : (
                 <>
                   <img

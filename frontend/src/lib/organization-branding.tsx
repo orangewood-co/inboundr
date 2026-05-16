@@ -5,6 +5,7 @@ import { useTheme } from "@/components/theme-provider"
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const DEFAULT_PRIMARY_COLOR = "#f5b400"
 const BRANDING_CHANGED_EVENT = "btsa:organization-branding-changed"
+const BRANDING_CACHE_KEY = "organization-branding"
 
 type OrganizationTheme = "dark" | "light"
 
@@ -98,6 +99,36 @@ async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
   return data.url
 }
 
+function readCachedBranding(): OrganizationBranding | null {
+  try {
+    const raw = localStorage.getItem(BRANDING_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.organizationId === "string" && parsed.primaryColor) {
+      return parsed as OrganizationBranding
+    }
+  } catch {
+    // Corrupted cache — ignore
+  }
+  return null
+}
+
+function writeCachedBranding(branding: OrganizationBranding) {
+  try {
+    localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(branding))
+  } catch {
+    // Storage full or unavailable — not critical
+  }
+}
+
+function clearCachedBranding() {
+  try {
+    localStorage.removeItem(BRANDING_CACHE_KEY)
+  } catch {
+    // Not critical
+  }
+}
+
 export function notifyOrganizationBrandingChanged() {
   window.dispatchEvent(new Event(BRANDING_CHANGED_EVENT))
 }
@@ -108,7 +139,7 @@ export function OrganizationBrandingProvider({
   children: React.ReactNode
 }) {
   const { setTheme } = useTheme()
-  const [branding, setBranding] = React.useState<OrganizationBranding | null>(null)
+  const [branding, setBranding] = React.useState<OrganizationBranding | null>(readCachedBranding)
   const [loading, setLoading] = React.useState(true)
 
   const refreshBranding = React.useCallback(async () => {
@@ -127,7 +158,7 @@ export function OrganizationBrandingProvider({
       const organization = data?.organization
       const logoUrl = organization?.logoUrl ?? ""
 
-      setBranding({
+      const freshBranding: OrganizationBranding = {
         organizationId: organization?._id ?? "",
         name: organization?.name ?? "",
         logoUrl,
@@ -136,10 +167,14 @@ export function OrganizationBrandingProvider({
           normalizeHexColor(organization?.preferences?.primaryColor) ??
           DEFAULT_PRIMARY_COLOR,
         theme: organization?.preferences?.theme === "light" ? "light" : "dark",
-      })
+      }
+
+      setBranding(freshBranding)
+      writeCachedBranding(freshBranding)
     } catch (error) {
       console.error("Failed to load organization branding", error)
       setBranding(null)
+      clearCachedBranding()
       applyPrimaryColor(null)
     } finally {
       setLoading(false)
