@@ -1,6 +1,8 @@
 import { useEffect } from "react"
 import { Outlet, createRootRoute, useRouterState } from "@tanstack/react-router"
 
+import { ErrorPage, NotFoundPage } from "@/components/error-boundary"
+
 const APP_TITLE = "Inboundr"
 
 const PAGE_TITLES: Record<string, string> = {
@@ -20,6 +22,8 @@ const PAGE_TITLES: Record<string, string> = {
 
 export const Route = createRootRoute({
   component: RootRouteComponent,
+  errorComponent: ErrorPage,
+  notFoundComponent: NotFoundPage,
 })
 
 function RootRouteComponent() {
