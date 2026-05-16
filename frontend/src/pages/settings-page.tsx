@@ -720,8 +720,10 @@ function AccountTab() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       await fetchGmailAccounts()
+      toast.success("Gmail account disconnected")
     } catch (err: any) {
       setGmailError(err.message || "Failed to disconnect Gmail")
+      toast.error(err.message || "Failed to disconnect Gmail")
     } finally {
       setDisconnectingId(null)
     }
@@ -1144,9 +1146,11 @@ function MembersTab() {
       setEmail("")
       setRole("member")
       setMessage("Invitation sent")
+      toast.success("Invitation sent")
       await fetchMembers()
     } catch (err: any) {
       setError(err.message || "Failed to send invitation")
+      toast.error(err.message || "Failed to send invitation")
     } finally {
       setSubmitting(false)
     }
@@ -1162,8 +1166,10 @@ function MembersTab() {
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to cancel invitation")
       await fetchMembers()
+      toast.success("Invitation cancelled")
     } catch (err: any) {
       setError(err.message || "Failed to cancel invitation")
+      toast.error(err.message || "Failed to cancel invitation")
     }
   }
 
@@ -1179,8 +1185,10 @@ function MembersTab() {
         throw new Error(data?.error || "Failed to remove member")
       }
       await fetchMembers()
+      toast.success("Member removed")
     } catch (err: any) {
       setError(err.message || "Failed to remove member")
+      toast.error(err.message || "Failed to remove member")
     }
   }
 

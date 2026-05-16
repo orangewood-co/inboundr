@@ -31,6 +31,11 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
+import { toast } from "sonner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
+import { CopyableText } from "@/components/copy-button"
+import { getAvatarColor } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
@@ -433,6 +438,48 @@ export function DashboardPage() {
     }
   }, [selectedId, fetchDetail, fetchReply])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return
+
+      switch (e.key) {
+        case "j":
+        case "J": {
+          e.preventDefault()
+          if (rfqs.length === 0) return
+          const idx = rfqs.findIndex((r) => r._id === selectedId)
+          setSelectedId(rfqs[idx < rfqs.length - 1 ? idx + 1 : 0]._id)
+          break
+        }
+        case "k":
+        case "K": {
+          e.preventDefault()
+          if (rfqs.length === 0) return
+          const idx = rfqs.findIndex((r) => r._id === selectedId)
+          setSelectedId(rfqs[idx > 0 ? idx - 1 : rfqs.length - 1]._id)
+          break
+        }
+        case "Escape": {
+          setSelectedId(null)
+          setDetail(null)
+          setReply(null)
+          break
+        }
+        case "r":
+        case "R": {
+          if (!refreshing) {
+            setRefreshing(true)
+            fetchList(page).then(() => setRefreshing(false))
+          }
+          break
+        }
+      }
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [rfqs, selectedId, refreshing, fetchList, page])
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchList(page)
@@ -584,7 +631,9 @@ export function DashboardPage() {
       }
       const data: RFQReply = await res.json()
       setReply(data)
+      toast.success("Quote generated successfully")
     } catch (err: any) {
+      toast.error("Failed to generate quote")
       console.error("Failed to generate quote:", err)
     } finally {
       setGenerating(false)
@@ -605,7 +654,9 @@ export function DashboardPage() {
         throw new Error(data?.error || `HTTP ${res.status}`)
       }
       setReply(data)
+      toast.success("Quote sent successfully")
     } catch (err) {
+      toast.error("Failed to send quote")
       console.error("Failed to send quote:", err)
     } finally {
       setSendingQuote(false)
@@ -640,15 +691,20 @@ export function DashboardPage() {
                   </span>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                  >
+                    <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh (R)</TooltipContent>
+              </Tooltip>
             </div>
 
             <div className="flex-1 overflow-y-auto">
@@ -665,10 +721,12 @@ export function DashboardPage() {
               ) : rfqs.length === 0 ? (
                 <EmptyState />
               ) : (
-                <div className="space-y-0.5 p-1">
+                <div className="animate-in fade-in-0 duration-300 space-y-0.5 p-1">
                   {rfqs.map((rfq) => {
                     const email = rfq.emailId
-                    const senderName = rfq.customer?.company || parseSender(email.from).name
+                    const sender = parseSender(email.from)
+                    const senderName = rfq.customer?.company || sender.name
+                    const avatarColors = getAvatarColor(senderName)
                     const initial = senderName.charAt(0).toUpperCase()
                     const isSelected = selectedId === rfq._id
                     return (
@@ -683,10 +741,18 @@ export function DashboardPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 overflow-hidden">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            <div className={`flex size-8 shrink-0 items-center justify-center rounded-full ${avatarColors.bg} ${avatarColors.text} text-xs font-bold`}>
                               {initial}
                             </div>
-                            <span className="truncate text-sm font-semibold">{senderName}</span>
+                            {rfq.customer ? (
+                              <ContactHoverCard contact={{ name: rfq.customer.name, email: rfq.customer.email, company: rfq.customer.company, phone: rfq.customer.contactNumber ?? undefined, address: rfq.customer.address ?? undefined }}>
+                                <span className="truncate text-sm font-semibold cursor-default">{senderName}</span>
+                              </ContactHoverCard>
+                            ) : (
+                              <SenderHoverCard name={sender.name} email={sender.email}>
+                                <span className="truncate text-sm font-semibold cursor-default">{senderName}</span>
+                              </SenderHoverCard>
+                            )}
                           </div>
                           <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                             {formatDate(rfq.createdAt)}
@@ -697,7 +763,16 @@ export function DashboardPage() {
                             {email.subject || "(no subject)"}
                           </p>
                           <div className="mt-1.5 flex items-center gap-2">
-                            <StatusBadge isProcessed={rfq.isProcessed} errorMessage={rfq.errorMessage} />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <StatusBadge isProcessed={rfq.isProcessed} errorMessage={rfq.errorMessage} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {rfq.errorMessage ? "Processing error occurred" : rfq.isProcessed ? "Classification complete" : "AI is classifying this RFQ"}
+                              </TooltipContent>
+                            </Tooltip>
                             {rfq.queryProducts.length > 0 && (
                               <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                                 <PackageIcon className="size-3" />
@@ -719,24 +794,34 @@ export function DashboardPage() {
                   Page {page} of {totalPages}
                 </span>
                 <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    disabled={page <= 1}
-                    onClick={() => fetchList(page - 1)}
-                  >
-                    <ChevronLeftIcon className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    disabled={page >= totalPages}
-                    onClick={() => fetchList(page + 1)}
-                  >
-                    <ChevronRightIcon className="size-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        disabled={page <= 1}
+                        onClick={() => fetchList(page - 1)}
+                      >
+                        <ChevronLeftIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Previous page</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
+                        disabled={page >= totalPages}
+                        onClick={() => fetchList(page + 1)}
+                      >
+                        <ChevronRightIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Next page</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             )}
@@ -749,7 +834,7 @@ export function DashboardPage() {
             ) : !detail ? (
               <DetailPlaceholder />
             ) : (
-              <div className="flex flex-1 flex-col overflow-y-auto">
+              <div className="animate-in fade-in-0 duration-300 flex flex-1 flex-col overflow-y-auto">
                 {/* Detail header */}
                 <div className="space-y-3 border-b px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
@@ -762,18 +847,32 @@ export function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <StatusBadge isProcessed={detail.isProcessed} errorMessage={detail.errorMessage} />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shrink-0"
-                        onClick={() => {
-                          setSelectedId(null)
-                          setDetail(null)
-                        }}
-                      >
-                        <XIcon className="size-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <StatusBadge isProcessed={detail.isProcessed} errorMessage={detail.errorMessage} />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {detail.errorMessage ? "Processing error occurred" : detail.isProcessed ? "Classification complete" : "AI is classifying this RFQ"}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 shrink-0"
+                            onClick={() => {
+                              setSelectedId(null)
+                              setDetail(null)
+                            }}
+                          >
+                            <XIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Close (Esc)</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>
@@ -805,7 +904,9 @@ export function DashboardPage() {
                           <MailIcon className="size-3" />
                           Email
                         </div>
-                        <p className="mt-1 text-sm font-medium">{detail.customer.email}</p>
+                        <CopyableText value={detail.customer.email} label="Email copied">
+                          <p className="mt-1 text-sm font-medium">{detail.customer.email}</p>
+                        </CopyableText>
                       </div>
                       {detail.customer.contactNumber && (
                         <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
@@ -813,7 +914,9 @@ export function DashboardPage() {
                             <PhoneIcon className="size-3" />
                             Phone
                           </div>
-                          <p className="mt-1 text-sm font-medium">{detail.customer.contactNumber}</p>
+                          <CopyableText value={detail.customer.contactNumber!} label="Phone copied">
+                            <p className="mt-1 text-sm font-medium">{detail.customer.contactNumber}</p>
+                          </CopyableText>
                         </div>
                       )}
                       {detail.customer.address && (
@@ -885,7 +988,16 @@ export function DashboardPage() {
                                 Qty: {sr.query.quantity}
                               </span>
                             </div>
-                            <MatchStatusBadge status={sr.status} />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <MatchStatusBadge status={sr.status} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
 
                           {/* Product cards */}
@@ -974,9 +1086,14 @@ export function DashboardPage() {
                                         ) : (
                                           <p className="text-xs text-muted-foreground">No price</p>
                                         )}
-                                        <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-                                          Score: {m.score}
-                                        </p>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <p className="mt-0.5 cursor-default text-[11px] tabular-nums text-muted-foreground">
+                                              Score: {m.score}
+                                            </p>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Match confidence score</TooltipContent>
+                                        </Tooltip>
                                       </div>
                                     </div>
                                   </button>

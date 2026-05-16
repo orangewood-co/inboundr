@@ -32,7 +32,10 @@ import {
 } from "@/components/ui/sheet"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { CopyableText } from "@/components/copy-button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
@@ -345,7 +348,7 @@ function DashboardView({
         </div>
       </div>
 
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-6 animate-in fade-in-0 duration-300">
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -623,6 +626,7 @@ export default function ProductsPage() {
       }
 
       setSheetOpen(false)
+      toast.success(editingProduct ? "Product updated" : "Product created")
       if (view === "table") {
         await fetchProducts()
       }
@@ -662,14 +666,19 @@ export default function ProductsPage() {
             <>
               <div className="flex items-center justify-between border-b px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setView("dashboard")}
-                  >
-                    <ArrowLeftIcon className="size-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={() => setView("dashboard")}
+                      >
+                        <ArrowLeftIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Back to dashboard</TooltipContent>
+                  </Tooltip>
                   <BoxIcon className="size-4 text-muted-foreground" />
                   <h2 className="text-sm font-semibold">Products</h2>
                   {!loading && (
@@ -679,19 +688,29 @@ export default function ProductsPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => void fetchProducts()}
-                    disabled={loading}
-                  >
-                    <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-                  </Button>
-                  <Button size="sm" onClick={openCreateSheet}>
-                    <PackagePlusIcon className="size-4" />
-                    Add Product
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={() => void fetchProducts()}
+                        disabled={loading}
+                      >
+                        <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Refresh</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" onClick={openCreateSheet}>
+                        <PackagePlusIcon className="size-4" />
+                        Add Product
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Add a new catalog product</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -724,7 +743,7 @@ export default function ProductsPage() {
               ) : products.length === 0 ? (
                 <EmptyState search={debouncedSearch} />
               ) : (
-                <div className="flex-1 overflow-auto">
+                <div className="flex-1 overflow-auto animate-in fade-in-0 duration-300">
                   <table className="w-full min-w-[980px] text-sm">
                     <thead>
                       <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -741,14 +760,16 @@ export default function ProductsPage() {
                       {products.map((product) => (
                         <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
                           <td className="px-5 py-3.5 align-top">
-                            <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
-                              {product.productcode || `#${product.id}`}
-                            </span>
+                            <CopyableText value={product.productcode || ''} label="Product code copied">
+                              <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
+                                {product.productcode || `#${product.id}`}
+                              </span>
+                            </CopyableText>
                           </td>
                           <td className="max-w-xl px-5 py-3.5 align-top">
                             <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
                             <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              <span>{product.hsncode || "No HSN"}</span>
+                              <CopyableText value={product.hsncode || ''} label="HSN code copied"><span>{product.hsncode || "No HSN"}</span></CopyableText>
                               <span className="text-border">/</span>
                               <span>{product.unit || "Unit not set"}</span>
                             </div>
@@ -767,10 +788,15 @@ export default function ProductsPage() {
                             </div>
                           </td>
                           <td className="px-3 py-3.5 align-top">
-                            <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(product)}>
-                              <Edit3Icon className="size-4" />
-                              <span className="sr-only">Edit product</span>
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon-sm" className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" onClick={() => openEditSheet(product)}>
+                                  <Edit3Icon className="size-4" />
+                                  <span className="sr-only">Edit product</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit product</TooltipContent>
+                            </Tooltip>
                           </td>
                         </tr>
                       ))}
@@ -785,14 +811,24 @@ export default function ProductsPage() {
                   <span className="font-semibold text-foreground">{totalPages}</span>
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
-                    <ChevronLeftIcon className="size-4" />
-                    Previous
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
-                    Next
-                    <ChevronRightIcon className="size-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
+                        <ChevronLeftIcon className="size-4" />
+                        Previous
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Previous page</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
+                        Next
+                        <ChevronRightIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Next page</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </>

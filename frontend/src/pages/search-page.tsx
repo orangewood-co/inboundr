@@ -136,11 +136,11 @@ function SearchPageContent() {
             Enter at least 2 characters to search.
           </div>
         ) : total === 0 ? (
-          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground">
-            No results for "{initialQuery}".
+          <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground animate-in fade-in-0 duration-300">
+            No results for "{initialQuery}". Try a different spelling or search term.
           </div>
         ) : (
-          <div className="grid gap-5">
+          <div className="grid gap-5 animate-in fade-in-0 duration-300">
             <div className="text-sm text-muted-foreground">
               Showing {total} result{total === 1 ? "" : "s"} for "{initialQuery}".
             </div>

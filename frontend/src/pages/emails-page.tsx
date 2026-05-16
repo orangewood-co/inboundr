@@ -1,12 +1,15 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { SenderHoverCard } from "@/components/contact-hover-card"
+import { CopyableText } from "@/components/copy-button"
+import { getAvatarColor } from "@/lib/utils"
 import {
   InboxIcon,
-  MailIcon,
   MailOpenIcon,
   PaperclipIcon,
   RefreshCwIcon,
@@ -14,12 +17,10 @@ import {
   ChevronRightIcon,
   XIcon,
   AlertCircleIcon,
-  CheckCircle2Icon,
   ClockIcon,
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
-  LoaderIcon,
 } from "lucide-react"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -156,21 +157,25 @@ function formatFullDate(iso: string): string {
 const statusConfig = {
   received: {
     label: "Received",
+    description: "Email received and queued for processing",
     dotClass: "bg-blue-500",
     pillClass: "bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
   },
   processing: {
     label: "Processing",
+    description: "AI is classifying this email",
     dotClass: "bg-amber-500 animate-pulse",
     pillClass: "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
   },
   processed: {
     label: "Processed",
+    description: "Classification complete",
     dotClass: "bg-emerald-500",
     pillClass: "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
   },
   failed: {
     label: "Failed",
+    description: "Processing failed — check error details",
     dotClass: "bg-red-500",
     pillClass: "bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-400",
   },
@@ -179,42 +184,75 @@ const statusConfig = {
 function StatusBadge({ status }: { status: EmailSummary["status"] }) {
   const config = statusConfig[status]
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${config.pillClass}`}>
-      <span className={`size-1.5 rounded-full ${config.dotClass}`} />
-      {config.label}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${config.pillClass}`}>
+          <span className={`size-1.5 rounded-full ${config.dotClass}`} />
+          {config.label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{config.description}</TooltipContent>
+    </Tooltip>
   )
 }
 
 function ClassificationBadge({ email }: { email: EmailSummary }) {
+  const reason = email.classificationReason
+
   if (email.status === "failed" || email.rfqErrorMessage) {
     return (
-      <span className="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-500/20 dark:text-red-400">
-        RFQ failed
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-500/20 dark:text-red-400">
+            RFQ failed
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          {email.rfqErrorMessage || "Processing failed"}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
   if (email.isRFQ === true) {
     return (
-      <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-        RFQ
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+            RFQ
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          {reason || "Classified as a Request for Quotation"}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
   if (email.isRFQ === false) {
     return (
-      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-        Not RFQ
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            Not RFQ
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          {reason || "Not a Request for Quotation"}
+        </TooltipContent>
+      </Tooltip>
     )
   }
 
   return (
-    <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
-      Pending
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+          Pending
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">Waiting for classification</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -266,7 +304,7 @@ function ListSkeleton() {
 
 function DetailSkeleton() {
   return (
-    <div className="flex flex-1 flex-col gap-8 p-8">
+    <div className="flex flex-1 flex-col gap-8 p-8 animate-in fade-in-0 duration-300">
       <div className="space-y-3">
         <Skeleton className="h-6 w-2/3" />
         <div className="flex items-center gap-3">
@@ -294,7 +332,10 @@ function DetailPlaceholder() {
       <div className="surface-raised rounded-2xl p-6">
         <MailOpenIcon className="size-8 text-muted-foreground/30" />
       </div>
-      <p className="text-[13px] text-muted-foreground/50">Select an email to read</p>
+      <div className="space-y-1">
+        <p className="text-[13px] text-muted-foreground/50">Select an email to read</p>
+        <p className="text-[11px] text-muted-foreground/30">Use J/K keys to navigate the list</p>
+      </div>
     </div>
   )
 }
@@ -313,6 +354,7 @@ export function EmailsPage() {
   const [selectedAttachment, setSelectedAttachment] = useState<EmailDetail["attachments"][number] | null>(null)
 
   const [refreshing, setRefreshing] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
   const emailDocument = useMemo(
     () => (detail?.bodyHtml ? buildEmailDocument(detail.bodyHtml) : null),
     [detail?.bodyHtml]
@@ -368,6 +410,39 @@ export function EmailsPage() {
     setRefreshing(false)
   }
 
+  // Keyboard navigation
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      if (e.key === "j" || e.key === "k") {
+        e.preventDefault()
+        const currentIndex = emails.findIndex((em) => em._id === selectedId)
+        const next = e.key === "j" ? currentIndex + 1 : currentIndex - 1
+        if (next >= 0 && next < emails.length) {
+          setSelectedId(emails[next]._id)
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (selectedAttachment) {
+          setSelectedAttachment(null)
+        } else if (detail) {
+          setSelectedId(null)
+          setDetail(null)
+        }
+      }
+
+      if (e.key === "r" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        handleRefresh()
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [emails, selectedId, selectedAttachment, detail, page])
+
   const senderInitial = (from: string) => {
     const { name } = parseSender(from)
     return name.charAt(0).toUpperCase()
@@ -398,18 +473,23 @@ export function EmailsPage() {
                   </span>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                <RefreshCwIcon className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                  >
+                    <RefreshCwIcon className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Refresh (R)</TooltipContent>
+              </Tooltip>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div ref={listRef} className="flex-1 overflow-y-auto">
               {listLoading ? (
                 <ListSkeleton />
               ) : listError ? (
@@ -423,10 +503,11 @@ export function EmailsPage() {
               ) : emails.length === 0 ? (
                 <EmptyState />
               ) : (
-                <div className="space-y-0.5 px-2 pb-2">
+                <div className="space-y-0.5 px-2 pb-2 animate-in fade-in-0 duration-300">
                   {emails.map((email) => {
-                    const { name } = parseSender(email.from)
+                    const { name, email: senderEmail } = parseSender(email.from)
                     const isSelected = selectedId === email._id
+                    const colors = getAvatarColor(name)
                     return (
                       <button
                         key={email._id}
@@ -440,19 +521,24 @@ export function EmailsPage() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 overflow-hidden">
                             <div
-                              className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold ${
-                                isSelected
-                                  ? "bg-primary/20 text-primary"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
+                              className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold ${colors.bg} ${colors.text}`}
                             >
                               {senderInitial(email.from)}
                             </div>
-                            <span className="truncate text-[13px] font-medium">{name}</span>
+                            <SenderHoverCard name={name} email={senderEmail} side="right">
+                              <span className="truncate text-[13px] font-medium hover:underline decoration-muted-foreground/30 underline-offset-2 cursor-pointer">
+                                {name}
+                              </span>
+                            </SenderHoverCard>
                           </div>
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
-                            {formatDate(email.date)}
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                {formatDate(email.date)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">{formatFullDate(email.date)}</TooltipContent>
+                          </Tooltip>
                         </div>
                         <div className="flex items-start justify-between gap-2 pl-[38px]">
                           <div className="min-w-0 flex-1">
@@ -467,7 +553,14 @@ export function EmailsPage() {
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
                             {email.attachments.length > 0 && (
-                              <PaperclipIcon className="size-3 text-muted-foreground/40" />
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <PaperclipIcon className="size-3 text-muted-foreground/40" />
+                                </TooltipTrigger>
+                                <TooltipContent side="left">
+                                  {email.attachments.length} attachment{email.attachments.length !== 1 ? "s" : ""}
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -488,12 +581,22 @@ export function EmailsPage() {
                   {page} / {totalPages}
                 </span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="size-7" disabled={page <= 1} onClick={() => fetchList(page - 1)}>
-                    <ChevronLeftIcon className="size-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="size-7" disabled={page >= totalPages} onClick={() => fetchList(page + 1)}>
-                    <ChevronRightIcon className="size-3.5" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-7" disabled={page <= 1} onClick={() => fetchList(page - 1)}>
+                        <ChevronLeftIcon className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Previous page</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-7" disabled={page >= totalPages} onClick={() => fetchList(page + 1)}>
+                        <ChevronRightIcon className="size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Next page</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             )}
@@ -506,55 +609,81 @@ export function EmailsPage() {
             ) : !detail ? (
               <DetailPlaceholder />
             ) : (
-              <>
+              <div className="animate-in fade-in-0 duration-300 flex flex-1 flex-col overflow-hidden">
                 <div className="space-y-4 px-8 pt-7 pb-6">
                   <div className="flex items-start justify-between gap-4">
                     <h1 className="font-heading text-lg font-semibold leading-snug tracking-tight">
                       {detail.subject || "(no subject)"}
                     </h1>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 shrink-0 text-muted-foreground/50 hover:text-foreground"
-                      onClick={() => {
-                        setSelectedId(null)
-                        setDetail(null)
-                      }}
-                    >
-                      <XIcon className="size-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 shrink-0 text-muted-foreground/50 hover:text-foreground"
+                          onClick={() => {
+                            setSelectedId(null)
+                            setDetail(null)
+                          }}
+                        >
+                          <XIcon className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Close (Esc)</TooltipContent>
+                    </Tooltip>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-[13px] font-semibold text-muted-foreground">
-                      {senderInitial(detail.from)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-[13px] font-semibold">
-                          {parseSender(detail.from).name}
-                        </span>
-                        <StatusBadge status={detail.status} />
-                      </div>
-                      <p className="truncate text-[11px] text-muted-foreground/60">
-                        {parseSender(detail.from).email}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground/60">
-                      <ClockIcon className="size-3" />
-                      {formatFullDate(detail.date)}
-                    </div>
+                    {(() => {
+                      const { name, email: senderEmail } = parseSender(detail.from)
+                      const colors = getAvatarColor(name)
+                      return (
+                        <>
+                          <div className={`flex size-9 items-center justify-center rounded-lg text-[13px] font-semibold ${colors.bg} ${colors.text}`}>
+                            {senderInitial(detail.from)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2.5">
+                              <SenderHoverCard name={name} email={senderEmail} side="bottom">
+                                <span className="text-[13px] font-semibold hover:underline decoration-muted-foreground/30 underline-offset-2 cursor-pointer">
+                                  {name}
+                                </span>
+                              </SenderHoverCard>
+                              <StatusBadge status={detail.status} />
+                            </div>
+                            <CopyableText value={senderEmail} label="Email copied">
+                              <p className="truncate text-[11px] text-muted-foreground/60">
+                                {senderEmail}
+                              </p>
+                            </CopyableText>
+                          </div>
+                        </>
+                      )
+                    })()}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground/60">
+                          <ClockIcon className="size-3" />
+                          {formatFullDate(detail.date)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>{new Date(detail.date).toISOString()}</TooltipContent>
+                    </Tooltip>
                   </div>
 
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
                     <span>
                       <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">To</span>{" "}
-                      {detail.to}
+                      <CopyableText value={detail.to} label="Recipient copied">
+                        {detail.to}
+                      </CopyableText>
                     </span>
                     {detail.cc && (
                       <span>
                         <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cc</span>{" "}
-                        {detail.cc}
+                        <CopyableText value={detail.cc} label="CC copied">
+                          {detail.cc}
+                        </CopyableText>
                       </span>
                     )}
                   </div>
@@ -562,28 +691,32 @@ export function EmailsPage() {
                   {detail.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {detail.attachments.map((att, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                          onClick={() => setSelectedAttachment(att)}
-                        >
-                          <PaperclipIcon className="size-3" />
-                          {att.filename}
-                          <span className="text-[10px] opacity-50">
-                            ({(att.size / 1024).toFixed(0)}KB)
-                          </span>
-                          {isRFQSupportedAttachment(att) && (
-                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
-                              RFQ scan
-                            </span>
-                          )}
-                          {isPreviewableAttachment(att) ? (
-                            <EyeIcon className="size-3 opacity-60" />
-                          ) : (
-                            <ExternalLinkIcon className="size-3 opacity-60" />
-                          )}
-                        </button>
+                        <Tooltip key={i}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/60"
+                              onClick={() => setSelectedAttachment(att)}
+                            >
+                              <PaperclipIcon className="size-3" />
+                              {att.filename}
+                              <span className="text-[10px] opacity-50">
+                                ({(att.size / 1024).toFixed(0)}KB)
+                              </span>
+                              {isRFQSupportedAttachment(att) && (
+                                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                  RFQ scan
+                                </span>
+                              )}
+                              {isPreviewableAttachment(att) ? (
+                                <EyeIcon className="size-3 opacity-60" />
+                              ) : (
+                                <ExternalLinkIcon className="size-3 opacity-60" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Click to preview {att.mimeType.split("/")[1]?.toUpperCase()}</TooltipContent>
+                        </Tooltip>
                       ))}
                     </div>
                   )}
@@ -623,13 +756,13 @@ export function EmailsPage() {
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
         {detail && selectedAttachment && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm">
-            <div className="flex h-full max-h-[860px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm animate-in fade-in-0 duration-200">
+            <div className="flex h-full max-h-[860px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between gap-4 border-b border-border/50 px-5 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold">{selectedAttachment.filename}</p>
@@ -644,9 +777,14 @@ export function EmailsPage() {
                       Download
                     </a>
                   </Button>
-                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setSelectedAttachment(null)}>
-                    <XIcon className="size-4" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-8" onClick={() => setSelectedAttachment(null)}>
+                        <XIcon className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Close (Esc)</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
               <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/30">

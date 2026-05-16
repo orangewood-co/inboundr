@@ -9,6 +9,8 @@ import {
   Trash2Icon,
 } from "lucide-react"
 
+import { toast } from "sonner"
+
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
@@ -63,9 +70,9 @@ function relativeDate(value: string) {
 }
 
 const statusConfig = {
-  draft: { label: "Draft", variant: "outline" as const },
-  published: { label: "Published", variant: "default" as const },
-  archived: { label: "Archived", variant: "secondary" as const },
+  draft: { label: "Draft", variant: "outline" as const, tooltip: "Form is in draft mode and not publicly accessible" },
+  published: { label: "Published", variant: "default" as const, tooltip: "Form is live and accepting submissions" },
+  archived: { label: "Archived", variant: "secondary" as const, tooltip: "Form has been archived and is no longer accessible" },
 }
 
 export default function FormsListPage() {
@@ -126,6 +133,7 @@ export default function FormsListPage() {
       const created = await response.json()
       void navigate({ to: "/forms/$slug", params: { slug: created.slug } })
     } catch {
+      toast.error("Failed to create form")
       setCreating(false)
     }
   }
@@ -135,7 +143,10 @@ export default function FormsListPage() {
       method: "POST",
       credentials: "include",
     })
-    if (response.ok) void fetchForms()
+    if (response.ok) {
+      toast.success("Form duplicated")
+      void fetchForms()
+    }
   }
 
   async function archiveForm(form: ManagedForm) {
@@ -143,6 +154,7 @@ export default function FormsListPage() {
       method: "DELETE",
       credentials: "include",
     })
+    toast.success("Form archived")
     void fetchForms()
   }
 
@@ -196,7 +208,7 @@ export default function FormsListPage() {
                 </Button>
               </div>
             ) : (
-              <div className="mt-6 rounded-xl border">
+              <div className="mt-6 animate-in fade-in-0 duration-300 rounded-xl border">
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -213,7 +225,7 @@ export default function FormsListPage() {
                       return (
                         <TableRow
                           key={form._id}
-                          className="cursor-pointer"
+                          className="group/row cursor-pointer"
                           onClick={() =>
                             void navigate({
                               to: "/forms/$slug",
@@ -244,25 +256,42 @@ export default function FormsListPage() {
                               : "-"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={status.variant}>
-                              {status.label}
-                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant={status.variant}>
+                                  {status.label}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>{status.tooltip}</TooltipContent>
+                            </Tooltip>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {relativeDate(form.updatedAt)}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>{relativeDate(form.updatedAt)}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {new Date(form.updatedAt).toLocaleString()}
+                              </TooltipContent>
+                            </Tooltip>
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-8"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <EllipsisIcon className="size-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-8 opacity-0 group-hover/row:opacity-100 data-[state=open]:opacity-100 transition-opacity"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <EllipsisIcon className="size-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>More actions</TooltipContent>
+                              </Tooltip>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onClick={(e) => {

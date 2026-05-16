@@ -51,6 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -152,15 +153,17 @@ function StatCard({
   title,
   value,
   helper,
+  tooltip,
   icon: Icon,
 }: {
   title: string
   value: string
   helper: string
+  tooltip?: string
   icon: typeof InboxIcon
 }) {
-  return (
-    <div className="rounded-xl border bg-card p-5">
+  const card = (
+    <div className="rounded-xl border bg-card p-5 transition-colors hover:bg-card/80">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
@@ -173,6 +176,17 @@ function StatCard({
       <p className="mt-3 text-xs text-muted-foreground">{helper}</p>
     </div>
   )
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{card}</TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return card
 }
 
 function StatsSkeleton() {
@@ -279,10 +293,15 @@ export function StatsPage() {
       <SidebarInset>
         <SiteHeader
           actions={
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading || refreshing}>
-              <RefreshCwIcon className={cn("size-4", refreshing && "animate-spin")} />
-              Refresh
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading || refreshing}>
+                  <RefreshCwIcon className={cn("size-4", refreshing && "animate-spin")} />
+                  Refresh
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reload stats data</TooltipContent>
+            </Tooltip>
           }
         />
         <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-5">
@@ -354,31 +373,35 @@ export function StatsPage() {
           ) : !data || !hasData ? (
             <EmptyState />
           ) : (
-            <>
+            <div className="animate-in fade-in-0 duration-500">
               {/* ── Stat Cards ── */}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   title="Total Emails"
                   value={data.totals.emails.toLocaleString("en-IN")}
                   helper={`${data.totals.nonRfqs.toLocaleString("en-IN")} non-RFQs this period`}
+                  tooltip="Total inbound emails received in the selected period"
                   icon={InboxIcon}
                 />
                 <StatCard
                   title="RFQs Received"
                   value={data.totals.rfqs.toLocaleString("en-IN")}
                   helper={`${rfqRate}% of received mail`}
+                  tooltip="Emails classified as Requests for Quotation"
                   icon={BarChart3Icon}
                 />
                 <StatCard
                   title="Products Requested"
                   value={data.totals.products.toLocaleString("en-IN")}
                   helper="Line items extracted from RFQs"
+                  tooltip="Individual product line items extracted from RFQ emails"
                   icon={PackageIcon}
                 />
                 <StatCard
                   title="Match Rate"
                   value={`${matchRate}%`}
                   helper={`${data.matchQuality.matched.toLocaleString("en-IN")} of ${matchTotal.toLocaleString("en-IN")} product lookups`}
+                  tooltip="Percentage of requested products matched to your catalog"
                   icon={CheckCircle2Icon}
                 />
               </div>
@@ -528,7 +551,7 @@ export function StatsPage() {
                   secondLabel="Quantity"
                 />
               </div>
-            </>
+            </div>
           )}
         </main>
       </SidebarInset>

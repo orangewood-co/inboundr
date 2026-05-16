@@ -12,8 +12,14 @@ import {
 } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { CopyableText } from "@/components/copy-button"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -27,7 +33,14 @@ import {
 } from "@/components/ui/sheet"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/customers`
@@ -272,13 +285,17 @@ function CustomerDetails({ customer }: { customer: Customer }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Email</p>
-          <a className="font-medium text-primary hover:underline" href={`mailto:${customer.email}`}>
-            {customer.email || "-"}
-          </a>
+          <CopyableText value={customer.email} label="Email copied">
+            <a className="font-medium text-primary hover:underline" href={`mailto:${customer.email}`}>
+              {customer.email || "-"}
+            </a>
+          </CopyableText>
         </div>
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Contact number</p>
-          <p className="font-medium">{customer.contactNumber || "-"}</p>
+          <CopyableText value={customer.contactNumber} label="Phone copied">
+            <span className="font-medium">{customer.contactNumber || "-"}</span>
+          </CopyableText>
         </div>
       </div>
 
@@ -307,13 +324,23 @@ function CustomerDetails({ customer }: { customer: Customer }) {
 function CustomerMetadata({ customer }: { customer: Customer }) {
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-      <span title={formatDate(customer.updatedAt)}>
-        Updated <span className="text-foreground/70">{formatRelativeTime(customer.updatedAt)}</span>
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-default">
+            Updated <span className="text-foreground/70">{formatRelativeTime(customer.updatedAt)}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{formatDate(customer.updatedAt)}</TooltipContent>
+      </Tooltip>
       <span className="text-border">·</span>
-      <span title={formatDate(customer.createdAt)}>
-        Created <span className="text-foreground/70">{formatRelativeTime(customer.createdAt)}</span>
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-default">
+            Created <span className="text-foreground/70">{formatRelativeTime(customer.createdAt)}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{formatDate(customer.createdAt)}</TooltipContent>
+      </Tooltip>
     </div>
   )
 }
@@ -427,6 +454,7 @@ export default function CustomersPage() {
       }
 
       setSheetOpen(false)
+      toast.success("Customer updated successfully")
       await fetchCustomers()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save customer")
@@ -436,6 +464,7 @@ export default function CustomersPage() {
   }
 
   return (
+    <TooltipProvider>
     <SidebarProvider
       defaultOpen
       style={
@@ -459,15 +488,20 @@ export default function CustomersPage() {
                 </span>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => void fetchCustomers()}
-              disabled={loading}
-            >
-              <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={() => void fetchCustomers()}
+                  disabled={loading}
+                >
+                  <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-4 border-b px-4 py-3">
@@ -510,27 +544,78 @@ export default function CustomersPage() {
                     <th className="w-20 px-3 py-2.5" />
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="animate-in fade-in-0 duration-300">
                   {customers.map((customer) => (
                     <tr key={customer._id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
-                      <td className="px-5 py-3.5 align-top font-medium">{customer.name || "Unnamed customer"}</td>
+                      <td className="px-5 py-3.5 align-top font-medium">
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <button type="button" className="cursor-default text-left font-medium hover:underline">
+                              {customer.name || "Unnamed customer"}
+                            </button>
+                          </HoverCardTrigger>
+                          <HoverCardContent align="start" className="w-80 space-y-3 text-sm">
+                            <p className="font-semibold">{customer.name}</p>
+                            {customer.address && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Address</p>
+                                <p className="whitespace-pre-wrap text-xs leading-5">{customer.address}</p>
+                              </div>
+                            )}
+                            {customer.notes && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Notes</p>
+                                <p className="text-xs leading-5 text-muted-foreground">
+                                  {customer.notes.length > 100 ? `${customer.notes.slice(0, 100)}…` : customer.notes}
+                                </p>
+                              </div>
+                            )}
+                            {customer.specialDiscountPercentage > 0 && (
+                              <p className="text-xs">
+                                <span className="text-muted-foreground">Discount:</span>{" "}
+                                <span className="font-medium">{customer.specialDiscountPercentage}%</span>
+                              </p>
+                            )}
+                            <div className="flex gap-3 border-t pt-2 text-[11px] text-muted-foreground">
+                              <span>Updated {formatRelativeTime(customer.updatedAt)}</span>
+                              <span>Created {formatRelativeTime(customer.createdAt)}</span>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </td>
                       <td className="px-5 py-3.5 align-top">{customer.company || "-"}</td>
                       <td className="px-5 py-3.5 align-top">
-                        <a className="font-medium text-primary hover:underline" href={`mailto:${customer.email}`}>
-                          {customer.email || "-"}
-                        </a>
+                        <CopyableText value={customer.email} label="Email copied">
+                          <a className="font-medium text-primary hover:underline" href={`mailto:${customer.email}`}>
+                            {customer.email || "-"}
+                          </a>
+                        </CopyableText>
                       </td>
-                      <td className="px-5 py-3.5 align-top">{customer.contactNumber || "-"}</td>
+                      <td className="px-5 py-3.5 align-top">
+                        <CopyableText value={customer.contactNumber} label="Phone copied">
+                          <span>{customer.contactNumber || "-"}</span>
+                        </CopyableText>
+                      </td>
                       <td className="px-3 py-3.5 align-top">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openViewSheet(customer)}>
-                            <EyeIcon className="size-4" />
-                            <span className="sr-only">View customer</span>
-                          </Button>
-                          <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(customer)}>
-                            <Edit3Icon className="size-4" />
-                            <span className="sr-only">Edit customer</span>
-                          </Button>
+                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openViewSheet(customer)}>
+                                <EyeIcon className="size-4" />
+                                <span className="sr-only">View customer</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>View</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(customer)}>
+                                <Edit3Icon className="size-4" />
+                                <span className="sr-only">Edit customer</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit</TooltipContent>
+                          </Tooltip>
                         </div>
                       </td>
                     </tr>
@@ -546,14 +631,24 @@ export default function CustomersPage() {
               <span className="font-semibold text-foreground">{totalPages}</span>
             </p>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
-                <ChevronLeftIcon className="size-4" />
-                Previous
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
-                Next
-                <ChevronRightIcon className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1 || loading}>
+                    <ChevronLeftIcon className="size-4" />
+                    Previous
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Previous page</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages || loading}>
+                    Next
+                    <ChevronRightIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Next page</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -613,5 +708,6 @@ export default function CustomersPage() {
         </SheetContent>
       </Sheet>
     </SidebarProvider>
+    </TooltipProvider>
   )
 }
