@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, FileTextIcon, InboxIcon, PackageIcon, Settings2Icon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, Settings2Icon, UsersIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -46,6 +46,11 @@ const data = {
       title: "Forms",
       url: "/forms",
       icon: <ClipboardListIcon />,
+    },
+    {
+      title: "Links",
+      url: "/links",
+      icon: <LinkIcon />,
     },
     {
       title: "Settings",
