@@ -50,9 +50,9 @@ We handle it instantly with AI. Inboundr is an end-to-end AI sales and customer 
 
 ### Backend
 
-| Technology | Role |
+| Technology | Role 
 |---|---|
-| **Bun** | Runtime & package manager |
+| **Bun** | Runtime & package manager 
 | **Express 5** | HTTP framework |
 | **LangChain / LangGraph** | AI agent orchestration |
 | **OpenAI** | LLM provider |
@@ -63,6 +63,8 @@ We handle it instantly with AI. Inboundr is an end-to-end AI sales and customer 
 | **AWS SES** | Transactional email |
 | **React Email** | Email templates |
 | **Google PubSub** | Async messaging |
+
+Inboundr requires Bun version v1.3.11 or higher—this is needed for Bun's built-in [cron](https://bun.com/docs/runtime/cron) support.
 
 ### Frontend
 
