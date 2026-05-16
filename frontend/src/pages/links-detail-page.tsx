@@ -43,10 +43,49 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+
+const EVENT_LABELS: Record<string, string> = {
+  redirected: "Opened",
+  password_required: "Password Required",
+  password_failed: "Password Failed",
+  precise_location_required: "Location Requested",
+  expired: "Expired",
+  view_limit_reached: "Limit Reached",
+}
+
+function eventLabel(result: string) {
+  return EVENT_LABELS[result] ?? result.replace(/_/g, " ")
+}
+
+function formatLocation(event: LinkEvent) {
+  const parts = [
+    event.approximateLocation.city,
+    event.approximateLocation.region,
+    event.approximateLocation.country,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(", ") : null
+}
+
+function osmUrl(lat: number, lng: number) {
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`
+}
+
+function osmEmbedUrl(lat: number, lng: number) {
+  const d = 0.01
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${lng - d},${lat - d},${lng + d},${lat + d}&layer=mapnik&marker=${lat},${lng}`
+}
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/links`
@@ -216,6 +255,12 @@ export default function LinksDetailPage() {
 
   const recentEvents = useMemo(() => events.slice(0, 20), [events])
 
+  const preciseLocations = useMemo(
+    () => events.filter((e) => e.preciseLocation.latitude != null && e.preciseLocation.longitude != null),
+    [events],
+  )
+  const latestPrecise = preciseLocations[0] ?? null
+
   async function copyLink() {
     if (!link) return
     await navigator.clipboard.writeText(shortUrl(link.code))
@@ -354,7 +399,7 @@ export default function LinksDetailPage() {
                   </div>
 
                   <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <ExternalLinkIcon className="size-3.5" />
+                    <ExternalLinkIcon className="size-4 shrink-0" />
                     <a
                       href={link.destinationUrl}
                       target="_blank"
@@ -392,19 +437,19 @@ export default function LinksDetailPage() {
                         <EllipsisIcon className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="min-w-44">
                       <DropdownMenuItem onClick={() => void copyLink()}>
                         <CopyIcon className="size-4" />
-                        Copy short link
+                        <span>Copy short link</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => window.open(link.destinationUrl, "_blank")}>
                         <ExternalLinkIcon className="size-4" />
-                        Open destination
+                        <span>Open destination</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => void archiveLink()} className="text-destructive">
                         <Trash2Icon className="size-4" />
-                        Archive
+                        <span>Archive</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -419,15 +464,15 @@ export default function LinksDetailPage() {
             {/* Stats cards */}
             <div className="mt-4 grid grid-cols-3 gap-4">
               <div className="rounded-xl border bg-card p-5">
-                <p className="text-sm font-medium text-primary">Engagements</p>
+                <p className="text-sm font-medium text-muted-foreground">Engagements</p>
                 <p className="mt-1 text-3xl font-bold tabular-nums">{stats.total}</p>
               </div>
               <div className="rounded-xl border bg-card p-5">
-                <p className="text-sm font-medium text-muted-foreground">Last 7 days</p>
+                <p className="text-sm font-medium text-muted-foreground">Last 7 Days</p>
                 <p className="mt-1 text-3xl font-bold tabular-nums">{stats.last7}</p>
               </div>
               <div className="rounded-xl border bg-card p-5">
-                <p className="text-sm font-medium text-muted-foreground">Weekly change</p>
+                <p className="text-sm font-medium text-muted-foreground">Weekly Change</p>
                 <p className={`mt-1 text-3xl font-bold tabular-nums ${stats.weeklyChange > 0 ? "text-green-600" : stats.weeklyChange < 0 ? "text-red-500" : ""}`}>
                   {stats.weeklyChange > 0 ? "+" : ""}{stats.weeklyChange}%
                 </p>
@@ -450,22 +495,22 @@ export default function LinksDetailPage() {
                 <p className="mt-3 text-xs text-muted-foreground">Coming soon</p>
               </div>
               <div className="rounded-xl border bg-card p-6">
-                <h2 className="text-lg font-semibold">Link performance</h2>
+                <h2 className="text-lg font-semibold">Link Performance</h2>
                 <div className="mt-3 grid gap-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Total events</span>
+                    <span className="text-muted-foreground">Total Events</span>
                     <span className="font-medium">{events.length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Successful redirects</span>
+                    <span className="text-muted-foreground">Successful Redirects</span>
                     <span className="font-medium">{events.filter((e) => e.result === "redirected").length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Password attempts</span>
+                    <span className="text-muted-foreground">Password Attempts</span>
                     <span className="font-medium">{events.filter((e) => e.result === "password_required" || e.result === "password_failed").length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Blocked (expired/limit)</span>
+                    <span className="text-muted-foreground">Blocked (Expired/Limit)</span>
                     <span className="font-medium">{events.filter((e) => e.result === "expired" || e.result === "view_limit_reached").length}</span>
                   </div>
                 </div>
@@ -518,45 +563,99 @@ export default function LinksDetailPage() {
               )}
             </div>
 
-            {/* Recent events */}
+            {/* Precise location map */}
+            {latestPrecise && latestPrecise.preciseLocation.latitude != null && latestPrecise.preciseLocation.longitude != null && (
+              <div className="mt-4 rounded-xl border bg-card p-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Location Map</h2>
+                  <a
+                    href={osmUrl(latestPrecise.preciseLocation.latitude, latestPrecise.preciseLocation.longitude!)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLinkIcon className="size-3" />
+                    Open in OpenStreetMap
+                  </a>
+                </div>
+                <div className="mt-3 overflow-hidden rounded-lg border">
+                  <iframe
+                    title="Location map"
+                    width="100%"
+                    height="300"
+                    src={osmEmbedUrl(latestPrecise.preciseLocation.latitude, latestPrecise.preciseLocation.longitude!)}
+                    className="border-0"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Showing the most recent precise location from {formatDate(latestPrecise.openedAt)}
+                </p>
+              </div>
+            )}
+
+            {/* Recent Events */}
             <div className="mt-4 rounded-xl border bg-card p-6">
-              <h2 className="text-lg font-semibold">Recent events</h2>
+              <h2 className="text-lg font-semibold">Recent Events</h2>
               {recentEvents.length === 0 ? (
                 <p className="mt-4 text-sm text-muted-foreground">No events recorded yet.</p>
               ) : (
-                <div className="mt-4 divide-y">
-                  {recentEvents.map((event) => (
-                    <div key={event._id} className="flex items-center gap-4 py-3">
-                      <Badge
-                        variant={event.result === "redirected" ? "default" : "secondary"}
-                        className="w-28 justify-center text-xs"
-                      >
-                        {event.result.replace(/_/g, " ")}
-                      </Badge>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-muted-foreground">
-                          {[event.userAgent.browser, event.userAgent.os, event.userAgent.device]
-                            .filter(Boolean)
-                            .join(" / ") || "Unknown device"}
-                        </p>
-                        {event.approximateLocation.city && (
-                          <p className="text-xs text-muted-foreground">
-                            {[event.approximateLocation.city, event.approximateLocation.region, event.approximateLocation.country]
-                              .filter(Boolean)
-                              .join(", ")}
-                          </p>
-                        )}
-                        {event.preciseLocation.latitude != null && (
-                          <p className="text-xs text-muted-foreground">
-                            Precise: {event.preciseLocation.latitude.toFixed(4)}, {event.preciseLocation.longitude?.toFixed(4)}
-                          </p>
-                        )}
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatDate(event.openedAt)}
-                      </span>
-                    </div>
-                  ))}
+                <div className="mt-4 overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-36">Status</TableHead>
+                        <TableHead>Device</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead className="text-right">Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentEvents.map((event) => {
+                        const location = formatLocation(event)
+                        const hasPrecise = event.preciseLocation.latitude != null && event.preciseLocation.longitude != null
+
+                        return (
+                          <TableRow key={event._id}>
+                            <TableCell>
+                              <Badge
+                                variant={event.result === "redirected" ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {eventLabel(event.result)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {[event.userAgent.browser, event.userAgent.os, event.userAgent.device]
+                                .filter(Boolean)
+                                .join(" / ") || "Unknown device"}
+                            </TableCell>
+                            <TableCell>
+                              {location && (
+                                <span className="text-sm">{location}</span>
+                              )}
+                              {hasPrecise && (
+                                <a
+                                  href={osmUrl(event.preciseLocation.latitude!, event.preciseLocation.longitude!)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <MapPinIcon className="size-3" />
+                                  View on map
+                                </a>
+                              )}
+                              {!location && !hasPrecise && (
+                                <span className="text-sm text-muted-foreground">--</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(event.openedAt)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </div>

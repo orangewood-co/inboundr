@@ -419,21 +419,21 @@ function LinkRow({
               <EllipsisIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="min-w-44">
             <DropdownMenuItem onClick={onCopy}>
               <CopyIcon className="size-4" />
-              Copy short link
+              <span>Copy short link</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => window.open(link.destinationUrl, "_blank")}
             >
               <ExternalLinkIcon className="size-4" />
-              Open destination
+              <span>Open destination</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onArchive} className="text-destructive">
               <Trash2Icon className="size-4" />
-              Archive
+              <span>Archive</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
