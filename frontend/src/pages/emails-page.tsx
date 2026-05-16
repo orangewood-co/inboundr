@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
+import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -367,6 +368,11 @@ function DetailPlaceholder() {
 }
 
 export function EmailsPage() {
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "btsa:layout:inbox",
+    storage: localStorage,
+  })
+
   const [emails, setEmails] = useState<EmailSummary[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -488,9 +494,9 @@ export function EmailsPage() {
       <AppSidebar collapsible="icon" variant="inset" />
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
-        <ResizablePanelGroup orientation="horizontal" className="flex-1">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {/* ── Email List Panel ── */}
-          <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden bg-surface">
+          <ResizablePanel id="list" defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden bg-surface">
             <div className="flex items-center justify-between px-4 py-3.5">
               <div className="flex items-center gap-2.5">
                 <h2 className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Inbox</h2>
@@ -632,7 +638,7 @@ export function EmailsPage() {
           <ResizableHandle />
 
           {/* ── Email Detail Panel ── */}
-          <ResizablePanel defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
+          <ResizablePanel id="detail" defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
             {detailLoading ? (
               <DetailSkeleton />
             ) : !detail ? (

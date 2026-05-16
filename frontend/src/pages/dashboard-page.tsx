@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
+import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -331,6 +332,11 @@ function DetailPlaceholder() {
 }
 
 export function DashboardPage() {
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "btsa:layout:rfq",
+    storage: localStorage,
+  })
+
   const [rfqs, setRfqs] = useState<RFQSummary[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -680,9 +686,9 @@ export function DashboardPage() {
       <AppSidebar collapsible="icon" variant="inset" />
       <SidebarInset className="overflow-hidden">
         <SiteHeader />
-        <ResizablePanelGroup orientation="horizontal" className="flex-1">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {/* ── RFQ List Panel ── */}
-          <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden">
+          <ResizablePanel id="list" defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2">
                 <FileTextIcon className="size-4 text-muted-foreground" />
@@ -832,7 +838,7 @@ export function DashboardPage() {
           <ResizableHandle />
 
           {/* ── RFQ Detail Panel ── */}
-          <ResizablePanel defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
+          <ResizablePanel id="detail" defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
             {detailLoading ? (
               <DetailSkeleton />
             ) : !detail ? (
