@@ -32,6 +32,7 @@ import {
   UserIcon,
   UsersIcon,
 } from "lucide-react"
+import { toast } from "sonner"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
@@ -278,7 +279,6 @@ function OrganizationTab() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("")
-  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const fetchOrganization = useCallback(async () => {
@@ -343,7 +343,6 @@ function OrganizationTab() {
   const saveOrganization = async () => {
     setSaving(true)
     setError(null)
-    setMessage(null)
 
     try {
       const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
@@ -354,10 +353,12 @@ function OrganizationTab() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to save organization")
-      setMessage("Organization settings saved")
+      toast.success("Organization settings saved")
       notifyOrganizationBrandingChanged()
     } catch (err: any) {
-      setError(err.message || "Failed to save organization")
+      const message = err.message || "Failed to save organization"
+      setError(message)
+      toast.error(message)
     } finally {
       setSaving(false)
     }
@@ -387,7 +388,6 @@ function OrganizationTab() {
 
     setUploadingLogo(true)
     setError(null)
-    setMessage(null)
 
     try {
       const presignRes = await fetch(`${API_ORIGIN}/api/v1/uploads/presign`, {
@@ -419,9 +419,13 @@ function OrganizationTab() {
 
       updateForm("logoUrl", presign.file.key)
       setLogoPreviewUrl(await resolveLogoDisplayUrl(presign.file.key))
-      setMessage("Logo uploaded. Save organization settings to publish it.")
+      toast.success("Logo uploaded", {
+        description: "Save organization settings to publish it.",
+      })
     } catch (err: any) {
-      setError(err.message || "Failed to upload logo")
+      const message = err.message || "Failed to upload logo"
+      setError(message)
+      toast.error(message)
     } finally {
       setUploadingLogo(false)
     }
@@ -451,7 +455,6 @@ function OrganizationTab() {
           ) : (
             <>
               {error && <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
-              {message && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400">{message}</div>}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -1400,9 +1403,7 @@ function NotificationsTab() {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
-  const [testSent, setTestSent] = useState(false)
 
   useEffect(() => {
     fetch(`${API_ORIGIN}/api/v1/digest/preferences`, { credentials: "include" })
@@ -1425,18 +1426,19 @@ function NotificationsTab() {
 
   const handleSave = async () => {
     setSaving(true)
-    setSaved(false)
     try {
-      await fetch(`${API_ORIGIN}/api/v1/digest/preferences`, {
+      const res = await fetch(`${API_ORIGIN}/api/v1/digest/preferences`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(prefs),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch {
-      // silently fail
+      if (!res.ok) {
+        throw new Error("Failed to save notification preferences")
+      }
+      toast.success("Notification preferences saved")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save notification preferences")
     } finally {
       setSaving(false)
     }
@@ -1444,18 +1446,19 @@ function NotificationsTab() {
 
   const handleSendTest = async () => {
     setSendingTest(true)
-    setTestSent(false)
     try {
       const res = await fetch(`${API_ORIGIN}/api/v1/digest/test`, {
         method: "POST",
         credentials: "include",
       })
-      if (res.ok) {
-        setTestSent(true)
-        setTimeout(() => setTestSent(false), 4000)
+      if (!res.ok) {
+        throw new Error("Failed to send test email")
       }
-    } catch {
-      // silently fail
+      toast.success("Test email sent", {
+        description: "Check your inbox.",
+      })
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send test email")
     } finally {
       setSendingTest(false)
     }
@@ -1522,21 +1525,11 @@ function NotificationsTab() {
 
           <div className="flex items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : saved ? "Saved" : "Save preferences"}
+              {saving ? "Saving..." : "Save preferences"}
             </Button>
             <Button variant="outline" onClick={handleSendTest} disabled={sendingTest}>
-              {sendingTest ? "Sending..." : testSent ? "Sent!" : "Send test email"}
+              {sendingTest ? "Sending..." : "Send test email"}
             </Button>
-            {saved && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                Preferences updated
-              </span>
-            )}
-            {testSent && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                Check your inbox
-              </span>
-            )}
           </div>
         </div>
       </SettingsCard>

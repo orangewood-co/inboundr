@@ -5,6 +5,7 @@ import { RouterProvider } from "@tanstack/react-router"
 import "./index.css"
 import { router } from "./router"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
+import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { OrganizationBrandingProvider } from "@/lib/organization-branding"
 import { installOrganizationFetchContext } from "@/lib/organization-context"
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
       <OrganizationBrandingProvider>
         <TooltipProvider>
           <RouterProvider router={router} />
+          <Toaster richColors position="top-right" />
         </TooltipProvider>
       </OrganizationBrandingProvider>
     </ThemeProvider>
