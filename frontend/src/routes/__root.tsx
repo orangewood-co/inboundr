@@ -13,6 +13,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/forms": "Forms",
   "/links": "Links",
   "/links/create": "Create Link",
+  "/links/$id": "Link Details",
   "/login": "Login",
   "/products": "Products",
   "/register": "Register",

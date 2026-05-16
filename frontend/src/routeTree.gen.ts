@@ -25,6 +25,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
+import { Route as LinksIdRouteImport } from './routes/links.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 
@@ -108,6 +109,11 @@ const LinksCreateRoute = LinksCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => LinksRoute,
 } as any)
+const LinksIdRoute = LinksIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => LinksRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/forms/': typeof FormsIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/forms': typeof FormsIndexRoute
   '/links': typeof LinksIndexRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/forms/': typeof FormsIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/$id'
     | '/links/create'
     | '/forms/'
     | '/links/'
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/$id'
     | '/links/create'
     | '/forms'
     | '/links'
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/links/$id'
     | '/links/create'
     | '/forms/'
     | '/links/'
@@ -370,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LinksCreateRouteImport
       parentRoute: typeof LinksRoute
     }
+    '/links/$id': {
+      id: '/links/$id'
+      path: '/$id'
+      fullPath: '/links/$id'
+      preLoaderRoute: typeof LinksIdRouteImport
+      parentRoute: typeof LinksRoute
+    }
     '/invite/$token': {
       id: '/invite/$token'
       path: '/invite/$token'
@@ -400,11 +419,13 @@ const FormsRouteChildren: FormsRouteChildren = {
 const FormsRouteWithChildren = FormsRoute._addFileChildren(FormsRouteChildren)
 
 interface LinksRouteChildren {
+  LinksIdRoute: typeof LinksIdRoute
   LinksCreateRoute: typeof LinksCreateRoute
   LinksIndexRoute: typeof LinksIndexRoute
 }
 
 const LinksRouteChildren: LinksRouteChildren = {
+  LinksIdRoute: LinksIdRoute,
   LinksCreateRoute: LinksCreateRoute,
   LinksIndexRoute: LinksIndexRoute,
 }

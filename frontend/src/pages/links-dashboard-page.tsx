@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   BarChart3Icon,
   CalendarIcon,
@@ -109,6 +109,7 @@ function formatDate(dateStr: string) {
 type StatusFilter = "active" | "all"
 
 export default function LinksDashboardPage() {
+  const navigate = useNavigate()
   const [links, setLinks] = useState<ShortLink[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -281,6 +282,7 @@ export default function LinksDashboardPage() {
                     link={link}
                     onCopy={() => void copyLink(link.code)}
                     onArchive={() => void archiveLink(link)}
+                    onNavigate={() => void navigate({ to: "/links/$id", params: { id: link._id } })}
                   />
                 ))}
               </div>
@@ -296,17 +298,22 @@ function LinkRow({
   link,
   onCopy,
   onArchive,
+  onNavigate,
 }: {
   link: ShortLink
   onCopy: () => void
   onArchive: () => void
+  onNavigate: () => void
 }) {
   const status = availabilityLabel(link)
   const faded = status !== "active"
   const favicon = faviconUrl(link.destinationUrl)
 
   return (
-    <div className={`flex items-center gap-4 px-5 py-4 transition hover:bg-muted/40 ${faded ? "opacity-60" : ""}`}>
+    <div
+      className={`flex cursor-pointer items-center gap-4 px-5 py-4 transition hover:bg-muted/40 ${faded ? "opacity-60" : ""}`}
+      onClick={onNavigate}
+    >
       {/* Favicon */}
       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted/50">
         {favicon ? (
@@ -349,14 +356,14 @@ function LinkRow({
 
         <div className="mt-0.5 flex items-center gap-1.5">
           <button
-            onClick={onCopy}
+            onClick={(e) => { e.stopPropagation(); onCopy() }}
             className="truncate text-sm font-medium text-primary hover:underline"
           >
             {shortUrl(link.code).replace(/^https?:\/\//, "")}
           </button>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={onCopy} className="shrink-0 text-muted-foreground hover:text-foreground">
+              <button onClick={(e) => { e.stopPropagation(); onCopy() }} className="shrink-0 text-muted-foreground hover:text-foreground">
                 <CopyIcon className="size-3.5" />
               </button>
             </TooltipTrigger>
@@ -387,7 +394,7 @@ function LinkRow({
       </div>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onCopy}>
@@ -399,7 +406,7 @@ function LinkRow({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onNavigate}>
               <BarChart3Icon className="size-4" />
             </Button>
           </TooltipTrigger>
