@@ -98,7 +98,7 @@ export default function LinksCreatePage() {
           ]}
         />
         <main className="flex-1 overflow-auto">
-          <form onSubmit={handleSubmit} className="mx-auto max-w-2xl p-6 pb-28 lg:p-8 lg:pb-28">
+          <form onSubmit={handleSubmit} className="mx-auto max-w-2xl p-6 lg:p-8">
             {/* Page header */}
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold tracking-tight">Create a new link</h1>
@@ -286,17 +286,15 @@ export default function LinksCreatePage() {
               </div>
             </div>
 
-            {/* Bottom sticky bar */}
-            <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-              <div className="mx-auto flex max-w-2xl items-center justify-end gap-3 px-6 py-4 lg:px-8">
-                <Button type="button" variant="outline" asChild>
-                  <Link to="/links">Cancel</Link>
-                </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving && <LoaderIcon className="size-4 animate-spin" />}
-                  Create link
-                </Button>
-              </div>
+            {/* Actions */}
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <Button type="button" variant="outline" asChild>
+                <Link to="/links">Cancel</Link>
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <LoaderIcon className="size-4 animate-spin" />}
+                Create link
+              </Button>
             </div>
           </form>
         </main>

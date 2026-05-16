@@ -167,21 +167,19 @@ export default function LinksDashboardPage() {
     <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
       <AppSidebar collapsible="icon" variant="inset" />
       <SidebarInset className="overflow-hidden">
-        <SiteHeader
-          breadcrumbs={[{ label: "Links" }]}
-          actions={
-            <Button asChild>
-              <Link to="/links/create">
-                <PlusIcon className="size-4" />
-                Create link
-              </Link>
-            </Button>
-          }
-        />
+        <SiteHeader breadcrumbs={[{ label: "Links" }]} />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6 lg:p-8">
-            {/* Page title */}
-            <h1 className="text-2xl font-bold tracking-tight">Inboundr Links</h1>
+            {/* Page title + Create button */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold tracking-tight">Links</h1>
+              <Button asChild>
+                <Link to="/links/create">
+                  <PlusIcon className="size-4" />
+                  Create link
+                </Link>
+              </Button>
+            </div>
 
             {/* Toolbar */}
             <div className="mt-5 flex flex-wrap items-center gap-3">
