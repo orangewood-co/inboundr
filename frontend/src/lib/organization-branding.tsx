@@ -12,6 +12,7 @@ interface OrganizationBranding {
   organizationId: string
   name: string
   logoUrl: string
+  logoDisplayUrl: string
   primaryColor: string
   theme: OrganizationTheme
 }
@@ -78,6 +79,25 @@ function applyPrimaryColor(primaryColor: string | null | undefined) {
   root.style.setProperty("--sidebar-primary-foreground", foreground)
 }
 
+async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
+  const source = logoUrl.trim()
+  if (!source || /^https?:\/\//i.test(source)) {
+    return source
+  }
+
+  const response = await fetch(
+    `${API_ORIGIN}/api/v1/uploads/view?key=${encodeURIComponent(source)}`,
+    { credentials: "include" }
+  )
+  const data: { url?: string; error?: string } = await response.json().catch(() => ({}))
+
+  if (!response.ok || !data.url) {
+    throw new Error(data.error || "Failed to load organization logo")
+  }
+
+  return data.url
+}
+
 export function notifyOrganizationBrandingChanged() {
   window.dispatchEvent(new Event(BRANDING_CHANGED_EVENT))
 }
@@ -105,10 +125,13 @@ export function OrganizationBrandingProvider({
       }
 
       const organization = data?.organization
+      const logoUrl = organization?.logoUrl ?? ""
+
       setBranding({
         organizationId: organization?._id ?? "",
         name: organization?.name ?? "",
-        logoUrl: organization?.logoUrl ?? "",
+        logoUrl,
+        logoDisplayUrl: await resolveLogoDisplayUrl(logoUrl),
         primaryColor:
           normalizeHexColor(organization?.preferences?.primaryColor) ??
           DEFAULT_PRIMARY_COLOR,
