@@ -38,6 +38,10 @@ const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 
+function getInitialListSearch(): string {
+  return new URLSearchParams(window.location.search).get("search") ?? ""
+}
+
 interface Product {
   id: number
   brand: string | null
@@ -484,13 +488,14 @@ function DashboardView({
 }
 
 export default function ProductsPage() {
-  const [view, setView] = useState<"dashboard" | "table">("dashboard")
+  const initialSearch = getInitialListSearch()
+  const [view, setView] = useState<"dashboard" | "table">(initialSearch ? "table" : "dashboard")
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [search, setSearch] = useState("")
-  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [search, setSearch] = useState(initialSearch)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch.trim())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)

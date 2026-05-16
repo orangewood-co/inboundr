@@ -16,6 +16,7 @@ import publicFormsRouter from "./routes/public-forms.route";
 import uploadsRouter from "./routes/uploads.route";
 import statsRouter from "./routes/stats.route";
 import digestRouter from "./routes/digest.route";
+import searchRouter from "./routes/search.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -60,6 +61,7 @@ app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/stats", statsRouter);
 app.use("/api/v1/digest", digestRouter);
+app.use("/api/v1/search", searchRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });
