@@ -87,6 +87,31 @@ const EMAIL_VIEWER_STYLE = `
       white-space: pre-wrap;
       overflow-x: auto;
     }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+    }
+    *:hover {
+      scrollbar-color: rgba(0,0,0,0.15) transparent;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 9999px;
+    }
+    *:hover::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.15);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.3);
+    }
   </style>
 `
 
