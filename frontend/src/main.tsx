@@ -9,8 +9,10 @@ import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { OrganizationBrandingProvider } from "@/lib/organization-branding"
 import { installOrganizationFetchContext } from "@/lib/organization-context"
+import { renderASCIILogo } from "@/lib/branding"
 
 installOrganizationFetchContext(import.meta.env.VITE_API_URL ?? "http://localhost:3000")
+renderASCIILogo()
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
