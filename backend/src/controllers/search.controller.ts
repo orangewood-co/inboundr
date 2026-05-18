@@ -192,7 +192,7 @@ async function searchRFQs(
         emailFrom: email?.from ?? null,
         emailStatus: email?.status ?? null,
       },
-      url: `/?rfq=${rfq._id.toString()}`,
+      url: `/rfq?rfq=${rfq._id.toString()}`,
     };
   });
 }

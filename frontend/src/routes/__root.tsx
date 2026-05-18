@@ -7,6 +7,7 @@ const APP_TITLE = "Inboundr"
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
+  "/rfq": "RFQ",
   "/customers": "Customers",
   "/emails": "Emails",
   "/forgot-password": "Forgot Password",

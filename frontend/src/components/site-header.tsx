@@ -20,7 +20,8 @@ export type BreadcrumbSegment = {
 }
 
 const pageTitles: Record<string, string> = {
-  "/": "RFQ",
+  "/": "Dashboard",
+  "/rfq": "RFQ",
   "/emails": "Inbox",
   "/products": "Products",
   "/search": "Search",

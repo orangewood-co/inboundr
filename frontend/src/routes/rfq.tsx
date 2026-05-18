@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { requireSession } from "@/lib/auth-guards"
-import HomePage from "@/pages/home-page"
+import DashboardPage from "@/pages/dashboard-page"
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/rfq")({
   beforeLoad: requireSession,
-  component: HomePage,
+  component: DashboardPage,
 })
