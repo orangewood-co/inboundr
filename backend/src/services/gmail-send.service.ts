@@ -14,6 +14,34 @@ function base64UrlEncode(value: string): string {
     .replace(/=+$/g, "");
 }
 
+export async function sendStandaloneEmail({
+  account,
+  to,
+  subject,
+  body,
+}: {
+  account: IGmailAccount;
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<string | null> {
+  const gmail = await getGmailClientForAccount(account);
+  const headers = [
+    `From: ${account.emailAddress}`,
+    `To: ${to}`,
+    `Subject: ${subject || "(no subject)"}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+  ];
+  const raw = base64UrlEncode(`${headers.join("\r\n")}\r\n\r\n${body}`);
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw },
+  });
+
+  return res.data.id ?? null;
+}
+
 function buildReferences(email: IEmail): string | undefined {
   const values = [email.references, email.inReplyTo, email.rfcMessageId]
     .filter(Boolean)

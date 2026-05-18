@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, FileTextIcon, HomeIcon, InboxIcon, LinkIcon, PackageIcon, Settings2Icon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, FileTextIcon, HomeIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
 
 const data = {
   navMain: [
@@ -36,6 +36,11 @@ const data = {
       title: "Products",
       url: "/products",
       icon: <PackageIcon />,
+    },
+    {
+      title: "Invoices",
+      url: "/invoices",
+      icon: <ReceiptTextIcon />,
     },
     {
       title: "Stats",

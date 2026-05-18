@@ -19,6 +19,7 @@ import uploadsRouter from "./routes/uploads.route";
 import statsRouter from "./routes/stats.route";
 import digestRouter from "./routes/digest.route";
 import searchRouter from "./routes/search.route";
+import invoiceRouter from "./routes/invoice.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -61,6 +62,7 @@ app.use("/api/v1/organization", organizationRouter);
 app.use("/api/v1/forms", formsRouter);
 app.use("/api/v1/links", linksRouter);
 app.use("/api/v1/uploads", uploadsRouter);
+app.use("/api/v1/invoices", invoiceRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/l", publicLinksRouter);
 app.use("/api/v1/stats", statsRouter);
