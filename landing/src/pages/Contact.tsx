@@ -1,3 +1,4 @@
+import { motion } from "motion/react"
 import { FadeIn } from "@/components/FadeIn"
 import { PageHeader } from "@/components/PageHeader"
 
@@ -10,28 +11,28 @@ export default function Contact() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-16 lg:grid-cols-2 lg:gap-24">
             <FadeIn>
-              <p className="mb-8 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Reach us</p>
+              <p className="label mb-10 text-text-muted">Reach us</p>
               <div className="space-y-8">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">Email</p>
+                  <p className="label-sm text-text-dim">Email</p>
                   <a href="mailto:hello@inboundr.ai" className="mt-1 block text-lg font-medium transition hover:text-green-bright">
                     hello@inboundr.co
                   </a>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">Sales inquiries</p>
+                  <p className="label-sm text-text-dim">Sales inquiries</p>
                   <a href="mailto:sales@inboundr.ai" className="mt-1 block text-lg font-medium transition hover:text-green-bright">
                     sales@inboundr.co
                   </a>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">Support</p>
+                  <p className="label-sm text-text-dim">Support</p>
                   <a href="mailto:support@inboundr.ai" className="mt-1 block text-lg font-medium transition hover:text-green-bright">
                     support@inboundr.co
                   </a>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">Location</p>
+                  <p className="label-sm text-text-dim">Location</p>
                   <p className="mt-1 text-sm leading-relaxed text-text-muted">
                     Remote-first company.<br />
                     Teams in India &amp; US.
@@ -41,7 +42,7 @@ export default function Contact() {
             </FadeIn>
 
             <FadeIn delay={0.12}>
-              <p className="mb-8 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Send a message</p>
+              <p className="label mb-10 text-text-muted">Send a message</p>
               <form
                 action="mailto:hello@inboundr.ai"
                 method="POST"
@@ -49,7 +50,7 @@ export default function Contact() {
                 className="space-y-5"
               >
                 <div>
-                  <label htmlFor="name" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">
+                  <label htmlFor="name" className="label-sm mb-1.5 block text-text-dim">
                     Name
                   </label>
                   <input
@@ -62,7 +63,7 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">
+                  <label htmlFor="email" className="label-sm mb-1.5 block text-text-dim">
                     Email
                   </label>
                   <input
@@ -75,7 +76,7 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="message" className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.15em] text-text-dim">
+                  <label htmlFor="message" className="label-sm mb-1.5 block text-text-dim">
                     Message
                   </label>
                   <textarea
@@ -87,12 +88,14 @@ export default function Contact() {
                     placeholder="Tell us what you're looking for..."
                   />
                 </div>
-                <button
+                <motion.button
                   type="submit"
-                  className="bg-text px-7 py-3 text-sm font-semibold text-base transition hover:bg-text/90"
+                  className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   Send message
-                </button>
+                </motion.button>
               </form>
             </FadeIn>
           </div>

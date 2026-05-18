@@ -78,7 +78,7 @@ export default function Privacy() {
         <div className="mx-auto max-w-3xl">
           {sections.map((s, i) => (
             <FadeIn key={s.title} delay={i * 0.04}>
-              <div className="mb-12">
+              <div className="mb-10">
                 <h2 className="mb-4 text-xl font-bold">{s.title}</h2>
                 <div className="whitespace-pre-line text-sm leading-relaxed text-text-muted">{s.content}</div>
               </div>

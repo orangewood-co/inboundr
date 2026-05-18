@@ -33,7 +33,7 @@ const footerLinks = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border px-6 py-14 lg:px-8">
+    <footer className="border-t border-border px-6 py-16 sm:py-24 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
@@ -47,7 +47,7 @@ export default function Footer() {
           </div>
           {footerLinks.map((col) => (
             <div key={col.heading}>
-              <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+              <p className="label-sm mb-4 text-text-muted">
                 {col.heading}
               </p>
               <ul className="space-y-2">

@@ -1,8 +1,5 @@
-import { Link } from "react-router-dom"
 import { motion } from "motion/react"
 import {
-  ArrowRight,
-  ArrowUpRight,
   CalendarIcon,
   CheckSquareIcon,
   CodeXmlIcon,
@@ -17,6 +14,7 @@ import {
   TypeIcon,
 } from "lucide-react"
 import { FadeIn } from "@/components/FadeIn"
+import { CtaSection } from "@/components/CtaSection"
 
 const features = [
   {
@@ -100,7 +98,7 @@ export default function FormStudio() {
         <div className="relative mx-auto max-w-4xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
           <FadeIn>
             <div className="flex items-center gap-3">
-              <span className="inline-block rounded-full bg-gold px-3 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-base">
+              <span className="inline-block bg-gold px-3 py-1 label-sm text-base">
                 New feature
               </span>
               <span className="font-mono text-[13px] text-text-dim">May 2026</span>
@@ -122,11 +120,11 @@ export default function FormStudio() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-3xl">
           <FadeIn>
-            <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.3em] text-green-bright">
+            <p className="label-sm mb-4 text-green-bright">
               Why we built this
             </p>
           </FadeIn>
-          <FadeIn delay={0.08}>
+          <FadeIn delay={0.06}>
             <p className="text-xl leading-relaxed text-text-muted sm:text-2xl">
               Most form tools force you out of your workflow. You build a form in
               one app, embed it in another, then manually pipe submissions into
@@ -134,7 +132,7 @@ export default function FormStudio() {
               can break.
             </p>
           </FadeIn>
-          <FadeIn delay={0.16}>
+          <FadeIn delay={0.12}>
             <p className="mt-8 text-xl leading-relaxed sm:text-2xl">
               Form Studio lives inside Inboundr. Create a form, publish it, collect
               responses, and turn them into customers — all without leaving the
@@ -145,17 +143,17 @@ export default function FormStudio() {
       </section>
 
       {/* ── Field types strip ── */}
-      <section className="border-b border-border px-6 py-16 sm:py-20 lg:px-8">
+      <section className="border-b border-border px-6 py-16 sm:py-24 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <FadeIn>
-            <p className="mb-10 text-center text-[13px] font-medium uppercase tracking-[0.3em] text-text-dim">
+            <p className="label mb-10 text-center text-text-dim">
               Supported field types
             </p>
           </FadeIn>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {fieldTypes.map((ft, i) => (
               <FadeIn key={ft.label} delay={i * 0.04}>
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-surface/50 px-4 py-3 text-sm text-text-muted transition-colors hover:border-text/10 hover:text-text">
+                <div className="flex items-center gap-3 border border-border bg-surface/50 px-4 py-3 text-sm text-text-muted transition-colors hover:border-text/10 hover:text-text">
                   <ft.icon className="size-4 shrink-0 text-green-bright" />
                   {ft.label}
                 </div>
@@ -169,7 +167,7 @@ export default function FormStudio() {
       <section className="px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <FadeIn>
-            <p className="mb-4 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
+            <p className="label mb-4 text-text-muted">
               What's included
             </p>
             <h2 className="max-w-xl text-3xl font-bold leading-snug tracking-[-0.02em] sm:text-4xl">
@@ -179,8 +177,8 @@ export default function FormStudio() {
           <div className="mt-14 grid gap-4 sm:grid-cols-2">
             {features.map((f, i) => (
               <FadeIn key={f.title} delay={i * 0.06}>
-                <div className="group flex h-full flex-col border border-border p-7 transition-colors hover:border-text/10 sm:p-8">
-                  <div className={`mb-5 flex size-10 items-center justify-center rounded-lg ${f.accent}`}>
+                <div className="group flex h-full flex-col border border-border p-7 card-hover sm:p-8">
+                  <div className={`mb-4 flex size-10 items-center justify-center ${f.accent}`}>
                     <f.icon className="size-5 text-text" />
                   </div>
                   <h3 className="text-lg font-semibold">{f.title}</h3>
@@ -198,12 +196,12 @@ export default function FormStudio() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
+            <p className="label mb-10 text-text-muted">
               How it works
             </p>
           </FadeIn>
           {steps.map((s, i) => (
-            <FadeIn key={s.num} delay={i * 0.08}>
+            <FadeIn key={s.num} delay={i * 0.06}>
               <div className="group flex gap-6 border-b border-border py-8 sm:gap-10">
                 <span className="shrink-0 font-mono text-xs text-text-dim">
                   {s.num}
@@ -226,7 +224,7 @@ export default function FormStudio() {
           <div className="noise relative mx-auto max-w-4xl overflow-hidden bg-green p-10 sm:p-14">
             <div className="relative z-10 grid items-center gap-8 lg:grid-cols-[1fr_auto]">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-text-muted">
+                <p className="label-sm text-text-muted">
                   Built for Inboundr
                 </p>
                 <h2 className="mt-3 text-2xl font-bold leading-snug sm:text-3xl">
@@ -242,7 +240,7 @@ export default function FormStudio() {
               <div className="flex gap-3">
                 <motion.a
                   href="https://app.inboundr.co/"
-                  className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-text/90"
+                  className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -255,31 +253,14 @@ export default function FormStudio() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="border-t border-border px-6 py-24 sm:py-36 lg:px-8">
-        <FadeIn className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl lg:text-5xl">
-            Start building forms today.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-muted">
-            Form Studio is available now for all Inboundr users. Create your
-            first form in under a minute.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a
-              href="https://app.inboundr.co/"
-              className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-text/90"
-            >
-              Get started free <ArrowRight className="mb-px ml-1 inline size-3.5" />
-            </a>
-            <Link
-              to="/contact"
-              className="border border-border px-7 py-3.5 text-sm font-medium transition hover:border-text/20 hover:bg-surface"
-            >
-              Talk to us <ArrowUpRight className="mb-px ml-1 inline size-3.5" />
-            </Link>
-          </div>
-        </FadeIn>
-      </section>
+      <CtaSection
+        heading="Start building forms today."
+        description="Form Studio is available now for all Inboundr users. Create your first form in under a minute."
+        actions={[
+          { label: "Get started free", href: "https://app.inboundr.co/", external: true, icon: "arrow-right" },
+          { label: "Talk to us", href: "/contact", variant: "secondary", icon: "arrow-up-right" },
+        ]}
+      />
     </>
   )
 }

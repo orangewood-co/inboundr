@@ -47,13 +47,13 @@ export default function Careers() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">How we work</p>
+            <p className="label mb-10 text-text-muted">How we work</p>
           </FadeIn>
           <div className="grid gap-0 sm:grid-cols-3">
             {values.map((v, i) => (
-              <FadeIn key={v.title} delay={i * 0.08}>
+              <FadeIn key={v.title} delay={i * 0.1}>
                 <div className="border-b border-border p-8 sm:border-b-0 sm:border-r sm:last:border-r-0">
-                  <h3 className="text-lg font-bold">{v.title}</h3>
+                  <h3 className="text-lg font-semibold">{v.title}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-text-muted">{v.text}</p>
                 </div>
               </FadeIn>
@@ -65,7 +65,7 @@ export default function Careers() {
       <section className="px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Open roles</p>
+            <p className="label mb-10 text-text-muted">Open roles</p>
           </FadeIn>
           {roles.map((r, i) => (
             <FadeIn key={r.title} delay={i * 0.06}>
@@ -77,7 +77,7 @@ export default function Careers() {
                   <h3 className="text-lg font-semibold transition-colors group-hover:text-green-bright sm:text-xl">
                     {r.title}
                   </h3>
-                  <div className="mt-1 flex gap-3 text-[13px] text-text-dim">
+                  <div className="mt-1 flex gap-3 label-sm text-text-dim">
                     <span>{r.dept}</span>
                     <span>&middot;</span>
                     <span>{r.location}</span>
@@ -90,7 +90,7 @@ export default function Careers() {
             </FadeIn>
           ))}
           <FadeIn delay={0.3}>
-            <p className="mt-12 text-sm text-text-muted">
+            <p className="mt-10 text-sm text-text-muted">
               Don't see your role? We're always looking for exceptional people.{" "}
               <a href="mailto:careers@inboundr.ai?subject=General Application" className="font-medium text-green-bright transition hover:text-text">
                 Send us a note &rarr;

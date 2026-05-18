@@ -1,6 +1,6 @@
 import { FadeIn } from "@/components/FadeIn"
 import { PageHeader } from "@/components/PageHeader"
-import { ArrowRight } from "lucide-react"
+import { CtaSection } from "@/components/CtaSection"
 
 const steps = [
   { num: "01", title: "Every lead, one place", text: "Emails, WhatsApp messages, website chats, and phone inquiries — all captured and unified in a single timeline." },
@@ -26,10 +26,10 @@ export default function AiCrm() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">How it works</p>
+            <p className="label mb-10 text-text-muted">How it works</p>
           </FadeIn>
           {steps.map((s, i) => (
-            <FadeIn key={s.num} delay={i * 0.08}>
+            <FadeIn key={s.num} delay={i * 0.06}>
               <div className="group flex gap-6 border-b border-border py-8 sm:gap-10">
                 <span className="shrink-0 font-mono text-xs text-text-dim">{s.num}</span>
                 <div>
@@ -57,21 +57,13 @@ export default function AiCrm() {
         </div>
       </section>
 
-      <section className="border-t border-border px-6 py-20 sm:py-28 lg:px-8">
-        <FadeIn className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
-            Your CRM should work for you.
-          </h2>
-          <p className="mx-auto mt-4 max-w-md text-base text-text-muted">
-            Let AI handle the busywork. Start free, no credit card required.
-          </p>
-          <div className="mt-8 flex justify-center gap-3">
-            <a href="mailto:hello@inboundr.ai?subject=Try AI CRM" className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-text/90">
-              Start free <ArrowRight className="mb-px ml-1 inline size-3.5" />
-            </a>
-          </div>
-        </FadeIn>
-      </section>
+      <CtaSection
+        heading="Your CRM should work for you."
+        description="Let AI handle the busywork. Start free, no credit card required."
+        actions={[
+          { label: "Start free", href: "mailto:hello@inboundr.ai?subject=Try AI CRM", external: true, icon: "arrow-right" },
+        ]}
+      />
     </>
   )
 }

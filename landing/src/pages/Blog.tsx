@@ -45,12 +45,12 @@ export default function Blog() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-4 sm:grid-cols-2">
             {posts.map((post, i) => (
-              <FadeIn key={post.title} delay={i * 0.08}>
-                <article className="noise group relative flex h-full flex-col overflow-hidden border border-border transition-colors hover:border-text/15">
+              <FadeIn key={post.title} delay={i * 0.1}>
+                <article className="noise group relative flex h-full flex-col overflow-hidden border border-border card-hover">
                   <div className="relative z-10 flex flex-1 flex-col p-7 sm:p-8">
                     <div className="mb-4 flex items-center gap-3">
                       <span
-                        className="noise relative overflow-hidden px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.15em]"
+                        className="noise relative overflow-hidden px-2.5 py-0.5 label-sm"
                         style={{ backgroundColor: post.bg }}
                       >
                         <span className="relative z-10">{post.tag}</span>
@@ -61,7 +61,7 @@ export default function Blog() {
                       {post.title}
                     </h2>
                     <p className="mt-3 flex-1 text-sm leading-relaxed text-text-muted">{post.excerpt}</p>
-                    <p className="mt-6 text-[13px] font-medium text-text-dim transition-colors group-hover:text-text">
+                    <p className="mt-6 label text-text-dim transition-colors group-hover:text-text">
                       Read more &rarr;
                     </p>
                   </div>

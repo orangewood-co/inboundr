@@ -1,11 +1,17 @@
 import { FadeIn } from "@/components/FadeIn"
 import { PageHeader } from "@/components/PageHeader"
-import { ArrowRight } from "lucide-react"
+import { CtaSection } from "@/components/CtaSection"
 
 const steps = [
   { num: "01", title: "AI initiates the call", text: "Warm leads get a call within minutes of expressing interest. AI handles the greeting, qualification, and key questions." },
   { num: "02", title: "Warm handoff to your rep", text: "When a lead is qualified and ready, AI transfers the call to your human closer — with full context on screen." },
   { num: "03", title: "Automated call summaries", text: "Every call gets a structured summary: topics discussed, next steps, sentiment score. Logged to CRM automatically." },
+]
+
+const stats = [
+  { value: "<2min", label: "Lead-to-call time" },
+  { value: "40%", label: "Higher qualification rate" },
+  { value: "100%", label: "Calls logged & summarized" },
 ]
 
 export default function Calls() {
@@ -20,10 +26,10 @@ export default function Calls() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">How it works</p>
+            <p className="label mb-10 text-text-muted">How it works</p>
           </FadeIn>
           {steps.map((s, i) => (
-            <FadeIn key={s.num} delay={i * 0.08}>
+            <FadeIn key={s.num} delay={i * 0.06}>
               <div className="flex gap-6 border-b border-border py-8 sm:gap-10">
                 <span className="shrink-0 font-mono text-xs text-text-dim">{s.num}</span>
                 <div>
@@ -40,11 +46,7 @@ export default function Calls() {
         <div className="mx-auto max-w-7xl">
           <FadeIn>
             <div className="grid gap-8 sm:grid-cols-3">
-              {[
-                { value: "<2min", label: "Lead-to-call time" },
-                { value: "40%", label: "Higher qualification rate" },
-                { value: "100%", label: "Calls logged & summarized" },
-              ].map((s) => (
+              {stats.map((s) => (
                 <div key={s.label} className="border-l border-border pl-6">
                   <p className="font-mono text-4xl font-bold text-green-bright">{s.value}</p>
                   <p className="mt-2 text-sm text-text-muted">{s.label}</p>
@@ -55,16 +57,12 @@ export default function Calls() {
         </div>
       </section>
 
-      <section className="border-t border-border px-6 py-20 sm:py-28 lg:px-8">
-        <FadeIn className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl">Let AI dial. Your reps close.</h2>
-          <div className="mt-8 flex justify-center gap-3">
-            <a href="mailto:hello@inboundr.ai?subject=Try AI Calls" className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-text/90">
-              Start free <ArrowRight className="mb-px ml-1 inline size-3.5" />
-            </a>
-          </div>
-        </FadeIn>
-      </section>
+      <CtaSection
+        heading="Let AI dial. Your reps close."
+        actions={[
+          { label: "Start free", href: "mailto:hello@inboundr.ai?subject=Try AI Calls", external: true, icon: "arrow-right" },
+        ]}
+      />
     </>
   )
 }

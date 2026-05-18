@@ -56,9 +56,9 @@ export default function About() {
         description="We believe every inbound lead deserves an instant, intelligent response — and that AI can deliver it better than a team of ten."
       />
 
-      <section className="border-y border-border px-6 py-28 sm:py-40 lg:px-8">
+      <section className="border-y border-border px-6 py-24 sm:py-36 lg:px-8">
         <div className="mx-auto max-w-4xl">
-          <p className="mb-10 text-[13px] font-medium uppercase tracking-[0.3em] text-gold">Our manifesto</p>
+          <p className="label mb-10 text-gold">Our manifesto</p>
           <h2 className="text-3xl font-bold leading-snug tracking-[-0.02em] sm:text-4xl lg:text-[3.25rem] lg:leading-[1.15]">
             <RevealLine text="Sales teams are drowning in busywork. They spend more time copying data, writing emails, and chasing cold threads than actually selling. We built Inboundr to flip that equation — so humans focus on relationships and AI handles everything else." />
           </h2>
@@ -68,13 +68,13 @@ export default function About() {
       <section className="px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">What we believe</p>
+            <p className="label mb-10 text-text-muted">What we believe</p>
           </FadeIn>
           <div className="grid gap-0 sm:grid-cols-2">
             {values.map((v, i) => (
-              <FadeIn key={v.title} delay={i * 0.08}>
+              <FadeIn key={v.title} delay={i * 0.1}>
                 <div className="border-b border-border p-8 sm:odd:border-r">
-                  <h3 className="text-lg font-bold">{v.title}</h3>
+                  <h3 className="text-lg font-semibold">{v.title}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-text-muted">{v.text}</p>
                 </div>
               </FadeIn>
@@ -86,7 +86,7 @@ export default function About() {
       <section className="border-t border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Our story</p>
+            <p className="label mb-10 text-text-muted">Our story</p>
           </FadeIn>
           <FadeIn delay={0.1}>
             <div className="mx-auto max-w-3xl space-y-6 text-base leading-relaxed text-text-muted">

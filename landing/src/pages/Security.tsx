@@ -59,14 +59,14 @@ export default function Security() {
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Trust & compliance</p>
+            <p className="label mb-10 text-text-muted">Trust & compliance</p>
           </FadeIn>
           <div className="grid gap-4 sm:grid-cols-3">
             {badges.map((b, i) => (
               <FadeIn key={b.label} delay={i * 0.1}>
-                <div className="noise relative overflow-hidden border border-border p-7 sm:p-8">
+                <div className="noise relative overflow-hidden border border-border p-7 card-hover sm:p-8">
                   <b.icon className="relative z-10 mb-4 size-6 text-green-bright" />
-                  <h3 className="relative z-10 text-lg font-bold">{b.label}</h3>
+                  <h3 className="relative z-10 text-lg font-semibold">{b.label}</h3>
                   <p className="relative z-10 mt-2 text-sm text-text-muted">{b.desc}</p>
                 </div>
               </FadeIn>
@@ -78,7 +78,7 @@ export default function Security() {
       <section className="px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
+            <p className="label mb-10 text-text-muted">
               Security practices
             </p>
           </FadeIn>
@@ -102,7 +102,7 @@ export default function Security() {
       <section className="border-t border-border px-6 py-16 sm:py-24 lg:px-8">
         <div className="mx-auto max-w-3xl">
           <FadeIn>
-            <p className="mb-6 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">Report a vulnerability</p>
+            <p className="label mb-4 text-text-muted">Report a vulnerability</p>
             <p className="text-sm leading-relaxed text-text-muted">
               If you've discovered a security vulnerability, please report it responsibly to{" "}
               <a href="mailto:security@inboundr.ai" className="font-medium text-green-bright transition hover:text-text">

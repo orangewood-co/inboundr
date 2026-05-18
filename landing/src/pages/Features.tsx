@@ -24,14 +24,14 @@ export default function Features() {
       />
 
       <section className="px-6 py-20 sm:py-28 lg:px-8">
-        <div className="mx-auto grid max-w-6xl gap-4 sm:grid-cols-2">
+        <div className="mx-auto grid max-w-7xl gap-4 sm:grid-cols-2">
           {features.map((feature, i) => (
-            <FadeIn key={feature.title} delay={i * 0.08}>
+            <FadeIn key={feature.title} delay={i * 0.1}>
               <Link to={feature.to} className="group block h-full">
-                <article className="flex h-full flex-col border border-border p-7 transition-colors hover:border-text/15 sm:p-8">
-                  <div className="mb-5 flex items-center gap-3">
+                <article className="flex h-full flex-col border border-border p-7 card-hover sm:p-8">
+                  <div className="mb-4 flex items-center gap-3">
                     <span
-                      className="noise relative overflow-hidden px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.15em]"
+                      className="noise relative overflow-hidden px-2.5 py-0.5 label-sm"
                       style={{ backgroundColor: feature.bg }}
                     >
                       <span className="relative z-10">{feature.tag}</span>
@@ -44,7 +44,7 @@ export default function Features() {
                   <p className="mt-2 flex-1 text-sm leading-relaxed text-text-muted">
                     {feature.description}
                   </p>
-                  <p className="mt-6 text-[13px] font-medium text-text-dim transition-colors group-hover:text-text">
+                  <p className="mt-6 label text-text-dim transition-colors group-hover:text-text">
                     Read more <ArrowRight className="mb-px ml-1 inline size-3" />
                   </p>
                 </article>

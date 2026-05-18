@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from "motion/react"
 import { ArrowUpRight } from "lucide-react"
 import { AuroraBackground } from "@/components/AuroraBackground"
 import { FadeIn } from "@/components/FadeIn"
+import { CtaSection } from "@/components/CtaSection"
 
 const features = [
   { num: "01", text: "AI reads inbound leads" },
@@ -71,9 +72,9 @@ export default function Home() {
     <>
       {/* ── Hero ── */}
       <AuroraBackground className="noise overflow-hidden">
-        <div className="relative z-10 mx-auto max-w-5xl px-6 pb-32 pt-36 text-center sm:pb-44 sm:pt-48 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-4xl px-6 pb-32 pt-36 text-center sm:pb-44 sm:pt-48 lg:px-8">
           <motion.p
-            className="mb-8 text-[12px] font-medium uppercase tracking-[0.35em] text-green-bright"
+            className="label mb-8 text-green-bright"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
@@ -106,15 +107,17 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.55 }}
           >
-            <a
+            <motion.a
               href="mailto:hello@inboundr.ai?subject=Try Inboundr"
-              className="bg-text px-8 py-3.5 text-sm font-semibold text-base shadow-[0_0_20px_rgba(62,207,142,0.12)] transition hover:shadow-[0_0_30px_rgba(62,207,142,0.2)]"
+              className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
               Start free
-            </a>
+            </motion.a>
             <a
               href="mailto:hello@inboundr.ai?subject=Contact Sales"
-              className="px-6 py-3.5 text-sm font-medium text-text-muted transition hover:text-text"
+              className="px-7 py-3.5 text-sm font-medium text-text-muted transition hover:text-text"
             >
               Book a demo →
             </a>
@@ -126,7 +129,7 @@ export default function Home() {
       <section id="features" className="border-y border-border">
         <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:px-8">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">
+            <p className="label mb-10 text-text-muted">
               What it does
             </p>
           </FadeIn>
@@ -150,13 +153,13 @@ export default function Home() {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-16 lg:grid-cols-2 lg:gap-24">
             <FadeIn>
-              <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.3em] text-text-dim">The problem</p>
-              <h2 className="text-2xl font-medium leading-snug text-text-muted sm:text-3xl lg:text-4xl">
+              <p className="label-sm mb-4 text-text-dim">The problem</p>
+              <h2 className="text-2xl font-bold leading-snug text-text-muted sm:text-3xl lg:text-4xl">
                 Your team wastes time replying, quoting, and chasing leads.
               </h2>
             </FadeIn>
             <FadeIn delay={0.15}>
-              <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.3em] text-gold">The solution</p>
+              <p className="label-sm mb-4 text-gold">The solution</p>
               <h2 className="text-2xl font-bold leading-snug sm:text-3xl lg:text-4xl">
                 We handle it instantly with AI.
               </h2>
@@ -172,7 +175,6 @@ export default function Home() {
               >
                 See it in action <ArrowUpRight className="size-3.5" />
               </a>
-         
             </FadeIn>
           </div>
         </div>
@@ -182,16 +184,16 @@ export default function Home() {
       <section id="proof" className="px-6 py-20 sm:py-28 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <FadeIn>
-            <p className="mb-12 text-[13px] font-medium uppercase tracking-[0.3em] text-text-muted">What teams say</p>
+            <p className="label mb-10 text-text-muted">What teams say</p>
           </FadeIn>
           <div className="grid gap-4 sm:grid-cols-3">
             {testimonials.map((t, i) => (
               <FadeIn key={i} delay={i * 0.1}>
-                <div className="noise relative overflow-hidden p-7 sm:p-8" style={{ backgroundColor: t.bg }}>
+                <div className="noise relative overflow-hidden border border-border p-7 card-hover sm:p-8" style={{ backgroundColor: t.bg }}>
                   <blockquote className="relative z-10 text-lg font-medium leading-snug text-white/95">
                     &ldquo;{t.quote}&rdquo;
                   </blockquote>
-                  <p className="relative z-10 mt-6 text-[13px] font-medium text-white/50">{t.who}</p>
+                  <p className="relative z-10 mt-6 label text-white/50">{t.who}</p>
                 </div>
               </FadeIn>
             ))}
@@ -200,21 +202,21 @@ export default function Home() {
       </section>
 
       {/* ── Scroll-reveal ── */}
-      <section id="about" className="grid-lines border-y border-border px-6 py-32 sm:py-44 lg:px-8">
+      <section id="about" className="grid-lines border-y border-border px-6 py-24 sm:py-36 lg:px-8">
         <div className="mx-auto max-w-4xl">
-          <p className="mb-10 text-[13px] font-medium uppercase tracking-[0.3em] text-green-bright">What is Inboundr?</p>
+          <p className="label mb-10 text-green-bright">What is Inboundr?</p>
           <h2 className="text-3xl font-bold leading-snug tracking-[-0.02em] sm:text-4xl lg:text-[3.25rem] lg:leading-[1.15]">
             <RevealLine text="Inboundr automates everything that happens after a customer inquiry — replies, quotes, follow-ups, and conversions." />
           </h2>
           <div className="mt-24 grid gap-16 sm:mt-32 lg:grid-cols-2 lg:gap-24">
             <div>
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-text-dim">Before</p>
+              <p className="label-sm mb-4 text-text-dim">Before</p>
               <p className="text-xl leading-snug text-text-muted sm:text-2xl">
                 <RevealLine text="Leads sit for hours. Quotes take days. Follow-ups get forgotten. Revenue leaks." />
               </p>
             </div>
             <div>
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-gold">After</p>
+              <p className="label-sm mb-4 text-gold">After</p>
               <p className="text-xl font-medium leading-snug sm:text-2xl">
                 <RevealLine text="Every lead gets an instant reply, a quote in minutes, and relentless follow-up. Automatically." />
               </p>
@@ -224,31 +226,15 @@ export default function Home() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="px-6 py-24 sm:py-36 lg:px-8">
-        <FadeIn className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl lg:text-5xl">
-            Inbound, handled&nbsp;automatically.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-muted">
-            Stop wasting time replying, quoting, and chasing.
-            Let AI do it — instantly, accurately, 24/7.
-          </p>
-          <div className="mt-10 flex justify-center gap-3">
-            <a
-              href="mailto:hello@inboundr.ai?subject=Inboundr demo"
-              className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:bg-text/90"
-            >
-              Start free
-            </a>
-            <a
-              href="mailto:hello@inboundr.ai?subject=Contact Sales"
-              className="border border-border px-7 py-3.5 text-sm font-medium transition hover:border-text/20 hover:bg-surface"
-            >
-              Book a demo
-            </a>
-          </div>
-        </FadeIn>
-      </section>
+      <CtaSection
+        heading="Inbound, handled&nbsp;automatically."
+        description="Stop wasting time replying, quoting, and chasing. Let AI do it — instantly, accurately, 24/7."
+        border={false}
+        actions={[
+          { label: "Start free", href: "mailto:hello@inboundr.ai?subject=Inboundr demo", external: true },
+          { label: "Book a demo", href: "mailto:hello@inboundr.ai?subject=Contact Sales", variant: "secondary", external: true },
+        ]}
+      />
     </>
   )
 }
