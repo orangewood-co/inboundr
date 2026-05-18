@@ -211,35 +211,29 @@ export function HomePage() {
           ) : (
             <>
               {/* Welcome Banner */}
-              <section
-                className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/5 via-card to-primary/[0.02] p-6 animate-in fade-in-0 duration-500"
-              >
-                <div className="relative z-10 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                      {getGreeting()}, {userName}
-                    </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Here&apos;s what&apos;s happening with your RFQs today.
-                    </p>
-                  </div>
-                  <div className="mt-3 flex gap-2 sm:mt-0">
-                    <Button asChild size="sm" variant="outline" className="gap-1.5">
-                      <Link to="/rfq">
-                        <FileTextIcon className="size-3.5" />
-                        View RFQs
-                      </Link>
-                    </Button>
-                    <Button asChild size="sm" className="gap-1.5">
-                      <Link to="/products">
-                        <PlusIcon className="size-3.5" />
-                        Add Product
-                      </Link>
-                    </Button>
-                  </div>
+              <section className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between animate-in fade-in-0 duration-500">
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                    {getGreeting()}, {userName}
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Here&apos;s what&apos;s happening with your RFQs today.
+                  </p>
                 </div>
-                <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.06] blur-2xl" />
-                <div className="pointer-events-none absolute -bottom-12 -left-12 size-56 rounded-full bg-primary/[0.04] blur-3xl" />
+                <div className="mt-3 flex gap-2 sm:mt-0">
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Link to="/rfq">
+                      <FileTextIcon className="size-3.5" />
+                      View RFQs
+                    </Link>
+                  </Button>
+                  <Button asChild size="sm" className="gap-1.5">
+                    <Link to="/products">
+                      <PlusIcon className="size-3.5" />
+                      Add Product
+                    </Link>
+                  </Button>
+                </div>
               </section>
 
               {/* Stat Cards */}
