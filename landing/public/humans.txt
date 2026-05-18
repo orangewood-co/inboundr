@@ -1,0 +1,3 @@
+Inboundr is built by Tushar Gaurav, with care for fast, useful AI-native sales infrastructure. It is updated continuously and built with modern web tools and technologies.
+
+Learn more about Tushar at https://tushgaurav.com.
