@@ -19,21 +19,52 @@ export async function sendStandaloneEmail({
   to,
   subject,
   body,
+  attachments = [],
 }: {
   account: IGmailAccount;
   to: string;
   subject: string;
   body: string;
+  attachments?: Array<{
+    filename: string;
+    contentType: string;
+    content: Buffer;
+  }>;
 }): Promise<string | null> {
   const gmail = await getGmailClientForAccount(account);
+  const boundary = `btsa_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const headers = [
     `From: ${account.emailAddress}`,
     `To: ${to}`,
     `Subject: ${subject || "(no subject)"}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
+    attachments.length > 0
+      ? `Content-Type: multipart/mixed; boundary="${boundary}"`
+      : "Content-Type: text/plain; charset=UTF-8",
   ];
-  const raw = base64UrlEncode(`${headers.join("\r\n")}\r\n\r\n${body}`);
+  const message =
+    attachments.length > 0
+      ? [
+          headers.join("\r\n"),
+          "",
+          `--${boundary}`,
+          "Content-Type: text/plain; charset=UTF-8",
+          "Content-Transfer-Encoding: 7bit",
+          "",
+          body,
+          ...attachments.flatMap((attachment) => [
+            `--${boundary}`,
+            `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+            "Content-Transfer-Encoding: base64",
+            `Content-Disposition: attachment; filename="${attachment.filename}"`,
+            "",
+            attachment.content.toString("base64").replace(/(.{76})/g, "$1\r\n"),
+          ]),
+          `--${boundary}--`,
+          "",
+        ].join("\r\n")
+      : `${headers.join("\r\n")}\r\n\r\n${body}`;
+  const raw = base64UrlEncode(message);
   const res = await gmail.users.messages.send({
     userId: "me",
     requestBody: { raw },

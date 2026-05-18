@@ -11,6 +11,7 @@ import { Customer } from "../models/customer.model";
 import { GmailAccount } from "../models/gmail-account.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { sendStandaloneEmail } from "../services/gmail-send.service";
+import { renderInvoicePdfBuffer, streamInvoicePdf } from "../services/invoice-pdf.service";
 
 const ACTIVE_STATUSES = new Set<InvoiceStatus>(["sent", "viewed", "partially_paid", "overdue"]);
 const LOCKED_STATUSES = new Set<InvoiceStatus>(["cancelled", "written_off", "paid"]);
@@ -451,11 +452,19 @@ export const sendInvoice = async (req: Request, res: Response): Promise<void> =>
       }).sort({ updatedAt: -1 });
 
       if (account) {
+        const pdf = await renderInvoicePdfBuffer(invoice);
         gmailMessageId = await sendStandaloneEmail({
           account,
           to: invoice.customerSnapshot.email,
           subject: `Invoice ${invoice.invoiceNumber} from ${invoice.organizationSnapshot.name}`,
           body: renderInvoiceEmail(invoice),
+          attachments: [
+            {
+              filename: `${invoice.invoiceNumber}.pdf`,
+              contentType: "application/pdf",
+              content: pdf,
+            },
+          ],
         });
       }
     }
@@ -587,6 +596,21 @@ export const getInvoicePreview = async (req: Request, res: Response): Promise<vo
   } catch (err) {
     console.error("Error rendering invoice preview:", err);
     res.status(500).json({ error: "Failed to render invoice preview" });
+  }
+};
+
+export const downloadInvoicePdf = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const invoice = await findInvoice(req, true);
+    if (!invoice) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+
+    streamInvoicePdf(invoice, res);
+  } catch (err) {
+    console.error("Error rendering invoice PDF:", err);
+    res.status(500).json({ error: "Failed to render invoice PDF" });
   }
 };
 

@@ -472,6 +472,10 @@ export default function InvoicesPage() {
     window.open(`${INVOICE_API}/${invoice._id}/preview`, "_blank", "noopener,noreferrer")
   }
 
+  function downloadPdf(invoice: Invoice) {
+    window.open(`${INVOICE_API}/${invoice._id}/pdf`, "_blank", "noopener,noreferrer")
+  }
+
   async function copyShareLink(invoice: Invoice) {
     const url = `${INVOICE_API}/${invoice._id}/preview`
     await navigator.clipboard.writeText(url)
@@ -684,8 +688,11 @@ export default function InvoicesPage() {
                     Send
                   </Button>
                   <Button variant="outline" onClick={() => openPreview(selectedInvoice)}>
+                    Preview
+                  </Button>
+                  <Button variant="outline" onClick={() => downloadPdf(selectedInvoice)}>
                     <DownloadIcon className="size-4" />
-                    Preview / print
+                    Download PDF
                   </Button>
                   <Button variant="outline" onClick={() => void copyShareLink(selectedInvoice)}>
                     <CopyIcon className="size-4" />
