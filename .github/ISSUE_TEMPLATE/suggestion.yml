@@ -1,0 +1,83 @@
+name: Suggestion
+description: Suggest a product idea, UX improvement, integration, or technical enhancement.
+title: "[Suggestion]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Inboundr. Describe the problem, the outcome you want, and any context that helps evaluate the idea.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which part of Inboundr would this improve?
+      options:
+        - Backend
+        - Frontend
+        - Landing
+        - Embed
+        - Docs
+        - Deployment
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user need, workflow gap, or technical issue does this address?
+      placeholder: "Example: Sales reps need a faster way to review AI-generated quotes before sending them."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches or workarounds have you considered?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Relevant package
+      description: If known, choose the workspace package most related to the suggestion.
+      options:
+        - backend
+        - frontend
+        - landing
+        - embed
+        - root/workspace
+        - not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-impact
+    attributes:
+      label: Expected impact
+      description: Who benefits, and how would this improve their workflow or the product?
+      placeholder: "Example: Reduces manual quote review time and helps teams respond to leads faster."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add mockups, examples, links, screenshots, or implementation notes if useful.
+    validations:
+      required: false
