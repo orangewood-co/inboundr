@@ -17,6 +17,7 @@ const stats = [
 export default function Calls() {
   return (
     <>
+      <title>AI Calls — Inboundr</title>
       <PageHeader
         label="Product"
         title="AI Calls"

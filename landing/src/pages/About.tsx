@@ -50,6 +50,7 @@ const values = [
 export default function About() {
   return (
     <>
+      <title>About — Inboundr</title>
       <PageHeader
         label="Company"
         title="About Inboundr"

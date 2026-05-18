@@ -35,6 +35,7 @@ const posts = [
 export default function Blog() {
   return (
     <>
+      <title>Blog — Inboundr</title>
       <PageHeader
         label="Company"
         title="Blog"

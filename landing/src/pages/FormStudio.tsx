@@ -92,6 +92,7 @@ const fieldTypes = [
 export default function FormStudio() {
   return (
     <>
+      <title>Form Studio — Inboundr</title>
       {/* ── Hero ── */}
       <section className="noise grid-lines relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(62,207,142,0.1),transparent)]" />

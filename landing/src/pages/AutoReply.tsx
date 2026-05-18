@@ -11,6 +11,7 @@ const steps = [
 export default function AutoReply() {
   return (
     <>
+      <title>Auto Reply — Inboundr</title>
       <PageHeader
         label="Product"
         title="Auto Reply"

@@ -17,6 +17,7 @@ const features = [
 export default function Features() {
   return (
     <>
+      <title>Features — Inboundr</title>
       <PageHeader
         label="Features"
         title="What's new"

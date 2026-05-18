@@ -17,6 +17,7 @@ const stats = [
 export default function Quotes() {
   return (
     <>
+      <title>AI Quote Generation — Inboundr</title>
       <PageHeader
         label="Product"
         title="AI Quote Generation"

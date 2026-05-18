@@ -50,6 +50,7 @@ const practices = [
 export default function Security() {
   return (
     <>
+      <title>Security — Inboundr</title>
       <PageHeader
         label="Legal"
         title="Security"

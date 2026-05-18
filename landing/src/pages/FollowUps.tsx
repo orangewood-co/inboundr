@@ -11,6 +11,7 @@ const steps = [
 export default function FollowUps() {
   return (
     <>
+      <title>AI Follow-ups — Inboundr</title>
       <PageHeader
         label="Product"
         title="AI Follow-ups"

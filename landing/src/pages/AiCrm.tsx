@@ -17,6 +17,7 @@ const stats = [
 export default function AiCrm() {
   return (
     <>
+      <title>AI-powered CRM — Inboundr</title>
       <PageHeader
         label="Product"
         title="AI-powered CRM"

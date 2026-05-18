@@ -70,6 +70,7 @@ function RevealWord({
 export default function Home() {
   return (
     <>
+      <title>Inboundr — Turn inbound into revenue</title>
       {/* ── Hero ── */}
       <AuroraBackground className="noise overflow-hidden">
         <div className="relative z-10 mx-auto max-w-4xl px-6 pb-32 pt-36 text-center sm:pb-44 sm:pt-48 lg:px-8">

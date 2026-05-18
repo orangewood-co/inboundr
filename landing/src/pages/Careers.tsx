@@ -38,6 +38,7 @@ const roles = [
 export default function Careers() {
   return (
     <>
+      <title>Careers — Inboundr</title>
       <PageHeader
         label="Company"
         title="Join Inboundr"

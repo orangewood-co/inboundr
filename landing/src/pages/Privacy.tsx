@@ -70,6 +70,7 @@ Response time: Within 5 business days`,
 export default function Privacy() {
   return (
     <>
+      <title>Privacy Policy — Inboundr</title>
       <PageHeader label="Legal" title="Privacy Policy">
         <p className="mt-6 font-mono text-[13px] text-text-dim">Last updated: May 1, 2026</p>
       </PageHeader>

@@ -81,6 +81,7 @@ Response time: Within 5 business days`,
 export default function Terms() {
   return (
     <>
+      <title>Terms of Service — Inboundr</title>
       <PageHeader label="Legal" title="Terms of Service">
         <p className="mt-6 font-mono text-[13px] text-text-dim">Last updated: May 1, 2026</p>
       </PageHeader>

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader"
 export default function Contact() {
   return (
     <>
+      <title>Contact — Inboundr</title>
       <PageHeader label="Contact" title="Get in touch" />
 
       <section className="px-6 py-20 sm:py-28 lg:px-8">
