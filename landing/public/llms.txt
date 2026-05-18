@@ -1,0 +1,52 @@
+# Inboundr
+
+Inboundr is AI-native sales infrastructure for turning inbound inquiries into revenue. It replies to leads, generates quotes, follows up, initiates calls, and helps close deals automatically.
+
+## Core Pages
+
+- /
+  Overview of Inboundr, including the core value proposition: AI that replies, quotes, follows up, and closes automatically.
+- /features
+  Product updates and new features shipping to Inboundr.
+- /features/forms
+  Form Studio, a form builder for creating branded forms, collecting submissions, tracking responses, and feeding leads into Inboundr's AI workflow.
+
+## Product
+
+- /product/ai-crm
+  AI-powered CRM that captures inbound leads from email, WhatsApp, website chat, and phone inquiries in one timeline.
+- /product/auto-reply
+  AI auto-reply that reads inbound messages, detects intent, drafts personalized responses, and sends or queues replies for review.
+- /product/quotes
+  AI quote generation that matches product requests to catalogs, applies pricing rules, and produces quote-ready drafts.
+- /product/follow-ups
+  AI follow-up sequences across email, WhatsApp, and SMS that adapt to deal stage, lead temperature, and engagement.
+- /product/calls
+  AI calls that qualify warm leads, handle key questions, hand off to reps, and log structured call summaries.
+
+## Company
+
+- /about
+  Company overview, manifesto, values, and story behind Inboundr.
+- /blog
+  Articles on AI sales, inbound automation, response time, quote generation, and customer engagement.
+- /careers
+  Careers and hiring information for Inboundr.
+- /contact
+  Contact page for reaching the Inboundr team.
+
+## Trust and Legal
+
+- /security
+  Security practices, trust and compliance information, encryption, access controls, AI model privacy, data retention, and vulnerability reporting.
+- /privacy
+  Privacy policy for Inboundr.
+- /terms
+  Terms of service for Inboundr.
+
+## Contact
+
+- hello@inboundr.ai
+  General inquiries, demos, and sales conversations.
+- security@inboundr.ai
+  Responsible disclosure and vulnerability reports.
