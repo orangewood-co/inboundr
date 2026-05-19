@@ -31,11 +31,21 @@ export type UploadedFile = {
   url: string | null
 }
 
+export type PublicFormBranding = {
+  accentColor: string
+  logoUrl: string | null
+  backgroundType?: "solid" | "gradient" | "none"
+  backgroundColor?: string | null
+  backgroundGradient?: string | null
+  theme?: string | null
+  borderRadius?: "sm" | "md" | "lg"
+}
+
 export type PublicForm = {
   title: string
   description: string | null
   slug: string
   fields: PublicField[]
-  branding: { accentColor: string; logoUrl: string | null }
+  branding: PublicFormBranding
   settings: { submitButtonLabel: string; successMessage: string }
 }

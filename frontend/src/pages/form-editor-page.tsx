@@ -21,8 +21,10 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CalendarIcon,
+  CheckIcon,
   CheckSquareIcon,
   ChevronDownIcon,
+  CircleIcon,
   CodeXmlIcon,
   CopyIcon,
   DownloadIcon,
@@ -30,19 +32,18 @@ import {
   FileUpIcon,
   GripVerticalIcon,
   HashIcon,
+  InboxIcon,
   LinkIcon,
   LoaderIcon,
   MailIcon,
   MessageSquareTextIcon,
   MonitorSmartphoneIcon,
-  PartyPopperIcon,
   PhoneIcon,
   PlusIcon,
+  RefreshCwIcon,
   SaveIcon,
-  SparklesIcon,
   Trash2Icon,
   TypeIcon,
-  XIcon,
 } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
@@ -87,6 +88,16 @@ type FormField = {
   multiple?: boolean
 }
 
+type FormBranding = {
+  accentColor: string
+  logoUrl: string | null
+  backgroundType?: "solid" | "gradient" | "none"
+  backgroundColor?: string | null
+  backgroundGradient?: string | null
+  theme?: string | null
+  borderRadius?: "sm" | "md" | "lg"
+}
+
 type ManagedForm = {
   _id: string
   title: string
@@ -94,7 +105,7 @@ type ManagedForm = {
   slug: string
   status: "draft" | "published" | "archived"
   fields: FormField[]
-  branding: { accentColor: string; logoUrl: string | null }
+  branding: FormBranding
   settings: {
     submitButtonLabel: string
     successMessage: string
@@ -142,6 +153,17 @@ const FIELD_TYPE_META: Record<FieldType, { label: string; icon: React.ReactNode 
   date: { label: "Date", icon: <CalendarIcon className="size-4" /> },
   file: { label: "File upload", icon: <FileUpIcon className="size-4" /> },
 }
+
+const THEME_PRESETS = [
+  { id: "minimal", label: "Minimal", accent: "#111827", bg: "#ffffff", gradient: null },
+  { id: "ocean", label: "Ocean", accent: "#0369a1", bg: "#f0f9ff", gradient: "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)" },
+  { id: "sunset", label: "Sunset", accent: "#c2410c", bg: "#fff7ed", gradient: "linear-gradient(135deg, #fed7aa 0%, #fecaca 100%)" },
+  { id: "forest", label: "Forest", accent: "#15803d", bg: "#f0fdf4", gradient: "linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%)" },
+  { id: "midnight", label: "Midnight", accent: "#6d28d9", bg: "#faf5ff", gradient: "linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%)" },
+  { id: "lavender", label: "Lavender", accent: "#7c3aed", bg: "#fdf4ff", gradient: "linear-gradient(135deg, #f5d0fe 0%, #e9d5ff 100%)" },
+  { id: "slate", label: "Slate", accent: "#334155", bg: "#f8fafc", gradient: "linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%)" },
+  { id: "rose", label: "Rose", accent: "#be123c", bg: "#fff1f2", gradient: "linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)" },
+] as const
 
 function makeFieldId(): string {
   return `field_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
@@ -247,7 +269,6 @@ function SortableFieldItem({ field, index, isSelected, onSelect }: {
       )}>
         {index + 1}
       </span>
-      <span className="shrink-0 opacity-60">{meta.icon}</span>
       <span className="min-w-0 truncate">{field.label || "Untitled"}</span>
     </button>
   )
@@ -264,6 +285,7 @@ export default function FormEditorPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [selected, setSelected] = useState<SelectedItem>("welcome")
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
+  const [refreshing, setRefreshing] = useState(false)
   const [sortKey, setSortKey] = useState<string>("createdAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -282,15 +304,21 @@ export default function FormEditorPage() {
     finally { setLoading(false) }
   }, [slug, navigate])
 
-  useEffect(() => { void fetchForm() }, [fetchForm])
-
-  useEffect(() => {
+  const fetchSubmissions = useCallback(async () => {
     if (!form) return
-    void fetch(`${API_BASE}/${form._id}/submissions`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d: { submissions: FormSubmission[] }) => setSubmissions(d.submissions))
-      .catch(() => {})
+    setRefreshing(true)
+    try {
+      const r = await fetch(`${API_BASE}/${form._id}/submissions`, { credentials: "include" })
+      if (r.ok) {
+        const d = (await r.json()) as { submissions: FormSubmission[] }
+        setSubmissions(d.submissions)
+      }
+    } catch { /* silent */ }
+    finally { setRefreshing(false) }
   }, [form])
+
+  useEffect(() => { void fetchForm() }, [fetchForm])
+  useEffect(() => { void fetchSubmissions() }, [fetchSubmissions])
 
   const fields = useMemo(() => draft.fields ?? [], [draft.fields])
   const selectedField = useMemo(() =>
@@ -346,14 +374,25 @@ export default function FormEditorPage() {
   function patchSettings(patch: Partial<ManagedForm["settings"]>) {
     setDraft((cur) => ({
       ...cur,
-      settings: { ...(cur.settings ?? { submitButtonLabel: "Submit", successMessage: "", notifyOnSubmission: true }), ...patch },
+      settings: { ...(cur.settings ?? { submitButtonLabel: "Submit", successMessage: "", notifyOnSubmission: true, collectDeviceInfo: false }), ...patch },
     }))
   }
-  function patchBranding(patch: Partial<ManagedForm["branding"]>) {
+  function patchBranding(patch: Partial<FormBranding>) {
     setDraft((cur) => ({
       ...cur,
       branding: { ...(cur.branding ?? { accentColor: "#111827", logoUrl: null }), ...patch },
     }))
+  }
+  function applyTheme(themeId: string) {
+    const preset = THEME_PRESETS.find((t) => t.id === themeId)
+    if (!preset) return
+    patchBranding({
+      theme: themeId,
+      accentColor: preset.accent,
+      backgroundType: preset.gradient ? "gradient" : preset.bg === "#ffffff" ? "none" : "solid",
+      backgroundColor: preset.bg === "#ffffff" ? null : preset.bg,
+      backgroundGradient: preset.gradient,
+    })
   }
 
   async function saveForm(status = draft.status ?? "draft") {
@@ -433,67 +472,63 @@ export default function FormEditorPage() {
   ]
 
   const headerActions = (
-    <>
+    <div className="flex items-center gap-2">
       {message && <span className="text-xs font-medium text-muted-foreground animate-in fade-in">{message}</span>}
       <Badge variant={draft.status === "published" ? "default" : "secondary"} className="text-[11px]">
         {draft.status === "published" ? "Live" : "Draft"}
       </Badge>
+      <div className="mx-1 h-4 w-px bg-border" />
       <Button variant="outline" size="sm" onClick={() => void saveForm("draft")} disabled={saving}>
         {saving ? <LoaderIcon className="size-3.5 animate-spin" /> : <SaveIcon className="size-3.5" />}
         Save
       </Button>
       <Button size="sm" onClick={() => void saveForm("published")} disabled={saving}>Publish</Button>
-    </>
+    </div>
   )
 
   if (loading) {
     return (
       <AppLayout>
-          <SiteHeader breadcrumbs={breadcrumbs} />
-          <div className="flex flex-1 items-center justify-center"><LoaderIcon className="size-5 animate-spin text-muted-foreground" /></div>
+        <SiteHeader breadcrumbs={breadcrumbs} />
+        <div className="flex flex-1 items-center justify-center"><LoaderIcon className="size-5 animate-spin text-muted-foreground" /></div>
       </AppLayout>
     )
   }
 
   return (
     <AppLayout>
-        <SiteHeader breadcrumbs={breadcrumbs} actions={headerActions} />
+      <SiteHeader breadcrumbs={breadcrumbs} actions={headerActions} />
 
-        <Tabs defaultValue="create" className="flex min-h-0 flex-1 flex-row gap-0">
-          <QuestionSidebar
-            fields={fields} selected={selected} setSelected={setSelected}
-            sensors={sensors} handleDragEnd={handleDragEnd} addField={addField}
-          />
+      <Tabs defaultValue="create" className="flex min-h-0 flex-1 flex-row gap-0">
+        <QuestionSidebar
+          fields={fields} selected={selected} setSelected={setSelected}
+          sensors={sensors} handleDragEnd={handleDragEnd} addField={addField}
+        />
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="border-b bg-background px-6">
-              <TabsList className="h-auto gap-4 bg-transparent p-0">
-                {(["create", "share", "responses"] as const).map((tab) => (
-                  <TabsTrigger key={tab} value={tab}
-                    className="relative rounded-none border-b-2 border-transparent px-0 pb-3 pt-3 text-[13px] font-medium capitalize shadow-none data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-                    {tab}
-                    {tab === "responses" && submissions.length > 0 && (
-                      <span className="ml-1.5 text-[11px] tabular-nums text-muted-foreground">{submissions.length}</span>
-                    )}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="border-b bg-background px-6 py-2">
+            <TabsList>
+              <TabsTrigger value="create">Create</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
+              <TabsTrigger value="share">Share</TabsTrigger>
+              <TabsTrigger value="responses">
+                Responses
+                {submissions.length > 0 && (
+                  <span className="ml-1 rounded-full bg-foreground/10 px-1.5 py-0.5 text-[10px] tabular-nums">{submissions.length}</span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-            {/* ---- CREATE ---- */}
-            <TabsContent value="create" className="mt-0 min-h-0 flex-1 overflow-y-auto bg-background">
-              <div className="mx-auto max-w-xl px-6 py-10 lg:px-8">
+          {/* ---- CREATE ---- */}
+          <TabsContent value="create" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-xl px-6 py-8 lg:px-8">
 
-                {/* ---- WELCOME ---- */}
-                {selected === "welcome" && (
-                  <div className="space-y-8">
-                    <div>
-                      <h2 className="text-base font-semibold">Welcome screen</h2>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">
-                        The first thing respondents see when they open your form.
-                      </p>
-                    </div>
+              {selected === "welcome" && (
+                <div className="space-y-6">
+                  <SectionHeader title="Welcome screen" description="The first thing respondents see when they open your form." />
 
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-5">
                       <FieldRow label="Title">
                         <Input value={draft.title ?? ""} onChange={(e) => updateDraft("title", e.target.value)} placeholder="Form title" />
@@ -512,41 +547,31 @@ export default function FormEditorPage() {
                         </FieldRow>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="space-y-4">
-                      <p className="text-[13px] font-medium text-muted-foreground">Accent color</p>
-                      <div className="flex items-center gap-3">
-                        <input type="color" value={draft.branding?.accentColor ?? "#111827"} onChange={(e) => patchBranding({ accentColor: e.target.value })}
-                          className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0" />
-                        <Input value={draft.branding?.accentColor ?? "#111827"} onChange={(e) => patchBranding({ accentColor: e.target.value })} className="w-28 font-mono text-xs" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <p className="text-[13px] font-medium text-muted-foreground">Preview</p>
-                      <div className="overflow-hidden rounded-xl text-white shadow-lg" style={{ backgroundColor: draft.branding?.accentColor ?? "#111827" }}>
-                        <div className="relative px-8 pb-8 pt-10">
-                          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,.18),transparent_50%)]" />
-                          <div className="relative space-y-4">
-                            <h3 className="text-xl font-semibold leading-tight">{draft.title || "Untitled form"}</h3>
-                            {draft.description && <p className="text-sm leading-relaxed text-white/65">{draft.description}</p>}
-                            <button type="button" className="rounded-md bg-white/15 px-5 py-2 text-sm font-medium backdrop-blur transition hover:bg-white/25">
-                              {draft.settings?.submitButtonLabel || "Start"}
-                            </button>
-                          </div>
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
+                    <p className="mb-4 text-sm font-medium">Preview</p>
+                    <div className="overflow-hidden rounded-lg text-white shadow-md" style={{ backgroundColor: draft.branding?.accentColor ?? "#111827" }}>
+                      <div className="relative px-8 pb-8 pt-10">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,.18),transparent_50%)]" />
+                        <div className="relative space-y-4">
+                          <h3 className="text-xl font-semibold leading-tight">{draft.title || "Untitled form"}</h3>
+                          {draft.description && <p className="text-sm leading-relaxed text-white/65">{draft.description}</p>}
+                          <button type="button" className="rounded-md bg-white/15 px-5 py-2 text-sm font-medium backdrop-blur transition hover:bg-white/25">
+                            {draft.settings?.submitButtonLabel || "Start"}
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* ---- ENDING ---- */}
-                {selected === "ending" && (
-                  <div className="space-y-8">
-                    <div>
-                      <h2 className="text-base font-semibold">Thank you screen</h2>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">What respondents see after submitting.</p>
-                    </div>
+              {selected === "ending" && (
+                <div className="space-y-6">
+                  <SectionHeader title="Thank you screen" description="What respondents see after submitting." />
+
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-5">
                       <FieldRow label="Success message">
                         <textarea rows={3} value={draft.settings?.successMessage ?? ""} onChange={(e) => patchSettings({ successMessage: e.target.value })}
@@ -558,44 +583,46 @@ export default function FormEditorPage() {
                       <ToggleRow label="Collect device information" description="Record the respondent's device, OS, and browser."
                         checked={draft.settings?.collectDeviceInfo ?? false} onCheckedChange={(v) => patchSettings({ collectDeviceInfo: v })} />
                     </div>
-                    <div className="space-y-3">
-                      <p className="text-[13px] font-medium text-muted-foreground">Preview</p>
-                      <div className="rounded-xl border bg-muted/30 px-8 py-10 text-center">
-                        <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-full bg-emerald-500/15">
-                          <svg className="size-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <p className="font-semibold">Response submitted</p>
-                        <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">{draft.settings?.successMessage || "Thanks! Your response has been recorded."}</p>
+                  </div>
+
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
+                    <p className="mb-4 text-sm font-medium">Preview</p>
+                    <div className="rounded-lg border bg-muted/30 px-8 py-10 text-center">
+                      <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-full bg-emerald-500/15">
+                        <svg className="size-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
                       </div>
+                      <p className="font-semibold">Response submitted</p>
+                      <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">{draft.settings?.successMessage || "Thanks! Your response has been recorded."}</p>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* ---- FIELD EDITOR ---- */}
-                {selectedField && selectedFieldIndex >= 0 && (
-                  <div className="space-y-8">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-7 shrink-0 items-center justify-center rounded bg-foreground text-xs font-semibold tabular-nums text-background">
-                          {selectedFieldIndex + 1}
-                        </span>
-                        <div>
-                          <h2 className="text-base font-semibold leading-tight">{selectedField.label || "Untitled question"}</h2>
-                          <p className="mt-0.5 text-[13px] text-muted-foreground">{FIELD_TYPE_META[selectedField.type].label}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="size-7" onClick={() => duplicateField(selectedField)} title="Duplicate">
-                          <CopyIcon className="size-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => removeField(selectedField.id)} title="Delete">
-                          <Trash2Icon className="size-3.5" />
-                        </Button>
+              {selectedField && selectedFieldIndex >= 0 && (
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-xs font-semibold tabular-nums text-background">
+                        {selectedFieldIndex + 1}
+                      </span>
+                      <div>
+                        <h2 className="text-base font-semibold leading-tight">{selectedField.label || "Untitled question"}</h2>
+                        <p className="mt-0.5 text-[13px] text-muted-foreground">{FIELD_TYPE_META[selectedField.type].label}</p>
                       </div>
                     </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="size-8" onClick={() => duplicateField(selectedField)} title="Duplicate">
+                        <CopyIcon className="size-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="size-8 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => removeField(selectedField.id)} title="Delete">
+                        <Trash2Icon className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
 
+                  <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-5">
                       <FieldRow label="Question">
                         <Input value={selectedField.label} onChange={(e) => updateField(selectedFieldIndex, { label: e.target.value })} placeholder="Type your question" />
@@ -607,10 +634,10 @@ export default function FormEditorPage() {
                           {(Object.entries(FIELD_TYPE_META) as [FieldType, (typeof FIELD_TYPE_META)[FieldType]][]).map(([type, meta]) => (
                             <button key={type} type="button" onClick={() => updateField(selectedFieldIndex, { type })}
                               className={cn(
-                                "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] transition-all",
+                                "flex items-center gap-2 rounded-md border px-2.5 py-2 text-[13px] transition-all",
                                 selectedField.type === type
-                                  ? "bg-foreground text-background shadow-sm"
-                                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                                  ? "border-foreground bg-foreground text-background shadow-sm"
+                                  : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
                               )}>
                               <span className="shrink-0">{meta.icon}</span>
                               <span className="truncate">{meta.label}</span>
@@ -668,64 +695,226 @@ export default function FormEditorPage() {
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* ---- SHARE ---- */}
-          <TabsContent value="share" className="mt-0 min-h-0 flex-1 overflow-y-auto bg-background">
-            <div className="mx-auto max-w-xl space-y-8 px-6 py-10 lg:px-8">
-              <div>
-                <h2 className="text-base font-semibold">Share</h2>
-                <p className="mt-0.5 text-[13px] text-muted-foreground">Share a direct link or embed the form on your site.</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-                  <LinkIcon className="size-3.5" /> Public link
                 </div>
-                <div className="flex gap-2">
-                  <Input readOnly value={draft.slug ? publicUrl(draft.slug) : "Save the form first"} className="font-mono text-xs" />
-                  <Button variant="outline" size="sm" onClick={() => draft.slug && navigator.clipboard.writeText(publicUrl(draft.slug))}>
-                    <CopyIcon className="size-3.5" /> Copy
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ---- APPEARANCE ---- */}
+          <TabsContent value="appearance" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-xl px-6 py-8 lg:px-8">
+              <div className="space-y-6">
+                <SectionHeader title="Appearance" description="Customize how your form looks to respondents." />
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Theme presets</p>
+                  <div className="grid grid-cols-4 gap-3">
+                    {THEME_PRESETS.map((preset) => {
+                      const isActive = draft.branding?.theme === preset.id
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyTheme(preset.id)}
+                          className={cn(
+                            "group relative flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
+                            isActive ? "border-foreground shadow-sm" : "border-transparent hover:border-muted-foreground/30 hover:bg-muted/50",
+                          )}
+                        >
+                          <div className="flex size-8 items-center justify-center rounded-full shadow-sm" style={{ backgroundColor: preset.accent }}>
+                            {isActive && <CheckIcon className="size-3.5 text-white" />}
+                          </div>
+                          <span className="text-[11px] font-medium text-muted-foreground">{preset.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Accent color</p>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <input type="color" value={draft.branding?.accentColor ?? "#111827"} onChange={(e) => patchBranding({ accentColor: e.target.value, theme: null })}
+                        className="absolute inset-0 cursor-pointer opacity-0" />
+                      <div className="size-9 rounded-lg border shadow-sm" style={{ backgroundColor: draft.branding?.accentColor ?? "#111827" }} />
+                    </div>
+                    <Input value={draft.branding?.accentColor ?? "#111827"} onChange={(e) => patchBranding({ accentColor: e.target.value, theme: null })} className="w-28 font-mono text-xs" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Background</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["none", "solid", "gradient"] as const).map((type) => (
+                        <button key={type} type="button"
+                          onClick={() => patchBranding({ backgroundType: type, theme: null })}
+                          className={cn(
+                            "rounded-lg border-2 px-3 py-2 text-[13px] font-medium capitalize transition-all",
+                            draft.branding?.backgroundType === type || (!draft.branding?.backgroundType && type === "none")
+                              ? "border-foreground bg-foreground/5"
+                              : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted",
+                          )}>
+                          {type === "none" ? "White" : type}
+                        </button>
+                      ))}
+                    </div>
+
+                    {draft.branding?.backgroundType === "solid" && (
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <input type="color" value={draft.branding?.backgroundColor ?? "#f5f5f4"} onChange={(e) => patchBranding({ backgroundColor: e.target.value, theme: null })}
+                            className="absolute inset-0 cursor-pointer opacity-0" />
+                          <div className="size-9 rounded-lg border shadow-sm" style={{ backgroundColor: draft.branding?.backgroundColor ?? "#f5f5f4" }} />
+                        </div>
+                        <Input value={draft.branding?.backgroundColor ?? "#f5f5f4"} onChange={(e) => patchBranding({ backgroundColor: e.target.value, theme: null })} className="w-28 font-mono text-xs" />
+                      </div>
+                    )}
+
+                    {draft.branding?.backgroundType === "gradient" && (
+                      <FieldRow label="CSS gradient">
+                        <Input
+                          value={draft.branding?.backgroundGradient ?? "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)"}
+                          onChange={(e) => patchBranding({ backgroundGradient: e.target.value, theme: null })}
+                          placeholder="linear-gradient(135deg, #e0f2fe, #bae6fd)"
+                          className="font-mono text-xs"
+                        />
+                      </FieldRow>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Border radius</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { value: "sm" as const, label: "Sharp", radius: "4px" },
+                      { value: "md" as const, label: "Rounded", radius: "12px" },
+                      { value: "lg" as const, label: "Pill", radius: "24px" },
+                    ]).map((opt) => (
+                      <button key={opt.value} type="button"
+                        onClick={() => patchBranding({ borderRadius: opt.value, theme: null })}
+                        className={cn(
+                          "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
+                          (draft.branding?.borderRadius ?? "md") === opt.value
+                            ? "border-foreground bg-foreground/5"
+                            : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted",
+                        )}>
+                        <div className="h-6 w-12 border-2 border-current" style={{ borderRadius: opt.radius }} />
+                        <span className="text-[11px] font-medium">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Logo</p>
+                  <FieldRow label="Logo URL">
+                    <Input value={draft.branding?.logoUrl ?? ""} onChange={(e) => patchBranding({ logoUrl: e.target.value || null })} placeholder="https://example.com/logo.png" className="text-xs" />
+                  </FieldRow>
+                  {draft.branding?.logoUrl && (
+                    <div className="mt-4 flex items-center gap-3">
+                      <img src={draft.branding.logoUrl} alt="Logo preview" className="size-12 rounded-lg border object-contain" />
+                      <span className="text-xs text-muted-foreground">Logo preview</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <p className="mb-4 text-sm font-medium">Live preview</p>
+                  <div
+                    className="flex items-center justify-center overflow-hidden p-8"
+                    style={{
+                      background: draft.branding?.backgroundType === "gradient" && draft.branding.backgroundGradient
+                        ? draft.branding.backgroundGradient
+                        : draft.branding?.backgroundType === "solid" && draft.branding.backgroundColor
+                          ? draft.branding.backgroundColor
+                          : "#ffffff",
+                      borderRadius: draft.branding?.borderRadius === "sm" ? "4px" : draft.branding?.borderRadius === "lg" ? "24px" : "12px",
+                    }}
+                  >
+                    <div
+                      className="w-full max-w-xs space-y-3 bg-white p-6 shadow-lg"
+                      style={{ borderRadius: draft.branding?.borderRadius === "sm" ? "4px" : draft.branding?.borderRadius === "lg" ? "20px" : "12px" }}
+                    >
+                      <div className="h-2 w-16 rounded-full" style={{ backgroundColor: draft.branding?.accentColor ?? "#111827" }} />
+                      <div className="h-2 w-32 rounded-full bg-muted" />
+                      <div className="h-8 rounded-md border" />
+                      <div className="h-8 rounded-md text-white text-xs font-medium flex items-center justify-center" style={{ backgroundColor: draft.branding?.accentColor ?? "#111827" }}>
+                        Submit
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ---- SHARE ---- */}
+          <TabsContent value="share" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-xl px-6 py-8 lg:px-8">
+              <div className="space-y-6">
+                <SectionHeader title="Share" description="Share a direct link or embed the form on your site." />
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+                    <LinkIcon className="size-4 text-muted-foreground" /> Public link
+                  </div>
+                  <div className="flex gap-2">
+                    <Input readOnly value={draft.slug ? publicUrl(draft.slug) : "Save the form first"} className="font-mono text-xs" />
+                    <Button variant="outline" size="sm" onClick={() => draft.slug && navigator.clipboard.writeText(publicUrl(draft.slug))}>
+                      <CopyIcon className="size-3.5" /> Copy
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={draft.slug ? publicUrl(draft.slug) : "#"} target="_blank" rel="noreferrer"><EyeIcon className="size-3.5" /> Preview</a>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
+                  <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+                    <CodeXmlIcon className="size-4 text-muted-foreground" /> Embed code
+                  </div>
+                  <textarea readOnly rows={4} value={draft.slug ? embedSnippet(draft.slug) : ""}
+                    className="w-full rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed text-muted-foreground outline-none" />
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => draft.slug && navigator.clipboard.writeText(embedSnippet(draft.slug))}>
+                    <CopyIcon className="size-3.5" /> Copy embed code
                   </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={draft.slug ? publicUrl(draft.slug) : "#"} target="_blank" rel="noreferrer"><EyeIcon className="size-3.5" /> Preview</a>
-                  </Button>
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
-                  <CodeXmlIcon className="size-3.5" /> Embed code
-                </div>
-                <textarea readOnly rows={4} value={draft.slug ? embedSnippet(draft.slug) : ""}
-                  className="w-full rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed text-muted-foreground outline-none" />
               </div>
             </div>
           </TabsContent>
 
           {/* ---- RESPONSES ---- */}
-          <TabsContent value="responses" className="mt-0 min-h-0 flex-1 overflow-y-auto bg-background">
+          <TabsContent value="responses" className="mt-0 min-h-0 flex-1 overflow-y-auto">
             <div className="space-y-4 p-6 lg:px-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-base font-semibold">Responses</h2>
                   <p className="text-[13px] text-muted-foreground">{submissions.length} response{submissions.length !== 1 && "s"}</p>
                 </div>
-                {form && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`${API_BASE}/${form._id}/submissions/export`}><DownloadIcon className="size-3.5" /> Export CSV</a>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void fetchSubmissions()} disabled={refreshing}>
+                    <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
+                    Refresh
                   </Button>
-                )}
+                  {form && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`${API_BASE}/${form._id}/submissions/export`}><DownloadIcon className="size-3.5" /> Export CSV</a>
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {submissions.length === 0 ? (
-                <div className="rounded-lg border border-dashed px-6 py-16 text-center">
-                  <p className="text-sm text-muted-foreground">No responses yet. Share your form to start collecting data.</p>
+                <div className="rounded-xl border border-dashed px-6 py-20 text-center">
+                  <InboxIcon className="mx-auto mb-3 size-10 text-muted-foreground/40" />
+                  <p className="font-medium text-muted-foreground">No responses yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground/70">Share your form to start collecting data.</p>
                 </div>
               ) : (
-                <div className="rounded-lg border">
+                <div className="rounded-xl border shadow-sm">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
@@ -741,10 +930,15 @@ export default function FormEditorPage() {
                     </TableHeader>
                     <TableBody>
                       {sortedSubmissions.map((sub, i) => (
-                        <TableRow key={sub._id} className="cursor-pointer" onClick={() => setDetailId(sub._id)}>
+                        <TableRow key={sub._id} className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setDetailId(sub._id)}>
                           <TableCell className="text-center text-xs text-muted-foreground">{i + 1}</TableCell>
                           <TableCell className="text-[13px]">{formatDate(sub.createdAt)}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[10px] capitalize">{sub.status}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant={sub.status === "new" ? "default" : "outline"} className="text-[10px] capitalize">
+                              {sub.status === "new" && <CircleIcon className="size-1.5 fill-current" />}
+                              {sub.status}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-[13px] text-muted-foreground">{sub.source}</TableCell>
                           {collectDeviceInfo && (
                             <TableCell className="text-[13px] text-muted-foreground">
@@ -764,7 +958,6 @@ export default function FormEditorPage() {
               )}
             </div>
 
-            {/* Detail sheet */}
             <Sheet open={detailId !== null} onOpenChange={(open) => { if (!open) setDetailId(null) }}>
               <SheetContent className="overflow-y-auto sm:max-w-md">
                 <SheetHeader>
@@ -839,9 +1032,9 @@ export default function FormEditorPage() {
                 )}
               </SheetContent>
             </Sheet>
-            </TabsContent>
-          </div>
-        </Tabs>
+          </TabsContent>
+        </div>
+      </Tabs>
     </AppLayout>
   )
 }
@@ -886,7 +1079,6 @@ function QuestionSidebar({ fields, selected, setSelected, sensors, handleDragEnd
               "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-all",
               selected === "welcome" ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
             )}>
-            <SparklesIcon className="size-4 shrink-0" />
             <span className="font-medium">Welcome</span>
           </button>
 
@@ -917,18 +1109,25 @@ function QuestionSidebar({ fields, selected, setSelected, sensors, handleDragEnd
               "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] transition-all",
               selected === "ending" ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
             )}>
-            <PartyPopperIcon className="size-4 shrink-0" />
             <span className="font-medium">Thank you</span>
           </button>
         </div>
       </div>
-      {/* Resize handle */}
       <div onPointerDown={onPointerDown}
         className={cn(
           "absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-foreground/10",
           dragging && "bg-foreground/15",
         )} />
     </aside>
+  )
+}
+
+function SectionHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div>
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+    </div>
   )
 }
 

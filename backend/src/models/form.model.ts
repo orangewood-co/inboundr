@@ -33,6 +33,11 @@ export interface IForm extends Document {
   branding: {
     accentColor: string;
     logoUrl: string | null;
+    backgroundType: "solid" | "gradient" | "none";
+    backgroundColor: string | null;
+    backgroundGradient: string | null;
+    theme: string | null;
+    borderRadius: "sm" | "md" | "lg";
   };
   settings: {
     submitButtonLabel: string;
@@ -84,6 +89,19 @@ const formSchema = new Schema<IForm>(
     branding: {
       accentColor: { type: String, default: "#111827" },
       logoUrl: { type: String, default: null },
+      backgroundType: {
+        type: String,
+        enum: ["solid", "gradient", "none"],
+        default: "none",
+      },
+      backgroundColor: { type: String, default: null },
+      backgroundGradient: { type: String, default: null },
+      theme: { type: String, default: null },
+      borderRadius: {
+        type: String,
+        enum: ["sm", "md", "lg"],
+        default: "md",
+      },
     },
     settings: {
       submitButtonLabel: { type: String, default: "Submit" },

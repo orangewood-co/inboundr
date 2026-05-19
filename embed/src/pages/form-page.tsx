@@ -224,8 +224,15 @@ export default function FormPage({ slug, embed = false }: { slug: string; embed?
     )
   }
 
+  const bgStyle: React.CSSProperties = (() => {
+    const b = form.branding
+    if (b.backgroundType === "gradient" && b.backgroundGradient) return { background: b.backgroundGradient }
+    if (b.backgroundType === "solid" && b.backgroundColor) return { background: b.backgroundColor }
+    return { background: "#ffffff" }
+  })()
+
   return (
-    <div ref={containerRef} className="relative min-h-[100dvh] overflow-hidden bg-white">
+    <div ref={containerRef} className="relative min-h-[100dvh] overflow-hidden" style={bgStyle}>
       {currentStep !== "welcome" && currentStep !== "success" && (
         <ProgressBar current={currentIndex + 1} total={totalFields} accent={accent} />
       )}
