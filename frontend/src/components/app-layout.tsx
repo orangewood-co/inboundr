@@ -7,6 +7,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider
       defaultOpen
+      className="max-h-svh overflow-hidden"
       style={
         {
           "--header-height": "4rem",

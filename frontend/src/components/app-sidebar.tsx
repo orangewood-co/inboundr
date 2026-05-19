@@ -12,16 +12,10 @@ import {
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, FileTextIcon, HomeIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
 
 const data = {
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: <HomeIcon />,
-      isActive: true,
-    },
     {
       title: "RFQ",
       url: "/rfq",
