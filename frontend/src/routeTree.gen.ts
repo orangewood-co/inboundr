@@ -25,10 +25,13 @@ import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
+import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as LinksIdRouteImport } from './routes/links.$id'
+import { Route as InvoicesNewRouteImport } from './routes/invoices.new'
+import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 
@@ -112,6 +115,11 @@ const LinksIndexRoute = LinksIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LinksRoute,
 } as any)
+const InvoicesIndexRoute = InvoicesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => InvoicesRoute,
+} as any)
 const FormsIndexRoute = FormsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -132,6 +140,16 @@ const LinksIdRoute = LinksIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => LinksRoute,
 } as any)
+const InvoicesNewRoute = InvoicesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => InvoicesRoute,
+} as any)
+const InvoicesIdRoute = InvoicesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => InvoicesRoute,
+} as any)
 const InviteTokenRoute = InviteTokenRouteImport.update({
   id: '/invite/$token',
   path: '/invite/$token',
@@ -149,7 +167,7 @@ export interface FileRoutesByFullPath {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
-  '/invoices': typeof InvoicesRoute
+  '/invoices': typeof InvoicesRouteWithChildren
   '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
@@ -161,10 +179,13 @@ export interface FileRoutesByFullPath {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/invoices/$id': typeof InvoicesIdRoute
+  '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
   '/forms/': typeof FormsIndexRoute
+  '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
 }
 export interface FileRoutesByTo {
@@ -172,7 +193,6 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
-  '/invoices': typeof InvoicesRoute
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
@@ -183,10 +203,13 @@ export interface FileRoutesByTo {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/invoices/$id': typeof InvoicesIdRoute
+  '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
   '/forms': typeof FormsIndexRoute
+  '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
 }
 export interface FileRoutesById {
@@ -196,7 +219,7 @@ export interface FileRoutesById {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
-  '/invoices': typeof InvoicesRoute
+  '/invoices': typeof InvoicesRouteWithChildren
   '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
   '/products': typeof ProductsRoute
@@ -208,10 +231,13 @@ export interface FileRoutesById {
   '/stats': typeof StatsRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/invoices/$id': typeof InvoicesIdRoute
+  '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products_/import': typeof ProductsImportRoute
   '/forms/': typeof FormsIndexRoute
+  '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
 }
 export interface FileRouteTypes {
@@ -234,10 +260,13 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/invoices/$id'
+    | '/invoices/new'
     | '/links/$id'
     | '/links/create'
     | '/products/import'
     | '/forms/'
+    | '/invoices/'
     | '/links/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -245,7 +274,6 @@ export interface FileRouteTypes {
     | '/customers'
     | '/emails'
     | '/forgot-password'
-    | '/invoices'
     | '/login'
     | '/products'
     | '/register'
@@ -256,10 +284,13 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/invoices/$id'
+    | '/invoices/new'
     | '/links/$id'
     | '/links/create'
     | '/products/import'
     | '/forms'
+    | '/invoices'
     | '/links'
   id:
     | '__root__'
@@ -280,10 +311,13 @@ export interface FileRouteTypes {
     | '/stats'
     | '/forms/$slug'
     | '/invite/$token'
+    | '/invoices/$id'
+    | '/invoices/new'
     | '/links/$id'
     | '/links/create'
     | '/products_/import'
     | '/forms/'
+    | '/invoices/'
     | '/links/'
   fileRoutesById: FileRoutesById
 }
@@ -293,7 +327,7 @@ export interface RootRouteChildren {
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FormsRoute: typeof FormsRouteWithChildren
-  InvoicesRoute: typeof InvoicesRoute
+  InvoicesRoute: typeof InvoicesRouteWithChildren
   LinksRoute: typeof LinksRouteWithChildren
   LoginRoute: typeof LoginRoute
   ProductsRoute: typeof ProductsRoute
@@ -421,6 +455,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LinksIndexRouteImport
       parentRoute: typeof LinksRoute
     }
+    '/invoices/': {
+      id: '/invoices/'
+      path: '/'
+      fullPath: '/invoices/'
+      preLoaderRoute: typeof InvoicesIndexRouteImport
+      parentRoute: typeof InvoicesRoute
+    }
     '/forms/': {
       id: '/forms/'
       path: '/'
@@ -448,6 +489,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/links/$id'
       preLoaderRoute: typeof LinksIdRouteImport
       parentRoute: typeof LinksRoute
+    }
+    '/invoices/new': {
+      id: '/invoices/new'
+      path: '/new'
+      fullPath: '/invoices/new'
+      preLoaderRoute: typeof InvoicesNewRouteImport
+      parentRoute: typeof InvoicesRoute
+    }
+    '/invoices/$id': {
+      id: '/invoices/$id'
+      path: '/$id'
+      fullPath: '/invoices/$id'
+      preLoaderRoute: typeof InvoicesIdRouteImport
+      parentRoute: typeof InvoicesRoute
     }
     '/invite/$token': {
       id: '/invite/$token'
@@ -478,6 +533,22 @@ const FormsRouteChildren: FormsRouteChildren = {
 
 const FormsRouteWithChildren = FormsRoute._addFileChildren(FormsRouteChildren)
 
+interface InvoicesRouteChildren {
+  InvoicesIdRoute: typeof InvoicesIdRoute
+  InvoicesNewRoute: typeof InvoicesNewRoute
+  InvoicesIndexRoute: typeof InvoicesIndexRoute
+}
+
+const InvoicesRouteChildren: InvoicesRouteChildren = {
+  InvoicesIdRoute: InvoicesIdRoute,
+  InvoicesNewRoute: InvoicesNewRoute,
+  InvoicesIndexRoute: InvoicesIndexRoute,
+}
+
+const InvoicesRouteWithChildren = InvoicesRoute._addFileChildren(
+  InvoicesRouteChildren,
+)
+
 interface LinksRouteChildren {
   LinksIdRoute: typeof LinksIdRoute
   LinksCreateRoute: typeof LinksCreateRoute
@@ -498,7 +569,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FormsRoute: FormsRouteWithChildren,
-  InvoicesRoute: InvoicesRoute,
+  InvoicesRoute: InvoicesRouteWithChildren,
   LinksRoute: LinksRouteWithChildren,
   LoginRoute: LoginRoute,
   ProductsRoute: ProductsRoute,

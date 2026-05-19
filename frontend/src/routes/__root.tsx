@@ -12,6 +12,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/emails": "Emails",
   "/forgot-password": "Forgot Password",
   "/forms": "Forms",
+  "/invoices": "Invoices",
+  "/invoices/new": "New Invoice",
   "/links": "Links",
   "/links/create": "Create Link",
   "/links/$id": "Link Details",
@@ -43,6 +45,11 @@ function RootRouteComponent() {
 
     if (pathname.startsWith("/forms/")) {
       document.title = `Form Editor | ${APP_TITLE}`
+      return
+    }
+
+    if (pathname.startsWith("/invoices/") && pathname !== "/invoices/new") {
+      document.title = `Invoice Details | ${APP_TITLE}`
       return
     }
 
