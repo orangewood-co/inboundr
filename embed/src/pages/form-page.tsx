@@ -1,146 +1,17 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react"
-import { AlertCircleIcon, CheckCircle2Icon, LoaderIcon } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
+import { LoaderIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { WelcomeStep } from "@/components/form/welcome-step"
+import { QuestionStep } from "@/components/form/question-step"
+import { SuccessStep } from "@/components/form/success-step"
+import { ProgressBar } from "@/components/form/progress-bar"
+import { NavigationControls } from "@/components/form/navigation-controls"
+import type { PublicField, PublicForm, UploadedFile } from "@/components/form/types"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
-type FieldType = "short_text" | "long_text" | "email" | "phone" | "number" | "dropdown" | "checkbox" | "date" | "file"
-
-type PublicField = {
-  id: string
-  label: string
-  type: FieldType
-  required: boolean
-  placeholder?: string | null
-  options?: string[]
-  maxFileSizeMb?: number
-  allowedMimeTypes?: string[]
-  multiple?: boolean
-}
-
-type UploadedFile = {
-  key: string
-  bucket: string
-  originalName: string
-  contentType: string
-  size: number
-  uploadedAt: string | null
-  url: string | null
-}
-
-type PublicForm = {
-  title: string
-  description: string | null
-  slug: string
-  fields: PublicField[]
-  branding: { accentColor: string; logoUrl: string | null }
-  settings: { submitButtonLabel: string; successMessage: string }
-}
-
-function FieldInput({
-  field, value, error, onChange, onUpload, uploading,
-}: {
-  field: PublicField
-  value: unknown
-  error?: string
-  onChange: (value: unknown) => void
-  onUpload?: (files: FileList) => Promise<void>
-  uploading?: boolean
-}) {
-  const id = `field-${field.id}`
-  const errorRing = error ? "ring-2 ring-red-300" : ""
-
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor={id} className="text-sm font-semibold text-stone-800">
-        {field.label}
-        {field.required && <span className="ml-1 text-red-500">*</span>}
-      </Label>
-
-      {field.type === "file" ? (
-        <div className={`rounded-xl border border-stone-200 bg-white p-3 ${errorRing}`}>
-          <input
-            id={id}
-            type="file"
-            multiple={Boolean(field.multiple)}
-            accept={(field.allowedMimeTypes ?? []).join(",")}
-            onChange={(e) => e.target.files && onUpload?.(e.target.files)}
-            className="block w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
-          />
-          <p className="mt-2 text-xs text-stone-400">
-            Max {field.maxFileSizeMb ?? 10}MB{field.allowedMimeTypes?.length ? ` · ${field.allowedMimeTypes.join(", ")}` : ""}
-          </p>
-          {uploading && <p className="mt-2 text-xs font-medium text-stone-600">Uploading...</p>}
-          {Array.isArray(value) && value.length > 0 && (
-            <ul className="mt-2 space-y-1 text-xs text-stone-600">
-              {(value as UploadedFile[]).map((f) => <li key={f.key}>{f.originalName}</li>)}
-            </ul>
-          )}
-          {!Array.isArray(value) && value && typeof value === "object" && "originalName" in value && (
-            <p className="mt-2 text-xs text-stone-600">{String((value as UploadedFile).originalName)}</p>
-          )}
-        </div>
-      ) : field.type === "long_text" ? (
-        <textarea
-          id={id} rows={5}
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder ?? undefined}
-          className={`w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 outline-none transition focus-visible:ring-2 focus-visible:ring-stone-300 ${errorRing}`}
-        />
-      ) : field.type === "dropdown" ? (
-        <Select
-          value={String(value ?? "")}
-          onValueChange={onChange}
-        >
-          <SelectTrigger id={id} className={errorRing}>
-            <SelectValue placeholder="Choose an option" />
-          </SelectTrigger>
-          <SelectContent>
-            {(field.options ?? []).map((opt) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      ) : field.type === "checkbox" ? (
-        <div className={`grid gap-2 rounded-xl border border-stone-200 bg-white p-3 ${errorRing}`}>
-          {(field.options ?? []).map((opt) => {
-            const checked = Array.isArray(value) ? value.includes(opt) : false
-            return (
-              <label key={opt} className="flex items-center gap-2 text-sm text-stone-800">
-                <input type="checkbox" checked={checked}
-                  onChange={(e) => {
-                    const cur = Array.isArray(value) ? value.filter((v) => typeof v === "string") : []
-                    onChange(e.target.checked ? [...cur, opt] : cur.filter((v) => v !== opt))
-                  }} />
-                {opt}
-              </label>
-            )
-          })}
-        </div>
-      ) : (
-        <Input
-          id={id}
-          type={field.type === "short_text" || field.type === "phone" ? "text" : field.type}
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.placeholder ?? undefined}
-          className={errorRing}
-        />
-      )}
-
-      {error && <p className="text-xs text-red-600">{error}</p>}
-    </div>
-  )
-}
+type Step = "welcome" | "question" | "success"
 
 export default function FormPage({ slug, embed = false }: { slug: string; embed?: boolean }) {
   const [form, setForm] = useState<PublicForm | null>(null)
@@ -152,6 +23,10 @@ export default function FormPage({ slug, embed = false }: { slug: string; embed?
   const [fatalError, setFatalError] = useState<string | null>(null)
   const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null)
 
+  const [currentIndex, setCurrentIndex] = useState(-1) // -1 = welcome
+  const [direction, setDirection] = useState(1) // 1 = forward, -1 = backward
+  const containerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     setLoading(true)
     fetch(`${API_ORIGIN}/api/v1/public/forms/${slug}`)
@@ -161,30 +36,111 @@ export default function FormPage({ slug, embed = false }: { slug: string; embed?
       .finally(() => setLoading(false))
   }, [slug])
 
+  const totalFields = form?.fields.length ?? 0
   const accent = form?.branding.accentColor || "#111827"
-  const initials = useMemo(() => form?.title.split(/\s+/).slice(0, 2).map((w) => w[0]).join("") ?? "IN", [form])
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  const currentStep: Step =
+    successMessage ? "success" : currentIndex === -1 ? "welcome" : "question"
+
+  const currentField: PublicField | undefined =
+    currentStep === "question" ? form?.fields[currentIndex] : undefined
+
+  const validateCurrent = useCallback((): boolean => {
+    if (!currentField) return true
+    const val = values[currentField.id]
+
+    if (currentField.required) {
+      if (val === undefined || val === null || val === "") {
+        setErrors((e) => ({ ...e, [currentField.id]: "This field is required" }))
+        return false
+      }
+      if (Array.isArray(val) && val.length === 0) {
+        setErrors((e) => ({ ...e, [currentField.id]: "Please select at least one option" }))
+        return false
+      }
+    }
+
+    if (currentField.type === "email" && val) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(String(val))) {
+        setErrors((e) => ({ ...e, [currentField.id]: "Please enter a valid email" }))
+        return false
+      }
+    }
+
+    setErrors((e) => ({ ...e, [currentField.id]: "" }))
+    return true
+  }, [currentField, values])
+
+  const goNext = useCallback(() => {
+    if (currentStep === "welcome") {
+      setDirection(1)
+      setCurrentIndex(0)
+      return
+    }
+
+    if (currentStep !== "question" || !form) return
+
+    if (!validateCurrent()) return
+
+    if (currentIndex === totalFields - 1) {
+      submitForm()
+    } else {
+      setDirection(1)
+      setCurrentIndex((i) => i + 1)
+    }
+  }, [currentStep, currentIndex, totalFields, form, validateCurrent])
+
+  const goPrev = useCallback(() => {
+    if (currentStep === "question" && currentIndex > 0) {
+      setDirection(-1)
+      setCurrentIndex((i) => i - 1)
+    } else if (currentStep === "question" && currentIndex === 0) {
+      setDirection(-1)
+      setCurrentIndex(-1)
+    }
+  }, [currentStep, currentIndex])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Enter" && currentStep === "welcome") {
+        e.preventDefault()
+        goNext()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [currentStep, goNext])
+
+  async function submitForm() {
     if (!form) return
-    setSubmitting(true); setErrors({}); setFatalError(null)
+    setSubmitting(true)
+    setErrors({})
+    setFatalError(null)
 
     const payload = {
-      website: (e.currentTarget.elements.namedItem("website") as HTMLInputElement | null)?.value ?? "",
+      website: "",
       source: embed ? "embed" : "link",
       values,
     }
 
     try {
       const res = await fetch(`${API_ORIGIN}/api/v1/public/forms/${form.slug}/submissions`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       })
       const body = await res.json().catch(() => null)
-      if (!res.ok) { setErrors(body?.errors ?? {}); throw new Error(body?.error ?? "Unable to submit form") }
+      if (!res.ok) {
+        if (body?.errors) setErrors(body.errors)
+        throw new Error(body?.error ?? "Unable to submit form")
+      }
       setSuccessMessage(body?.message ?? form.settings.successMessage)
     } catch (err) {
       setFatalError(err instanceof Error ? err.message : "Unable to submit form")
-    } finally { setSubmitting(false) }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function uploadFiles(field: PublicField, files: FileList) {
@@ -201,14 +157,27 @@ export default function FormPage({ slug, embed = false }: { slug: string; embed?
         if (field.allowedMimeTypes?.length && !field.allowedMimeTypes.includes(file.type))
           throw new Error(`${file.name} is not an allowed file type`)
 
-        const presignRes = await fetch(`${API_ORIGIN}/api/v1/public/forms/${form.slug}/uploads/presign`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fieldId: field.id, fileName: file.name, contentType: file.type || "application/octet-stream", size: file.size }),
-        })
+        const presignRes = await fetch(
+          `${API_ORIGIN}/api/v1/public/forms/${form.slug}/uploads/presign`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fieldId: field.id,
+              fileName: file.name,
+              contentType: file.type || "application/octet-stream",
+              size: file.size,
+            }),
+          }
+        )
         const presign = await presignRes.json().catch(() => null)
         if (!presignRes.ok) throw new Error(presign?.error ?? "Unable to prepare upload")
 
-        const uploadRes = await fetch(presign.uploadUrl, { method: presign.method, headers: presign.headers, body: file })
+        const uploadRes = await fetch(presign.uploadUrl, {
+          method: presign.method,
+          headers: presign.headers,
+          body: file,
+        })
         if (!uploadRes.ok) throw new Error(`Unable to upload ${file.name}`)
         uploaded.push({ ...presign.file, uploadedAt: new Date().toISOString() })
       }
@@ -217,73 +186,127 @@ export default function FormPage({ slug, embed = false }: { slug: string; embed?
       const msg = err instanceof Error ? err.message : "Unable to upload file"
       setErrors((cur) => ({ ...cur, [field.id]: msg }))
       setFatalError(msg)
-    } finally { setUploadingFieldId(null) }
+    } finally {
+      setUploadingFieldId(null)
+    }
+  }
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      y: dir > 0 ? 60 : -60,
+      opacity: 0,
+    }),
+    center: {
+      y: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      y: dir > 0 ? -60 : 60,
+      opacity: 0,
+    }),
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center">
+        <LoaderIcon className="size-6 animate-spin text-stone-400" />
+      </div>
+    )
+  }
+
+  if (!form || (fatalError && !currentField)) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center px-6">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+          <p className="font-medium text-red-700">{fatalError ?? "This form is not available"}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <main className={embed ? "min-h-screen bg-transparent p-2" : "min-h-screen bg-stone-100 p-4 sm:p-8"}>
-      <div className="mx-auto max-w-2xl">
-        <div className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-2xl shadow-stone-900/10">
-          {/* Header */}
-          <div className="relative p-8 text-white" style={{ backgroundColor: accent }}>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,.28),transparent_35%)]" />
-            <div className="relative flex items-start gap-4">
-              {form?.branding.logoUrl ? (
-                <img src={form.branding.logoUrl} alt="" className="size-14 rounded-2xl bg-white object-contain p-2" />
-              ) : (
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/15 text-lg font-bold">{initials}</div>
-              )}
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/70">Inboundr form</p>
-                <h1 className="mt-2 text-2xl font-bold">{form?.title ?? "Loading form..."}</h1>
-                {form?.description && <p className="mt-2 max-w-xl text-sm leading-6 text-white/80">{form.description}</p>}
-              </div>
-            </div>
-          </div>
+    <div ref={containerRef} className="relative min-h-[100dvh] overflow-hidden bg-white">
+      {currentStep !== "welcome" && currentStep !== "success" && (
+        <ProgressBar current={currentIndex + 1} total={totalFields} accent={accent} />
+      )}
 
-          {/* Body */}
-          <div className="p-6 sm:p-8">
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-stone-500">
-                <LoaderIcon className="size-4 animate-spin" />
-                Loading form
-              </div>
-            ) : successMessage ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
-                <CheckCircle2Icon className="mb-3 size-6" />
-                <p className="font-semibold">Response submitted</p>
-                <p className="mt-1 text-sm">{successMessage}</p>
-              </div>
-            ) : form ? (
-              <form onSubmit={submit} className="space-y-5">
-                <input name="website" tabIndex={-1} autoComplete="off" className="hidden" />
-                {form.fields.map((field) => (
-                  <FieldInput
-                    key={field.id} field={field} value={values[field.id]} error={errors[field.id]}
-                    onChange={(v) => setValues((cur) => ({ ...cur, [field.id]: v }))}
-                    onUpload={(files) => uploadFiles(field, files)}
-                    uploading={uploadingFieldId === field.id}
-                  />
-                ))}
-                {fatalError && (
-                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    <AlertCircleIcon className="size-4" />
-                    {fatalError}
-                  </div>
-                )}
-                <Button type="submit" className="h-11 w-full rounded-xl text-white" disabled={submitting} style={{ backgroundColor: accent }}>
-                  {submitting && <LoaderIcon className="size-4 animate-spin" />}
-                  {form.settings.submitButtonLabel}
-                </Button>
-              </form>
-            ) : (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-                {fatalError ?? "This form is not available"}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </main>
+      <AnimatePresence mode="wait" custom={direction}>
+        {currentStep === "welcome" && (
+          <motion.div
+            key="welcome"
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <WelcomeStep
+              title={form.title}
+              description={form.description}
+              logoUrl={form.branding.logoUrl}
+              accent={accent}
+              onStart={goNext}
+            />
+          </motion.div>
+        )}
+
+        {currentStep === "question" && currentField && (
+          <motion.div
+            key={`question-${currentIndex}`}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <QuestionStep
+              field={currentField}
+              value={values[currentField.id]}
+              error={errors[currentField.id] || (fatalError && currentIndex === totalFields - 1 ? fatalError : undefined)}
+              accent={accent}
+              questionNumber={currentIndex + 1}
+              totalQuestions={totalFields}
+              onChange={(v) => {
+                setValues((cur) => ({ ...cur, [currentField.id]: v }))
+                setErrors((cur) => ({ ...cur, [currentField.id]: "" }))
+                setFatalError(null)
+              }}
+              onUpload={(files) => uploadFiles(currentField, files)}
+              uploading={uploadingFieldId === currentField.id}
+              onNext={goNext}
+              isLast={currentIndex === totalFields - 1}
+              submitLabel={form.settings.submitButtonLabel}
+              submitting={submitting}
+            />
+          </motion.div>
+        )}
+
+        {currentStep === "success" && successMessage && (
+          <motion.div
+            key="success"
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <SuccessStep message={successMessage} accent={accent} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {currentStep === "question" && (
+        <NavigationControls
+          onPrev={goPrev}
+          onNext={goNext}
+          canGoPrev={currentIndex > 0}
+          canGoNext={true}
+          accent={accent}
+        />
+      )}
+    </div>
   )
 }

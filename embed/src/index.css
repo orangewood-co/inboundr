@@ -4,8 +4,11 @@
   color-scheme: light;
 }
 
+html,
 body {
   margin: 0;
+  height: 100%;
+  overflow: hidden;
   font-family:
     system-ui,
     -apple-system,
@@ -16,5 +19,21 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #1c1917;
-  background: #f5f5f4;
+  background: #ffffff;
+}
+
+#root {
+  height: 100%;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep functionality */
+#root::-webkit-scrollbar {
+  display: none;
+}
+
+#root {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
