@@ -4,9 +4,11 @@ import {
   ArrowLeftIcon,
   BoxIcon,
   CalendarPlusIcon,
+  CheckCircle2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   Edit3Icon,
+  FileSpreadsheetIcon,
   IndianRupeeIcon,
   LoaderIcon,
   PackagePlusIcon,
@@ -14,14 +16,25 @@ import {
   SearchIcon,
   TagIcon,
   TableIcon,
+  UploadIcon,
+  XCircleIcon,
 } from "lucide-react"
+import * as XLSX from "xlsx"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Sheet,
   SheetContent,
@@ -39,6 +52,7 @@ import { toast } from "sonner"
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
+const UNMAPPED_COLUMN = "__unmapped__"
 
 function getInitialListSearch(): string {
   return new URLSearchParams(window.location.search).get("search") ?? ""
@@ -92,6 +106,30 @@ type ProductFormState = {
   addeduser: string
 }
 
+type ImportMode = "skip" | "update"
+type ImportField = keyof ProductFormState
+type ImportMapping = Record<ImportField, string>
+
+type ParsedImportFile = {
+  fileName: string
+  headers: string[]
+  rows: Record<string, string>[]
+}
+
+type ImportSummary = {
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+  total: number
+}
+
+type ImportResult = {
+  summary: ImportSummary
+  errors: Array<{ row: number; error: string }>
+  skipped: Array<{ row: number; productcode: string; reason: string }>
+}
+
 const emptyForm: ProductFormState = {
   brand: "",
   maxdiscount: "",
@@ -114,6 +152,27 @@ const numericFields: Array<keyof ProductFormState> = [
   "gstrate",
   "maxupsell",
   "calibrationcharges",
+]
+
+const importFields: Array<{
+  key: ImportField
+  label: string
+  required?: boolean
+  aliases: string[]
+}> = [
+  { key: "productdescription", label: "Product description", required: true, aliases: ["productdescription", "product description", "description", "product", "item description", "name"] },
+  { key: "productcode", label: "Product code", required: true, aliases: ["productcode", "product code", "code", "sku", "item code", "part number"] },
+  { key: "brand", label: "Brand", required: true, aliases: ["brand", "make", "manufacturer"] },
+  { key: "unitprice", label: "Unit price", aliases: ["unitprice", "unit price", "price", "rate", "mrp", "selling price"] },
+  { key: "gstrate", label: "GST rate", aliases: ["gstrate", "gst rate", "gst", "tax", "tax rate"] },
+  { key: "hsncode", label: "HSN code", aliases: ["hsncode", "hsn code", "hsn"] },
+  { key: "productlink", label: "Product link", aliases: ["productlink", "product link", "link", "url"] },
+  { key: "maxdiscount", label: "Max discount", aliases: ["maxdiscount", "max discount", "discount"] },
+  { key: "maxupsell", label: "Max upsell", aliases: ["maxupsell", "max upsell", "upsell", "margin"] },
+  { key: "calibrationcharges", label: "Calibration charges", aliases: ["calibrationcharges", "calibration charges", "calibration"] },
+  { key: "unit", label: "Unit", aliases: ["unit", "uom", "measure"] },
+  { key: "addedtime", label: "Added date", aliases: ["addedtime", "added time", "added date", "date"] },
+  { key: "addeduser", label: "Added user", aliases: ["addeduser", "added user", "user", "created by"] },
 ]
 
 function toCurrency(value: Product["unitprice"]) {
@@ -169,6 +228,98 @@ function formToPayload(form: ProductFormState) {
       return [key, value.trim() === "" ? null : value.trim()]
     })
   )
+}
+
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+}
+
+function stringifyCell(value: unknown) {
+  if (value === null || value === undefined) return ""
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  return String(value).trim()
+}
+
+function createEmptyMapping(): ImportMapping {
+  return Object.fromEntries(importFields.map((field) => [field.key, UNMAPPED_COLUMN])) as ImportMapping
+}
+
+function suggestMapping(headers: string[]): ImportMapping {
+  const normalizedHeaders = headers.map((header) => ({
+    header,
+    normalized: normalizeHeader(header),
+  }))
+
+  return Object.fromEntries(
+    importFields.map((field) => {
+      const match = normalizedHeaders.find(({ normalized }) =>
+        field.aliases.some((alias) => normalized === normalizeHeader(alias))
+      )
+      return [field.key, match?.header ?? UNMAPPED_COLUMN]
+    })
+  ) as ImportMapping
+}
+
+async function parseImportFile(file: File): Promise<ParsedImportFile> {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true })
+  const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  if (!sheet) throw new Error("The file does not contain a worksheet")
+
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  })
+
+  const headerRow = rawRows.find((row) => row.some((cell) => stringifyCell(cell)))
+  if (!headerRow) throw new Error("The file does not contain a header row")
+
+  const headers = headerRow.map((cell, index) => stringifyCell(cell) || `Column ${index + 1}`)
+  const rows = rawRows
+    .slice(rawRows.indexOf(headerRow) + 1)
+    .map((row) =>
+      Object.fromEntries(headers.map((header, index) => [header, stringifyCell(row[index])]))
+    )
+    .filter((row) => Object.values(row).some(Boolean))
+
+  if (rows.length === 0) throw new Error("The file does not contain product rows")
+
+  return { fileName: file.name, headers, rows }
+}
+
+function buildImportProducts(file: ParsedImportFile | null, mapping: ImportMapping) {
+  if (!file) return []
+
+  return file.rows.map((row) =>
+    Object.fromEntries(
+      importFields
+        .filter((field) => mapping[field.key] !== UNMAPPED_COLUMN)
+        .map((field) => [field.key, row[mapping[field.key]] ?? ""])
+    )
+  )
+}
+
+function getImportValidationErrors(file: ParsedImportFile | null, mapping: ImportMapping) {
+  const errors: string[] = []
+  if (!file) return ["Upload a CSV or Excel file to continue."]
+
+  for (const field of importFields.filter((item) => item.required)) {
+    if (mapping[field.key] === UNMAPPED_COLUMN) {
+      errors.push(`${field.label} must be mapped.`)
+    }
+  }
+
+  const mappedProducts = buildImportProducts(file, mapping)
+  mappedProducts.forEach((product, index) => {
+    for (const field of importFields.filter((item) => item.required)) {
+      if (!String(product[field.key] ?? "").trim()) {
+        errors.push(`Row ${index + 2} is missing ${field.label}.`)
+      }
+    }
+  })
+
+  return errors.slice(0, 12)
 }
 
 function ProductTableSkeleton() {
@@ -295,6 +446,225 @@ function ProductForm({
   )
 }
 
+function ProductImportPanel({
+  parsedFile,
+  mapping,
+  mode,
+  parsing,
+  importing,
+  parseError,
+  importResult,
+  validationErrors,
+  onFileChange,
+  onMappingChange,
+  onModeChange,
+  onImport,
+  onReset,
+}: {
+  parsedFile: ParsedImportFile | null
+  mapping: ImportMapping
+  mode: ImportMode
+  parsing: boolean
+  importing: boolean
+  parseError: string | null
+  importResult: ImportResult | null
+  validationErrors: string[]
+  onFileChange: (file: File | null) => void
+  onMappingChange: (field: ImportField, column: string) => void
+  onModeChange: (mode: ImportMode) => void
+  onImport: () => void
+  onReset: () => void
+}) {
+  const previewRows = parsedFile?.rows.slice(0, 5) ?? []
+  const canImport = Boolean(parsedFile) && validationErrors.length === 0 && !importing
+
+  return (
+    <div className="grid gap-5 px-5 pb-5">
+      <div className="rounded-xl border border-dashed bg-muted/20 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <FileSpreadsheetIcon className="size-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">Upload product spreadsheet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Supports CSV, XLS, and XLSX files. The first populated row is treated as headers.
+              </p>
+              {parsedFile && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{parsedFile.fileName}</span> ·{" "}
+                  {parsedFile.rows.length.toLocaleString("en-IN")} rows · {parsedFile.headers.length} columns
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:shrink-0">
+            {parsedFile && (
+              <Button type="button" variant="outline" onClick={onReset} disabled={importing} className="w-full md:w-auto">
+                Reset
+              </Button>
+            )}
+            <Label className="inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 md:w-auto">
+              {parsing ? <LoaderIcon className="size-4 animate-spin" /> : <UploadIcon className="size-4" />}
+              Choose file
+              <Input
+                type="file"
+                accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="sr-only"
+                disabled={parsing || importing}
+                onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+              />
+            </Label>
+          </div>
+        </div>
+        {parseError && (
+          <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {parseError}
+          </div>
+        )}
+      </div>
+
+      {parsedFile && (
+        <>
+          <div className="grid gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Column matching</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Match your spreadsheet columns to product fields before importing.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {importFields.map((field) => (
+                <div key={field.key} className="grid gap-1.5 rounded-lg border bg-background p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>{field.label}</Label>
+                    {field.required && <Badge variant="outline">Required</Badge>}
+                  </div>
+                  <Select value={mapping[field.key]} onValueChange={(value) => onMappingChange(field.key, value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNMAPPED_COLUMN}>Do not import</SelectItem>
+                      {parsedFile.headers.map((header) => (
+                        <SelectItem key={header} value={header}>
+                          {header}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-xl border bg-muted/20 p-4">
+            <div>
+              <h3 className="text-sm font-semibold">Duplicate product codes</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose what happens when an uploaded product code already exists.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => onModeChange("skip")}
+                className={cn(
+                  "rounded-lg border bg-background p-3 text-left text-sm transition-colors",
+                  mode === "skip" && "border-primary bg-primary/5"
+                )}
+              >
+                <span className="font-medium">Skip duplicates</span>
+                <span className="mt-1 block text-muted-foreground">Keep existing products unchanged.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onModeChange("update")}
+                className={cn(
+                  "rounded-lg border bg-background p-3 text-left text-sm transition-colors",
+                  mode === "update" && "border-primary bg-primary/5"
+                )}
+              >
+                <span className="font-medium">Update existing</span>
+                <span className="mt-1 block text-muted-foreground">Overwrite mapped fields for matching codes.</span>
+              </button>
+            </div>
+          </div>
+
+          {validationErrors.length > 0 ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+              <div className="mb-2 flex items-center gap-2 font-medium">
+                <XCircleIcon className="size-4" />
+                Fix these issues before importing
+              </div>
+              <ul className="list-disc space-y-1 pl-5">
+                {validationErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
+              <div className="flex items-center gap-2 font-medium">
+                <CheckCircle2Icon className="size-4" />
+                {parsedFile.rows.length.toLocaleString("en-IN")} rows ready to import
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-xl border">
+            <div className="border-b bg-muted/30 px-4 py-2 text-sm font-semibold">Preview</div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {parsedFile.headers.slice(0, 8).map((header) => (
+                      <th key={header} className="px-4 py-2">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, index) => (
+                    <tr key={index} className="border-b last:border-0">
+                      {parsedFile.headers.slice(0, 8).map((header) => (
+                        <td key={header} className="max-w-48 truncate px-4 py-2.5">
+                          {row[header] || "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {importResult && (
+            <div className="rounded-xl border bg-muted/20 p-4 text-sm">
+              <h3 className="font-semibold">Last import summary</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <Badge variant="outline">Created {importResult.summary.created}</Badge>
+                <Badge variant="outline">Updated {importResult.summary.updated}</Badge>
+                <Badge variant="outline">Skipped {importResult.summary.skipped}</Badge>
+                <Badge variant={importResult.summary.failed ? "destructive" : "outline"}>
+                  Failed {importResult.summary.failed}
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          <Button type="button" onClick={onImport} disabled={!canImport}>
+            {importing && <LoaderIcon className="size-4 animate-spin" />}
+            Import products
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function StatCard({
   label,
   value,
@@ -328,6 +698,7 @@ function DashboardView({
   recentLoading,
   onViewCatalog,
   onAddProduct,
+  onBulkImport,
 }: {
   stats: ProductStats | null
   statsLoading: boolean
@@ -335,6 +706,7 @@ function DashboardView({
   recentLoading: boolean
   onViewCatalog: () => void
   onAddProduct: () => void
+  onBulkImport: () => void
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
@@ -385,7 +757,7 @@ function DashboardView({
         </div>
 
         {/* Action cards */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <button
             type="button"
             onClick={onViewCatalog}
@@ -414,6 +786,22 @@ function DashboardView({
               <h3 className="text-sm font-semibold">Add Product</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Create a new catalog entry for future quotes and matching.
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onBulkImport}
+            className="group flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/5"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+              <UploadIcon className="size-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Bulk Upload</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Import catalog rows from CSV or Excel with column matching.
               </p>
             </div>
           </button>
@@ -505,6 +893,14 @@ export default function ProductsPage() {
   const [form, setForm] = useState<ProductFormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [importSheetOpen, setImportSheetOpen] = useState(false)
+  const [parsedImportFile, setParsedImportFile] = useState<ParsedImportFile | null>(null)
+  const [importMapping, setImportMapping] = useState<ImportMapping>(() => createEmptyMapping())
+  const [importMode, setImportMode] = useState<ImportMode>("skip")
+  const [parsingImport, setParsingImport] = useState(false)
+  const [importingProducts, setImportingProducts] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -593,11 +989,85 @@ export default function ProductsPage() {
     return `${start}-${end}`
   }, [page, total])
 
+  const importValidationErrors = useMemo(
+    () => getImportValidationErrors(parsedImportFile, importMapping),
+    [parsedImportFile, importMapping]
+  )
+
   function openCreateSheet() {
     setEditingProduct(null)
     setForm({ ...emptyForm, addedtime: new Date().toISOString().slice(0, 10) })
     setSaveError(null)
     setSheetOpen(true)
+  }
+
+  function openImportSheet() {
+    setImportSheetOpen(true)
+    setImportError(null)
+  }
+
+  function resetImport() {
+    setParsedImportFile(null)
+    setImportMapping(createEmptyMapping())
+    setImportError(null)
+    setImportResult(null)
+  }
+
+  async function handleImportFile(file: File | null) {
+    if (!file) return
+
+    setParsingImport(true)
+    setImportError(null)
+    setImportResult(null)
+    try {
+      const parsed = await parseImportFile(file)
+      setParsedImportFile(parsed)
+      setImportMapping(suggestMapping(parsed.headers))
+    } catch (err) {
+      setParsedImportFile(null)
+      setImportMapping(createEmptyMapping())
+      setImportError(err instanceof Error ? err.message : "Unable to parse import file")
+    } finally {
+      setParsingImport(false)
+    }
+  }
+
+  async function importProducts() {
+    if (!parsedImportFile || importValidationErrors.length > 0) return
+
+    setImportingProducts(true)
+    setImportError(null)
+    try {
+      const response = await fetch(`${API_BASE}/import`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: importMode,
+          products: buildImportProducts(parsedImportFile, importMapping),
+        }),
+      })
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Unable to import products")
+      }
+
+      const result = payload as ImportResult
+      setImportResult(result)
+      toast.success(
+        `Import complete: ${result.summary.created} created, ${result.summary.updated} updated, ${result.summary.skipped} skipped`
+      )
+      if (view === "table") {
+        await fetchProducts()
+      }
+      void fetchStats()
+      void fetchRecentProducts()
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Unable to import products")
+    } finally {
+      setImportingProducts(false)
+    }
   }
 
   function openEditSheet(product: Product) {
@@ -651,6 +1121,7 @@ export default function ProductsPage() {
               recentLoading={recentLoading}
               onViewCatalog={() => setView("table")}
               onAddProduct={openCreateSheet}
+              onBulkImport={openImportSheet}
             />
           ) : (
             <>
@@ -691,6 +1162,15 @@ export default function ProductsPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Refresh</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={openImportSheet}>
+                        <UploadIcon className="size-4" />
+                        Bulk upload
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Import products from CSV or Excel</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -857,6 +1337,35 @@ export default function ProductsPage() {
               Cancel
             </Button>
           </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={importSheetOpen} onOpenChange={setImportSheetOpen}>
+        <SheetContent className="w-[min(100vw,56rem)] max-w-none overflow-y-auto sm:max-w-none" side="right">
+          <SheetHeader className="px-5 pt-5">
+            <SheetTitle className="text-xl">Bulk upload products</SheetTitle>
+            <SheetDescription>
+              Upload a CSV or Excel file, match columns to product fields, then import catalog rows.
+            </SheetDescription>
+          </SheetHeader>
+          <Separator />
+          <ProductImportPanel
+            parsedFile={parsedImportFile}
+            mapping={importMapping}
+            mode={importMode}
+            parsing={parsingImport}
+            importing={importingProducts}
+            parseError={importError}
+            importResult={importResult}
+            validationErrors={importValidationErrors}
+            onFileChange={(file) => void handleImportFile(file)}
+            onMappingChange={(field, column) =>
+              setImportMapping((current) => ({ ...current, [field]: column }))
+            }
+            onModeChange={setImportMode}
+            onImport={() => void importProducts()}
+            onReset={resetImport}
+          />
         </SheetContent>
       </Sheet>
     </>

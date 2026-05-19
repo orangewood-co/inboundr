@@ -3,6 +3,7 @@ import {
   createProduct,
   getProduct,
   getProductStats,
+  importProducts,
   listProducts,
   updateProduct,
 } from "../controllers/products.controller";
@@ -18,6 +19,7 @@ router.use(requireAuth);
 router.use(requireOrganization);
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
+router.post("/import", requireOrganizationRole(["owner", "admin"]), importProducts);
 router.get("/:id", getProduct);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createProduct);
 router.put("/:id", requireOrganizationRole(["owner", "admin"]), updateProduct);

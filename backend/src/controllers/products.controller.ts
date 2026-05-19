@@ -5,9 +5,23 @@ import type { OrganizationRequest } from "../middleware/auth.middleware";
 
 type ProductInput = Omit<
   Product,
-  "id" | "addedtime" | "embedding" | "embedding_model" | "embedding_updated_at" | "embedding_task"
+  "id" | "organization_id" | "addedtime" | "embedding" | "embedding_model" | "embedding_updated_at" | "embedding_task"
 > & {
   addedtime?: string | Date | null;
+};
+
+type ImportMode = "skip" | "update";
+
+type ProductImportResult = {
+  summary: {
+    created: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  };
+  errors: Array<{ row: number; error: string }>;
+  skipped: Array<{ row: number; productcode: string; reason: string }>;
 };
 
 const PRODUCT_COLUMNS = [
@@ -88,6 +102,26 @@ function normalizeProductInput(body: Record<string, unknown>): ProductInput {
   }
 
   return input as ProductInput;
+}
+
+function normalizeImportProductInput(body: Record<string, unknown>): Partial<ProductInput> {
+  const input = normalizeProductInput(body) as Record<string, unknown>;
+
+  for (const column of ["maxdiscount", "unitprice", "gstrate", "maxupsell", "calibrationcharges"] as const) {
+    if (column in input && input[column] !== null) {
+      const parsed = Number(input[column]);
+      input[column] = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  if (!("addedtime" in input) || input.addedtime === null) {
+    input.addedtime = new Date();
+  } else {
+    const parsedDate = new Date(String(input.addedtime));
+    input.addedtime = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  }
+
+  return input as Partial<ProductInput>;
 }
 
 function validateRequiredProductFields(input: Partial<ProductInput>): string | null {
@@ -217,6 +251,126 @@ export const createProduct = async (
   } catch (err) {
     console.error("Error creating product:", err);
     res.status(500).json({ error: "Failed to create product" });
+  }
+};
+
+export const importProducts = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const client = await pool.connect();
+
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+    const mode = req.body?.mode as ImportMode;
+    const products = Array.isArray(req.body?.products) ? req.body.products : [];
+
+    if (mode !== "skip" && mode !== "update") {
+      res.status(400).json({ error: "Import mode must be skip or update" });
+      return;
+    }
+
+    if (products.length === 0) {
+      res.status(400).json({ error: "No products provided for import" });
+      return;
+    }
+
+    if (products.length > 1000) {
+      res.status(400).json({ error: "Import is limited to 1000 rows at a time" });
+      return;
+    }
+
+    const result: ProductImportResult = {
+      summary: {
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        failed: 0,
+        total: products.length,
+      },
+      errors: [],
+      skipped: [],
+    };
+
+    await client.query("BEGIN");
+
+    for (const [index, rawProduct] of products.entries()) {
+      const rowNumber = index + 2;
+
+      try {
+        if (!rawProduct || typeof rawProduct !== "object" || Array.isArray(rawProduct)) {
+          throw new Error("Row is not a valid product");
+        }
+
+        const input = normalizeImportProductInput(rawProduct as Record<string, unknown>);
+        const validationError = validateRequiredProductFields(input);
+        if (validationError) {
+          throw new Error(validationError);
+        }
+
+        const existing = await client.query<{ id: number }>(
+          `SELECT id
+           FROM products
+           WHERE organization_id = $1 AND productcode = $2
+           LIMIT 1`,
+          [organizationId, input.productcode]
+        );
+
+        if (existing.rows[0] && mode === "skip") {
+          result.summary.skipped += 1;
+          result.skipped.push({
+            row: rowNumber,
+            productcode: String(input.productcode),
+            reason: "Product code already exists",
+          });
+          continue;
+        }
+
+        if (existing.rows[0] && mode === "update") {
+          const columns = EDITABLE_COLUMNS.filter((column) => column in input);
+          const values = columns.map((column) => input[column]);
+          const assignments = columns.map((column, assignmentIndex) => `${column} = $${assignmentIndex + 1}`);
+          values.push(existing.rows[0].id, organizationId);
+
+          await client.query(
+            `UPDATE products
+             SET ${assignments.join(", ")}
+             WHERE id = $${values.length - 1} AND organization_id = $${values.length}`,
+            values
+          );
+          result.summary.updated += 1;
+          continue;
+        }
+
+        const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+        const values = columns.map((column) =>
+          column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+        );
+        const placeholders = columns.map((_, placeholderIndex) => `$${placeholderIndex + 1}`);
+
+        await client.query(
+          `INSERT INTO products (${columns.join(", ")})
+           VALUES (${placeholders.join(", ")})`,
+          values
+        );
+        result.summary.created += 1;
+      } catch (err) {
+        result.summary.failed += 1;
+        result.errors.push({
+          row: rowNumber,
+          error: err instanceof Error ? err.message : "Unable to import row",
+        });
+      }
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json(result);
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    console.error("Error importing products:", err);
+    res.status(500).json({ error: "Failed to import products" });
+  } finally {
+    client.release();
   }
 };
 

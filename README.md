@@ -143,6 +143,9 @@ For the EC2 backend deployment runbook, see [`docs/deployment/ec2-backend.md`](d
 
 ---
 
+## References
+- Invoice Design #1 - U.S. Graphics Company Template. [Tweet](https://x.com/usgraphics/status/2054047419755864442) and [source](https://github.com/usgraphics/usgc-invoice).
+
 ## License
 
 Proprietary. All rights reserved.
