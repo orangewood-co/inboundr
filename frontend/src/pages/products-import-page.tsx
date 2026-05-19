@@ -185,37 +185,42 @@ function Stepper({ currentStep }: { currentStep: ImportStep }) {
   const currentIndex = steps.findIndex((step) => step.id === currentStep)
 
   return (
-    <div className="grid gap-3 md:grid-cols-4">
-      {steps.map((step, index) => {
-        const active = step.id === currentStep
-        const complete = index < currentIndex
-        return (
-          <div
-            key={step.id}
-            className={cn(
-              "rounded-xl border bg-card p-4 transition-colors",
-              active && "border-primary bg-primary/5",
-              complete && "border-primary/30"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "flex size-8 items-center justify-center rounded-full border text-xs font-bold",
-                  active && "border-primary bg-primary text-primary-foreground",
-                  complete && "border-primary bg-primary/10 text-primary"
+    <div className="mx-auto w-full max-w-5xl px-2 py-4">
+      <div className="grid gap-4 md:grid-cols-4 md:gap-3">
+        {steps.map((step, index) => {
+          const active = step.id === currentStep
+          const complete = index < currentIndex
+          return (
+            <div key={step.id} className="min-w-0">
+              <div className="flex items-center">
+                <span
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-bold text-muted-foreground shadow-xs transition-colors",
+                    active && "border-primary bg-primary text-primary-foreground ring-4 ring-primary/15",
+                    complete && "border-primary bg-primary/10 text-primary"
+                  )}
+                >
+                  {complete ? <CheckCircle2Icon className="size-4" /> : index + 1}
+                </span>
+                {index < steps.length - 1 && (
+                  <span
+                    className={cn(
+                    "ml-3 hidden h-px flex-1 bg-border md:block",
+                      complete && "bg-primary/60"
+                    )}
+                  />
                 )}
-              >
-                {complete ? <CheckCircle2Icon className="size-4" /> : index + 1}
-              </span>
-              <div>
-                <p className="text-sm font-semibold">{step.label}</p>
-                <p className="text-xs text-muted-foreground">{step.description}</p>
+              </div>
+              <div className="mt-3 pl-0.5">
+                <p className={cn("text-sm font-semibold leading-none", active && "text-primary")}>
+                  {step.label}
+                </p>
+                <p className="mt-2 text-xs leading-none text-muted-foreground">{step.description}</p>
               </div>
             </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
