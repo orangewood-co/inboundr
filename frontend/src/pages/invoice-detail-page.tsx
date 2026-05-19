@@ -336,7 +336,7 @@ export default function InvoiceDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <SiteHeader />
+        <SiteHeader breadcrumbs={[{ label: "Invoices", href: "/invoices" }, { label: "Details" }]} />
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
           <div className="flex items-center gap-3">
             <Skeleton className="h-5 w-5" />
@@ -356,7 +356,7 @@ export default function InvoiceDetailPage() {
   if (error || !invoice) {
     return (
       <AppLayout>
-        <SiteHeader />
+        <SiteHeader breadcrumbs={[{ label: "Invoices", href: "/invoices" }, { label: "Details" }]} />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
           <XCircleIcon className="size-8 text-destructive" />
           <p className="text-sm text-muted-foreground">{error ?? "Invoice not found"}</p>
@@ -373,7 +373,7 @@ export default function InvoiceDetailPage() {
 
   return (
     <AppLayout>
-      <SiteHeader />
+      <SiteHeader breadcrumbs={[{ label: "Invoices", href: "/invoices" }, { label: invoice.invoiceNumber }]} />
       <div className="flex flex-1 flex-col overflow-y-auto">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">

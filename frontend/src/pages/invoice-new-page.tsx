@@ -342,7 +342,7 @@ export default function InvoiceNewPage() {
   if (loadingEdit) {
     return (
       <AppLayout>
-        <SiteHeader />
+        <SiteHeader breadcrumbs={[{ label: "Invoices", href: "/invoices" }, { label: "New Invoice" }]} />
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
           <Skeleton className="h-8 w-64" />
           <div className="grid gap-4 lg:grid-cols-3">
@@ -358,7 +358,7 @@ export default function InvoiceNewPage() {
 
   return (
     <AppLayout>
-      <SiteHeader />
+      <SiteHeader breadcrumbs={[{ label: "Invoices", href: "/invoices" }, { label: editId ? "Edit Invoice" : "New Invoice" }]} />
       <div className="flex flex-1 flex-col overflow-y-auto">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
