@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  DownloadIcon,
   Edit3Icon,
   EyeIcon,
   LoaderIcon,
   RefreshCwIcon,
   SearchIcon,
+  UploadIcon,
   UsersIcon,
 } from "lucide-react"
 
@@ -345,6 +348,7 @@ function CustomerMetadata({ customer }: { customer: Customer }) {
 }
 
 export default function CustomersPage() {
+  const navigate = useNavigate()
   const initialSearch = getInitialListSearch()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [page, setPage] = useState(1)
@@ -477,20 +481,52 @@ export default function CustomersPage() {
                 </span>
               )}
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={() => void fetchCustomers()}
-                  disabled={loading}
-                >
-                  <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    onClick={() => void fetchCustomers()}
+                    disabled={loading}
+                  >
+                    <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const params = new URLSearchParams()
+                      if (debouncedSearch) params.set("search", debouncedSearch)
+                      window.open(`${API_BASE}/export?${params}`, "_blank")
+                    }}
+                  >
+                    <DownloadIcon className="size-4" />
+                    Export
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Export customers as CSV</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void navigate({ to: "/customers/import" })}
+                  >
+                    <UploadIcon className="size-4" />
+                    Import
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bulk import customers from CSV or Excel</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 border-b px-4 py-3">
@@ -535,11 +571,15 @@ export default function CustomersPage() {
                 </thead>
                 <tbody className="animate-in fade-in-0 duration-300">
                   {customers.map((customer) => (
-                    <tr key={customer._id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
+                    <tr
+                      key={customer._id}
+                      className="group cursor-pointer border-b last:border-0 transition-colors hover:bg-muted/30"
+                      onClick={() => void navigate({ to: "/customers/$id", params: { id: customer._id } })}
+                    >
                       <td className="px-5 py-3.5 align-top font-medium">
                         <HoverCard>
                           <HoverCardTrigger asChild>
-                            <button type="button" className="cursor-default text-left font-medium hover:underline">
+                            <button type="button" className="cursor-default text-left font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
                               {customer.name || "Unnamed customer"}
                             </button>
                           </HoverCardTrigger>
@@ -573,37 +613,37 @@ export default function CustomersPage() {
                         </HoverCard>
                       </td>
                       <td className="px-5 py-3.5 align-top">{customer.company || "-"}</td>
-                      <td className="px-5 py-3.5 align-top">
+                      <td className="px-5 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
                         <CopyableText value={customer.email} label="Email copied">
                           <a className="font-medium text-primary hover:underline" href={`mailto:${customer.email}`}>
                             {customer.email || "-"}
                           </a>
                         </CopyableText>
                       </td>
-                      <td className="px-5 py-3.5 align-top">
+                      <td className="px-5 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
                         <CopyableText value={customer.contactNumber} label="Phone copied">
                           <span>{customer.contactNumber || "-"}</span>
                         </CopyableText>
                       </td>
-                      <td className="px-3 py-3.5 align-top">
+                      <td className="px-3 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openViewSheet(customer)}>
                                 <EyeIcon className="size-4" />
-                                <span className="sr-only">View customer</span>
+                                <span className="sr-only">Quick view</span>
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>View</TooltipContent>
+                            <TooltipContent>Quick view</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => openEditSheet(customer)}>
                                 <Edit3Icon className="size-4" />
-                                <span className="sr-only">Edit customer</span>
+                                <span className="sr-only">Quick edit</span>
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Edit</TooltipContent>
+                            <TooltipContent>Quick edit</TooltipContent>
                           </Tooltip>
                         </div>
                       </td>

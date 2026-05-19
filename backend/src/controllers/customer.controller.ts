@@ -132,6 +132,37 @@ export const createCustomer = async (
   }
 };
 
+export const getCustomer = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid customer id" });
+      return;
+    }
+
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+
+    const customer = await Customer.findOne({
+      _id: id,
+      organizationId: organization._id,
+    }).lean();
+
+    if (!customer) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    res.json(customer);
+  } catch (err) {
+    console.error("Error fetching customer:", err);
+    res.status(500).json({ error: "Failed to fetch customer" });
+  }
+};
+
 export const updateCustomer = async (
   req: Request,
   res: Response
@@ -171,5 +202,166 @@ export const updateCustomer = async (
   } catch (err) {
     console.error("Error updating customer:", err);
     res.status(500).json({ error: "Failed to update customer" });
+  }
+};
+
+export const exportCustomers = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+    const search = String(req.query.search ?? "").trim();
+
+    const filter = {
+      organizationId: organization._id,
+      ...(search
+        ? {
+          $or: SEARCH_FIELDS.map((field) => ({
+            [field]: { $regex: search, $options: "i" },
+          })),
+        }
+        : {}),
+    };
+
+    const customers = await Customer.find(filter)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+
+    const csvHeaders = ["Name", "Company", "Email", "Contact Number", "Address", "Notes", "Special Discount %"];
+    const escapeCell = (value: string | number | null | undefined): string => {
+      const str = String(value ?? "");
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replaceAll('"', '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = customers.map((c) => [
+      escapeCell(c.name),
+      escapeCell(c.company),
+      escapeCell(c.email),
+      escapeCell(c.contactNumber),
+      escapeCell(c.address),
+      escapeCell(c.notes),
+      escapeCell(c.specialDiscountPercentage),
+    ].join(","));
+
+    const csv = [csvHeaders.join(","), ...rows].join("\r\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="customers-export-${Date.now()}.csv"`);
+    res.send(csv);
+  } catch (err) {
+    console.error("Error exporting customers:", err);
+    res.status(500).json({ error: "Failed to export customers" });
+  }
+};
+
+type ImportMode = "skip" | "update";
+
+type CustomerImportResult = {
+  summary: {
+    created: number;
+    updated: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  };
+  errors: Array<{ row: number; error: string }>;
+  skipped: Array<{ row: number; email: string; reason: string }>;
+};
+
+export const importCustomers = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+    const mode = req.body?.mode as ImportMode;
+    const customers = Array.isArray(req.body?.customers) ? req.body.customers : [];
+
+    if (mode !== "skip" && mode !== "update") {
+      res.status(400).json({ error: "Import mode must be skip or update" });
+      return;
+    }
+
+    if (customers.length === 0) {
+      res.status(400).json({ error: "No customers provided for import" });
+      return;
+    }
+
+    if (customers.length > 1000) {
+      res.status(400).json({ error: "Import is limited to 1000 rows at a time" });
+      return;
+    }
+
+    const result: CustomerImportResult = {
+      summary: { created: 0, updated: 0, skipped: 0, failed: 0, total: customers.length },
+      errors: [],
+      skipped: [],
+    };
+
+    for (const [index, rawCustomer] of customers.entries()) {
+      const rowNumber = index + 2;
+
+      try {
+        const input = normalizeCustomerInput(rawCustomer ?? {});
+
+        if (!input.name || !input.company || !input.email) {
+          result.summary.failed++;
+          result.errors.push({ row: rowNumber, error: "Name, company, and email are required" });
+          continue;
+        }
+
+        const validationError = validateCustomerInput(input);
+        if (validationError) {
+          result.summary.failed++;
+          result.errors.push({ row: rowNumber, error: validationError });
+          continue;
+        }
+
+        const existing = await Customer.findOne({
+          organizationId: organization._id,
+          email: input.email,
+        }).lean();
+
+        if (existing) {
+          if (mode === "skip") {
+            result.summary.skipped++;
+            result.skipped.push({
+              row: rowNumber,
+              email: String(input.email),
+              reason: "Duplicate email",
+            });
+          } else {
+            await Customer.updateOne(
+              { _id: existing._id },
+              { $set: input }
+            );
+            result.summary.updated++;
+          }
+        } else {
+          await Customer.create({
+            ...input,
+            organizationId: organization._id,
+          });
+          result.summary.created++;
+        }
+      } catch (err) {
+        result.summary.failed++;
+        result.errors.push({
+          row: rowNumber,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error importing customers:", err);
+    res.status(500).json({ error: "Failed to import customers" });
   }
 };

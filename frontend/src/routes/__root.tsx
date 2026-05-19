@@ -9,6 +9,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/rfq": "RFQ",
   "/customers": "Customers",
+  "/customers/import": "Import Customers",
+  "/customers/$id": "Customer Details",
   "/emails": "Emails",
   "/forgot-password": "Forgot Password",
   "/forms": "Forms",
@@ -50,6 +52,11 @@ function RootRouteComponent() {
 
     if (pathname.startsWith("/invoices/") && pathname !== "/invoices/new") {
       document.title = `Invoice Details | ${APP_TITLE}`
+      return
+    }
+
+    if (pathname.startsWith("/customers/") && pathname !== "/customers/import") {
+      document.title = `Customer Details | ${APP_TITLE}`
       return
     }
 

@@ -34,6 +34,8 @@ import { Route as InvoicesNewRouteImport } from './routes/invoices.new'
 import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
+import { Route as CustomersImportRouteImport } from './routes/customers_.import'
+import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
@@ -160,6 +162,16 @@ const FormsSlugRoute = FormsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => FormsRoute,
 } as any)
+const CustomersImportRoute = CustomersImportRouteImport.update({
+  id: '/customers_/import',
+  path: '/customers/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersIdRoute = CustomersIdRouteImport.update({
+  id: '/customers_/$id',
+  path: '/customers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -177,6 +189,8 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/customers/$id': typeof CustomersIdRoute
+  '/customers/import': typeof CustomersImportRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -201,6 +215,8 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/customers/$id': typeof CustomersIdRoute
+  '/customers/import': typeof CustomersImportRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -229,6 +245,8 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/customers_/$id': typeof CustomersIdRoute
+  '/customers_/import': typeof CustomersImportRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -258,6 +276,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/customers/$id'
+    | '/customers/import'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -282,6 +302,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/customers/$id'
+    | '/customers/import'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -309,6 +331,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/customers_/$id'
+    | '/customers_/import'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -337,6 +361,8 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
+  CustomersIdRoute: typeof CustomersIdRoute
+  CustomersImportRoute: typeof CustomersImportRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
 }
@@ -518,6 +544,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsSlugRouteImport
       parentRoute: typeof FormsRoute
     }
+    '/customers_/import': {
+      id: '/customers_/import'
+      path: '/customers/import'
+      fullPath: '/customers/import'
+      preLoaderRoute: typeof CustomersImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customers_/$id': {
+      id: '/customers_/$id'
+      path: '/customers/$id'
+      fullPath: '/customers/$id'
+      preLoaderRoute: typeof CustomersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -579,6 +619,8 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
+  CustomersIdRoute: CustomersIdRoute,
+  CustomersImportRoute: CustomersImportRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,
 }
