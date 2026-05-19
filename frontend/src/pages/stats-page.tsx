@@ -362,7 +362,7 @@ export function StatsPage() {
           ) : !data || !hasData ? (
             <EmptyState />
           ) : (
-            <div className="animate-in fade-in-0 duration-500">
+            <div className="grid gap-6 animate-in fade-in-0 duration-500">
               {/* ── Stat Cards ── */}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard
