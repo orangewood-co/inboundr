@@ -1,8 +1,7 @@
-import { type CSSProperties, useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1310,17 +1309,7 @@ function MembersTab() {
 
 export function SettingsPage() {
   return (
-    <SidebarProvider
-      defaultOpen
-      style={
-        {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader />
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl px-6 py-8 lg:px-8">
@@ -1378,8 +1367,7 @@ export function SettingsPage() {
             </Tabs>
           </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

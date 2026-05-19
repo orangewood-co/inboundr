@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import {
   ArrowRightIcon,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +24,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSession } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
@@ -223,12 +222,7 @@ export function HomePage() {
   })
 
   return (
-    <SidebarProvider
-      defaultOpen
-      style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset>
+    <AppLayout>
         <SiteHeader />
         <main className="flex flex-1 flex-col gap-5 overflow-auto p-4 lg:px-6 lg:py-5">
           {loading ? (
@@ -543,8 +537,7 @@ export function HomePage() {
             </>
           )}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   BarChart3Icon,
@@ -21,7 +21,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {
   Tooltip,
   TooltipContent,
@@ -165,9 +164,7 @@ export default function LinksDashboardPage() {
   }
 
   return (
-    <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader breadcrumbs={[{ label: "Links" }]} />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6 lg:p-8">
@@ -289,8 +286,7 @@ export default function LinksDashboardPage() {
             )}
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

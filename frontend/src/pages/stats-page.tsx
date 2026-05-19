@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   BarChart3Icon,
@@ -23,7 +23,7 @@ import {
   YAxis,
 } from "recharts"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import {
@@ -34,7 +34,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Select,
@@ -280,17 +279,7 @@ export function StatsPage() {
   }, [data])
 
   return (
-    <SidebarProvider
-      defaultOpen
-      style={
-        {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset>
+    <AppLayout>
         <SiteHeader
           actions={
             <Tooltip>
@@ -554,8 +543,7 @@ export function StatsPage() {
             </div>
           )}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

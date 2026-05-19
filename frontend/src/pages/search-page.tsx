@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react"
 import { useSearch } from "@tanstack/react-router"
 import { AlertCircleIcon, Building2Icon, FileTextIcon, LoaderIcon, PackageIcon, SearchIcon } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { fetchGlobalSearch, type SearchResult, type SearchResponse } from "@/lib/search-api"
 import { cn } from "@/lib/utils"
 
@@ -172,12 +171,9 @@ function SearchPageContent() {
 
 export default function SearchPage() {
   return (
-    <SidebarProvider>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
+    <AppLayout>
         <SiteHeader />
         <SearchPageContent />
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }

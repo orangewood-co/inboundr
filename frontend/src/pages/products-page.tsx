@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   ArrowLeftIcon,
@@ -16,7 +16,7 @@ import {
   TableIcon,
 } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,7 +30,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CopyableText } from "@/components/copy-button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -640,17 +639,8 @@ export default function ProductsPage() {
   }
 
   return (
-    <SidebarProvider
-      defaultOpen
-      style={
-        {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <>
+    <AppLayout>
         <SiteHeader />
         <div className="flex flex-1 flex-col overflow-hidden">
           {view === "dashboard" ? (
@@ -834,7 +824,7 @@ export default function ProductsPage() {
             </>
           )}
         </div>
-      </SidebarInset>
+    </AppLayout>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
@@ -869,6 +859,6 @@ export default function ProductsPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-    </SidebarProvider>
+    </>
   )
 }

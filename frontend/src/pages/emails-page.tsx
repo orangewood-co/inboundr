@@ -1,7 +1,6 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { AppSidebar } from "@/components/app-sidebar"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
@@ -481,18 +480,7 @@ export function EmailsPage() {
   }
 
   return (
-    <SidebarProvider
-      defaultOpen
-      className="h-svh"
-      style={
-        {
-          "--header-height": "3.5rem",
-          "--sidebar-width": "16rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader />
         <ResizablePanelGroup orientation="horizontal" className="flex-1" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {/* ── Email List Panel ── */}
@@ -860,8 +848,7 @@ export function EmailsPage() {
             </div>
           </div>
         )}
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

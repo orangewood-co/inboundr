@@ -1,4 +1,4 @@
-import { type CSSProperties, type FormEvent, useState } from "react"
+import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ChevronDownIcon,
@@ -9,13 +9,12 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
 import {
   Collapsible,
@@ -88,9 +87,7 @@ export default function LinksCreatePage() {
   }
 
   return (
-    <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader
           breadcrumbs={[
             { label: "Links", href: "/links" },
@@ -298,7 +295,6 @@ export default function LinksCreatePage() {
             </div>
           </form>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }

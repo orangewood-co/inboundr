@@ -1,8 +1,7 @@
-import { type CSSProperties, useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
@@ -673,18 +672,7 @@ export function DashboardPage() {
   const hasSelections = Object.keys(selectedProducts).length > 0 || manualProducts.length > 0
 
   return (
-    <SidebarProvider
-      defaultOpen
-      className="h-svh"
-      style={
-        {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader />
         <ResizablePanelGroup orientation="horizontal" className="flex-1" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {/* ── RFQ List Panel ── */}
@@ -1508,8 +1496,7 @@ export function DashboardPage() {
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

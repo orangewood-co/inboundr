@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "@tanstack/react-router"
 import {
   Area,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -41,7 +41,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {
   Table,
   TableBody,
@@ -276,9 +275,7 @@ export default function LinksDetailPage() {
 
   if (loading) {
     return (
-      <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-        <AppSidebar collapsible="icon" variant="inset" />
-        <SidebarInset className="overflow-hidden">
+      <AppLayout>
           <SiteHeader breadcrumbs={[{ label: "Links", href: "/links" }, { label: "Details" }]} />
           <main className="flex flex-1 items-center justify-center">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -286,16 +283,13 @@ export default function LinksDetailPage() {
               Loading link...
             </div>
           </main>
-        </SidebarInset>
-      </SidebarProvider>
+      </AppLayout>
     )
   }
 
   if (error || !link) {
     return (
-      <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-        <AppSidebar collapsible="icon" variant="inset" />
-        <SidebarInset className="overflow-hidden">
+      <AppLayout>
           <SiteHeader breadcrumbs={[{ label: "Links", href: "/links" }, { label: "Details" }]} />
           <main className="flex flex-1 flex-col items-center justify-center gap-3">
             <LinkIcon className="size-10 text-muted-foreground" />
@@ -307,17 +301,14 @@ export default function LinksDetailPage() {
               </Link>
             </Button>
           </main>
-        </SidebarInset>
-      </SidebarProvider>
+      </AppLayout>
     )
   }
 
   const favicon = faviconUrl(link.destinationUrl)
 
   return (
-    <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader
           breadcrumbs={[
             { label: "Links", href: "/links" },
@@ -661,7 +652,6 @@ export default function LinksDetailPage() {
             </div>
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }

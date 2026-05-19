@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   CopyIcon,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -505,9 +504,7 @@ export default function InvoicesPage() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-        <AppSidebar collapsible="icon" variant="inset" />
-        <SidebarInset className="overflow-hidden">
+      <AppLayout>
           <SiteHeader />
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
@@ -640,7 +637,7 @@ export default function InvoicesPage() {
               </div>
             </div>
           </div>
-        </SidebarInset>
+      </AppLayout>
 
         <Sheet open={builderOpen} onOpenChange={setBuilderOpen}>
           <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-5xl">
@@ -712,7 +709,6 @@ export default function InvoicesPage() {
             )}
           </SheetContent>
         </Sheet>
-      </SidebarProvider>
     </TooltipProvider>
   )
 }

@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import {
   DndContext,
@@ -45,14 +45,13 @@ import {
   XIcon,
 } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader, type BreadcrumbSegment } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Switch } from "@/components/ui/switch"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -449,20 +448,15 @@ export default function FormEditorPage() {
 
   if (loading) {
     return (
-      <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-        <AppSidebar collapsible="icon" variant="inset" />
-        <SidebarInset className="overflow-hidden">
+      <AppLayout>
           <SiteHeader breadcrumbs={breadcrumbs} />
           <div className="flex flex-1 items-center justify-center"><LoaderIcon className="size-5 animate-spin text-muted-foreground" /></div>
-        </SidebarInset>
-      </SidebarProvider>
+      </AppLayout>
     )
   }
 
   return (
-    <SidebarProvider defaultOpen style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}>
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader breadcrumbs={breadcrumbs} actions={headerActions} />
 
         <Tabs defaultValue="create" className="flex min-h-0 flex-1 flex-row gap-0">
@@ -848,8 +842,7 @@ export default function FormEditorPage() {
             </TabsContent>
           </div>
         </Tabs>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
 

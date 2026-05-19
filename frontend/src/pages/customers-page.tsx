@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   ChevronLeftIcon,
@@ -11,7 +11,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { CopyableText } from "@/components/copy-button"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
@@ -31,7 +31,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -465,17 +464,7 @@ export default function CustomersPage() {
 
   return (
     <TooltipProvider>
-    <SidebarProvider
-      defaultOpen
-      style={
-        {
-          "--header-height": "4rem",
-          "--sidebar-width": "18rem",
-        } as CSSProperties
-      }
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader />
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b px-4 py-3">
@@ -652,7 +641,7 @@ export default function CustomersPage() {
             </div>
           </div>
         </div>
-      </SidebarInset>
+    </AppLayout>
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
@@ -707,7 +696,6 @@ export default function CustomersPage() {
           )}
         </SheetContent>
       </Sheet>
-    </SidebarProvider>
     </TooltipProvider>
   )
 }

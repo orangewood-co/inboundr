@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   ClipboardListIcon,
@@ -11,7 +11,7 @@ import {
 
 import { toast } from "sonner"
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,7 +22,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {
   Table,
   TableBody,
@@ -159,12 +158,7 @@ export default function FormsListPage() {
   }
 
   return (
-    <SidebarProvider
-      defaultOpen
-      style={{ "--header-height": "4rem", "--sidebar-width": "18rem" } as CSSProperties}
-    >
-      <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+    <AppLayout>
         <SiteHeader breadcrumbs={[{ label: "Forms" }]} />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6 lg:p-8">
@@ -325,7 +319,6 @@ export default function FormsListPage() {
             )}
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </AppLayout>
   )
 }
