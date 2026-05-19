@@ -8,12 +8,16 @@ export type FieldType =
   | "checkbox"
   | "date"
   | "file"
+  | "rating"
+  | "url"
+  | "yes_no"
 
 export type PublicField = {
   id: string
   label: string
   type: FieldType
   required: boolean
+  description?: string | null
   placeholder?: string | null
   options?: string[]
   maxFileSizeMb?: number

@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { FormTemplateDialog } from "@/components/form-template-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -79,6 +80,7 @@ export default function FormsListPage() {
   const [forms, setForms] = useState<ManagedForm[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [templateOpen, setTemplateOpen] = useState(false)
 
   const fetchForms = useCallback(async () => {
     setLoading(true)
@@ -98,7 +100,7 @@ export default function FormsListPage() {
     void fetchForms()
   }, [fetchForms])
 
-  async function createNewForm() {
+  async function createFromTemplate(template: { title: string; description: string; fields: { id: string; label: string; type: string; required: boolean; description?: string | null; placeholder?: string | null; options?: string[] }[] }) {
     setCreating(true)
     try {
       const slug = `form-${Date.now().toString(36)}`
@@ -107,19 +109,11 @@ export default function FormsListPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: "Untitled form",
-          description: "",
+          title: template.title,
+          description: template.description,
           slug,
           status: "draft",
-          fields: [
-            {
-              id: `field_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-              label: "Your email",
-              type: "email",
-              required: true,
-              placeholder: "name@company.com",
-            },
-          ],
+          fields: template.fields,
           branding: { accentColor: "#111827", logoUrl: null },
           settings: {
             submitButtonLabel: "Submit",
@@ -169,7 +163,7 @@ export default function FormsListPage() {
                   {forms.length} {forms.length === 1 ? "form" : "forms"}
                 </p>
               </div>
-              <Button onClick={() => void createNewForm()} disabled={creating}>
+              <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
                 {creating ? (
                   <LoaderIcon className="size-4 animate-spin" />
                 ) : (
@@ -196,7 +190,7 @@ export default function FormsListPage() {
                     customers.
                   </p>
                 </div>
-                <Button onClick={() => void createNewForm()} disabled={creating}>
+                <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
                   <PlusIcon className="size-4" />
                   Create your first form
                 </Button>
@@ -319,6 +313,12 @@ export default function FormsListPage() {
             )}
           </div>
         </main>
+        <FormTemplateDialog
+          open={templateOpen}
+          onOpenChange={setTemplateOpen}
+          onSelect={(t) => void createFromTemplate(t)}
+          creating={creating}
+        />
     </AppLayout>
   )
 }

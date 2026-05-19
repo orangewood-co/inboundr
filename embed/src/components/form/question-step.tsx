@@ -52,7 +52,11 @@ export function QuestionStep({
             {field.required && <span className="ml-1 text-red-400">*</span>}
           </h2>
 
-          {field.placeholder && field.type !== "short_text" && field.type !== "long_text" && field.type !== "email" && field.type !== "phone" && field.type !== "number" && (
+          {field.description && (
+            <p className="mb-4 text-base leading-relaxed text-stone-400">{field.description}</p>
+          )}
+
+          {field.placeholder && field.type !== "short_text" && field.type !== "long_text" && field.type !== "email" && field.type !== "phone" && field.type !== "number" && field.type !== "url" && (
             <p className="mb-6 text-base text-stone-400">{field.placeholder}</p>
           )}
 

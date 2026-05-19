@@ -34,6 +34,7 @@ import {
   HashIcon,
   InboxIcon,
   LinkIcon,
+  Link2Icon,
   LoaderIcon,
   MailIcon,
   MessageSquareTextIcon,
@@ -42,6 +43,8 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SaveIcon,
+  StarIcon,
+  ToggleLeftIcon,
   Trash2Icon,
   TypeIcon,
 } from "lucide-react"
@@ -75,12 +78,16 @@ type FieldType =
   | "checkbox"
   | "date"
   | "file"
+  | "rating"
+  | "url"
+  | "yes_no"
 
 type FormField = {
   id: string
   label: string
   type: FieldType
   required: boolean
+  description?: string | null
   placeholder?: string | null
   options?: string[]
   maxFileSizeMb?: number
@@ -152,6 +159,9 @@ const FIELD_TYPE_META: Record<FieldType, { label: string; icon: React.ReactNode 
   checkbox: { label: "Checkboxes", icon: <CheckSquareIcon className="size-4" /> },
   date: { label: "Date", icon: <CalendarIcon className="size-4" /> },
   file: { label: "File upload", icon: <FileUpIcon className="size-4" /> },
+  rating: { label: "Rating", icon: <StarIcon className="size-4" /> },
+  url: { label: "URL", icon: <Link2Icon className="size-4" /> },
+  yes_no: { label: "Yes / No", icon: <ToggleLeftIcon className="size-4" /> },
 }
 
 const THEME_PRESETS = [
@@ -626,6 +636,10 @@ export default function FormEditorPage() {
                     <div className="space-y-5">
                       <FieldRow label="Question">
                         <Input value={selectedField.label} onChange={(e) => updateField(selectedFieldIndex, { label: e.target.value })} placeholder="Type your question" />
+                      </FieldRow>
+
+                      <FieldRow label="Description (optional)">
+                        <Input value={selectedField.description ?? ""} onChange={(e) => updateField(selectedFieldIndex, { description: e.target.value || null })} placeholder="Add helper text for respondents" />
                       </FieldRow>
 
                       <div className="space-y-2">
