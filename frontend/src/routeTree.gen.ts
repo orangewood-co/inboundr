@@ -26,6 +26,7 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as ProductsImportRouteImport } from './routes/products_.import'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as LinksIdRouteImport } from './routes/links.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
@@ -116,6 +117,11 @@ const FormsIndexRoute = FormsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => FormsRoute,
 } as any)
+const ProductsImportRoute = ProductsImportRouteImport.update({
+  id: '/products_/import',
+  path: '/products/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LinksCreateRoute = LinksCreateRouteImport.update({
   id: '/create',
   path: '/create',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/invite/$token': typeof InviteTokenRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products/import': typeof ProductsImportRoute
   '/forms/': typeof FormsIndexRoute
   '/links/': typeof LinksIndexRoute
 }
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/invite/$token': typeof InviteTokenRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products/import': typeof ProductsImportRoute
   '/forms': typeof FormsIndexRoute
   '/links': typeof LinksIndexRoute
 }
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/invite/$token': typeof InviteTokenRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products_/import': typeof ProductsImportRoute
   '/forms/': typeof FormsIndexRoute
   '/links/': typeof LinksIndexRoute
 }
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/links/$id'
     | '/links/create'
+    | '/products/import'
     | '/forms/'
     | '/links/'
   fileRoutesByTo: FileRoutesByTo
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/links/$id'
     | '/links/create'
+    | '/products/import'
     | '/forms'
     | '/links'
   id:
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/invite/$token'
     | '/links/$id'
     | '/links/create'
+    | '/products_/import'
     | '/forms/'
     | '/links/'
   fileRoutesById: FileRoutesById
@@ -292,6 +304,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ProductsImportRoute: typeof ProductsImportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -415,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
     }
+    '/products_/import': {
+      id: '/products_/import'
+      path: '/products/import'
+      fullPath: '/products/import'
+      preLoaderRoute: typeof ProductsImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/links/create': {
       id: '/links/create'
       path: '/create'
@@ -489,6 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ProductsImportRoute: ProductsImportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
