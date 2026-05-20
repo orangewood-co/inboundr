@@ -22,7 +22,20 @@ function extractEmailAddress(value: string | null | undefined): string {
   return email.trim().replace(/^mailto:/i, "");
 }
 
-type SelectedRFQProduct = { searchResultIndex: number; matchIndex: number };
+type SelectedRFQProduct = {
+  searchResultIndex: number
+  matchIndex: number
+  overrides?: {
+    description?: unknown
+    brand?: unknown
+    code?: unknown
+    price?: unknown
+    hsnCode?: unknown
+    gstRate?: unknown
+    quantity?: unknown
+    discountPercent?: unknown
+  }
+};
 type ManualQuoteProduct = {
   queryName?: unknown;
   quantity?: unknown;
@@ -235,16 +248,24 @@ export const generateQuote = async (
       if (!sr) throw new Error(`Invalid searchResultIndex: ${sel.searchResultIndex}`);
       const match = sr.matches[sel.matchIndex];
       if (!match) throw new Error(`Invalid matchIndex: ${sel.matchIndex}`);
+
+      const overrides = sel.overrides || {};
+      const overridePrice = nullableNumber(overrides.price);
+      const overrideDiscount = nullableNumber(overrides.discountPercent) ?? 0;
+      const basePrice = overridePrice ?? match.price;
+      const finalPrice = basePrice != null ? basePrice * (1 - overrideDiscount / 100) : null;
+
       return {
         queryName: sr.query.name,
-        quantity: sr.query.quantity,
+        quantity: positiveNumber(overrides.quantity) ?? sr.query.quantity,
         productId: match.id,
-        brand: match.brand,
-        description: match.description,
-        code: match.code,
-        price: match.price,
-        hsnCode: match.hsnCode,
-        gstRate: match.gstRate,
+        brand: nullableString(overrides.brand) ?? match.brand,
+        description: nullableString(overrides.description) ?? match.description,
+        code: nullableString(overrides.code) ?? match.code,
+        price: finalPrice,
+        hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
+        gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
+        discountPercent: overrideDiscount,
       };
     });
     const products = [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
