@@ -1033,150 +1033,153 @@ export function DashboardPage() {
                                 const discountPct = override?.discountPercent != null && override.discountPercent !== "" ? Number(override.discountPercent) : 0
                                 const finalPrice = effectivePrice != null && Number.isFinite(effectivePrice) ? effectivePrice * (1 - discountPct / 100) : null
                                 return (
-                                  <div key={j}>
+                                  <div
+                                    key={j}
+                                    className={`rounded-lg border transition-all ${
+                                      isSelected
+                                        ? "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
+                                        : j === 0
+                                          ? "border-primary/20 bg-primary/5 hover:border-primary/40"
+                                          : "bg-muted/20 hover:border-muted-foreground/30"
+                                    }`}
+                                  >
                                     <button
                                       type="button"
                                       onClick={() => handleSelectProduct(i, j)}
-                                      className={`w-full cursor-pointer rounded-lg border px-3 py-2.5 text-left transition-all ${
-                                        isSelected
-                                          ? "border-primary bg-primary/8 ring-1 ring-primary/30"
-                                          : j === 0
-                                            ? "border-primary/20 bg-primary/5 hover:border-primary/40"
-                                            : "bg-muted/20 hover:border-muted-foreground/30"
-                                      }`}
+                                      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left"
                                     >
-                                      <div className="flex items-center gap-3">
-                                        <div className="shrink-0">
-                                          {isSelected ? (
-                                            <CircleCheckIcon className="size-4.5 text-primary" />
-                                          ) : (
-                                            <CircleIcon className="size-4.5 text-muted-foreground/30" />
+                                      <div className="shrink-0">
+                                        {isSelected ? (
+                                          <CircleCheckIcon className="size-4.5 text-primary" />
+                                        ) : (
+                                          <CircleIcon className="size-4.5 text-muted-foreground/30" />
+                                        )}
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <p className="truncate text-sm font-semibold leading-snug">
+                                            {m.description || "—"}
+                                          </p>
+                                          {j === 0 && sr.status === "matched" && (
+                                            <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                              Best
+                                            </span>
                                           )}
                                         </div>
-
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-2">
-                                            <p className="truncate text-sm font-semibold leading-snug">
-                                              {m.description || "—"}
-                                            </p>
-                                            {j === 0 && sr.status === "matched" && (
-                                              <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                                                Best
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
-                                            {m.brand && <span>{m.brand}</span>}
-                                            {m.brand && m.code && <span>·</span>}
-                                            {m.code && (
-                                              <span className="font-mono">{m.code}</span>
-                                            )}
-                                            {(m.brand || m.code) && m.hsnCode && <span>·</span>}
-                                            {m.hsnCode && <span>HSN: {m.hsnCode}</span>}
-                                            {m.gstRate != null && <span>· GST: {m.gstRate}%</span>}
-                                          </div>
-                                        </div>
-
-                                        <div className="shrink-0 text-right">
-                                          {isSelected && discountPct > 0 && finalPrice != null ? (
-                                            <>
-                                              <p className="text-[11px] tabular-nums text-muted-foreground line-through">
-                                                ₹{(effectivePrice ?? 0).toLocaleString("en-IN")}
-                                              </p>
-                                              <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                                                ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                                              </p>
-                                            </>
-                                          ) : m.price != null ? (
-                                            <p className="text-sm font-bold tabular-nums">
-                                              ₹{m.price.toLocaleString("en-IN")}
-                                            </p>
-                                          ) : (
-                                            <p className="text-[11px] text-muted-foreground">No price</p>
+                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                                          {m.brand && <span>{m.brand}</span>}
+                                          {m.brand && m.code && <span>·</span>}
+                                          {m.code && (
+                                            <span className="font-mono">{m.code}</span>
                                           )}
+                                          {(m.brand || m.code) && m.hsnCode && <span>·</span>}
+                                          {m.hsnCode && <span>HSN: {m.hsnCode}</span>}
+                                          {m.gstRate != null && <span>· GST: {m.gstRate}%</span>}
                                         </div>
+                                      </div>
+
+                                      <div className="shrink-0 text-right">
+                                        {isSelected && discountPct > 0 && finalPrice != null ? (
+                                          <>
+                                            <p className="text-[11px] tabular-nums text-muted-foreground line-through">
+                                              ₹{(effectivePrice ?? 0).toLocaleString("en-IN")}
+                                            </p>
+                                            <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                              ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                            </p>
+                                          </>
+                                        ) : m.price != null ? (
+                                          <p className="text-sm font-bold tabular-nums">
+                                            ₹{m.price.toLocaleString("en-IN")}
+                                          </p>
+                                        ) : (
+                                          <p className="text-[11px] text-muted-foreground">No price</p>
+                                        )}
                                       </div>
                                     </button>
 
                                     {isSelected && (
-                                      <div className="mt-1.5 ml-7.5 rounded-lg border border-dashed bg-muted/10 p-3">
-                                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                          Adjust for quote
-                                        </p>
-                                        <div className="grid gap-2 sm:grid-cols-2">
-                                          <Input
-                                            value={override?.description ?? m.description ?? ""}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "description", e.target.value)}
-                                            placeholder="Description"
-                                            className="h-8 text-xs"
-                                          />
-                                          <Input
-                                            value={override?.quantity ?? String(sr.query.quantity)}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "quantity", e.target.value)}
-                                            placeholder="Quantity"
-                                            type="number"
-                                            min="1"
-                                            className="h-8 text-xs"
-                                          />
-                                          <Input
-                                            value={override?.brand ?? m.brand ?? ""}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "brand", e.target.value)}
-                                            placeholder="Brand"
-                                            className="h-8 text-xs"
-                                          />
-                                          <Input
-                                            value={override?.code ?? m.code ?? ""}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "code", e.target.value)}
-                                            placeholder="Code"
-                                            className="h-8 text-xs"
-                                          />
-                                          <Input
-                                            value={override?.hsnCode ?? m.hsnCode ?? ""}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "hsnCode", e.target.value)}
-                                            placeholder="HSN"
-                                            className="h-8 text-xs"
-                                          />
-                                          <Input
-                                            value={override?.gstRate ?? (m.gstRate != null ? String(m.gstRate) : "")}
-                                            onChange={(e) => handleOverrideChange(overrideKey, "gstRate", e.target.value)}
-                                            placeholder="GST %"
-                                            type="number"
-                                            min="0"
-                                            className="h-8 text-xs"
-                                          />
-                                        </div>
-                                        <div className="mt-2.5 flex items-end gap-3">
-                                          <div className="flex-1">
-                                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Price</label>
+                                      <div className="border-t border-primary/15 px-3 pb-3 pt-2.5">
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-2">
+                                            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Desc</label>
                                             <Input
-                                              value={override?.price ?? (m.price != null ? String(m.price) : "")}
-                                              onChange={(e) => handleOverrideChange(overrideKey, "price", e.target.value)}
-                                              placeholder="Unit price"
-                                              type="number"
-                                              min="0"
-                                              className="h-8 text-xs"
+                                              value={override?.description ?? m.description ?? ""}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "description", e.target.value)}
+                                              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
                                             />
                                           </div>
-                                          <div className="flex-1">
-                                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Discount %</label>
+                                          <div className="flex items-center gap-2">
+                                            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Brand</label>
                                             <Input
-                                              value={override?.discountPercent ?? ""}
-                                              onChange={(e) => handleOverrideChange(overrideKey, "discountPercent", e.target.value)}
-                                              placeholder="0"
-                                              type="number"
-                                              min="0"
-                                              max="100"
-                                              className="h-8 text-xs"
+                                              value={override?.brand ?? m.brand ?? ""}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "brand", e.target.value)}
+                                              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+                                            />
+                                            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">Code</label>
+                                            <Input
+                                              value={override?.code ?? m.code ?? ""}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "code", e.target.value)}
+                                              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
                                             />
                                           </div>
-                                          <div className="flex-1 text-right">
-                                            {finalPrice != null ? (
-                                              <p className="text-sm font-bold tabular-nums">
+                                          <div className="flex items-center gap-2">
+                                            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">HSN</label>
+                                            <Input
+                                              value={override?.hsnCode ?? m.hsnCode ?? ""}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "hsnCode", e.target.value)}
+                                              className="h-7 w-28 border-muted-foreground/15 bg-transparent text-xs"
+                                            />
+                                            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">GST%</label>
+                                            <Input
+                                              value={override?.gstRate ?? (m.gstRate != null ? String(m.gstRate) : "")}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "gstRate", e.target.value)}
+                                              type="number"
+                                              min="0"
+                                              className="h-7 w-16 border-muted-foreground/15 bg-transparent text-xs"
+                                            />
+                                            <label className="ml-1 w-7 shrink-0 text-[10px] text-muted-foreground">Qty</label>
+                                            <Input
+                                              value={override?.quantity ?? String(sr.query.quantity)}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "quantity", e.target.value)}
+                                              type="number"
+                                              min="1"
+                                              className="h-7 w-16 border-muted-foreground/15 bg-transparent text-xs"
+                                            />
+                                          </div>
+                                          <div className="flex items-center gap-2 pt-1">
+                                            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Price</label>
+                                            <div className="relative">
+                                              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">₹</span>
+                                              <Input
+                                                value={override?.price ?? (m.price != null ? String(m.price) : "")}
+                                                onChange={(e) => handleOverrideChange(overrideKey, "price", e.target.value)}
+                                                type="number"
+                                                min="0"
+                                                className="h-7 w-28 border-muted-foreground/15 bg-transparent pl-5 text-xs"
+                                              />
+                                            </div>
+                                            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">Disc.</label>
+                                            <div className="relative">
+                                              <Input
+                                                value={override?.discountPercent ?? ""}
+                                                onChange={(e) => handleOverrideChange(overrideKey, "discountPercent", e.target.value)}
+                                                placeholder="0"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                className="h-7 w-16 border-muted-foreground/15 bg-transparent pr-5 text-xs"
+                                              />
+                                              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
+                                            </div>
+                                            {finalPrice != null && discountPct > 0 && (
+                                              <span className="ml-auto text-xs font-semibold tabular-nums text-emerald-500 dark:text-emerald-400">
                                                 ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
-                                                <span className="ml-1 text-[10px] font-normal text-muted-foreground">final</span>
-                                              </p>
-                                            ) : (
-                                              <p className="text-xs text-muted-foreground">No price</p>
+                                                <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                                                  ({discountPct}% off)
+                                                </span>
+                                              </span>
                                             )}
                                           </div>
                                         </div>
