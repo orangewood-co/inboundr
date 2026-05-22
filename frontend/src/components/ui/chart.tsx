@@ -79,13 +79,23 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip
 
+type ChartTooltipPayloadItem = {
+  value?: string | number
+  name?: string | number
+  dataKey?: string | number
+  color?: string
+}
+
 function ChartTooltipContent({
   active,
   payload,
   label,
   className,
   hideLabel = false,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> & {
+}: {
+  active?: boolean
+  payload?: ChartTooltipPayloadItem[]
+  label?: string | number
   className?: string
   hideLabel?: boolean
 }) {
@@ -132,10 +142,17 @@ function ChartTooltipContent({
 
 const ChartLegend = RechartsPrimitive.Legend
 
+type ChartLegendPayloadItem = {
+  value?: string | number
+  dataKey?: string | number
+  color?: string
+}
+
 function ChartLegendContent({
   payload,
   className,
-}: React.ComponentProps<typeof RechartsPrimitive.Legend> & {
+}: {
+  payload?: ChartLegendPayloadItem[]
   className?: string
 }) {
   const config = useChart()

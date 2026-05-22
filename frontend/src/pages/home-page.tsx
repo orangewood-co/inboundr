@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react"
 import { Link } from "@tanstack/react-router"
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
   BarChart3Icon,
   CheckCircle2Icon,
-  CircleIcon,
   FileTextIcon,
   InboxIcon,
   PackageIcon,

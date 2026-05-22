@@ -260,7 +260,6 @@ function SortableFieldItem({ field, index, isSelected, onSelect }: {
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const meta = FIELD_TYPE_META[field.type]
 
   return (
     <button ref={setNodeRef} style={style} onClick={onSelect}

@@ -250,7 +250,7 @@ export default function InvoicesPage() {
                 Export CSV
               </Button>
               <Button size="sm" asChild>
-                <Link to="/invoices/new">
+                <Link to="/invoices/new" search={{ edit: undefined }}>
                   <PlusIcon className="size-4" />
                   New invoice
                 </Link>
@@ -342,7 +342,7 @@ export default function InvoicesPage() {
                 Create your first invoice to start tracking payments and revenue.
               </p>
               <Button size="sm" asChild>
-                <Link to="/invoices/new">
+                <Link to="/invoices/new" search={{ edit: undefined }}>
                   <PlusIcon className="size-4" />
                   Create invoice
                 </Link>

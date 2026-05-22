@@ -7,7 +7,6 @@ import {
   InboxIcon,
   PackageIcon,
   RefreshCwIcon,
-  TrendingUpIcon,
   UsersIcon,
 } from "lucide-react"
 import {
@@ -465,7 +464,7 @@ export function StatsPage() {
                           outerRadius={110}
                           strokeWidth={2}
                           stroke="var(--background)"
-                          label={({ name, percent }) => `${name}: ${Math.round(percent * 100)}%`}
+                          label={({ name, percent }) => `${name}: ${Math.round((percent ?? 0) * 100)}%`}
                           labelLine={false}
                         >
                           {donutData.map((_, index) => (
