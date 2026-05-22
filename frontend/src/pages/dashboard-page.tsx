@@ -1174,28 +1174,16 @@ export function DashboardPage() {
                                 Qty: {sr.query.quantity}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 gap-1.5 px-2 text-[11px]"
-                                onClick={() => handleToggleManualProductPanel(i)}
-                              >
-                                <PlusIcon className="size-3" />
-                                Add other product
-                              </Button>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span>
-                                    <MatchStatusBadge status={sr.status} />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <MatchStatusBadge status={sr.status} />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
 
                           {/* Product cards */}
@@ -1370,6 +1358,18 @@ export function DashboardPage() {
                               No matching products found in the catalog
                             </div>
                           )}
+                          <div className="mt-2 flex items-center justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                              onClick={() => handleToggleManualProductPanel(i)}
+                            >
+                              <PlusIcon className="size-3" />
+                              {activeManualProductQueryIndex === i ? "Hide add product" : "Add another product for this request"}
+                            </Button>
+                          </div>
                           {activeManualProductQueryIndex === i && renderManualProductPanel()}
                         </div>
                       ))}
