@@ -1,8 +1,7 @@
 "use client"
 
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
-import { SidebarInput } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { fetchGlobalSearch, type SearchResult, type SearchResponse } from "@/lib/search-api"
 import { useNavigate } from "@tanstack/react-router"
@@ -106,6 +105,30 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
     }
   }
 
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [isFocused, setIsFocused] = useState(false)
+
+  const isMac = useMemo(
+    () => typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent),
+    []
+  )
+
+  const handleGlobalShortcut = useCallback(
+    (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault()
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleGlobalShortcut)
+    return () => document.removeEventListener("keydown", handleGlobalShortcut)
+  }, [handleGlobalShortcut])
+
   return (
     <form
       {...props}
@@ -116,41 +139,63 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
       }}
       className={cn("relative", props.className)}
     >
-      <div className="relative">
+      <div
+        className={cn(
+          "group relative flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 transition-all duration-200",
+          "sm:min-w-[280px]",
+          isFocused
+            ? "border-ring bg-background ring-2 ring-ring/20"
+            : "border-transparent hover:bg-muted/70"
+        )}
+      >
         <Label htmlFor="search" className="sr-only">
           Search
         </Label>
-        <SidebarInput
+        {isLoading ? (
+          <LoaderIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground/70" />
+        ) : (
+          <SearchIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+        )}
+        <input
+          ref={inputRef}
           id="search"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
             setIsOpen(true)
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            setIsFocused(true)
+            setIsOpen(true)
+          }}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={onKeyDown}
-          placeholder="Search customers, products, RFQs..."
-          className="h-8 pl-7"
+          placeholder="Search..."
           autoComplete="off"
+          className="h-8 w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
         />
-        {isLoading ? (
-          <LoaderIcon className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 animate-spin opacity-50 select-none" />
-        ) : (
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 opacity-50 select-none" />
+        {!isFocused && !query && (
+          <kbd className="pointer-events-none hidden select-none items-center gap-0.5 rounded-[5px] border bg-background/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground/70 sm:inline-flex">
+            {isMac ? "⌘" : "Ctrl"}
+            <span className="text-[9px]">K</span>
+          </kbd>
         )}
       </div>
       {isOpen && trimmedQuery.length >= 2 ? (
-        <div className="absolute right-0 top-10 z-50 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-lg animate-in fade-in-0 slide-in-from-top-1 duration-150">
           {error ? (
             <div className="px-4 py-3 text-sm text-muted-foreground">{error}</div>
           ) : results && results.total === 0 && !isLoading ? (
-            <div className="px-4 py-3 text-sm text-muted-foreground">No results for "{trimmedQuery}"</div>
+            <div className="flex flex-col items-center gap-1 px-4 py-6 text-center">
+              <SearchIcon className="size-5 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">No results for "{trimmedQuery}"</p>
+            </div>
           ) : (
-            <div className="max-h-[28rem] overflow-y-auto py-2">
+            <div className="max-h-[28rem] overflow-y-auto py-1.5">
               {groupedResults.map((group) =>
                 group.items.length ? (
                   <div key={group.key} className="py-1">
-                    <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                       {group.label}
                     </div>
                     {group.items.map((item) => {
@@ -163,13 +208,18 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
                           key={`${item.type}-${item.id}`}
                           type="button"
                           className={cn(
-                            "flex w-full items-start gap-3 px-3 py-2 text-left text-sm hover:bg-accent",
-                            activeIndex === itemIndex && "bg-accent"
+                            "flex w-full items-start gap-3 rounded-lg mx-1.5 px-2 py-2 text-left text-sm transition-colors",
+                            activeIndex === itemIndex
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-accent/50"
                           )}
+                          style={{ width: "calc(100% - 12px)" }}
                           onMouseEnter={() => setActiveIndex(itemIndex)}
                           onClick={() => openResult(item)}
                         >
-                          <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                          <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/60">
+                            <Icon className="size-3.5 text-muted-foreground" />
+                          </div>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate font-medium">{item.title}</span>
                             <span className="block truncate text-xs text-muted-foreground">{item.subtitle}</span>
@@ -180,13 +230,15 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
                   </div>
                 ) : null
               )}
-              <button
-                type="submit"
-                className="mt-1 flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-medium hover:bg-accent"
-              >
-                <SearchIcon className="size-4 text-muted-foreground" />
-                View all results for "{trimmedQuery}"
-              </button>
+              <div className="mx-1.5 mt-1">
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-2 rounded-lg border border-dashed border-border/60 px-2.5 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <SearchIcon className="size-3.5" />
+                  View all results for "{trimmedQuery}"
+                </button>
+              </div>
             </div>
           )}
         </div>
