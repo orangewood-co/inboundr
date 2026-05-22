@@ -323,9 +323,10 @@ export const importCustomers = async (
           continue;
         }
 
+        const email = String(input.email);
         const existing = await Customer.findOne({
           organizationId: organization._id,
-          email: input.email,
+          email,
         }).lean();
 
         if (existing) {
