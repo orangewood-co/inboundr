@@ -68,6 +68,7 @@ interface SearchQueryParts {
   brandTokens: string[];
   dimensionTokens: string[];
   codeLikeTokens: string[];
+  normalizedCodeHints: string[];
   exactCodeQuery: string;
   phrasePattern: string;
 }
@@ -87,6 +88,30 @@ const TEXT_SEARCH_SQL = `
         WHEN $1 <> '' AND lower(COALESCE(p.productcode, '')) = $1 THEN 220
         ELSE 0
       END AS exact_code_score,
+      CASE
+        WHEN EXISTS (
+          SELECT 1
+          FROM unnest($8::text[]) AS code_hint
+          WHERE regexp_replace(lower(COALESCE(p.productcode, '')), '[^a-z0-9]', '', 'g') = code_hint
+        ) THEN 320
+        ELSE 0
+      END AS normalized_exact_code_score,
+      CASE
+        WHEN EXISTS (
+          SELECT 1
+          FROM unnest($8::text[]) AS code_hint
+          WHERE regexp_replace(lower(COALESCE(p.productcode, '')), '[^a-z0-9]', '', 'g') LIKE code_hint || '%'
+        ) THEN 260
+        ELSE 0
+      END AS normalized_prefix_code_score,
+      CASE
+        WHEN EXISTS (
+          SELECT 1
+          FROM unnest($8::text[]) AS code_hint
+          WHERE regexp_replace(lower(COALESCE(p.productcode, '')), '[^a-z0-9]', '', 'g') LIKE '%' || code_hint || '%'
+        ) THEN 180
+        ELSE 0
+      END AS normalized_contains_code_score,
       CASE
         WHEN EXISTS (
           SELECT 1
@@ -123,7 +148,7 @@ const TEXT_SEARCH_SQL = `
       ), 0) AS dimension_score
     FROM products p
     WHERE
-      p.organization_id = $10
+      p.organization_id = $11
       AND
       (
         ($4 <> '' AND lower(COALESCE(p.productdescription, '')) LIKE $5)
@@ -147,6 +172,11 @@ const TEXT_SEARCH_SQL = `
         )
         OR EXISTS (
           SELECT 1
+          FROM unnest($8::text[]) AS code_hint
+          WHERE regexp_replace(lower(COALESCE(p.productcode, '')), '[^a-z0-9]', '', 'g') LIKE '%' || code_hint || '%'
+        )
+        OR EXISTS (
+          SELECT 1
           FROM unnest($3::text[]) AS brand_token
           WHERE lower(COALESCE(p.brand, '')) = brand_token
              OR lower(COALESCE(p.brand, '')) LIKE '%' || brand_token || '%'
@@ -157,6 +187,9 @@ const TEXT_SEARCH_SQL = `
     SELECT
       *,
       exact_code_score
+        + normalized_exact_code_score
+        + normalized_prefix_code_score
+        + normalized_contains_code_score
         + partial_code_score
         + brand_score
         + phrase_score
@@ -164,6 +197,9 @@ const TEXT_SEARCH_SQL = `
         + dimension_score AS rank_score,
       ARRAY_REMOVE(ARRAY[
         CASE WHEN exact_code_score > 0 THEN 'exact_code' END,
+        CASE WHEN normalized_exact_code_score > 0 THEN 'normalized_exact_code' END,
+        CASE WHEN normalized_prefix_code_score > 0 THEN 'normalized_code_prefix' END,
+        CASE WHEN normalized_contains_code_score > 0 THEN 'normalized_code_contains' END,
         CASE WHEN partial_code_score > 0 THEN 'partial_code' END,
         CASE WHEN brand_score > 0 THEN 'brand' END,
         CASE WHEN phrase_score > 0 THEN 'full_phrase' END,
@@ -184,9 +220,9 @@ const TEXT_SEARCH_SQL = `
     rank_score,
     match_reasons
   FROM scored_products
-  WHERE rank_score >= $8
+  WHERE rank_score >= $9
   ORDER BY rank_score DESC, char_length(COALESCE(productdescription, '')) ASC, id ASC
-  LIMIT $9
+  LIMIT $10
 `;
 
 export class TextProductSearcher {
@@ -225,6 +261,7 @@ export class TextProductSearcher {
         parts.phrasePattern,
         parts.searchTokens,
         parts.dimensionTokens,
+        parts.normalizedCodeHints,
         this.getMinimumScore(parts),
         limit,
         organizationId,
@@ -281,6 +318,7 @@ export class TextProductSearcher {
     const codeLikeTokens = unique(
       searchTokens.filter((token) => /[a-z]/.test(token) && /\d/.test(token))
     );
+    const normalizedCodeHints = extractNormalizedCodeHints(normalizedQuery);
 
     return {
       normalizedQuery,
@@ -288,6 +326,7 @@ export class TextProductSearcher {
       brandTokens,
       dimensionTokens,
       codeLikeTokens,
+      normalizedCodeHints,
       exactCodeQuery:
         searchTokens.length === 1 && codeLikeTokens.length === 1 ? (codeLikeTokens[0] ?? "") : "",
       phrasePattern: normalizedQuery ? `%${normalizedQuery}%` : "",
@@ -295,6 +334,10 @@ export class TextProductSearcher {
   }
 
   private getMinimumScore(parts: SearchQueryParts): number {
+    if (parts.normalizedCodeHints.length > 0) {
+      return 80;
+    }
+
     if (parts.dimensionTokens.length > 0 && parts.brandTokens.length > 0) {
       return 70;
     }
@@ -359,6 +402,48 @@ function normalizeText(input: string): string {
 function extractDimensionTokens(input: string): string[] {
   const matches = input.match(/\b\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?(?:mm|cm|m|inch|in)\b/g) ?? [];
   return unique(matches.map((match) => match.replace(/\s+/g, "")));
+}
+
+export function extractNormalizedCodeHints(input: string): string[] {
+  const compactInput = input.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const separatedMatches = input.match(/\b[a-z0-9]*\d+[a-z0-9]*(?:[\/-][a-z0-9]*\d+[a-z0-9]*)+\b/gi) ?? [];
+  const compactMatches = compactInput.match(/\b(?=[a-z0-9]*\d)[a-z0-9]{5,}\b/g) ?? [];
+
+  return unique(
+    [...separatedMatches, ...compactMatches]
+      .map(normalizeCodeHint)
+      .filter((hint) => hint.length >= 5 && /\d/.test(hint))
+  );
+}
+
+export function normalizeCodeHint(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function getNormalizedCodeMatchReason(
+  queryCodeHint: string,
+  productCode: string | null | undefined
+): "normalized_exact_code" | "normalized_code_prefix" | "normalized_code_contains" | null {
+  const normalizedQueryCode = normalizeCodeHint(queryCodeHint);
+  const normalizedProductCode = normalizeCodeHint(productCode ?? "");
+
+  if (!normalizedQueryCode || !normalizedProductCode) {
+    return null;
+  }
+
+  if (normalizedProductCode === normalizedQueryCode) {
+    return "normalized_exact_code";
+  }
+
+  if (normalizedProductCode.startsWith(normalizedQueryCode)) {
+    return "normalized_code_prefix";
+  }
+
+  if (normalizedProductCode.includes(normalizedQueryCode)) {
+    return "normalized_code_contains";
+  }
+
+  return null;
 }
 
 function unique(values: string[]): string[] {

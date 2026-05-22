@@ -206,11 +206,11 @@ function numberInputValue(value: number | string | null | undefined): string {
   return Number.isFinite(number) ? String(number) : ""
 }
 
-function catalogProductToManual(product: CatalogProduct): ManualProduct {
+function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult["query"]): ManualProduct {
   return {
     id: `${product.id}-${Date.now()}`,
-    queryName: product.productdescription || product.productcode || "Catalog product",
-    quantity: "1",
+    queryName: query?.name || product.productdescription || product.productcode || "Catalog product",
+    quantity: query ? String(query.quantity) : "1",
     productId: product.id,
     brand: product.brand ?? "",
     description: product.productdescription ?? "",
@@ -364,7 +364,7 @@ export function DashboardPage() {
   const [selectedProducts, setSelectedProducts] = useState<Record<number, number>>({})
   const [productOverrides, setProductOverrides] = useState<Record<string, ProductOverride>>({})
   const [manualProducts, setManualProducts] = useState<ManualProduct[]>([])
-  const [showManualProductPanel, setShowManualProductPanel] = useState(false)
+  const [activeManualProductQueryIndex, setActiveManualProductQueryIndex] = useState<number | null>(null)
   const [productSearch, setProductSearch] = useState("")
   const [productResults, setProductResults] = useState<CatalogProduct[]>([])
   const [productSearchLoading, setProductSearchLoading] = useState(false)
@@ -449,7 +449,7 @@ export function DashboardPage() {
       setSelectedProducts({})
       setProductOverrides({})
       setManualProducts([])
-      setShowManualProductPanel(false)
+      setActiveManualProductQueryIndex(null)
       setProductSearch("")
       setProductResults([])
       setProductSearchError(null)
@@ -575,8 +575,36 @@ export function DashboardPage() {
     }
   }
 
+  const getManualProductQuery = (searchResultIndex: number | null) => {
+    if (searchResultIndex == null) return undefined
+    return detail?.searchResults[searchResultIndex]?.query
+  }
+
+  const handleToggleManualProductPanel = (searchResultIndex: number) => {
+    setActiveManualProductQueryIndex((prev) => {
+      if (prev === searchResultIndex) return null
+
+      const query = detail?.searchResults[searchResultIndex]?.query
+      if (query) {
+        setCustomProduct((current) => ({
+          ...current,
+          queryName: query.name,
+          quantity: String(query.quantity),
+        }))
+        setProductSearch(query.name)
+        setProductResults([])
+        setProductSearchError(null)
+      }
+
+      return searchResultIndex
+    })
+  }
+
   const handleAddCatalogProduct = (product: CatalogProduct) => {
-    setManualProducts((prev) => [...prev, catalogProductToManual(product)])
+    setManualProducts((prev) => [
+      ...prev,
+      catalogProductToManual(product, getManualProductQuery(activeManualProductQueryIndex)),
+    ])
   }
 
   const handleManualProductChange = (
@@ -694,6 +722,142 @@ export function DashboardPage() {
   }
 
   const hasSelections = Object.keys(selectedProducts).length > 0 || manualProducts.length > 0
+
+  const renderManualProductPanel = () => (
+    <div className="mt-3 rounded-xl border border-dashed bg-muted/10 p-3">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border bg-background/70 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Search catalog
+          </p>
+          <div className="flex gap-2">
+            <Input
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  handleSearchProducts()
+                }
+              }}
+              placeholder="Search product code, brand, HSN..."
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleSearchProducts}
+              disabled={productSearchLoading}
+            >
+              {productSearchLoading ? "Searching..." : "Search"}
+            </Button>
+          </div>
+          {productSearchError && (
+            <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
+          )}
+          {productResults.length > 0 && (
+            <div className="mt-3 grid gap-2">
+              {productResults.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex items-start justify-between gap-3 rounded-lg border bg-muted/10 p-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {product.productdescription || product.productcode || "Catalog product"}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      {product.brand && <span>{product.brand}</span>}
+                      {product.productcode && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                          {product.productcode}
+                        </span>
+                      )}
+                      {product.unitprice != null && (
+                        <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => handleAddCatalogProduct(product)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border bg-background/70 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Custom line
+          </p>
+          <div className="grid gap-2 md:grid-cols-2">
+            <Input
+              value={customProduct.queryName}
+              onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
+              placeholder="Line name"
+            />
+            <Input
+              value={customProduct.quantity}
+              onChange={(event) => handleCustomProductChange("quantity", event.target.value)}
+              placeholder="Quantity"
+              type="number"
+              min="1"
+            />
+            <Input
+              value={customProduct.description}
+              onChange={(event) => handleCustomProductChange("description", event.target.value)}
+              placeholder="Description"
+            />
+            <Input
+              value={customProduct.code}
+              onChange={(event) => handleCustomProductChange("code", event.target.value)}
+              placeholder="Code"
+            />
+            <Input
+              value={customProduct.brand}
+              onChange={(event) => handleCustomProductChange("brand", event.target.value)}
+              placeholder="Brand"
+            />
+            <Input
+              value={customProduct.price}
+              onChange={(event) => handleCustomProductChange("price", event.target.value)}
+              placeholder="Price"
+              type="number"
+              min="0"
+            />
+            <Input
+              value={customProduct.hsnCode}
+              onChange={(event) => handleCustomProductChange("hsnCode", event.target.value)}
+              placeholder="HSN"
+            />
+            <Input
+              value={customProduct.gstRate}
+              onChange={(event) => handleCustomProductChange("gstRate", event.target.value)}
+              placeholder="GST %"
+              type="number"
+              min="0"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="mt-3 gap-1.5"
+            onClick={handleAddCustomProduct}
+          >
+            <PlusIcon className="size-3.5" />
+            Add custom line
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <AppLayout>
@@ -1010,16 +1174,28 @@ export function DashboardPage() {
                                 Qty: {sr.query.quantity}
                               </span>
                             </div>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <MatchStatusBadge status={sr.status} />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
-                              </TooltipContent>
-                            </Tooltip>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1.5 px-2 text-[11px]"
+                                onClick={() => handleToggleManualProductPanel(i)}
+                              >
+                                <PlusIcon className="size-3" />
+                                Add other product
+                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <MatchStatusBadge status={sr.status} />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
 
                           {/* Product cards */}
@@ -1194,6 +1370,7 @@ export function DashboardPage() {
                               No matching products found in the catalog
                             </div>
                           )}
+                          {activeManualProductQueryIndex === i && renderManualProductPanel()}
                         </div>
                       ))}
                     </div>
@@ -1201,156 +1378,12 @@ export function DashboardPage() {
                     <div className="mt-5 rounded-xl border border-dashed bg-muted/10 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium">Need another product?</p>
+                          <p className="text-sm font-medium">Added products</p>
                           <p className="text-[11px] text-muted-foreground">
-                            Add from catalog or type a custom quote line.
+                            Extra catalog or custom quote lines added from product rows.
                           </p>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5"
-                          onClick={() => setShowManualProductPanel((prev) => !prev)}
-                        >
-                          <PlusIcon className="size-3.5" />
-                          Add other product
-                        </Button>
                       </div>
-
-                      {showManualProductPanel && (
-                        <div className="mt-4 space-y-4">
-                          <div className="rounded-lg border bg-background/70 p-3">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Search catalog
-                            </p>
-                            <div className="flex gap-2">
-                              <Input
-                                value={productSearch}
-                                onChange={(event) => setProductSearch(event.target.value)}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    event.preventDefault()
-                                    handleSearchProducts()
-                                  }
-                                }}
-                                placeholder="Search product code, brand, HSN..."
-                              />
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={handleSearchProducts}
-                                disabled={productSearchLoading}
-                              >
-                                {productSearchLoading ? "Searching..." : "Search"}
-                              </Button>
-                            </div>
-                            {productSearchError && (
-                              <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
-                            )}
-                            {productResults.length > 0 && (
-                              <div className="mt-3 grid gap-2">
-                                {productResults.map((product) => (
-                                  <div
-                                    key={product.id}
-                                    className="flex items-start justify-between gap-3 rounded-lg border bg-muted/10 p-2.5"
-                                  >
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm font-medium">
-                                        {product.productdescription || product.productcode || "Catalog product"}
-                                      </p>
-                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                        {product.brand && <span>{product.brand}</span>}
-                                        {product.productcode && (
-                                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
-                                            {product.productcode}
-                                          </span>
-                                        )}
-                                        {product.unitprice != null && (
-                                          <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="shrink-0"
-                                      onClick={() => handleAddCatalogProduct(product)}
-                                    >
-                                      Add
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="rounded-lg border bg-background/70 p-3">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                              Custom line
-                            </p>
-                            <div className="grid gap-2 md:grid-cols-2">
-                              <Input
-                                value={customProduct.queryName}
-                                onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
-                                placeholder="Line name"
-                              />
-                              <Input
-                                value={customProduct.quantity}
-                                onChange={(event) => handleCustomProductChange("quantity", event.target.value)}
-                                placeholder="Quantity"
-                                type="number"
-                                min="1"
-                              />
-                              <Input
-                                value={customProduct.description}
-                                onChange={(event) => handleCustomProductChange("description", event.target.value)}
-                                placeholder="Description"
-                              />
-                              <Input
-                                value={customProduct.code}
-                                onChange={(event) => handleCustomProductChange("code", event.target.value)}
-                                placeholder="Code"
-                              />
-                              <Input
-                                value={customProduct.brand}
-                                onChange={(event) => handleCustomProductChange("brand", event.target.value)}
-                                placeholder="Brand"
-                              />
-                              <Input
-                                value={customProduct.price}
-                                onChange={(event) => handleCustomProductChange("price", event.target.value)}
-                                placeholder="Price"
-                                type="number"
-                                min="0"
-                              />
-                              <Input
-                                value={customProduct.hsnCode}
-                                onChange={(event) => handleCustomProductChange("hsnCode", event.target.value)}
-                                placeholder="HSN"
-                              />
-                              <Input
-                                value={customProduct.gstRate}
-                                onChange={(event) => handleCustomProductChange("gstRate", event.target.value)}
-                                placeholder="GST %"
-                                type="number"
-                                min="0"
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="mt-3 gap-1.5"
-                              onClick={handleAddCustomProduct}
-                            >
-                              <PlusIcon className="size-3.5" />
-                              Add custom line
-                            </Button>
-                          </div>
-                        </div>
-                      )}
 
                       {manualProducts.length > 0 && (
                         <div className="mt-4 space-y-2">
