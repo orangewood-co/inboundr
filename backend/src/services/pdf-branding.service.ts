@@ -161,6 +161,7 @@ export function drawPdfBrandHeader(
 export function drawPdfFooter(doc: PDFKit.PDFDocument, reference: string): void {
   const range = doc.bufferedPageRange();
   const generated = `Generated ${formatPdfDate(new Date())}`;
+  const safeReference = reference.replace(/\s+/g, " ").trim() || "PDF";
 
   for (let index = range.start; index < range.start + range.count; index += 1) {
     doc.switchToPage(index);
@@ -169,20 +170,84 @@ export function drawPdfFooter(doc: PDFKit.PDFDocument, reference: string): void 
       .font("Helvetica")
       .fontSize(8)
       .fillColor(PDF_COLORS.muted)
-      .text(`${reference} · ${generated}`, PDF_PAGE.margin, footerY, {
+      .text(`${safeReference} · ${generated}`, PDF_PAGE.margin, footerY, {
         width: 320,
+        height: 10,
+        ellipsis: true,
+        lineBreak: false,
       })
       .text(`Page ${index + 1} of ${range.count}`, PDF_PAGE.width - PDF_PAGE.margin - 100, footerY, {
         width: 100,
+        height: 10,
         align: "right",
+        lineBreak: false,
       });
   }
+  doc.switchToPage(range.start + range.count - 1);
 }
 
 export function ensurePdfRoom(doc: PDFKit.PDFDocument, currentY: number, neededHeight: number): number {
   if (currentY + neededHeight <= PDF_PAGE.height - PDF_PAGE.margin - PDF_PAGE.footerHeight) return currentY;
   doc.addPage();
   return PDF_PAGE.margin;
+}
+
+export function drawPdfTextBlock(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  y: number,
+  options: {
+    font?: string;
+    fontSize?: number;
+    color?: string;
+    width?: number;
+    lineGap?: number;
+  } = {}
+): number {
+  const width = options.width ?? PDF_PAGE.width - PDF_PAGE.margin * 2;
+  const font = options.font ?? "Helvetica";
+  const fontSize = options.fontSize ?? 9;
+  const lineGap = options.lineGap ?? 2;
+  const lineHeight = fontSize + lineGap + 2;
+  const paragraphs = (text || "-").split(/\n{2,}/);
+  let currentY = y;
+
+  doc.font(font).fontSize(fontSize).fillColor(options.color ?? PDF_COLORS.text);
+
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    const words = paragraph.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+    const lines: string[] = [];
+    let line = "";
+
+    words.forEach((word) => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (doc.widthOfString(candidate) <= width || !line) {
+        line = candidate;
+      } else {
+        lines.push(line);
+        line = word;
+      }
+    });
+    if (line) lines.push(line);
+    if (lines.length === 0) lines.push("-");
+
+    lines.forEach((lineText) => {
+      currentY = ensurePdfRoom(doc, currentY, lineHeight);
+      doc.text(lineText, PDF_PAGE.margin, currentY, {
+        width,
+        height: lineHeight,
+        lineBreak: false,
+      });
+      currentY += lineHeight;
+    });
+
+    if (paragraphIndex < paragraphs.length - 1) {
+      currentY = ensurePdfRoom(doc, currentY, lineHeight);
+      currentY += lineHeight / 2;
+    }
+  });
+
+  return currentY + 10;
 }
 
 export function drawPdfKeyValueGrid(

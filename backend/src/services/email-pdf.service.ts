@@ -5,6 +5,7 @@ import {
   drawPdfFooter,
   drawPdfKeyValueGrid,
   drawPdfSectionTitle,
+  drawPdfTextBlock,
   ensurePdfRoom,
   formatPdfDateTime,
   PDF_COLORS,
@@ -60,33 +61,27 @@ function stripHtml(value: string): string {
     .trim();
 }
 
-function textOrDash(value: string | null | undefined): string {
-  return value?.trim() || "-";
+function decodeQuotedPrintable(value: string): string {
+  return value
+    .replace(/=\r?\n/g, "")
+    .replace(/=([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 }
 
-function drawWrappedText(
-  doc: PDFKit.PDFDocument,
-  text: string,
-  y: number,
-  options: { fontSize?: number; color?: string; maxHeight?: number } = {}
-): number {
-  const fontSize = options.fontSize ?? 9;
-  const maxHeight = options.maxHeight ?? 520;
-  const width = PDF_PAGE.width - PDF_PAGE.margin * 2;
-  const height = Math.min(maxHeight, doc.heightOfString(text, { width, lineGap: 2 }));
-  let currentY = ensurePdfRoom(doc, y, height + 16);
+function cleanEmailText(value: string | null | undefined): string {
+  if (!value) return "";
+  return decodeQuotedPrintable(value)
+    .replace(/\r\n/g, "\n")
+    .replace(/\u0000/g, "")
+    .replace(/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{4,}/g, "\n\n\n")
+    .trim();
+}
 
-  doc
-    .font("Helvetica")
-    .fontSize(fontSize)
-    .fillColor(options.color ?? PDF_COLORS.text)
-    .text(text, PDF_PAGE.margin, currentY, {
-      width,
-      lineGap: 2,
-    });
-
-  currentY = doc.y + 18;
-  return currentY;
+function selectBody(email: PdfEmail): string {
+  const text = cleanEmailText(email.bodyText);
+  if (text) return text;
+  return cleanEmailText(stripHtml(email.bodyHtml || ""));
 }
 
 function drawAttachmentList(doc: PDFKit.PDFDocument, email: PdfEmail, y: number): number {
@@ -146,19 +141,25 @@ export function createEmailPdfDocument(options: {
 
   if (classification?.reason || classification?.errorMessage) {
     y = drawPdfSectionTitle(doc, "Classification", y);
-    y = drawWrappedText(doc, [classification.reason, classification.errorMessage].filter(Boolean).join("\n"), y, {
+    y = drawPdfTextBlock(doc, cleanEmailText([classification.reason, classification.errorMessage].filter(Boolean).join("\n")), y, {
       color: classification.errorMessage ? PDF_COLORS.danger : PDF_COLORS.text,
     });
   }
 
   if (email.snippet) {
     y = drawPdfSectionTitle(doc, "Snippet", y);
-    y = drawWrappedText(doc, email.snippet, y, { color: PDF_COLORS.muted });
+    y = drawPdfTextBlock(doc, cleanEmailText(email.snippet), y, { color: PDF_COLORS.muted });
   }
 
-  const body = textOrDash(email.bodyText) !== "-" ? textOrDash(email.bodyText) : stripHtml(email.bodyHtml || "");
+  const body = selectBody(email);
   y = drawPdfSectionTitle(doc, "Message", y);
-  y = drawWrappedText(doc, body || "-", y);
+  y = drawPdfTextBlock(doc, body || "-", y);
+  if (email.bodyHtml?.includes("<img")) {
+    y = drawPdfTextBlock(doc, "Note: inline email images are not embedded in this PDF export.", y, {
+      color: PDF_COLORS.muted,
+      fontSize: 8,
+    });
+  }
   y = drawAttachmentList(doc, email, y);
 
   drawPdfFooter(doc, email.subject || "Email");

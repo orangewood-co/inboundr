@@ -5,6 +5,7 @@ import {
   drawPdfFooter,
   drawPdfKeyValueGrid,
   drawPdfSectionTitle,
+  drawPdfTextBlock,
   ensurePdfRoom,
   formatPdfDateTime,
   PDF_COLORS,
@@ -69,14 +70,7 @@ function money(value: number | null | undefined): string {
 }
 
 function drawParagraph(doc: PDFKit.PDFDocument, text: string, y: number, color = PDF_COLORS.text): number {
-  const width = PDF_PAGE.width - PDF_PAGE.margin * 2;
-  const height = doc.heightOfString(text || "-", { width, lineGap: 2 }) + 16;
-  const currentY = ensurePdfRoom(doc, y, height);
-  doc.font("Helvetica").fontSize(9).fillColor(color).text(text || "-", PDF_PAGE.margin, currentY, {
-    width,
-    lineGap: 2,
-  });
-  return doc.y + 18;
+  return drawPdfTextBlock(doc, text || "-", y, { color });
 }
 
 function drawCustomer(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): number {
@@ -128,15 +122,17 @@ function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): num
       .font("Helvetica-Bold")
       .fontSize(9)
       .fillColor(PDF_COLORS.text)
-      .text(result.query.name, PDF_PAGE.margin + 12, currentY + 10, { width: 320, ellipsis: true })
+      .text(result.query.name, PDF_PAGE.margin + 12, currentY + 10, { width: 320, height: 12, ellipsis: true })
       .fillColor(PDF_COLORS.muted)
       .font("Helvetica")
       .text(`Qty ${result.query.quantity} · ${statusLabel(result.status)}`, PDF_PAGE.margin + 12, currentY + 24, {
         width: 320,
+        height: 12,
         ellipsis: true,
       })
       .text(result.matchedBrand || "-", PDF_PAGE.width - PDF_PAGE.margin - 160, currentY + 10, {
         width: 148,
+        height: 12,
         align: "right",
         ellipsis: true,
       });
@@ -150,20 +146,24 @@ function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): num
         .fillColor(PDF_COLORS.text)
         .text(`${index + 1}. ${match.description || match.code || "Matched product"}`, PDF_PAGE.margin + 12, currentY, {
           width: 300,
+          height: 12,
           ellipsis: true,
         })
         .font("Helvetica")
         .fillColor(PDF_COLORS.muted)
         .text([match.brand, match.code, match.hsnCode ? `HSN ${match.hsnCode}` : null].filter(Boolean).join(" · ") || "-", PDF_PAGE.margin + 12, currentY + 14, {
           width: 300,
+          height: 12,
           ellipsis: true,
         })
         .text(money(match.price), PDF_PAGE.width - PDF_PAGE.margin - 130, currentY, {
           width: 70,
+          height: 12,
           align: "right",
         })
         .text(`${Math.round(match.score * 100)}%`, PDF_PAGE.width - PDF_PAGE.margin - 52, currentY, {
           width: 52,
+          height: 12,
           align: "right",
         });
       currentY += 34;
