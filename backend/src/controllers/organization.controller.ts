@@ -49,6 +49,7 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
           preferences: {
             primaryColor: normalizeHexColor(preferences.primaryColor),
             theme: preferences.theme === "light" ? "light" : "dark",
+            colorTheme: stringValue(preferences.colorTheme) || "default",
             pricing: stringValue(preferences.pricing) || "INR",
             defaultTerms: stringValue(preferences.defaultTerms),
           },

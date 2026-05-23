@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ThemePicker } from "@/components/theme-picker"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { setActiveOrganizationId } from "@/lib/organization-context"
 import {
@@ -79,6 +80,7 @@ interface Organization {
   preferences: {
     primaryColor: string
     theme: "dark" | "light"
+    colorTheme: string
     pricing: string
     defaultTerms: string
   }
@@ -125,6 +127,7 @@ const emptyOrganizationForm: OrganizationFormState = {
   preferences: {
     primaryColor: "#f5b400",
     theme: "dark",
+    colorTheme: "default",
     pricing: "INR",
     defaultTerms: "",
   },
@@ -303,6 +306,7 @@ function OrganizationTab() {
         preferences: {
           primaryColor: data.organization.preferences?.primaryColor ?? "#f5b400",
           theme: data.organization.preferences?.theme ?? "dark",
+          colorTheme: data.organization.preferences?.colorTheme ?? "default",
           pricing: data.organization.preferences?.pricing ?? "INR",
           defaultTerms: data.organization.preferences?.defaultTerms ?? "",
         },
@@ -560,7 +564,7 @@ function OrganizationTab() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="theme">Theme</Label>
+                  <Label htmlFor="theme">Mode</Label>
                   <Select
                     value={form.preferences.theme}
                     onValueChange={(value) => updatePreference("theme", value)}
@@ -578,6 +582,18 @@ function OrganizationTab() {
                   <Label htmlFor="pricing">Pricing currency</Label>
                   <Input id="pricing" value={form.preferences.pricing} onChange={(event) => updatePreference("pricing", event.target.value)} />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Color theme</Label>
+                <p className="text-[13px] text-muted-foreground">
+                  Sets the default color theme for all users in this organization.
+                </p>
+                <ThemePicker
+                  value={form.preferences.colorTheme}
+                  onChange={(name) => updatePreference("colorTheme", name)}
+                  className="pt-1"
+                />
               </div>
 
               <div className="space-y-1.5">

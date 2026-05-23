@@ -11,6 +11,7 @@ export interface IOrganizationDefaultContact {
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
+  colorTheme: string;
   pricing: string;
   defaultTerms: string;
 }
@@ -40,6 +41,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   {
     primaryColor: { type: String, default: "#f5b400" },
     theme: { type: String, enum: ["dark", "light"], default: "dark" },
+    colorTheme: { type: String, default: "default", trim: true },
     pricing: { type: String, default: "INR" },
     defaultTerms: { type: String, default: "" },
   },

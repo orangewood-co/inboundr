@@ -16,6 +16,7 @@ interface OrganizationBranding {
   logoDisplayUrl: string
   primaryColor: string
   theme: OrganizationTheme
+  colorTheme: string
 }
 
 interface OrganizationBrandingContextValue {
@@ -138,7 +139,7 @@ export function OrganizationBrandingProvider({
 }: {
   children: React.ReactNode
 }) {
-  const { setTheme } = useTheme()
+  const { setTheme, setOrgColorTheme } = useTheme()
   const [branding, setBranding] = React.useState<OrganizationBranding | null>(readCachedBranding)
   const [loading, setLoading] = React.useState(true)
 
@@ -167,6 +168,7 @@ export function OrganizationBrandingProvider({
           normalizeHexColor(organization?.preferences?.primaryColor) ??
           DEFAULT_PRIMARY_COLOR,
         theme: organization?.preferences?.theme === "light" ? "light" : "dark",
+        colorTheme: organization?.preferences?.colorTheme ?? "default",
       }
 
       setBranding(freshBranding)
@@ -176,10 +178,11 @@ export function OrganizationBrandingProvider({
       setBranding(null)
       clearCachedBranding()
       applyPrimaryColor(null)
+      setOrgColorTheme(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setOrgColorTheme])
 
   React.useEffect(() => {
     void refreshBranding()
@@ -200,12 +203,13 @@ export function OrganizationBrandingProvider({
   }, [refreshBranding])
 
   React.useEffect(() => {
-    applyPrimaryColor(branding?.primaryColor)
-
     if (branding?.theme) {
       setTheme(branding.theme)
     }
-  }, [branding?.primaryColor, branding?.theme, setTheme])
+
+    setOrgColorTheme(branding?.colorTheme ?? null)
+    applyPrimaryColor(branding?.primaryColor)
+  }, [branding?.primaryColor, branding?.theme, branding?.colorTheme, setTheme, setOrgColorTheme])
 
   const value = React.useMemo(
     () => ({
