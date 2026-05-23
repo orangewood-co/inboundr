@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
 import { requestPasswordReset } from "@/lib/auth-client"
 
 export function ForgotPasswordPage() {
@@ -66,7 +67,8 @@ export function ForgotPasswordPage() {
         ) : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Sending..." : "Send reset link"}
+          {isSubmitting && <Spinner data-icon="inline-start" />}
+          Send reset link
         </Button>
       </form>
 

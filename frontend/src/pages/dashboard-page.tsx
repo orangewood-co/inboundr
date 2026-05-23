@@ -7,6 +7,7 @@ import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import {
   FileTextIcon,
   RefreshCwIcon,
@@ -748,7 +749,8 @@ export function DashboardPage() {
               onClick={handleSearchProducts}
               disabled={productSearchLoading}
             >
-              {productSearchLoading ? "Searching..." : "Search"}
+              {productSearchLoading && <Spinner data-icon="inline-start" />}
+              Search
             </Button>
           </div>
           {productSearchError && (
@@ -1484,11 +1486,11 @@ export function DashboardPage() {
                         className="gap-2"
                       >
                         {generating ? (
-                          <LoaderIcon className="size-4 animate-spin" />
+                          <Spinner data-icon="inline-start" />
                         ) : (
                           <SparklesIcon className="size-4" />
                         )}
-                        {generating ? "Generating Quote..." : "Generate Quote"}
+                        Generate Quote
                       </Button>
                       {!hasSelections && (
                         <p className="text-xs text-muted-foreground">
@@ -1550,15 +1552,13 @@ export function DashboardPage() {
                         className="gap-2"
                       >
                         {sendingQuote || reply.sendStatus === "sending" ? (
-                          <LoaderIcon className="size-4 animate-spin" />
+                          <Spinner data-icon="inline-start" />
                         ) : (
                           <SendIcon className="size-4" />
                         )}
                         {reply.sendStatus === "sent"
                           ? "Quote Sent"
-                          : sendingQuote || reply.sendStatus === "sending"
-                            ? "Sending..."
-                            : "Send Quote"}
+                          : "Send Quote"}
                       </Button>
                       <p className="text-xs text-muted-foreground">
                         Sends from the connected Gmail account on the original thread.
@@ -1582,8 +1582,12 @@ export function DashboardPage() {
                         disabled={retrying}
                         onClick={() => handleRetry(detail._id)}
                       >
-                        <RotateCcwIcon className={`size-3 ${retrying ? "animate-spin" : ""}`} />
-                        {retrying ? "Rerunning..." : "Rerun processing"}
+                        {retrying ? (
+                          <Spinner className="size-3" data-icon="inline-start" />
+                        ) : (
+                          <RotateCcwIcon className="size-3" />
+                        )}
+                        Rerun processing
                       </Button>
                     )}
                   </div>
@@ -1610,8 +1614,12 @@ export function DashboardPage() {
                         disabled={retrying}
                         onClick={() => handleRetry(detail._id)}
                       >
-                        <RotateCcwIcon className={`size-3.5 ${retrying ? "animate-spin" : ""}`} />
-                        {retrying ? "Retrying..." : "Retry Processing"}
+                        {retrying ? (
+                          <Spinner className="size-3.5" data-icon="inline-start" />
+                        ) : (
+                          <RotateCcwIcon className="size-3.5" />
+                        )}
+                        Retry Processing
                       </Button>
                     </div>
                   </div>

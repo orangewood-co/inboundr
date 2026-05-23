@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Select,
   SelectContent,
@@ -610,7 +611,8 @@ function OrganizationTab() {
 
               <div className="flex">
                 <Button onClick={saveOrganization} disabled={saving || !form.name.trim()}>
-                  {saving ? "Saving..." : "Save Organization"}
+                  {saving && <Spinner data-icon="inline-start" />}
+                  Save Organization
                 </Button>
               </div>
             </div>
@@ -761,8 +763,12 @@ function AccountTab() {
             onClick={handleConnectGmail}
             disabled={connecting}
           >
-            <MailIcon className="size-4" />
-            {connecting ? "Connecting..." : "Connect Gmail"}
+            {connecting ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <MailIcon className="size-4" />
+            )}
+            Connect Gmail
           </Button>
         }
       >
@@ -821,7 +827,8 @@ function AccountTab() {
                   onClick={() => handleDisconnectGmail(account._id)}
                   disabled={disconnectingId === account._id}
                 >
-                  {disconnectingId === account._id ? "Disconnecting..." : "Disconnect"}
+                  {disconnectingId === account._id && <Spinner data-icon="inline-start" />}
+                  Disconnect
                 </Button>
               </div>
             ))
@@ -1245,8 +1252,12 @@ function MembersTab() {
             </SelectContent>
           </Select>
           <Button className="gap-1.5" onClick={inviteMember} disabled={submitting || !email.trim()}>
-            <PlusIcon className="size-4" />
-            {submitting ? "Sending..." : "Invite"}
+            {submitting ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <PlusIcon className="size-4" />
+            )}
+            Invite
           </Button>
         </div>
       </SettingsCard>
@@ -1537,10 +1548,12 @@ function NotificationsTab() {
 
           <div className="flex items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save preferences"}
+              {saving && <Spinner data-icon="inline-start" />}
+              Save preferences
             </Button>
             <Button variant="outline" onClick={handleSendTest} disabled={sendingTest}>
-              {sendingTest ? "Sending..." : "Send test email"}
+              {sendingTest && <Spinner data-icon="inline-start" />}
+              Send test email
             </Button>
           </div>
         </div>

@@ -9,7 +9,6 @@ import {
   ChevronRightIcon,
   Edit3Icon,
   IndianRupeeIcon,
-  LoaderIcon,
   PackagePlusIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -24,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Sheet,
   SheetContent,
@@ -885,7 +885,7 @@ export default function ProductsPage() {
           )}
           <SheetFooter className="border-t bg-muted/30">
             <Button onClick={saveProduct} disabled={saving}>
-              {saving && <LoaderIcon className="size-4 animate-spin" />}
+              {saving && <Spinner data-icon="inline-start" />}
               {editingProduct ? "Save changes" : "Create product"}
             </Button>
             <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>

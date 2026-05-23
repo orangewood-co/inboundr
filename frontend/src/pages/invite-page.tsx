@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Link, useParams } from "@tanstack/react-router"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { getSession } from "@/lib/auth-client"
 import { setActiveOrganizationId } from "@/lib/organization-context"
 
@@ -176,7 +177,8 @@ export function InvitePage() {
               <div className="grid gap-3">
                 {sessionEmail && !signedInWithWrongEmail ? (
                   <Button size="lg" onClick={acceptInvitation} disabled={accepting}>
-                    {accepting ? "Accepting..." : "Accept invitation"}
+                    {accepting && <Spinner data-icon="inline-start" />}
+                    Accept invitation
                   </Button>
                 ) : (
                   <>

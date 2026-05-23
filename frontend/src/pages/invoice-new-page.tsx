@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, Link, useSearch } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
-  LoaderIcon,
   PlusIcon,
   SendIcon,
   TrashIcon,
@@ -17,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -374,12 +374,15 @@ export default function InvoiceNewPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void saveInvoice(false)} disabled={saving}>
-              {saving && <LoaderIcon className="size-3.5 animate-spin" />}
+              {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
               Save draft
             </Button>
             <Button size="sm" onClick={() => void saveInvoice(true)} disabled={saving}>
-              {saving && <LoaderIcon className="size-3.5 animate-spin" />}
-              <SendIcon className="size-3.5" />
+              {saving ? (
+                <Spinner className="size-3.5" data-icon="inline-start" />
+              ) : (
+                <SendIcon className="size-3.5" />
+              )}
               Save & Send
             </Button>
           </div>
@@ -561,12 +564,15 @@ export default function InvoiceNewPage() {
               <Link to="/invoices">Cancel</Link>
             </Button>
             <Button variant="outline" onClick={() => void saveInvoice(false)} disabled={saving}>
-              {saving && <LoaderIcon className="size-3.5 animate-spin" />}
+              {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
               Save draft
             </Button>
             <Button onClick={() => void saveInvoice(true)} disabled={saving}>
-              {saving && <LoaderIcon className="size-3.5 animate-spin" />}
-              <SendIcon className="size-3.5" />
+              {saving ? (
+                <Spinner className="size-3.5" data-icon="inline-start" />
+              ) : (
+                <SendIcon className="size-3.5" />
+              )}
               Save & Send
             </Button>
           </div>

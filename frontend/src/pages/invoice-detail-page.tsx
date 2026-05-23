@@ -11,7 +11,6 @@ import {
   EditIcon,
   EyeIcon,
   FileTextIcon,
-  LoaderIcon,
   MoreHorizontalIcon,
   RefreshCwIcon,
   SendIcon,
@@ -23,6 +22,7 @@ import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -403,7 +403,7 @@ export default function InvoiceDetailPage() {
               onClick={() => void runAction("send")}
               disabled={actionLoading !== null || !isDraft}
             >
-              {actionLoading === "send" ? <LoaderIcon className="size-3.5 animate-spin" /> : <SendIcon className="size-3.5" />}
+              {actionLoading === "send" ? <Spinner className="size-3.5" data-icon="inline-start" /> : <SendIcon className="size-3.5" />}
               Send
             </Button>
             <Button variant="outline" size="sm" onClick={openPreview}>
@@ -647,8 +647,11 @@ export default function InvoiceDetailPage() {
                   disabled={actionLoading !== null || !paymentAmount || invoice.status === "paid" || invoice.status === "cancelled"}
                   className="w-full sm:w-auto sm:justify-self-end"
                 >
-                  {actionLoading === "payments" && <LoaderIcon className="size-3.5 animate-spin" />}
-                  <CheckCircle2Icon className="size-3.5" />
+                  {actionLoading === "payments" ? (
+                    <Spinner className="size-3.5" data-icon="inline-start" />
+                  ) : (
+                    <CheckCircle2Icon className="size-3.5" />
+                  )}
                   Record payment
                 </Button>
               </div>

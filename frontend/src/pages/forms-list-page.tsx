@@ -16,6 +16,7 @@ import { FormTemplateDialog } from "@/components/form-template-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -165,7 +166,7 @@ export default function FormsListPage() {
               </div>
               <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
                 {creating ? (
-                  <LoaderIcon className="size-4 animate-spin" />
+                  <Spinner data-icon="inline-start" />
                 ) : (
                   <PlusIcon className="size-4" />
                 )}

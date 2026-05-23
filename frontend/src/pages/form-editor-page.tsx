@@ -56,6 +56,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -488,7 +489,7 @@ export default function FormEditorPage() {
       </Badge>
       <div className="mx-1 h-4 w-px bg-border" />
       <Button variant="outline" size="sm" onClick={() => void saveForm("draft")} disabled={saving}>
-        {saving ? <LoaderIcon className="size-3.5 animate-spin" /> : <SaveIcon className="size-3.5" />}
+        {saving ? <Spinner className="size-3.5" data-icon="inline-start" /> : <SaveIcon className="size-3.5" />}
         Save
       </Button>
       <Button size="sm" onClick={() => void saveForm("published")} disabled={saving}>Publish</Button>

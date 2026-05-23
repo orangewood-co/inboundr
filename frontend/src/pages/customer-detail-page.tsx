@@ -4,7 +4,6 @@ import {
   AlertCircleIcon,
   ArrowLeftIcon,
   Edit3Icon,
-  LoaderIcon,
   MailIcon,
   PhoneIcon,
   SaveIcon,
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -374,7 +374,7 @@ export default function CustomerDetailPage() {
                       Cancel
                     </Button>
                     <Button onClick={() => void saveCustomer()} disabled={saving}>
-                      {saving ? <LoaderIcon className="size-4 animate-spin" /> : <SaveIcon className="size-4" />}
+                      {saving ? <Spinner data-icon="inline-start" /> : <SaveIcon className="size-4" />}
                       Save changes
                     </Button>
                   </div>

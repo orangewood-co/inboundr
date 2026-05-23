@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Select,
   SelectContent,
@@ -488,7 +489,7 @@ export default function CustomersImportPage() {
                   Back
                 </Button>
                 <Button onClick={() => void submitImport()} disabled={validationErrors.length > 0 || importing}>
-                  {importing && <LoaderIcon className="size-4 animate-spin" />}
+                  {importing && <Spinner data-icon="inline-start" />}
                   Import customers
                 </Button>
               </div>

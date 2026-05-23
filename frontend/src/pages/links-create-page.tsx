@@ -2,7 +2,6 @@ import { type FormEvent, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ChevronDownIcon,
-  LoaderIcon,
   MailIcon,
   QrCodeIcon,
   SparklesIcon,
@@ -15,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import {
   Collapsible,
@@ -289,7 +289,7 @@ export default function LinksCreatePage() {
                 <Link to="/links">Cancel</Link>
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving && <LoaderIcon className="size-4 animate-spin" />}
+                {saving && <Spinner data-icon="inline-start" />}
                 Create link
               </Button>
             </div>

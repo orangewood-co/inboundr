@@ -7,7 +7,6 @@ import {
   DownloadIcon,
   Edit3Icon,
   EyeIcon,
-  LoaderIcon,
   RefreshCwIcon,
   SearchIcon,
   UploadIcon,
@@ -18,6 +17,7 @@ import { AppLayout } from "@/components/app-layout"
 import { CopyableText } from "@/components/copy-button"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   HoverCard,
   HoverCardContent,
@@ -725,7 +725,7 @@ export default function CustomersPage() {
               )}
               <SheetFooter className="border-t bg-muted/30">
                 <Button onClick={saveCustomer} disabled={saving}>
-                  {saving && <LoaderIcon className="size-4 animate-spin" />}
+                  {saving && <Spinner data-icon="inline-start" />}
                   Save changes
                 </Button>
                 <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>

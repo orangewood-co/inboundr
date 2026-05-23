@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Spinner } from "@/components/ui/spinner"
 import { signIn, signUp } from "@/lib/auth-client"
 
 type AuthPageProps = {
@@ -191,7 +192,8 @@ export function AuthPage({
             ) : null}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Please wait..." : submitLabel}
+              {isSubmitting && <Spinner data-icon="inline-start" />}
+              {submitLabel}
             </Button>
           </form>
 
