@@ -177,7 +177,42 @@ bun run build:landing
 
 ## Deployment
 
-For the EC2 backend deployment runbook, see [`docs/deployment/ec2-backend.md`](docs/deployment/ec2-backend.md).
+Production deployments are handled by GitHub Actions workflows in `.github/workflows`. Each app has its own workflow so changes only rebuild and deploy the workspace they affect.
+
+| Workflow | App | Runs on | Deploy target |
+|---|---|---|---|
+| `backend-deploy.yml` | `backend` | Backend, deployment script, deployment docs, root package, or lockfile changes | EC2 via SSH and `systemd` |
+| `frontend-deploy.yml` | `frontend` | Frontend, root package, lockfile, or frontend deployment docs changes | S3 + CloudFront |
+| `embed-deploy.yml` | `embed` | Embed, root package, lockfile, or embed workflow changes | S3 + CloudFront |
+| `landing-deploy.yml` | `landing` | Landing, root package, lockfile, or landing workflow changes | S3 + CloudFront |
+
+### CI/CD Guide
+
+- Pull requests to `main` run the relevant workspace checks before review. Backend runs `bun run typecheck:backend`; frontend apps run typecheck and production builds.
+- Pushes to `main` run the same checks, then deploy only after the check/build job succeeds.
+- Static apps (`frontend`, `embed`, and `landing`) build a `dist` artifact, upload hashed assets to S3 with long-lived cache headers, upload `index.html` with no-cache headers, then invalidate the matching CloudFront distribution.
+- The backend workflow connects to the EC2 host over SSH, runs `scripts/deploy/ec2-deploy.sh`, installs dependencies with the frozen lockfile, restarts the `inboundr-backend` service, and checks the API health URL.
+- All deployment jobs use the `production` GitHub environment and read infrastructure details from GitHub repository secrets and variables.
+
+Common GitHub configuration:
+
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_REGION
+FRONTEND_S3_BUCKET
+EMBED_S3_BUCKET
+LANDING_S3_BUCKET
+CLOUDFRONT_DISTRIBUTION_ID
+EMBED_CLOUDFRONT_DISTRIBUTION_ID
+LANDING_CLOUDFRONT_DISTRIBUTION_ID
+EC2_HOST
+EC2_USER
+EC2_SSH_KEY
+API_HEALTH_URL
+```
+
+For the detailed backend EC2 runbook, see [`docs/deployment/ec2-backend.md`](docs/deployment/ec2-backend.md).
 
 ---
 
