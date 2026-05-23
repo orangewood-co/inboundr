@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  downloadEmailPdf,
   emailWebhookController,
   getEmail,
   getEmailAttachment,
@@ -23,6 +24,7 @@ router.get(
   requireOrganization,
   getEmailAttachment
 );
+router.get("/:id/pdf", requireAuth, requireOrganization, downloadEmailPdf);
 router.get("/:id", requireAuth, requireOrganization, getEmail);
 
 export default router;

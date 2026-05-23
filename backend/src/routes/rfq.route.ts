@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listRFQs, getRFQ, retryRFQ, generateQuote, getQuoteReply, sendQuoteReply } from "../controllers/rfq.controller";
+import { listRFQs, getRFQ, retryRFQ, generateQuote, getQuoteReply, sendQuoteReply, downloadRFQPdf } from "../controllers/rfq.controller";
 import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -7,6 +7,7 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireOrganization);
 router.get("/", listRFQs);
+router.get("/:id/pdf", downloadRFQPdf);
 router.get("/:id", getRFQ);
 router.post("/:id/retry", retryRFQ);
 router.post("/:id/generate-quote", generateQuote);

@@ -1,6 +1,14 @@
-import PDFDocument from "pdfkit";
 import type { Response } from "express";
 import type { IInvoice, IInvoiceLineItem } from "../models/invoice.model";
+import {
+  createBrandedPdfDocument,
+  drawPdfFooter,
+  ensurePdfRoom,
+  formatPdfDate as date,
+  PDF_COLORS as COLORS,
+  PDF_PAGE as PAGE,
+  safePdfFilename,
+} from "./pdf-branding.service";
 
 type PdfInvoice = Pick<
   IInvoice,
@@ -18,21 +26,6 @@ type PdfInvoice = Pick<
   | "totals"
 >;
 
-const PAGE = {
-  width: 595.28,
-  height: 841.89,
-  margin: 48,
-};
-
-const COLORS = {
-  text: "#111827",
-  muted: "#6b7280",
-  border: "#d1d5db",
-  soft: "#f3f4f6",
-  primary: "#111827",
-  danger: "#b91c1c",
-};
-
 function money(value: number): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -41,50 +34,12 @@ function money(value: number): string {
   }).format(value || 0);
 }
 
-function date(value: Date | string | null | undefined): string {
-  if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "-";
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(parsed);
-}
-
 function statusLabel(status: string): string {
   return status.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function safeFilename(value: string): string {
-  return value.replace(/[^a-z0-9-_]+/gi, "_");
-}
-
 function fitText(doc: PDFKit.PDFDocument, value: string, x: number, y: number, options: PDFKit.Mixins.TextOptions) {
   doc.text(value || "-", x, y, { ellipsis: true, ...options });
-}
-
-function drawFooter(doc: PDFKit.PDFDocument, invoice: PdfInvoice) {
-  const range = doc.bufferedPageRange();
-  const generated = `Generated ${date(new Date())}`;
-
-  for (let index = range.start; index < range.start + range.count; index += 1) {
-    doc.switchToPage(index);
-    const footerY = PAGE.height - 36;
-    doc
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor(COLORS.muted)
-      .text(`${invoice.invoiceNumber} · ${generated}`, PAGE.margin, footerY, {
-        width: 300,
-      })
-      .text(`Page ${index + 1} of ${range.count}`, PAGE.width - PAGE.margin - 100, footerY, {
-        width: 100,
-        align: "right",
-      });
-  }
-}
-
-function ensureRoom(doc: PDFKit.PDFDocument, currentY: number, neededHeight: number): number {
-  if (currentY + neededHeight <= PAGE.height - PAGE.margin - 36) return currentY;
-  doc.addPage();
-  return PAGE.margin;
 }
 
 function drawHeader(doc: PDFKit.PDFDocument, invoice: PdfInvoice): number {
@@ -233,7 +188,7 @@ function drawLineItems(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: num
       lineGap: 1,
     });
     const rowHeight = Math.max(32, descriptionHeight + 16);
-    y = ensureRoom(doc, y, rowHeight + 110);
+    y = ensurePdfRoom(doc, y, rowHeight + 110);
     if (y === PAGE.margin) y = drawTableHeader(doc, y);
     y = drawLineItem(doc, item, y);
   }
@@ -242,7 +197,7 @@ function drawLineItems(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: num
 }
 
 function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): number {
-  let y = ensureRoom(doc, startY, 160);
+  let y = ensurePdfRoom(doc, startY, 160);
   const x = PAGE.width - PAGE.margin - 220;
   const rows = [
     ["Subtotal", invoice.totals.subtotal],
@@ -273,7 +228,7 @@ function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number
 }
 
 function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): void {
-  let y = ensureRoom(doc, startY, 96);
+  let y = ensurePdfRoom(doc, startY, 96);
   const sections: Array<[string, string]> = [
     ["Notes", invoice.notes],
     ["Terms & Conditions", invoice.termsAndConditions],
@@ -282,7 +237,7 @@ function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number)
   sections.forEach(([title, content]) => {
     if (!content) return;
     const height = doc.heightOfString(content, { width: PAGE.width - PAGE.margin * 2, lineGap: 2 }) + 32;
-    y = ensureRoom(doc, y, height);
+    y = ensurePdfRoom(doc, y, height);
     doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text(title, PAGE.margin, y);
     doc
       .font("Helvetica")
@@ -294,17 +249,11 @@ function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number)
 }
 
 export function createInvoicePdfDocument(invoice: PdfInvoice): PDFKit.PDFDocument {
-  const doc = new PDFDocument({
-    size: "A4",
-    margins: { top: PAGE.margin, bottom: PAGE.margin, left: PAGE.margin, right: PAGE.margin },
-    bufferPages: true,
-    compress: true,
-    info: {
-      Title: `Invoice ${invoice.invoiceNumber}`,
-      Author: invoice.organizationSnapshot.name || "Inboundr",
-      Subject: "Invoice",
-      Keywords: "invoice, pdf",
-    },
+  const doc = createBrandedPdfDocument({
+    title: `Invoice ${invoice.invoiceNumber}`,
+    author: invoice.organizationSnapshot.name,
+    subject: "Invoice",
+    keywords: "invoice, pdf",
   });
 
   let y = drawHeader(doc, invoice);
@@ -312,13 +261,13 @@ export function createInvoicePdfDocument(invoice: PdfInvoice): PDFKit.PDFDocumen
   y = drawLineItems(doc, invoice, y);
   y = drawTotals(doc, invoice, y);
   drawNotes(doc, invoice, y);
-  drawFooter(doc, invoice);
+  drawPdfFooter(doc, invoice.invoiceNumber);
 
   return doc;
 }
 
 export function streamInvoicePdf(invoice: PdfInvoice, res: Response): void {
-  const filename = `${safeFilename(invoice.invoiceNumber)}.pdf`;
+  const filename = `${safePdfFilename(invoice.invoiceNumber)}.pdf`;
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 

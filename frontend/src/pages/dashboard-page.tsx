@@ -31,11 +31,13 @@ import {
   SendIcon,
   PlusIcon,
   Trash2Icon,
+  DownloadIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText } from "@/components/copy-button"
+import { openDownload } from "@/lib/downloads"
 import { getAvatarColor } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -1044,6 +1046,19 @@ export function DashboardPage() {
                         <TooltipContent>
                           {detail.errorMessage ? "Processing error occurred" : detail.isProcessed ? "Classification complete" : "AI is classifying this RFQ"}
                         </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 shrink-0"
+                            onClick={() => openDownload(`${API_BASE}/${detail._id}/pdf`)}
+                          >
+                            <DownloadIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Download PDF</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

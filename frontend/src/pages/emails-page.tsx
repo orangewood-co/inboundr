@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText } from "@/components/copy-button"
+import { openDownload } from "@/lib/downloads"
 import { getAvatarColor } from "@/lib/utils"
 import {
   InboxIcon,
@@ -669,6 +670,19 @@ export function EmailsPage() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Open in Gmail</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground/50 hover:text-foreground"
+                            onClick={() => openDownload(`${API_BASE}/${detail._id}/pdf`)}
+                          >
+                            <DownloadIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Download PDF</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>

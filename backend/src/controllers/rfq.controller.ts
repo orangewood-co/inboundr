@@ -12,6 +12,7 @@ import {
   buildRFQProcessingInput,
   hasRFQProcessableContent,
 } from "../services/rfq-input.service";
+import { streamRFQPdf } from "../services/rfq-pdf.service";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -140,6 +141,44 @@ export const getRFQ = async (
   } catch (err) {
     console.error("Error fetching RFQ:", err);
     res.status(500).json({ error: "Failed to fetch RFQ" });
+  }
+};
+
+export const downloadRFQPdf = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const rfq = await RFQ.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
+      .populate("emailId", "subject from date snippet status")
+      .lean();
+
+    if (!rfq) {
+      res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    streamRFQPdf(
+      rfq as any,
+      {
+        name: organization.name,
+        email: organization.defaultContact?.email,
+        phoneNumber: organization.defaultContact?.phoneNumber,
+        address: organization.address,
+        website: organization.website,
+        primaryColor: organization.preferences?.primaryColor,
+      },
+      res
+    );
+  } catch (err) {
+    console.error("Error rendering RFQ PDF:", err);
+    res.status(500).json({ error: "Failed to render RFQ PDF" });
   }
 };
 

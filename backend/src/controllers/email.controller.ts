@@ -4,6 +4,7 @@ import { Email } from "../models/email.model";
 import { GmailAccount } from "../models/gmail-account.model";
 import { RFQ } from "../models/rfq.model";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
+import { streamEmailPdf } from "../services/email-pdf.service";
 
 const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -182,6 +183,50 @@ export const getEmail = async (
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });
+  }
+};
+
+export const downloadEmailPdf = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const email = await Email.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    }).lean();
+    if (!email) {
+      res.status(404).json({ error: "Email not found" });
+      return;
+    }
+
+    const rfq = await RFQ.findOne({
+      emailId: email._id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
+      .select("isRFQ reason errorMessage")
+      .lean();
+
+    streamEmailPdf(
+      email,
+      {
+        name: organization.name,
+        email: organization.defaultContact?.email,
+        phoneNumber: organization.defaultContact?.phoneNumber,
+        address: organization.address,
+        website: organization.website,
+        primaryColor: organization.preferences?.primaryColor,
+      },
+      rfq,
+      res
+    );
+  } catch (err) {
+    console.error("Error rendering email PDF:", err);
+    res.status(500).json({ error: "Failed to render email PDF" });
   }
 };
 
