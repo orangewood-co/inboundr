@@ -25,9 +25,10 @@ function buildContentDisposition(filename: string, forceDownload: boolean): stri
   return `${disposition}; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`;
 }
 
-function attachClassification(email: any, rfq: any | undefined) {
+function attachClassification(email: any, rfq: any | undefined, gmailAccountEmail: string | null = null) {
   return {
     ...email,
+    gmailAccountEmail,
     rfqId: rfq?._id ?? null,
     isRFQ: rfq?.isRFQ ?? null,
     classificationReason: rfq?.reason ?? null,
@@ -115,10 +116,25 @@ export const listEmails = async (
       .select("emailId isRFQ reason errorMessage")
       .lean();
     const rfqByEmailId = new Map(rfqs.map((rfq) => [rfq.emailId.toString(), rfq]));
+    const accountIds = [...new Set(emails.map((email) => email.gmailAccountId?.toString()).filter(Boolean))];
+    const accounts = await GmailAccount.find({
+      _id: { $in: accountIds },
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
+      .select("emailAddress")
+      .lean();
+    const accountEmailById = new Map(
+      accounts.map((account) => [account._id.toString(), account.emailAddress])
+    );
 
     res.json({
       emails: emails.map((email) =>
-        attachClassification(email, rfqByEmailId.get(email._id.toString()))
+        attachClassification(
+          email,
+          rfqByEmailId.get(email._id.toString()),
+          accountEmailById.get(email.gmailAccountId.toString()) ?? null
+        )
       ),
       total,
       page,
@@ -154,8 +170,15 @@ export const getEmail = async (
     })
       .select("emailId isRFQ reason errorMessage")
       .lean();
+    const account = await GmailAccount.findOne({
+      _id: email.gmailAccountId,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    })
+      .select("emailAddress")
+      .lean();
 
-    res.json(attachClassification(email, rfq));
+    res.json(attachClassification(email, rfq, account?.emailAddress ?? null));
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });

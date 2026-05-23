@@ -30,6 +30,8 @@ const API_BASE = `${API_ORIGIN}/api/v1/email`
 interface EmailSummary {
   _id: string
   messageId: string
+  threadId: string
+  gmailAccountEmail: string | null
   from: string
   to: string
   subject: string
@@ -186,6 +188,12 @@ function formatFullDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+function buildGmailUrl(email: Pick<EmailSummary, "threadId" | "messageId" | "gmailAccountEmail">): string {
+  const gmailId = email.threadId || email.messageId
+  const authUser = email.gmailAccountEmail ? `?authuser=${encodeURIComponent(email.gmailAccountEmail)}` : ""
+  return `https://mail.google.com/mail/${authUser}#inbox/${encodeURIComponent(gmailId)}`
 }
 
 const statusConfig = {
@@ -646,22 +654,39 @@ export function EmailsPage() {
                     <h1 className="font-heading text-lg font-semibold leading-snug tracking-tight">
                       {detail.subject || "(no subject)"}
                     </h1>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 shrink-0 text-muted-foreground/50 hover:text-foreground"
-                          onClick={() => {
-                            setSelectedId(null)
-                            setDetail(null)
-                          }}
-                        >
-                          <XIcon className="size-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Close (Esc)</TooltipContent>
-                    </Tooltip>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground/50 hover:text-foreground"
+                            asChild
+                          >
+                            <a href={buildGmailUrl(detail)} target="_blank" rel="noreferrer">
+                              <ExternalLinkIcon className="size-4" />
+                            </a>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Open in Gmail</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 text-muted-foreground/50 hover:text-foreground"
+                            onClick={() => {
+                              setSelectedId(null)
+                              setDetail(null)
+                            }}
+                          >
+                            <XIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Close (Esc)</TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3">
