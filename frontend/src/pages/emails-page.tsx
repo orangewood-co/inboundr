@@ -74,12 +74,17 @@ const EMAIL_VIEWER_STYLE = `
     }
 
     body {
-      padding: 16px;
+      box-sizing: border-box;
+      padding: 32px 40px !important;
       color: #1a1a1a;
       font-family: Arial, sans-serif;
       font-size: 13px;
       line-height: 1.5;
       overflow-wrap: anywhere;
+    }
+
+    table {
+      max-width: 100%;
     }
 
     img {
