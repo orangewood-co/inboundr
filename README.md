@@ -78,15 +78,32 @@ Inboundr requires Bun version v1.3.11 or higher—this is needed for Bun's built
 
 ---
 
-## Monorepo Structure
+## Workspace Guide
 
 ```
 inboundr/
-├── backend/      # API, AI agents, integrations
-├── frontend/     # Dashboard & CRM interface
-├── landing/      # Marketing site
-└── package.json  # Workspace root
+├── backend/      # API, auth, AI agents, jobs, email, storage, data models
+├── frontend/     # Authenticated dashboard and CRM workspace
+├── embed/        # Public embeddable forms and short-link experiences
+├── landing/      # Public marketing website
+└── package.json  # Bun workspace root and shared scripts
 ```
+
+This repository is a Bun workspace. Install dependencies once at the root, then run each app through the root scripts or from the individual package directories.
+
+| Workspace | What it does | Common commands |
+|---|---|---|
+| `backend` | Express API for auth, organizations, customers, products, RFQs, invoices, forms, short links, uploads, Gmail, email, scheduled digests, and AI quote/RFQ agents. It owns database models, external integrations, background jobs, and React Email templates. | `bun run dev:backend`, `bun run typecheck:backend`, `bun run email:dev` |
+| `frontend` | Main authenticated Inboundr app for CRM workflows: dashboard, customers, products, invoices, RFQs, forms, email, search, settings, links, and organization branding. Built with React, Vite, TanStack Router, shadcn/ui, and Tailwind. | `bun run dev:frontend`, `bun run build:frontend`, `bun run lint:frontend`, `bun run typecheck:frontend` |
+| `embed` | Lightweight public-facing React app for embeddable lead capture forms and public short-link pages. It is separate from the dashboard so embedded/customer-facing experiences can stay small and isolated. | `bun run dev:embed`, `bun run build:embed`, `bun run lint:embed`, `bun run typecheck:embed` |
+| `landing` | Marketing website with public pages such as home, features, product pages, contact, careers, legal pages, and security. Built with React, Vite, Tailwind, and motion. | `bun run dev:landing`, `bun run build:landing`, `bun run lint:landing`, `bun run typecheck:landing` |
+
+### How the apps fit together
+
+- `backend` is the system of record and integration layer. Start here when changing API behavior, data models, authentication, agents, email templates, jobs, or third-party services.
+- `frontend` is the internal product UI. Start here when changing authenticated CRM, quoting, forms management, search, settings, or organization-facing workflows.
+- `embed` is for external/public experiences that customers or leads interact with outside the dashboard, such as hosted forms and short-link pages.
+- `landing` is for public marketing content and brand pages. Keep product app logic out of this workspace unless it is only presentation for the public site.
 
 ---
 
@@ -111,6 +128,9 @@ bun run dev:backend
 # Dashboard
 bun run dev:frontend
 
+# Embeddable forms and public links
+bun run dev:embed
+
 # Landing page
 bun run dev:landing
 
@@ -121,18 +141,36 @@ bun run email:dev
 ### Quality
 
 ```bash
-# Typecheck everything
+# Typecheck backend and frontend
 bun run typecheck
 
-# Lint & format the frontend
+# Typecheck individual workspaces
+bun run typecheck:backend
+bun run typecheck:frontend
+bun run typecheck:embed
+bun run typecheck:landing
+
+# Lint frontend apps
 bun run lint
-bun run format
+bun run lint:frontend
+bun run lint:embed
+bun run lint:landing
+
+# Format configured frontend apps
+bun run format:frontend
+bun run format:landing
 ```
 
 ### Build
 
 ```bash
+# Default production build
 bun run build
+
+# Build individual frontend apps
+bun run build:frontend
+bun run build:embed
+bun run build:landing
 ```
 
 ---
