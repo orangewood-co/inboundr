@@ -76,6 +76,9 @@ const EMAIL_VIEWER_STYLE = `
     body {
       padding: 16px;
       color: #1a1a1a;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
       overflow-wrap: anywhere;
     }
 
@@ -769,7 +772,7 @@ export function EmailsPage() {
                     />
                   ) : detail.bodyText ? (
                     <div className="h-full overflow-y-auto p-8">
-                      <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-foreground/85">
+                      <pre className="whitespace-pre-wrap font-[Arial,sans-serif] text-[13px] leading-normal text-foreground/85">
                         {detail.bodyText}
                       </pre>
                     </div>
