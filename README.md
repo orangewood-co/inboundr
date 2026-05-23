@@ -105,19 +105,56 @@ This repository is a Bun workspace. Install dependencies once at the root, then 
 - `embed` is for external/public experiences that customers or leads interact with outside the dashboard, such as hosted forms and short-link pages.
 - `landing` is for public marketing content and brand pages. Keep product app logic out of this workspace unless it is only presentation for the public site.
 
+## Architecture Overview
+
+The backend is the integration boundary for product data, auth, AI workflows, email, storage, and external services. The React apps stay focused on their user surfaces: public marketing, authenticated operations, and embeddable lead capture.
+
 ---
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) installed globally
+- [Bun](https://bun.sh) v1.3.11 or higher installed globally
 
-### Install
+### Quick Start
 
 ```bash
+# Install all workspace dependencies
 bun install
+
+# Start the API
+bun run dev:backend
+
+# Start the dashboard in another terminal
+bun run dev:frontend
 ```
+
+Optional local apps:
+
+```bash
+# Embeddable forms and public links
+bun run dev:embed
+
+# Marketing website
+bun run dev:landing
+
+# Email template preview
+bun run email:dev
+```
+
+### Environment Variables
+
+Create local `.env` files from the production examples, then replace placeholder values with local or development credentials.
+
+| Workspace | Env file | Notes |
+|---|---|---|
+| `backend` | `backend/.env` from `backend/.env.production.example` | Requires database, auth, origin, Google OAuth/Gmail, Pub/Sub, and AWS SES values. Keep production secrets only on the production host or in GitHub secrets. |
+| `frontend` | `frontend/.env` from `frontend/.env.production.example` | Requires `VITE_API_URL` so the dashboard can reach the API. |
+| `embed` | Optional `embed/.env` | Add only public `VITE_*` variables if the embed app needs environment-specific URLs. |
+| `landing` | Optional `landing/.env` | Add only public `VITE_*` variables for marketing-site configuration. |
+
+Never commit real `.env` files or private keys. Use GitHub repository secrets and environment variables for CI/CD values.
 
 ### Development
 
@@ -161,6 +198,8 @@ bun run format:frontend
 bun run format:landing
 ```
 
+CI enforces workspace-specific checks on pull requests. Backend changes typecheck the API package; frontend app changes typecheck and build the affected Vite app before deployment.
+
 ### Build
 
 ```bash
@@ -172,6 +211,31 @@ bun run build:frontend
 bun run build:embed
 bun run build:landing
 ```
+
+## Development Workflow
+
+Use short-lived branches off `main` for feature work and fixes. Open pull requests back into `main`; the relevant GitHub Actions workflow runs based on the files changed.
+
+Before opening a PR, run the checks for the workspace you touched:
+
+```bash
+# Backend
+bun run typecheck:backend
+
+# Dashboard
+bun run typecheck:frontend
+bun run lint:frontend
+
+# Embed
+bun run typecheck:embed
+bun run lint:embed
+
+# Landing
+bun run typecheck:landing
+bun run lint:landing
+```
+
+Merging to `main` is the production release path. The same checks run again in CI, and deployment starts only after the workflow's check or build job succeeds.
 
 ---
 
@@ -213,6 +277,14 @@ API_HEALTH_URL
 ```
 
 For the detailed backend EC2 runbook, see [`docs/deployment/ec2-backend.md`](docs/deployment/ec2-backend.md).
+
+## Security Notes
+
+- Keep real `.env` files, private keys, OAuth secrets, database URLs, and AWS credentials out of git.
+- Use `BETTER_AUTH_SECRET`, trusted `FRONTEND_ORIGIN`/`API_ORIGIN` values, and environment-specific callback URLs for auth and OAuth flows.
+- Store CI/CD credentials in GitHub repository secrets or protected environment variables, not in workflow files.
+- Production backend secrets live on the EC2 host or in GitHub secrets; static app configuration should only expose public `VITE_*` values.
+- Restrict infrastructure access where possible: EC2 SSH from trusted sources, least-privilege AWS credentials, verified SES identities, and controlled database network access.
 
 ---
 
