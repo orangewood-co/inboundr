@@ -765,138 +765,144 @@ export function DashboardPage() {
   const hasSelections = Object.keys(selectedProducts).length > 0 || manualProducts.length > 0
 
   const renderManualProductPanel = () => (
-    <div className="mt-3 rounded-xl border border-dashed bg-muted/10 p-3">
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border bg-background/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Search catalog
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={productSearch}
-              onChange={(event) => setProductSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault()
-                  handleSearchProducts()
-                }
-              }}
-              placeholder="Search product code, brand, HSN..."
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleSearchProducts}
-              disabled={productSearchLoading}
-            >
-              {productSearchLoading && <Spinner data-icon="inline-start" />}
-              Search
-            </Button>
-          </div>
-          {productSearchError && (
-            <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
-          )}
-          {productResults.length > 0 && (
-            <div className="mt-3 grid gap-2">
-              {productResults.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex items-start justify-between gap-3 rounded-lg border bg-muted/10 p-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {product.productdescription || product.productcode || "Catalog product"}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      {product.brand && <span>{product.brand}</span>}
-                      {product.productcode && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
-                          {product.productcode}
-                        </span>
-                      )}
-                      {product.unitprice != null && (
-                        <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => handleAddCatalogProduct(product)}
-                  >
-                    Add
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-lg border bg-background/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Custom line
-          </p>
-          <div className="grid gap-2 md:grid-cols-2">
-            <Input
-              value={customProduct.queryName}
-              onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
-              placeholder="Line name"
-            />
-            <Input
-              value={customProduct.quantity}
-              onChange={(event) => handleCustomProductChange("quantity", event.target.value)}
-              placeholder="Quantity"
-              type="number"
-              min="1"
-            />
-            <Input
-              value={customProduct.description}
-              onChange={(event) => handleCustomProductChange("description", event.target.value)}
-              placeholder="Description"
-            />
-            <Input
-              value={customProduct.code}
-              onChange={(event) => handleCustomProductChange("code", event.target.value)}
-              placeholder="Code"
-            />
-            <Input
-              value={customProduct.brand}
-              onChange={(event) => handleCustomProductChange("brand", event.target.value)}
-              placeholder="Brand"
-            />
-            <Input
-              value={customProduct.price}
-              onChange={(event) => handleCustomProductChange("price", event.target.value)}
-              placeholder="Price"
-              type="number"
-              min="0"
-            />
-            <Input
-              value={customProduct.hsnCode}
-              onChange={(event) => handleCustomProductChange("hsnCode", event.target.value)}
-              placeholder="HSN"
-            />
-            <Input
-              value={customProduct.gstRate}
-              onChange={(event) => handleCustomProductChange("gstRate", event.target.value)}
-              placeholder="GST %"
-              type="number"
-              min="0"
-            />
-          </div>
+    <div className="mt-3 flex items-start gap-3 rounded-xl border bg-card p-3">
+      <div className="min-w-0 flex-1 rounded-lg border bg-card p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Search catalog
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={productSearch}
+            onChange={(event) => setProductSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault()
+                handleSearchProducts()
+              }
+            }}
+            placeholder="Search product code, brand, HSN..."
+          />
           <Button
             type="button"
             variant="secondary"
-            size="sm"
-            className="mt-3 gap-1.5"
-            onClick={handleAddCustomProduct}
+            onClick={handleSearchProducts}
+            disabled={productSearchLoading}
           >
-            <PlusIcon className="size-3.5" />
-            Add custom line
+            {productSearchLoading && <Spinner data-icon="inline-start" />}
+            Search
           </Button>
         </div>
+        {productSearchError && (
+          <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
+        )}
+        {productResults.length > 0 && (
+          <div className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+            {productResults.map((product) => (
+              <div
+                key={product.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {product.productdescription || product.productcode || "Catalog product"}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    {product.brand && <span>{product.brand}</span>}
+                    {product.productcode && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                        {product.productcode}
+                      </span>
+                    )}
+                    {product.unitprice != null && (
+                      <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => handleAddCatalogProduct(product)}
+                >
+                  Add
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="w-52 shrink-0 rounded-lg border bg-card p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Custom line
+        </p>
+        <div className="grid gap-1.5">
+          <Input
+            value={customProduct.queryName}
+            onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
+            placeholder="Line name"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.quantity}
+            onChange={(event) => handleCustomProductChange("quantity", event.target.value)}
+            placeholder="Qty"
+            type="number"
+            min="1"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.description}
+            onChange={(event) => handleCustomProductChange("description", event.target.value)}
+            placeholder="Description"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.code}
+            onChange={(event) => handleCustomProductChange("code", event.target.value)}
+            placeholder="Code"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.brand}
+            onChange={(event) => handleCustomProductChange("brand", event.target.value)}
+            placeholder="Brand"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.price}
+            onChange={(event) => handleCustomProductChange("price", event.target.value)}
+            placeholder="Price"
+            type="number"
+            min="0"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.hsnCode}
+            onChange={(event) => handleCustomProductChange("hsnCode", event.target.value)}
+            placeholder="HSN"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.gstRate}
+            onChange={(event) => handleCustomProductChange("gstRate", event.target.value)}
+            placeholder="GST %"
+            type="number"
+            min="0"
+            className="h-8 text-xs"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="mt-2 w-full gap-1.5 text-xs"
+          onClick={handleAddCustomProduct}
+        >
+          <PlusIcon className="size-3.5" />
+          Add custom line
+        </Button>
       </div>
     </div>
   )
@@ -1443,7 +1449,7 @@ export function DashboardPage() {
                       ))}
                     </div>
 
-                    <div className="mt-5 rounded-xl border border-dashed bg-muted/10 p-3">
+                    <div className="mt-5 rounded-xl border border-dashed p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">Added products</p>
@@ -1459,7 +1465,7 @@ export function DashboardPage() {
                             Added products
                           </p>
                           {manualProducts.map((product) => (
-                            <div key={product.id} className="rounded-lg border bg-background/70 p-3">
+                            <div key={product.id} className="rounded-lg border p-3">
                               <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   {product.source === "catalog" ? "Catalog" : "Custom"}
