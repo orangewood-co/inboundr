@@ -11,6 +11,7 @@ import {
 } from "../models/organization-member.model";
 import { Organization } from "../models/organization.model";
 import { sendEmail } from "../lib/email";
+import { serializeEntitlements } from "../services/entitlement.service";
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -85,7 +86,7 @@ export async function getMyOrganization(
 ): Promise<void> {
   try {
     const organization = (req as OrganizationRequest).organization;
-    res.json({ organization });
+    res.json({ organization, entitlements: serializeEntitlements(organization) });
   } catch (err) {
     console.error("Error fetching organization:", err);
     res.status(500).json({ error: "Failed to fetch organization" });
@@ -297,6 +298,16 @@ export async function acceptOrganizationInvitation(
       { $setOnInsert: { role: invitation.role } },
       { upsert: true }
     );
+
+    if (invitation.role === "owner") {
+      await Organization.updateOne(
+        {
+          _id: invitation.organizationId,
+          ownerUserId: /^pending-owner:/,
+        },
+        { $set: { ownerUserId: authReq.user.id } }
+      );
+    }
 
     invitation.status = "accepted";
     invitation.acceptedAt = new Date();

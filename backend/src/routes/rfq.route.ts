@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { archiveRFQ, listRFQs, getRFQ, retryRFQ, generateQuote, getQuoteReply, sendQuoteReply, downloadRFQPdf } from "../controllers/rfq.controller";
-import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
+import { requireAuth, requireFeature, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("rfq"));
 router.get("/", listRFQs);
 router.get("/:id/pdf", downloadRFQPdf);
 router.get("/:id", getRFQ);

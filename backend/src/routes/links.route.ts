@@ -9,6 +9,7 @@ import {
 } from "../controllers/links.controller";
 import {
   requireAuth,
+  requireFeature,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -17,6 +18,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("links"));
 
 router.get("/", listLinks);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createLink);

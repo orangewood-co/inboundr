@@ -23,6 +23,7 @@ import { Route as FormsRouteImport } from './routes/forms'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
@@ -36,6 +37,7 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
+import { Route as AdminOrganizationsIdRouteImport } from './routes/admin.organizations.$id'
 
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
@@ -107,6 +109,11 @@ const CustomersRoute = CustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -172,9 +179,15 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
+  id: '/organizations/$id',
+  path: '/organizations/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -201,9 +214,11 @@ export interface FileRoutesByFullPath {
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
+  '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -227,10 +242,12 @@ export interface FileRoutesByTo {
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
+  '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -257,11 +274,13 @@ export interface FileRoutesById {
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
+  '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/customers'
     | '/emails'
     | '/forgot-password'
@@ -288,9 +307,11 @@ export interface FileRouteTypes {
     | '/forms/'
     | '/invoices/'
     | '/links/'
+    | '/admin/organizations/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/customers'
     | '/emails'
     | '/forgot-password'
@@ -314,9 +335,11 @@ export interface FileRouteTypes {
     | '/forms'
     | '/invoices'
     | '/links'
+    | '/admin/organizations/$id'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/customers'
     | '/emails'
     | '/forgot-password'
@@ -343,10 +366,12 @@ export interface FileRouteTypes {
     | '/forms/'
     | '/invoices/'
     | '/links/'
+    | '/admin/organizations/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   CustomersRoute: typeof CustomersRoute
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -467,6 +492,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -558,8 +590,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/organizations/$id': {
+      id: '/admin/organizations/$id'
+      path: '/organizations/$id'
+      fullPath: '/admin/organizations/$id'
+      preLoaderRoute: typeof AdminOrganizationsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface FormsRouteChildren {
   FormsSlugRoute: typeof FormsSlugRoute
@@ -605,6 +654,7 @@ const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   CustomersRoute: CustomersRoute,
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

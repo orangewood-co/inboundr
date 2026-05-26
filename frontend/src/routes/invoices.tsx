@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 
-import { requireSession } from "@/lib/auth-guards"
+import { requireFeatureAccess } from "@/lib/auth-guards"
 
 export const Route = createFileRoute("/invoices")({
-  beforeLoad: requireSession,
+  beforeLoad: () => requireFeatureAccess("invoices"),
   component: () => <Outlet />,
 })

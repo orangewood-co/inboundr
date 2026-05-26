@@ -6,6 +6,12 @@ import {
   type OrganizationContext,
 } from "../services/organization.service";
 import type { OrganizationRole } from "../models/organization-member.model";
+import { PlatformAdmin } from "../models/platform-admin.model";
+import {
+  getEffectiveFeatures,
+  isFeatureKey,
+  type FeatureKey,
+} from "../services/entitlement.service";
 
 export interface AuthenticatedRequest extends Request {
   user: Session["user"];
@@ -23,6 +29,70 @@ export function requireOrganizationRole(roles: OrganizationRole[]) {
 
     if (!roles.includes(membership.role)) {
       res.status(403).json({ error: "Insufficient organization permissions" });
+      return;
+    }
+
+    next();
+  };
+}
+
+function superAdminEmailAllowlist(): string[] {
+  return (process.env.SUPER_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export async function isPlatformAdmin(user: Session["user"]): Promise<boolean> {
+  const email = (user.email ?? "").toLowerCase();
+  if (email && superAdminEmailAllowlist().includes(email)) return true;
+
+  const admin = await PlatformAdmin.findOne({
+    $or: [{ userId: user.id }, ...(email ? [{ email }] : [])],
+  }).lean();
+  return Boolean(admin);
+}
+
+export async function requireSuperAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    if (!authReq.user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (!(await isPlatformAdmin(authReq.user))) {
+      res.status(403).json({ error: "Platform admin access required" });
+      return;
+    }
+
+    next();
+  } catch (err) {
+    console.error("Super admin validation failed:", err);
+    res.status(500).json({ error: "Failed to validate platform admin access" });
+  }
+}
+
+export function requireFeature(feature: FeatureKey) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const organization = (req as OrganizationRequest).organization;
+
+    if (!organization) {
+      res.status(401).json({ error: "Organization context is required" });
+      return;
+    }
+
+    if (organization.status === "suspended") {
+      res.status(403).json({ error: "Organization is suspended" });
+      return;
+    }
+
+    if (!isFeatureKey(feature) || !getEffectiveFeatures(organization).includes(feature)) {
+      res.status(403).json({ error: "Feature is not enabled for this organization" });
       return;
     }
 

@@ -1,6 +1,7 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 export type OrganizationTheme = "dark" | "light";
+export type OrganizationStatus = "active" | "suspended";
 
 export interface IOrganizationDefaultContact {
   name: string;
@@ -19,6 +20,10 @@ export interface IOrganizationPreferences {
 export interface IOrganization extends Document {
   name: string;
   ownerUserId: string;
+  status: OrganizationStatus;
+  planSlug: string;
+  enabledFeatures: string[];
+  disabledFeatures: string[];
   defaultContact: IOrganizationDefaultContact;
   website: string;
   logoUrl: string;
@@ -52,6 +57,15 @@ const organizationSchema = new Schema<IOrganization>(
   {
     name: { type: String, required: true, trim: true },
     ownerUserId: { type: String, required: true, unique: true, index: true },
+    status: {
+      type: String,
+      enum: ["active", "suspended"],
+      default: "active",
+      index: true,
+    },
+    planSlug: { type: String, default: "all_features", trim: true, index: true },
+    enabledFeatures: { type: [String], default: [] },
+    disabledFeatures: { type: [String], default: [] },
     defaultContact: { type: defaultContactSchema, default: () => ({}) },
     website: { type: String, default: "", trim: true },
     logoUrl: { type: String, default: "", trim: true },

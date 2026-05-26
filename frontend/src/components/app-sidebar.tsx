@@ -11,8 +11,17 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
+import { getAdminMe } from "@/lib/admin"
+import { useEntitlements, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, CrownIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
+
+type SidebarNavItem = {
+  title: string
+  url: string
+  icon: React.ReactNode
+  feature?: FeatureKey
+}
 
 const data = {
   navMain: [
@@ -20,6 +29,7 @@ const data = {
       title: "RFQ",
       url: "/rfq",
       icon: <FileTextIcon />,
+      feature: "rfq",
     },
     {
       title: "Inbox",
@@ -35,6 +45,7 @@ const data = {
       title: "Invoices",
       url: "/invoices",
       icon: <ReceiptTextIcon />,
+      feature: "invoices",
     },
     {
       title: "Stats",
@@ -50,22 +61,26 @@ const data = {
       title: "Forms",
       url: "/forms",
       icon: <ClipboardListIcon />,
+      feature: "forms",
     },
     {
       title: "Links",
       url: "/links",
       icon: <LinkIcon />,
+      feature: "links",
     },
     {
       title: "Settings",
       url: "/settings",
       icon: <Settings2Icon />,
     },
-  ],
+  ] satisfies SidebarNavItem[],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
+  const [isSuperAdmin, setIsSuperAdmin] = React.useState(false)
+  const { hasFeature } = useEntitlements()
   const { branding, loading } = useOrganizationBranding()
   const user = {
     name: session?.user.name ?? "BTSA User",
@@ -74,6 +89,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
   const organizationName = branding?.name?.trim() || "Inboundr"
   const logoUrl = branding?.logoDisplayUrl?.trim()
+  const navItems = React.useMemo(() => {
+    const items = data.navMain.filter((item) => !item.feature || hasFeature(item.feature))
+    if (isSuperAdmin) {
+      items.push({
+        title: "Super Admin",
+        url: "/admin",
+        icon: <CrownIcon />,
+      })
+    }
+    return items
+  }, [hasFeature, isSuperAdmin])
+
+  React.useEffect(() => {
+    void getAdminMe().then(({ isSuperAdmin }) => setIsSuperAdmin(isSuperAdmin))
+  }, [])
 
   return (
     <Sidebar
@@ -120,7 +150,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
