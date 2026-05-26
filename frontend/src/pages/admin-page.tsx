@@ -75,6 +75,11 @@ function planLabel(plans: Plan[], slug: string) {
   return plans.find((plan) => plan.slug === slug)?.name ?? slug.replaceAll("_", " ")
 }
 
+function featureLabel(feature: string) {
+  if (feature === "rfq") return "RFQ"
+  return feature.charAt(0).toUpperCase() + feature.slice(1)
+}
+
 function StatCard({ title, value, icon: Icon }: { title: string; value: number; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <div className="rounded-2xl border bg-background p-4">
@@ -307,7 +312,7 @@ export default function AdminPage() {
                       <TableCell>
                         <div className="flex max-w-72 flex-wrap gap-1">
                           {organization.entitlements.effectiveFeatures.map((feature) => (
-                            <Badge key={feature} variant="secondary" className="capitalize">{feature}</Badge>
+                            <Badge key={feature} variant="secondary">{featureLabel(feature)}</Badge>
                           ))}
                         </div>
                       </TableCell>
