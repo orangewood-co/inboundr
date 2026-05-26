@@ -2,7 +2,18 @@ import { StateSchema, type GraphNode, StateGraph, START, END } from "@langchain/
 import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-search";
+import {
+  TextProductSearcher,
+  extractDimensionTokens,
+  extractNormalizedCodeHints,
+  extractProductFamilyAnchorTokens,
+  getDatabaseConfigFromEnv,
+  normalizeProductSearchText,
+  productMatchesAnchorTokens,
+  resolveProductMatchStatus,
+  type ProductSearchGroup,
+  type ProductSearchMatch,
+} from "../utils/product-search";
 import { Customer } from "../models/customer.model";
 
 const model = new ChatOpenAI({
@@ -44,6 +55,33 @@ const searchResult = z.object({
   status: z.enum(["matched", "ambiguous", "no_match"]),
   matches: z.array(searchMatch),
 });
+
+const aiSearchExpansion = z.object({
+  correctedQuery: z.string().nullable(),
+  brand: z.string().nullable(),
+  productType: z.string().nullable(),
+  specifications: z.array(z.string()).default([]),
+  codeHints: z.array(z.string()).default([]),
+  alternateQueries: z.array(z.string()).default([]),
+});
+
+const aiRerankResult = z.object({
+  rankedMatches: z.array(
+    z.object({
+      id: z.number(),
+      confidence: z.number().min(0).max(1),
+      reason: z.string(),
+    })
+  ),
+});
+
+type QueryProduct = z.infer<typeof queryProduct>;
+type AiSearchExpansion = z.infer<typeof aiSearchExpansion>;
+
+const FINAL_MATCH_LIMIT = 5;
+const SEARCH_CANDIDATE_LIMIT = 8;
+const RERANK_CANDIDATE_LIMIT = 12;
+const MAX_SEARCH_VARIANTS = 6;
 
 const State = new StateSchema({
   emailBody: z.string(),
@@ -117,7 +155,7 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
        You are given a email from a potential customer asking for a quote for the products they are interested in.
        Your task is to identify the products from the email and return the products details in the structured output format.
        
-       Pay attention to the product make and specification if given and include them in the product name.
+       Pay attention to the product make and specification if given and include them in the product nam
        `
 
     ),
@@ -144,7 +182,23 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
         throw new Error("Organization context is required for product search");
       }
 
-      const result = await searcher.searchProduct(product, state.organizationId, 5);
+      const expansion = await expandProductSearchQuery(product);
+      const searchQueries = buildProductSearchQueries(product.name, expansion);
+      const originalAnchorTokens = getAnchorTokensForSearchText(product.name);
+      const candidateGroups = await Promise.all(
+        searchQueries.map((searchQuery) =>
+          searcher.searchProduct({ ...product, name: searchQuery }, state.organizationId!, SEARCH_CANDIDATE_LIMIT)
+        )
+      );
+      const mergedResult = filterSearchResultByAnchor(
+        mergeSearchResults(product, candidateGroups),
+        originalAnchorTokens
+      );
+      const result = limitSearchResultMatches(
+        await rerankProductMatches(product, expansion, mergedResult),
+        FINAL_MATCH_LIMIT
+      );
+
       console.log(`SEARCH QUERY: ${product.name}`);
       console.log(
         "SEARCH RESPONSE:",
@@ -165,6 +219,307 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
     await searcher.close();
   }
 };
+
+async function expandProductSearchQuery(product: QueryProduct): Promise<AiSearchExpansion | null> {
+  try {
+    const response = await model.withStructuredOutput(aiSearchExpansion).invoke([
+      new SystemMessage(
+        `You improve industrial tools catalog search queries.
+
+Return corrected and expanded search terms for a buyer's product request.
+Preserve exact model numbers, catalogue codes, dimensions, ranges, units, and brand names.
+Fix obvious typos such as ":itutoyo" -> "Mitutoyo".
+Expand common wording such as "mike" or "mic" -> "micrometer" and "digimatic" -> "digital".
+Do not invent a product. Do not return product ids. Only return terms useful for database search.
+Every alternate query must keep the product family words from the buyer request, such as "caliper", "vernier", or "micrometer".
+Do not return bare dimension-only alternate queries such as "150mm", "300mm", or "0-50mm".
+
+Examples:
+- "Micrometer - 0-50 mm" should include "micrometer 0-50mm" and may include "depth micrometer 0-50mm".
+- ":itutoyo 0/25 Digimatic Mike 293/340" should include brand "Mitutoyo", product type "digital micrometer", range "0-25mm", and code hints like "293340" and "293-340".`
+      ),
+      new HumanMessage(`Product request: ${product.name}\nQuantity: ${product.quantity}`),
+    ]);
+
+    return {
+      correctedQuery: response.correctedQuery,
+      brand: response.brand,
+      productType: response.productType,
+      specifications: response.specifications ?? [],
+      codeHints: response.codeHints ?? [],
+      alternateQueries: response.alternateQueries ?? [],
+    };
+  } catch (error) {
+    console.warn("AI product search expansion failed:", error);
+    return null;
+  }
+}
+
+function buildProductSearchQueries(originalQuery: string, expansion: AiSearchExpansion | null): string[] {
+  const originalAnchorTokens = getAnchorTokensForSearchText(originalQuery);
+  const expandedStructuredQuery = [
+    expansion?.brand,
+    expansion?.productType,
+    ...(expansion?.specifications ?? []),
+    ...(expansion?.codeHints ?? []),
+  ]
+    .filter(isNonEmptyString)
+    .join(" ");
+
+  return uniqueByNormalizedText([
+    originalQuery,
+    expansion?.correctedQuery ?? "",
+    expandedStructuredQuery,
+    ...(expansion?.alternateQueries ?? []),
+    ...(expansion?.codeHints ?? []),
+  ])
+    .filter((query) => shouldKeepSearchVariant(query, originalAnchorTokens))
+    .slice(0, MAX_SEARCH_VARIANTS);
+}
+
+function shouldKeepSearchVariant(query: string, originalAnchorTokens: string[]): boolean {
+  const normalizedQuery = normalizeProductSearchText(query);
+  if (!normalizedQuery) {
+    return false;
+  }
+
+  if (originalAnchorTokens.length === 0) {
+    return true;
+  }
+
+  const variantAnchorTokens = getAnchorTokensForSearchText(normalizedQuery);
+  if (variantAnchorTokens.length > 0) {
+    return true;
+  }
+
+  return extractNormalizedCodeHints(normalizedQuery).length > 0 && !isBareDimensionSearchVariant(normalizedQuery);
+}
+
+function filterSearchResultByAnchor(
+  result: ProductSearchGroup,
+  anchorTokens: string[]
+): ProductSearchGroup {
+  if (anchorTokens.length === 0) {
+    return result;
+  }
+
+  const matches = result.matches.filter((match) => productMatchesAnchorTokens(match, anchorTokens));
+
+  return {
+    ...result,
+    matches,
+    matchedBrand: matches[0]?.brand ?? null,
+    status: resolveProductMatchStatus(matches),
+  };
+}
+
+function mergeSearchResults(query: QueryProduct, groups: ProductSearchGroup[]): ProductSearchGroup {
+  const matchesById = new Map<number, ProductSearchMatch>();
+  const searchTokens = uniqueStrings(groups.flatMap((group) => group.searchTokens));
+  const primaryNormalizedQuery = groups[0]?.normalizedQuery ?? "";
+
+  for (const group of groups) {
+    const fromExpandedQuery = normalizeForDedup(group.query.name) !== normalizeForDedup(query.name);
+
+    for (const match of group.matches) {
+      const existingMatch = matchesById.get(match.id);
+      const matchReasons = uniqueStrings([
+        ...(existingMatch?.matchReasons ?? []),
+        ...match.matchReasons,
+        ...(fromExpandedQuery ? ["ai_query_expansion"] : []),
+      ]);
+
+      if (!existingMatch || match.score > existingMatch.score) {
+        matchesById.set(match.id, {
+          ...match,
+          score: Math.max(match.score, existingMatch?.score ?? 0),
+          matchReasons,
+        });
+      } else {
+        matchesById.set(match.id, {
+          ...existingMatch,
+          matchReasons,
+        });
+      }
+    }
+  }
+
+  const matches = [...matchesById.values()].sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+
+    return (left.description ?? "").length - (right.description ?? "").length;
+  });
+
+  return {
+    query,
+    normalizedQuery: primaryNormalizedQuery,
+    searchTokens,
+    matchedBrand: matches[0]?.brand ?? null,
+    status: resolveProductMatchStatus(matches),
+    matches,
+  };
+}
+
+async function rerankProductMatches(
+  query: QueryProduct,
+  expansion: AiSearchExpansion | null,
+  result: ProductSearchGroup
+): Promise<ProductSearchGroup> {
+  if (result.matches.length <= 1) {
+    return result;
+  }
+
+  const candidates = result.matches.slice(0, RERANK_CANDIDATE_LIMIT);
+
+  try {
+    const response = await model.withStructuredOutput(aiRerankResult).invoke([
+      new SystemMessage(
+        `You rerank real catalog candidates for an RFQ product search.
+
+Use only the provided candidates. Return candidate ids in best-match order.
+Prefer matches with the same brand, product family, dimensions/range, units, catalogue/model code, and clear synonyms.
+Penalize candidates with conflicting product type, range, or brand.
+If several candidates are close variants, keep them ranked but use lower confidence.`
+      ),
+      new HumanMessage(
+        JSON.stringify(
+          {
+            request: query,
+            expansion,
+            candidates: candidates.map((candidate) => ({
+              id: candidate.id,
+              brand: candidate.brand,
+              code: candidate.code,
+              description: candidate.description,
+              score: candidate.score,
+              matchReasons: candidate.matchReasons,
+            })),
+          },
+          null,
+          2
+        )
+      ),
+    ]);
+
+    const candidatesById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+    const usedIds = new Set<number>();
+    const confidenceById = new Map<number, number>();
+    const rerankedMatches: ProductSearchMatch[] = [];
+
+    for (const rankedMatch of response.rankedMatches) {
+      const candidate = candidatesById.get(rankedMatch.id);
+      if (!candidate || usedIds.has(rankedMatch.id)) {
+        continue;
+      }
+
+      usedIds.add(rankedMatch.id);
+      confidenceById.set(rankedMatch.id, rankedMatch.confidence);
+      rerankedMatches.push({
+        ...candidate,
+        matchReasons: uniqueStrings([...candidate.matchReasons, "ai_rerank"]),
+      });
+    }
+
+    if (rerankedMatches.length === 0) {
+      return result;
+    }
+
+    const remainingMatches = result.matches.filter((match) => !usedIds.has(match.id));
+    const matches = [...rerankedMatches, ...remainingMatches];
+
+    return {
+      ...result,
+      matches,
+      matchedBrand: matches[0]?.brand ?? null,
+      status: resolveAiMatchStatus(matches, confidenceById),
+    };
+  } catch (error) {
+    console.warn("AI product search rerank failed:", error);
+    return result;
+  }
+}
+
+function resolveAiMatchStatus(
+  matches: ProductSearchMatch[],
+  confidenceById: Map<number, number>
+): "matched" | "ambiguous" | "no_match" {
+  if (matches.length === 0) {
+    return "no_match";
+  }
+
+  if (matches.length === 1) {
+    return "matched";
+  }
+
+  const [topMatch, secondMatch] = matches;
+  const topConfidence = topMatch ? confidenceById.get(topMatch.id) : undefined;
+  const secondConfidence = secondMatch ? confidenceById.get(secondMatch.id) ?? 0 : 0;
+
+  if (topConfidence != null && topConfidence >= 0.82 && topConfidence - secondConfidence >= 0.2) {
+    return "matched";
+  }
+
+  return "ambiguous";
+}
+
+function limitSearchResultMatches(result: ProductSearchGroup, limit: number): ProductSearchGroup {
+  const matches = result.matches.slice(0, limit);
+
+  return {
+    ...result,
+    matches,
+    matchedBrand: matches[0]?.brand ?? null,
+    status: matches.length === 0 ? "no_match" : result.status,
+  };
+}
+
+function uniqueByNormalizedText(values: string[]): string[] {
+  const seen = new Set<string>();
+  const uniqueValues: string[] = [];
+
+  for (const value of values) {
+    if (!isNonEmptyString(value)) {
+      continue;
+    }
+
+    const normalizedValue = normalizeForDedup(value);
+    if (!normalizedValue || seen.has(normalizedValue)) {
+      continue;
+    }
+
+    seen.add(normalizedValue);
+    uniqueValues.push(value.trim());
+  }
+
+  return uniqueValues;
+}
+
+function normalizeForDedup(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function getAnchorTokensForSearchText(value: string): string[] {
+  const normalizedValue = normalizeProductSearchText(value);
+  return extractProductFamilyAnchorTokens(normalizedValue.split(" ").filter(Boolean));
+}
+
+function isBareDimensionSearchVariant(value: string): boolean {
+  const normalizedValue = normalizeProductSearchText(value);
+  const tokens = normalizedValue.split(" ").filter(Boolean);
+  const dimensionTokens = new Set(extractDimensionTokens(normalizedValue));
+
+  return tokens.length > 0 && tokens.every((token) => dimensionTokens.has(token));
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter(isNonEmptyString))];
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
 
 const graph = new StateGraph(State)
   .addNode("identifyCustomer", identifyCustomer)
