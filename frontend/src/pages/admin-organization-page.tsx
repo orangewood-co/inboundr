@@ -395,17 +395,21 @@ export default function AdminOrganizationPage() {
                 const enabled = (planFeatures.includes(feature.key) || organization.entitlements.enabledFeatures.includes(feature.key)) &&
                   !organization.entitlements.disabledFeatures.includes(feature.key)
                 return (
-                  <label key={feature.key} className="flex cursor-pointer gap-3 rounded-xl border p-4">
-                    <Checkbox checked={enabled} onCheckedChange={(checked) => setFeatureEnabled(feature.key, checked === true)} />
-                    <span>
-                      <span className="flex items-center gap-2 text-sm font-medium">
+                  <label key={feature.key} className="grid cursor-pointer grid-cols-[auto_1fr] gap-x-3 rounded-xl border p-4">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={enabled}
+                      onCheckedChange={(checked) => setFeatureEnabled(feature.key, checked === true)}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex min-h-5 flex-wrap items-center gap-2 text-sm font-medium leading-5">
                         {feature.label}
                         <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Enabled" : "Disabled"}</Badge>
                         {planDefault && <Badge variant="outline">Plan default</Badge>}
                         {forcedOn && <Badge variant="secondary">Override on</Badge>}
                         {forcedOff && <Badge variant="destructive">Override off</Badge>}
                       </span>
-                      <span className="text-xs text-muted-foreground">{feature.description}</span>
+                      <span className="mt-1 block text-xs leading-5 text-muted-foreground">{feature.description}</span>
                     </span>
                   </label>
                 )
