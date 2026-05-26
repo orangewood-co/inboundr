@@ -31,6 +31,18 @@ const pageTitles: Record<string, string> = {
   "/customers": "Customers",
   "/invoices": "Invoices",
   "/stats": "Stats",
+  "/admin": "Super Admin",
+}
+
+function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
+  if (pathname.startsWith("/admin/organizations/")) {
+    return [
+      { label: "Super Admin", href: "/admin" },
+      { label: "Organization" },
+    ]
+  }
+
+  return [{ label: pageTitles[pathname] ?? "Dashboard" }]
 }
 
 export function SiteHeader({
@@ -43,9 +55,7 @@ export function SiteHeader({
   const { toggleSidebar } = useSidebar()
   const { pathname } = useLocation()
 
-  const segments: BreadcrumbSegment[] = breadcrumbs ?? [
-    { label: pageTitles[pathname] ?? "Dashboard" },
-  ]
+  const segments: BreadcrumbSegment[] = breadcrumbs ?? breadcrumbsForPath(pathname)
 
   return (
     <header className="sticky top-0 z-50 flex w-full items-center border-b bg-background">
