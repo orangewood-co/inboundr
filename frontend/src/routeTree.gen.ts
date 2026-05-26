@@ -37,7 +37,7 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
-import { Route as AdminOrganizationsIdRouteImport } from './routes/admin.organizations.$id'
+import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
@@ -180,14 +180,14 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
-  id: '/organizations/$id',
-  path: '/organizations/$id',
-  getParentRoute: () => AdminRoute,
+  id: '/admin_/organizations/$id',
+  path: '/admin/organizations/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -218,7 +218,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -247,7 +247,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
+  '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -274,7 +274,7 @@ export interface FileRoutesById {
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
-  '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
+  '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -366,12 +366,12 @@ export interface FileRouteTypes {
     | '/forms/'
     | '/invoices/'
     | '/links/'
-    | '/admin/organizations/$id'
+    | '/admin_/organizations/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRouteWithChildren
+  AdminRoute: typeof AdminRoute
   CustomersRoute: typeof CustomersRoute
   EmailsRoute: typeof EmailsRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -390,6 +390,7 @@ export interface RootRouteChildren {
   CustomersImportRoute: typeof CustomersImportRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
+  AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -590,25 +591,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/organizations/$id': {
-      id: '/admin/organizations/$id'
-      path: '/organizations/$id'
+    '/admin_/organizations/$id': {
+      id: '/admin_/organizations/$id'
+      path: '/admin/organizations/$id'
       fullPath: '/admin/organizations/$id'
       preLoaderRoute: typeof AdminOrganizationsIdRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface AdminRouteChildren {
-  AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface FormsRouteChildren {
   FormsSlugRoute: typeof FormsSlugRoute
@@ -654,7 +645,7 @@ const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRouteWithChildren,
+  AdminRoute: AdminRoute,
   CustomersRoute: CustomersRoute,
   EmailsRoute: EmailsRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
@@ -673,6 +664,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersImportRoute: CustomersImportRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,
+  AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,11 +1,15 @@
 import { Router } from "express";
 import {
+  cancelAdminOrganizationInvitation,
   createAdminOrganization,
   getAdminMe,
   getAdminOrganization,
   getAdminPlans,
   inviteAdminOrganizationMember,
   listAdminOrganizations,
+  removeAdminOrganizationMember,
+  transferAdminOrganizationOwner,
+  updateAdminOrganizationMember,
   updateAdminOrganization,
 } from "../controllers/admin.controller";
 import { requireAuth, requireSuperAdmin } from "../middleware/auth.middleware";
@@ -21,5 +25,9 @@ router.post("/organizations", createAdminOrganization);
 router.get("/organizations/:id", getAdminOrganization);
 router.patch("/organizations/:id", updateAdminOrganization);
 router.post("/organizations/:id/invitations", inviteAdminOrganizationMember);
+router.delete("/organizations/:id/invitations/:invitationId", cancelAdminOrganizationInvitation);
+router.patch("/organizations/:id/members/:memberId", updateAdminOrganizationMember);
+router.delete("/organizations/:id/members/:memberId", removeAdminOrganizationMember);
+router.post("/organizations/:id/members/:memberId/transfer-owner", transferAdminOrganizationOwner);
 
 export default router;

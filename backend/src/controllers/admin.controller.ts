@@ -45,6 +45,20 @@ function publicInvitation(invitation: any) {
   };
 }
 
+function serializeMember(member: any, user?: any) {
+  return {
+    _id: member._id,
+    organizationId: member.organizationId,
+    userId: member.userId,
+    role: member.role,
+    user: user
+      ? { id: user.id, name: user.name ?? "", email: user.email ?? "" }
+      : null,
+    createdAt: member.createdAt,
+    updatedAt: member.updatedAt,
+  };
+}
+
 async function getUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) return new Map<string, any>();
@@ -58,6 +72,20 @@ async function getUsersByIds(userIds: string[]) {
   return new Map(users.map((user) => [user.id as string, user]));
 }
 
+async function getUsersByEmails(emails: string[]) {
+  const db = mongoose.connection.db;
+  const normalizedEmails = emails.map((email) => email.toLowerCase()).filter(Boolean);
+  if (!db || normalizedEmails.length === 0) return new Map<string, any>();
+
+  const users = await db
+    .collection("user")
+    .find({ email: { $in: normalizedEmails } })
+    .project({ id: 1, name: 1, email: 1 })
+    .toArray();
+
+  return new Map(users.map((user) => [String(user.email).toLowerCase(), user]));
+}
+
 async function createInvitation({
   organization,
   email,
@@ -69,6 +97,14 @@ async function createInvitation({
   role: OrganizationRole;
   inviter: AuthenticatedRequest["user"];
 }) {
+  const existingMember = await OrganizationMember.findOne({
+    organizationId: organization._id,
+    userId: email,
+  }).lean();
+  if (existingMember) {
+    throw new Error("User is already a member of this organization");
+  }
+
   await OrganizationInvitation.updateMany(
     { organizationId: organization._id, email, status: "pending" },
     { $set: { status: "cancelled", cancelledAt: new Date() } }
@@ -135,20 +171,38 @@ export async function listAdminOrganizations(_req: Request, res: Response): Prom
   try {
     const organizations = await Organization.find({}).sort({ createdAt: -1 }).lean();
     const orgIds = organizations.map((org) => org._id);
-    const memberCounts = await OrganizationMember.aggregate([
-      { $match: { organizationId: { $in: orgIds } } },
-      { $group: { _id: "$organizationId", count: { $sum: 1 } } },
+    const [memberCounts, pendingInviteCounts] = await Promise.all([
+      OrganizationMember.aggregate([
+        { $match: { organizationId: { $in: orgIds } } },
+        { $group: { _id: "$organizationId", count: { $sum: 1 } } },
+      ]),
+      OrganizationInvitation.aggregate([
+        { $match: { organizationId: { $in: orgIds }, status: "pending" } },
+        { $group: { _id: "$organizationId", count: { $sum: 1 } } },
+      ]),
     ]);
     const countMap = new Map(memberCounts.map((row) => [row._id.toString(), row.count]));
+    const inviteCountMap = new Map(pendingInviteCounts.map((row) => [row._id.toString(), row.count]));
     const users = await getUsersByIds(organizations.map((org) => org.ownerUserId));
+    const pendingOwnerCount = organizations.filter((org) => org.ownerUserId.startsWith("pending-owner:")).length;
 
     res.json({
+      summary: {
+        total: organizations.length,
+        active: organizations.filter((org) => (org.status ?? "active") === "active").length,
+        suspended: organizations.filter((org) => org.status === "suspended").length,
+        pendingOwner: pendingOwnerCount,
+        pendingInvites: pendingInviteCounts.reduce((sum, row) => sum + row.count, 0),
+      },
       organizations: organizations.map((organization) =>
-        serializeOrganization(
+        ({
+          ...serializeOrganization(
           organization,
           users.get(organization.ownerUserId),
           countMap.get(organization._id.toString()) ?? 0
-        )
+          ),
+          pendingInviteCount: inviteCountMap.get(organization._id.toString()) ?? 0,
+        })
       ),
     });
   } catch (err) {
@@ -214,16 +268,26 @@ export async function getAdminOrganization(req: Request, res: Response): Promise
       return;
     }
 
-    const [members, invitations, users] = await Promise.all([
-      OrganizationMember.find({ organizationId: organization._id }).sort({ createdAt: 1 }).lean(),
+    const members = await OrganizationMember.find({ organizationId: organization._id }).sort({ createdAt: 1 }).lean();
+    const userIds = [...new Set([organization.ownerUserId, ...members.map((member) => member.userId)])];
+    const [invitations, users] = await Promise.all([
       OrganizationInvitation.find({ organizationId: organization._id, status: "pending" }).sort({ createdAt: -1 }).lean(),
-      getUsersByIds([organization.ownerUserId]),
+      getUsersByIds(userIds),
     ]);
 
     res.json({
-      organization: serializeOrganization(organization, users.get(organization.ownerUserId), members.length),
-      members,
+      organization: {
+        ...serializeOrganization(organization, users.get(organization.ownerUserId), members.length),
+        pendingInviteCount: invitations.length,
+      },
+      members: members.map((member) => serializeMember(member, users.get(member.userId))),
       invitations: invitations.map(publicInvitation),
+      summary: {
+        members: members.length,
+        admins: members.filter((member) => member.role === "admin").length,
+        owners: members.filter((member) => member.role === "owner").length,
+        pendingInvites: invitations.length,
+      },
     });
   } catch (err) {
     console.error("Error fetching admin organization:", err);
@@ -293,6 +357,15 @@ export async function inviteAdminOrganizationMember(req: Request, res: Response)
       return;
     }
 
+    const user = (await getUsersByEmails([email])).get(email);
+    const existingMember = user
+      ? await OrganizationMember.findOne({ organizationId: organization._id, userId: user.id }).lean()
+      : null;
+    if (existingMember) {
+      res.status(409).json({ error: "User is already a member of this organization" });
+      return;
+    }
+
     const invitation = await createInvitation({
       organization,
       email,
@@ -304,5 +377,129 @@ export async function inviteAdminOrganizationMember(req: Request, res: Response)
   } catch (err) {
     console.error("Error inviting admin organization member:", err);
     res.status(500).json({ error: "Failed to invite organization member" });
+  }
+}
+
+export async function updateAdminOrganizationMember(req: Request, res: Response): Promise<void> {
+  try {
+    const organizationId = stringValue(req.params.id);
+    const memberId = stringValue(req.params.memberId);
+    const role = normalizeRole(req.body?.role);
+
+    if (!mongoose.Types.ObjectId.isValid(organizationId) || !mongoose.Types.ObjectId.isValid(memberId)) {
+      res.status(400).json({ error: "Invalid organization or member id" });
+      return;
+    }
+
+    const member = await OrganizationMember.findOne({ _id: memberId, organizationId });
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    if (member.role === "owner" && role !== "owner") {
+      res.status(400).json({ error: "Transfer ownership before changing the owner role" });
+      return;
+    }
+
+    member.role = role;
+    await member.save();
+    res.json({ member: serializeMember(member.toObject()) });
+  } catch (err) {
+    console.error("Error updating admin organization member:", err);
+    res.status(500).json({ error: "Failed to update member" });
+  }
+}
+
+export async function removeAdminOrganizationMember(req: Request, res: Response): Promise<void> {
+  try {
+    const organizationId = stringValue(req.params.id);
+    const memberId = stringValue(req.params.memberId);
+
+    if (!mongoose.Types.ObjectId.isValid(organizationId) || !mongoose.Types.ObjectId.isValid(memberId)) {
+      res.status(400).json({ error: "Invalid organization or member id" });
+      return;
+    }
+
+    const member = await OrganizationMember.findOne({ _id: memberId, organizationId });
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    if (member.role === "owner") {
+      res.status(400).json({ error: "Owner members cannot be removed" });
+      return;
+    }
+
+    await member.deleteOne();
+    res.status(204).send();
+  } catch (err) {
+    console.error("Error removing admin organization member:", err);
+    res.status(500).json({ error: "Failed to remove member" });
+  }
+}
+
+export async function transferAdminOrganizationOwner(req: Request, res: Response): Promise<void> {
+  try {
+    const organizationId = stringValue(req.params.id);
+    const memberId = stringValue(req.params.memberId);
+
+    if (!mongoose.Types.ObjectId.isValid(organizationId) || !mongoose.Types.ObjectId.isValid(memberId)) {
+      res.status(400).json({ error: "Invalid organization or member id" });
+      return;
+    }
+
+    const [organization, newOwner] = await Promise.all([
+      Organization.findById(organizationId),
+      OrganizationMember.findOne({ _id: memberId, organizationId }),
+    ]);
+
+    if (!organization || !newOwner) {
+      res.status(404).json({ error: "Organization or member not found" });
+      return;
+    }
+
+    await OrganizationMember.updateMany(
+      { organizationId, role: "owner" },
+      { $set: { role: "admin" } }
+    );
+    newOwner.role = "owner";
+    await newOwner.save();
+    organization.ownerUserId = newOwner.userId;
+    await organization.save();
+
+    res.json({ organization: serializeOrganization(organization.toObject()), member: serializeMember(newOwner.toObject()) });
+  } catch (err) {
+    console.error("Error transferring admin organization owner:", err);
+    res.status(500).json({ error: "Failed to transfer owner" });
+  }
+}
+
+export async function cancelAdminOrganizationInvitation(req: Request, res: Response): Promise<void> {
+  try {
+    const organizationId = stringValue(req.params.id);
+    const invitationId = stringValue(req.params.invitationId);
+
+    if (!mongoose.Types.ObjectId.isValid(organizationId) || !mongoose.Types.ObjectId.isValid(invitationId)) {
+      res.status(400).json({ error: "Invalid organization or invitation id" });
+      return;
+    }
+
+    const invitation = await OrganizationInvitation.findOneAndUpdate(
+      { _id: invitationId, organizationId, status: "pending" },
+      { $set: { status: "cancelled", cancelledAt: new Date() } },
+      { new: true }
+    );
+
+    if (!invitation) {
+      res.status(404).json({ error: "Invitation not found" });
+      return;
+    }
+
+    res.json({ invitation: publicInvitation(invitation) });
+  } catch (err) {
+    console.error("Error cancelling admin organization invitation:", err);
+    res.status(500).json({ error: "Failed to cancel invitation" });
   }
 }
