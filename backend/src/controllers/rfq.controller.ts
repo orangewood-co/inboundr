@@ -14,6 +14,32 @@ import {
 } from "../services/rfq-input.service";
 import { streamRFQPdf } from "../services/rfq-pdf.service";
 
+export const archiveRFQ = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+
+    const rfq = await RFQ.findOneAndUpdate(
+      { _id: req.params.id, userId: authReq.user.id, organizationId: organization._id },
+      { isArchived: true },
+      { new: true }
+    ).lean();
+
+    if (!rfq) {
+      res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    res.json({ message: "RFQ archived", rfq });
+  } catch (err) {
+    console.error("Error archiving RFQ:", err);
+    res.status(500).json({ error: "Failed to archive RFQ" });
+  }
+};
+
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
 
@@ -100,14 +126,15 @@ export const listRFQs = async (
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
+    const listFilter = { userId: authReq.user.id, organizationId: organization._id, isRFQ: true, isArchived: { $ne: true } };
     const [rfqs, total] = await Promise.all([
-      RFQ.find({ userId: authReq.user.id, organizationId: organization._id, isRFQ: true })
+      RFQ.find(listFilter)
         .populate("emailId", "subject from date snippet status")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      RFQ.countDocuments({ userId: authReq.user.id, organizationId: organization._id, isRFQ: true }),
+      RFQ.countDocuments(listFilter),
     ]);
 
     res.json({ rfqs, total, page, limit, totalPages: Math.ceil(total / limit) });

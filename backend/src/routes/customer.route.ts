@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  archiveCustomer,
   createCustomer,
   exportCustomers,
   getCustomer,
@@ -19,5 +20,6 @@ router.post("/import", requireOrganizationRole(["owner", "admin"]), importCustom
 router.get("/:id", getCustomer);
 router.post("/", createCustomer);
 router.put("/:id", updateCustomer);
+router.patch("/:id/archive", archiveCustomer);
 
 export default router;

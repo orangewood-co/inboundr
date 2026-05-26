@@ -3,6 +3,38 @@ import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 
+export const archiveCustomer = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid customer id" });
+      return;
+    }
+
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+
+    const customer = await Customer.findOneAndUpdate(
+      { _id: id, organizationId: organization._id },
+      { isArchived: true },
+      { new: true }
+    ).lean();
+
+    if (!customer) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    res.json({ message: "Customer archived", customer });
+  } catch (err) {
+    console.error("Error archiving customer:", err);
+    res.status(500).json({ error: "Failed to archive customer" });
+  }
+};
+
 const SEARCH_FIELDS = ["name", "company", "email", "contactNumber", "address", "notes"] as const;
 const EDITABLE_FIELDS = [
   "name",
@@ -69,6 +101,7 @@ export const listCustomers = async (
 
     const filter = {
       organizationId: organization._id,
+      isArchived: { $ne: true },
       ...(search
         ? {
           $or: SEARCH_FIELDS.map((field) => ({
@@ -216,6 +249,7 @@ export const exportCustomers = async (
 
     const filter = {
       organizationId: organization._id,
+      isArchived: { $ne: true },
       ...(search
         ? {
           $or: SEARCH_FIELDS.map((field) => ({

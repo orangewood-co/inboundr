@@ -65,6 +65,7 @@ async function searchCustomers(
   const regex = new RegExp(escapeRegex(query), "i");
   const filter = {
     organizationId,
+    isArchived: { $ne: true },
     $or: [
       { name: regex },
       { company: regex },
@@ -152,6 +153,7 @@ async function searchRFQs(
   const rfqs = await RFQ.find({
     organizationId,
     isRFQ: true,
+    isArchived: { $ne: true },
     $or: [
       { reason: regex },
       { "customer.name": regex },

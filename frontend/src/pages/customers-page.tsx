@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
+  ArchiveIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DownloadIcon,
@@ -26,6 +27,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Sheet,
   SheetContent,
@@ -364,6 +373,8 @@ export default function CustomersPage() {
   const [form, setForm] = useState<CustomerFormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archiving, setArchiving] = useState(false)
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true)
@@ -463,6 +474,31 @@ export default function CustomersPage() {
       setSaveError(err instanceof Error ? err.message : "Unable to save customer")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleArchiveCustomer() {
+    if (!editingCustomer) return
+
+    setArchiving(true)
+    try {
+      const response = await fetch(`${API_BASE}/${editingCustomer._id}/archive`, {
+        method: "PATCH",
+        credentials: "include",
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error ?? "Unable to archive customer")
+      }
+
+      setArchiveConfirmOpen(false)
+      setSheetOpen(false)
+      toast.success("Customer archived")
+      await fetchCustomers()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to archive customer")
+    } finally {
+      setArchiving(false)
     }
   }
 
@@ -707,6 +743,10 @@ export default function CustomersPage() {
                   <Edit3Icon className="size-4" />
                   Edit customer
                 </Button>
+                <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)}>
+                  <ArchiveIcon className="size-4" />
+                  Archive
+                </Button>
                 <Button variant="outline" onClick={() => setSheetOpen(false)}>
                   Close
                 </Button>
@@ -728,6 +768,10 @@ export default function CustomersPage() {
                   {saving && <Spinner data-icon="inline-start" />}
                   Save changes
                 </Button>
+                <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)} disabled={saving}>
+                  <ArchiveIcon className="size-4" />
+                  Archive
+                </Button>
                 <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
                   Cancel
                 </Button>
@@ -736,6 +780,26 @@ export default function CustomersPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Archive customer</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to archive <span className="font-medium text-foreground">{editingCustomer?.name}</span>? They will no longer appear in your customer list or search results.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveConfirmOpen(false)} disabled={archiving}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleArchiveCustomer} disabled={archiving}>
+              {archiving && <Spinner data-icon="inline-start" />}
+              Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

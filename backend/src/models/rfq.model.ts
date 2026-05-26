@@ -47,6 +47,7 @@ export interface IRFQ extends Document {
   queryProducts: IRFQProduct[];
   searchResults: IRFQSearchResult[];
   errorMessage: string | null;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -131,6 +132,7 @@ const rfqSchema = new Schema<IRFQ>(
     },
     searchResults: { type: [rfqSearchResultSchema], default: [] },
     errorMessage: { type: String, default: null },
+    isArchived: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

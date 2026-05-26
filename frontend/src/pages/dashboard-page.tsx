@@ -32,8 +32,17 @@ import {
   PlusIcon,
   Trash2Icon,
   DownloadIcon,
+  ArchiveIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText } from "@/components/copy-button"
@@ -388,6 +397,8 @@ export function DashboardPage() {
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
+  const [archivingRfq, setArchivingRfq] = useState(false)
 
   const fetchList = useCallback(async (p: number) => {
     setListLoading(true)
@@ -721,6 +732,33 @@ export function DashboardPage() {
       console.error("Failed to send quote:", err)
     } finally {
       setSendingQuote(false)
+    }
+  }
+
+  const handleArchiveRFQ = async () => {
+    if (!detail) return
+
+    setArchivingRfq(true)
+    try {
+      const res = await fetch(`${API_BASE}/${detail._id}/archive`, {
+        method: "PATCH",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error ?? "Failed to archive RFQ")
+      }
+
+      setArchiveConfirmOpen(false)
+      setSelectedId(null)
+      setDetail(null)
+      setReply(null)
+      toast.success("RFQ archived")
+      await fetchList(page)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to archive RFQ")
+    } finally {
+      setArchivingRfq(false)
     }
   }
 
@@ -1059,6 +1097,19 @@ export function DashboardPage() {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Download PDF</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 shrink-0 text-destructive hover:bg-destructive/10"
+                            onClick={() => setArchiveConfirmOpen(true)}
+                          >
+                            <ArchiveIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Archive RFQ</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1643,6 +1694,26 @@ export function DashboardPage() {
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
+
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Archive RFQ</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to archive this RFQ{detail?.customer?.company ? <> from <span className="font-medium text-foreground">{detail.customer.company}</span></> : ""}? It will no longer appear in your RFQ list or search results.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveConfirmOpen(false)} disabled={archivingRfq}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleArchiveRFQ} disabled={archivingRfq}>
+              {archivingRfq && <Spinner data-icon="inline-start" />}
+              Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

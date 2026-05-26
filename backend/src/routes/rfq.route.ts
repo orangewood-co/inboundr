@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listRFQs, getRFQ, retryRFQ, generateQuote, getQuoteReply, sendQuoteReply, downloadRFQPdf } from "../controllers/rfq.controller";
+import { archiveRFQ, listRFQs, getRFQ, retryRFQ, generateQuote, getQuoteReply, sendQuoteReply, downloadRFQPdf } from "../controllers/rfq.controller";
 import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -13,5 +13,6 @@ router.post("/:id/retry", retryRFQ);
 router.post("/:id/generate-quote", generateQuote);
 router.post("/:id/send-quote", sendQuoteReply);
 router.get("/:id/reply", getQuoteReply);
+router.patch("/:id/archive", archiveRFQ);
 
 export default router;

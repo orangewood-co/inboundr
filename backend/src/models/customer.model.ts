@@ -9,6 +9,7 @@ export interface ICustomer extends Document {
   address: string | null;
   notes: string | null;
   specialDiscountPercentage: number;
+  isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +29,7 @@ const customerSchema = new Schema<ICustomer>(
     address: { type: String, default: null },
     notes: { type: String, default: null },
     specialDiscountPercentage: { type: Number, default: 0 },
+    isArchived: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
