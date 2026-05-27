@@ -19,13 +19,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { signOut } from "@/lib/auth-client"
+import { useNavigate } from "@tanstack/react-router"
 import {
   BadgeCheckIcon,
   BellIcon,
   ChevronsUpDownIcon,
-  CreditCardIcon,
   LogOutIcon,
-  SparklesIcon,
+  Settings2Icon,
 } from "lucide-react"
 
 export function NavUser({
@@ -38,6 +38,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const navigate = useNavigate()
   const fallback = getInitials(user.name || user.email)
 
   async function handleSignOut() {
@@ -85,34 +86,22 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <SparklesIcon
-                />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheckIcon
-                />
+              <DropdownMenuItem onClick={() => navigate({ to: "/settings", search: { tab: "account" } })}>
+                <BadgeCheckIcon />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <BellIcon
-                />
+              <DropdownMenuItem onClick={() => navigate({ to: "/settings", search: { tab: "notifications" } })}>
+                <BellIcon />
                 Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>
+                <Settings2Icon />
+                Settings
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
-              <LogOutIcon
-              />
+              <LogOutIcon />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

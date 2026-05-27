@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
+import { useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
@@ -1003,6 +1004,9 @@ function MembersTab() {
 // ─── Main Page ───────────────────────────────────────────────
 
 export function SettingsPage() {
+  const { tab } = useSearch({ from: "/settings" })
+  const activeTab = tab ?? "organization"
+
   return (
     <AppLayout>
       <SiteHeader />
@@ -1012,7 +1016,7 @@ export function SettingsPage() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight">Settings</h1>
           </div>
 
-          <Tabs defaultValue="organization">
+          <Tabs defaultValue={activeTab} key={activeTab}>
             <div className="mb-6 overflow-x-auto">
               <TabsList className="h-auto rounded-2xl bg-muted/60 p-1.5">
                 <TabsTrigger value="organization" className="gap-1.5">
