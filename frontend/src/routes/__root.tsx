@@ -43,22 +43,22 @@ function RootRouteComponent() {
   useEffect(() => {
     const exactTitle = PAGE_TITLES[pathname]
     if (exactTitle) {
-      document.title = `${exactTitle} | ${APP_TITLE}`
+      document.title = `${exactTitle} - ${APP_TITLE}`
       return
     }
 
     if (pathname.startsWith("/forms/")) {
-      document.title = `Form Editor | ${APP_TITLE}`
+      document.title = `Form Editor - ${APP_TITLE}`
       return
     }
 
     if (pathname.startsWith("/invoices/") && pathname !== "/invoices/new") {
-      document.title = `Invoice Details | ${APP_TITLE}`
+      document.title = `Invoice Details - ${APP_TITLE}`
       return
     }
 
     if (pathname.startsWith("/customers/") && pathname !== "/customers/import") {
-      document.title = `Customer Details | ${APP_TITLE}`
+      document.title = `Customer Details - ${APP_TITLE}`
       return
     }
 
