@@ -64,7 +64,6 @@ export function QuestionStep({
             <FieldInput
               field={field}
               value={value}
-              error={error}
               accent={accent}
               onChange={onChange}
               onUpload={onUpload}

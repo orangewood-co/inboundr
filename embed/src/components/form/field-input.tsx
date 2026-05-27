@@ -4,7 +4,6 @@ import type { PublicField, UploadedFile } from "./types"
 export function FieldInput({
   field,
   value,
-  error,
   accent,
   onChange,
   onUpload,
@@ -13,7 +12,6 @@ export function FieldInput({
 }: {
   field: PublicField
   value: unknown
-  error?: string
   accent: string
   onChange: (value: unknown) => void
   onUpload?: (files: FileList) => Promise<void>
@@ -21,6 +19,7 @@ export function FieldInput({
   onSubmit?: () => void
 }) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+  const uploadedFile = !Array.isArray(value) && isUploadedFile(value) ? value : null
 
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 400)
@@ -80,12 +79,12 @@ export function FieldInput({
             ))}
           </ul>
         )}
-        {!Array.isArray(value) && value && typeof value === "object" && "originalName" in value && (
+        {uploadedFile && (
           <p className="flex items-center gap-2 text-sm text-stone-600">
             <svg className="size-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
-            {String((value as UploadedFile).originalName)}
+            {uploadedFile.originalName}
           </p>
         )}
       </div>
@@ -263,5 +262,14 @@ export function FieldInput({
       className={baseInputClasses}
       style={{ borderColor: value ? accent : undefined }}
     />
+  )
+}
+
+function isUploadedFile(value: unknown): value is UploadedFile {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "originalName" in value &&
+    typeof value.originalName === "string"
   )
 }
