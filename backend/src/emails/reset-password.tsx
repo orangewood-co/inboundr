@@ -1,113 +1,178 @@
-import * as React from "react";
 import {
   Body,
   Button,
+  Column,
   Container,
   Head,
   Heading,
   Html,
+  Img,
+  Link,
   Preview,
+  Row,
   Section,
+  Tailwind,
   Text,
 } from "react-email";
+import { barebonesBoxedTailwindConfig } from "./theme";
+import { BarebonesFonts } from "./theme-fonts";
+
+const baseUrl = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : process.env.FRONTEND_ORIGIN ?? "";
 
 interface ResetPasswordEmailProps {
   name?: string | null;
   resetUrl: string;
+  companyName?: string;
 }
 
-export function ResetPasswordEmail({ name, resetUrl }: ResetPasswordEmailProps) {
-  const greetingName = name?.trim() || "there";
-
+export function ResetPasswordEmail({
+  resetUrl,
+  companyName = "Inboundr.co",
+}: ResetPasswordEmailProps) {
   return (
-    <Html lang="en">
-      <Head />
-      <Preview>Reset your BTSA password</Preview>
-      <Body style={body}>
-        <Container style={container}>
-          <Heading style={heading}>Reset your password</Heading>
-          <Text style={text}>Hi {greetingName},</Text>
-          <Text style={text}>
-            We received a request to reset your BTSA password. Use the button
-            below to choose a new password.
-          </Text>
-          <Section style={buttonWrap}>
-            <Button href={resetUrl} style={button}>
-              Reset password
-            </Button>
-          </Section>
-          <Text style={mutedText}>
-            If you did not request this, you can safely ignore this email.
-          </Text>
-          <Text style={mutedText}>
-            If the button does not work, paste this link into your browser:
-          </Text>
-          <Text style={linkText}>{resetUrl}</Text>
-        </Container>
-      </Body>
-    </Html>
+    <Tailwind config={barebonesBoxedTailwindConfig}>
+      <Html lang="en">
+        <Head>
+          <BarebonesFonts />
+        </Head>
+
+        <Body className="bg-bg-2 m-0 text-center font-sans">
+          <Preview>Reset your password</Preview>
+          <Container className="mobile:mt-0 mx-auto mt-8 w-full max-w-[640px]">
+            <Section>
+              <Section className="bg-bg mobile:px-2 px-6 py-4">
+                <Section className="mb-3 px-6">
+                  <Row>
+                    <Column className="w-1/2 py-[7px] align-middle">
+                      <Row>
+                        <Column className="w-[302px] align-middle">
+                          <Img
+                            src={`https://inboundr.co/logo-black.png`}
+                            alt=""
+                            width={200}
+                            className="block"
+                          />
+                        </Column>
+                      </Row>
+                    </Column>
+                    <Column align="right" className="w-1/2 py-[7px] align-middle">
+                      <Text className="font-13 m-0 text-right font-sans">
+                        <span className="text-fg-3">{companyName}</span>
+                      </Text>
+                    </Column>
+                  </Row>
+                </Section>
+
+                <Section className="bg-bg-2 mobile:px-6 mobile:py-12 rounded-[8px] px-[40px] py-[64px] text-center">
+                  <Section className="mb-3">
+                    <Img
+                      src={`https://inboundr.co/mark-black.png`}
+                      alt="Logo"
+                      width={48}
+                      className="mx-auto mb-5 block"
+                    />
+                    <Heading as="h1" className="font-28 text-fg m-0 font-sans">
+                      Reset your password
+                    </Heading>
+                  </Section>
+
+                  <Text className="font-16 text-fg-2 mx-auto mt-0 mb-8 max-w-[380px] text-center font-sans">
+                    Someone has requested a link to change your password, and you
+                    can do this through the link below.
+                  </Text>
+
+                  <Section className="mb-6 text-center">
+                    <Button
+                      href={resetUrl}
+                      className="bg-fg font-16 text-fg-inverted inline-block rounded-lg px-7 py-4 text-center font-sans leading-6"
+                    >
+                      Change password
+                    </Button>
+                  </Section>
+
+                  <Text className="font-13 text-fg-3 mx-auto mt-8 mb-0 max-w-[400px] text-center font-sans">
+                    If you didn&apos;t request this, please ignore this email.
+                    Your password won&apos;t change until you access the link
+                    above and create a new one.
+                  </Text>
+                </Section>
+
+                <Section className="bg-bg">
+                  <Row>
+                    <Column className="px-6 py-10 text-center">
+                      <Text className="font-13 text-fg-3 mx-auto mt-0 mb-8 max-w-[280px] text-center font-sans">
+                        Turn inbound into revenue.
+                      </Text>
+
+                      {/* <Section className="mb-8">
+                        <Link
+                          href="https://example.com/"
+                          className="inline-block px-2 align-middle"
+                        >
+                          <Img
+                            src={`${baseUrl}/static/shared/social-x-black.png`}
+                            alt="X"
+                            width={18}
+                            className="block"
+                          />
+                        </Link>
+                        <Link
+                          href="https://example.com/"
+                          className="inline-block px-2 align-middle"
+                        >
+                          <Img
+                            src={`${baseUrl}/static/shared/social-in-black.png`}
+                            alt="LinkedIn"
+                            width={18}
+                            className="block"
+                          />
+                        </Link>
+                        <Link
+                          href="https://example.com/"
+                          className="inline-block px-2 align-middle"
+                        >
+                          <Img
+                            src={`${baseUrl}/static/shared/social-yt-black.png`}
+                            alt="YouTube"
+                            width={18}
+                            className="block"
+                          />
+                        </Link>
+                        <Link
+                          href="https://example.com/"
+                          className="inline-block px-2 align-middle"
+                        >
+                          <Img
+                            src={`${baseUrl}/static/shared/social-gh-black.png`}
+                            alt="GitHub"
+                            width={18}
+                            className="block"
+                          />
+                        </Link>
+                      </Section> */}
+
+                      <Text className="font-11 text-fg-3 mt-4 mb-5 text-center font-sans">
+                        Second Floor, A-48, Sector-67, Noida, Gautam Buddha Nagar
+                        <br />
+                        Uttar Pradesh, 201301
+                      </Text>
+                    </Column>
+                  </Row>
+                </Section>
+              </Section>
+            </Section>
+          </Container>
+        </Body>
+      </Html>
+    </Tailwind>
   );
 }
 
+ResetPasswordEmail.PreviewProps = {
+  companyName: "BTSA",
+  resetUrl: "https://example.com/",
+} satisfies ResetPasswordEmailProps;
+
 export default ResetPasswordEmail;
-
-const body = {
-  backgroundColor: "#f6f7f9",
-  color: "#111827",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  margin: 0,
-};
-
-const container = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  margin: "40px auto",
-  padding: "32px",
-  width: "100%",
-  maxWidth: "560px",
-};
-
-const heading = {
-  color: "#111827",
-  fontSize: "24px",
-  lineHeight: "32px",
-  margin: "0 0 24px",
-};
-
-const text = {
-  color: "#374151",
-  fontSize: "16px",
-  lineHeight: "24px",
-  margin: "0 0 16px",
-};
-
-const buttonWrap = {
-  margin: "28px 0",
-};
-
-const button = {
-  backgroundColor: "#111827",
-  borderRadius: "8px",
-  color: "#ffffff",
-  fontSize: "15px",
-  fontWeight: 600,
-  padding: "12px 20px",
-  textDecoration: "none",
-};
-
-const mutedText = {
-  color: "#6b7280",
-  fontSize: "13px",
-  lineHeight: "20px",
-  margin: "24px 0 8px",
-};
-
-const linkText = {
-  color: "#4b5563",
-  fontSize: "13px",
-  lineHeight: "20px",
-  margin: 0,
-  wordBreak: "break-all" as const,
-};
