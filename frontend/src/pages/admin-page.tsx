@@ -173,7 +173,7 @@ export default function AdminPage() {
 
   return (
     <AppLayout>
-      <SiteHeader title="Super Admin" />
+      <SiteHeader breadcrumbs={[{ label: "Super Admin" }]} />
       <main className="h-full overflow-y-auto bg-muted/20 p-4 md:p-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-6">
           <section className="overflow-hidden rounded-2xl border bg-background">

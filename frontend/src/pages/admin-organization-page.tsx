@@ -303,7 +303,7 @@ export default function AdminOrganizationPage() {
   if (loading || !organization) {
     return (
       <AppLayout>
-        <SiteHeader title="Organization Admin" />
+        <SiteHeader breadcrumbs={[{ label: "Super Admin", href: "/admin" }, { label: "Organization" }]} />
         <div className="flex h-full items-center justify-center">
           <Spinner />
         </div>
@@ -313,7 +313,7 @@ export default function AdminOrganizationPage() {
 
   return (
     <AppLayout>
-      <SiteHeader title={organization.name} />
+      <SiteHeader breadcrumbs={[{ label: "Super Admin", href: "/admin" }, { label: organization.name }]} />
       <main className="h-full overflow-y-auto bg-muted/20 p-4 md:p-6">
         <div className="mx-auto grid max-w-6xl gap-6">
           <section className="rounded-2xl border bg-background p-5">

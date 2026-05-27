@@ -175,7 +175,8 @@ function formToPayload(form: ProductFormState) {
         return [key, stringValue.trim() === "" ? null : Number(stringValue)]
       }
       if (key === "addedtime") {
-        return [key, value ? new Date(value).toISOString() : new Date().toISOString()]
+        const dateValue = form.addedtime
+        return [key, dateValue ? new Date(dateValue).toISOString() : new Date().toISOString()]
       }
       const stringValue = String(value)
       return [key, stringValue.trim() === "" ? null : stringValue.trim()]
