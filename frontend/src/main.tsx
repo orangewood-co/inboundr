@@ -11,9 +11,15 @@ import { OrganizationBrandingProvider } from "@/lib/organization-branding"
 import { EntitlementProvider } from "@/lib/entitlements"
 import { installOrganizationFetchContext } from "@/lib/organization-context"
 import { renderASCIILogo } from "@/lib/branding"
+import { useAppVersionCheck } from "@/hooks/use-app-version-check"
 
 installOrganizationFetchContext(import.meta.env.VITE_API_URL ?? "http://localhost:3000")
 renderASCIILogo()
+
+function AppVersionCheck() {
+  useAppVersionCheck()
+  return null
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -22,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
         <EntitlementProvider>
           <TooltipProvider>
             <RouterProvider router={router} />
+            <AppVersionCheck />
             <Toaster richColors position="top-right" />
           </TooltipProvider>
         </EntitlementProvider>
