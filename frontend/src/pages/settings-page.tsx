@@ -94,6 +94,8 @@ type OrganizationRole = "owner" | "admin" | "member"
 interface OrganizationMember {
   _id: string
   userId: string
+  userName: string | null
+  userEmail: string | null
   role: OrganizationRole
   createdAt: string
 }
@@ -1272,10 +1274,13 @@ function MembersTab() {
             <div key={member._id} className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/30">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {member.userId.slice(0, 1).toUpperCase()}
+                  {(member.userName ?? member.userEmail ?? member.userId).slice(0, 1).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{member.userId}</p>
+                  <p className="text-sm font-medium">{member.userName ?? member.userEmail ?? member.userId}</p>
+                  {member.userEmail && (
+                    <p className="text-xs text-muted-foreground">{member.userEmail}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Joined {new Date(member.createdAt).toLocaleDateString()}
                   </p>
