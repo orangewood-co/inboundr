@@ -1372,8 +1372,8 @@ function NotificationsTab() {
                   {members.map((member) => (
                     <label key={member._id} className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{member.userName ?? member.userEmail ?? member.userId}</p>
-                        <p className="truncate text-xs text-muted-foreground">{member.userEmail ?? "No email on account"}</p>
+                        <p className="truncate text-sm font-medium">{member.userName ?? member.userEmail ?? "Unnamed member"}</p>
+                        <p className="truncate text-xs text-muted-foreground">{member.userEmail ?? "Email unavailable for this member"}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <RoleBadge role={toRoleLabel(member.role)} />

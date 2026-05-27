@@ -23,13 +23,27 @@ async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) return new Map<string, { name?: string; email?: string }>();
 
+  const objectIds = userIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
   const users = await db
     .collection("user")
-    .find({ id: { $in: userIds } })
+    .find({
+      $or: [
+        { id: { $in: userIds } },
+        ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
+      ],
+    })
     .project({ id: 1, name: 1, email: 1 })
     .toArray();
 
-  return new Map(users.map((user) => [user.id as string, user as { name?: string; email?: string }]));
+  const map = new Map<string, { name?: string; email?: string }>();
+  for (const user of users) {
+    map.set(user.id as string, user);
+    map.set(String(user._id), user);
+  }
+  return map;
 }
 
 async function listDigestMembers(organizationId: mongoose.Types.ObjectId) {
