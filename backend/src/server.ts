@@ -1,5 +1,10 @@
 import "dotenv/config";
 import app, { initializeServices } from "./app";
+import { renderASCIILogo } from "./lib/branding";
+
+renderASCIILogo();
+console.log("Logs: ");
+console.log("--------------------------------");
 
 const PORT = process.env.PORT || 3000;
 
