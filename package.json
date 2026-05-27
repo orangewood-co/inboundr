@@ -30,5 +30,8 @@
     "build:embed": "bun run --cwd embed build",
     "lint:embed": "bun run --cwd embed lint",
     "typecheck:embed": "bun run --cwd embed typecheck"
+  },
+  "dependencies": {
+    "@langchain/openrouter": "^0.3.0"
   }
 }

@@ -1,10 +1,10 @@
 import { END, START, StateGraph, StateSchema, type GraphNode } from "@langchain/langgraph";
 import { z } from "zod";
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatOpenRouter } from "@langchain/openrouter";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-const model = new ChatOpenAI({
-  model: "gpt-4o-mini",
+const model = new ChatOpenRouter({
+  model: "openai/gpt-oss-120b:free",
   temperature: 0,
 });
 
