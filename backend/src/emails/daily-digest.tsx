@@ -1,16 +1,20 @@
-import * as React from "react";
 import {
   Body,
   Button,
+  Column,
   Container,
   Head,
   Heading,
-  Hr,
   Html,
+  Img,
   Preview,
+  Row,
   Section,
+  Tailwind,
   Text,
 } from "react-email";
+import { barebonesBoxedTailwindConfig } from "./theme";
+import { BarebonesFonts } from "./theme-fonts";
 
 interface TopProduct {
   name: string;
@@ -36,6 +40,7 @@ export interface DailyDigestProps {
     };
   };
   statsPageUrl: string;
+  companyName?: string;
 }
 
 export function DailyDigest({
@@ -44,199 +49,206 @@ export function DailyDigest({
   date,
   sections,
   statsPageUrl,
+  companyName = "Inboundr.co",
 }: DailyDigestProps) {
   const greetingName = userName?.trim() || "there";
   const hasSections = Object.keys(sections).length > 0;
 
   return (
-    <Html lang="en">
-      <Head />
-      <Preview>
-        Your daily stats digest for {organizationName} — {date}
-      </Preview>
-      <Body style={body}>
-        <Container style={container}>
-          <Heading style={heading}>Daily Stats Digest</Heading>
-          <Text style={text}>Hi {greetingName},</Text>
-          <Text style={text}>
-            Here&apos;s your daily summary for <strong>{organizationName}</strong> on{" "}
-            {date}.
-          </Text>
+    <Tailwind config={barebonesBoxedTailwindConfig}>
+      <Html lang="en">
+        <Head>
+          <BarebonesFonts />
+        </Head>
 
-          {!hasSections && (
-            <Text style={mutedText}>
-              No sections are enabled for your digest. Update your preferences
-              in Settings to start receiving stats.
-            </Text>
-          )}
+        <Body className="bg-bg-2 m-0 text-center font-sans">
+          <Preview>
+            Your daily stats digest for {organizationName} - {date}
+          </Preview>
+          <Container className="mobile:mt-0 mx-auto mt-8 w-full max-w-[640px]">
+            <Section>
+              <Section className="bg-bg mobile:px-2 px-6 py-4">
+                <Section className="mb-3 px-6">
+                  <Row>
+                    <Column className="w-1/2 py-[7px] align-middle">
+                      <Row>
+                        <Column className="w-[302px] align-middle">
+                          <Img
+                            src="https://inboundr.co/logo-black.png"
+                            alt=""
+                            width={200}
+                            className="block"
+                          />
+                        </Column>
+                      </Row>
+                    </Column>
+                    <Column align="right" className="w-1/2 py-[7px] align-middle">
+                      <Text className="font-13 m-0 text-right font-sans">
+                        <span className="text-fg-3">{companyName}</span>
+                      </Text>
+                    </Column>
+                  </Row>
+                </Section>
 
-          {sections.emailVolume && (
-            <Section style={sectionCard}>
-              <Text style={sectionTitle}>Email Volume</Text>
-              <Text style={metricRow}>
-                Total received: <strong>{sections.emailVolume.total}</strong>
-              </Text>
-              <Text style={metricRow}>
-                RFQs: <strong>{sections.emailVolume.rfqs}</strong> &nbsp;|&nbsp;
-                Non-RFQs: <strong>{sections.emailVolume.nonRfqs}</strong>
-              </Text>
+                <Section className="bg-bg-2 mobile:px-6 mobile:py-12 rounded-[8px] px-[40px] py-[64px] text-center">
+                  <Section className="mb-3">
+                    <Img
+                      src="https://inboundr.co/mark-black.png"
+                      alt="Logo"
+                      width={48}
+                      className="mx-auto mb-5 block"
+                    />
+                    <Heading as="h1" className="font-28 text-fg m-0 font-sans">
+                      Daily stats digest
+                    </Heading>
+                  </Section>
+
+                  <Text className="font-16 text-fg-2 mx-auto mt-0 mb-8 max-w-[420px] text-center font-sans">
+                    Hi {greetingName}, here&apos;s your daily summary for{" "}
+                    <strong>{organizationName}</strong> on {date}.
+                  </Text>
+
+                  <Section className="mx-auto mb-8 max-w-[440px] text-left">
+                    {!hasSections && (
+                      <Text className="font-13 text-fg-3 m-0 text-center font-sans">
+                        No sections are enabled for your digest. Update your
+                        preferences in Settings to start receiving stats.
+                      </Text>
+                    )}
+
+                    {sections.emailVolume && (
+                      <Section className="bg-bg mb-3 rounded-lg px-5 py-4">
+                        <Text className="font-13 text-fg m-0 font-sans">
+                          <strong>Email Volume</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-2 mb-0 font-sans">
+                          Total received:{" "}
+                          <strong>{sections.emailVolume.total}</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-1 mb-0 font-sans">
+                          RFQs: <strong>{sections.emailVolume.rfqs}</strong>{" "}
+                          | Non-RFQs:{" "}
+                          <strong>{sections.emailVolume.nonRfqs}</strong>
+                        </Text>
+                      </Section>
+                    )}
+
+                    {sections.rfqBreakdown && (
+                      <Section className="bg-bg mb-3 rounded-lg px-5 py-4">
+                        <Text className="font-13 text-fg m-0 font-sans">
+                          <strong>RFQ Breakdown</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-2 mb-0 font-sans">
+                          Total RFQs:{" "}
+                          <strong>{sections.rfqBreakdown.total}</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-1 mb-0 font-sans">
+                          Processed:{" "}
+                          <strong>{sections.rfqBreakdown.processed}</strong> |
+                          Failed: <strong>{sections.rfqBreakdown.failed}</strong>
+                        </Text>
+                      </Section>
+                    )}
+
+                    {sections.productRequests && (
+                      <Section className="bg-bg mb-3 rounded-lg px-5 py-4">
+                        <Text className="font-13 text-fg m-0 font-sans">
+                          <strong>Product Requests</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-2 mb-0 font-sans">
+                          Total line items:{" "}
+                          <strong>{sections.productRequests.total}</strong>
+                        </Text>
+                        {sections.productRequests.topProducts.length > 0 && (
+                          <>
+                            <Text className="font-13 text-fg-2 mt-2 mb-1 font-sans">
+                              Top products:
+                            </Text>
+                            {sections.productRequests.topProducts.map(
+                              (product, index) => (
+                                <Text
+                                  key={index}
+                                  className="font-13 text-fg-3 mt-0 mb-1 font-sans"
+                                >
+                                  - {product.name} (qty: {product.quantity})
+                                </Text>
+                              ),
+                            )}
+                          </>
+                        )}
+                      </Section>
+                    )}
+
+                    {sections.matchQuality && (
+                      <Section className="bg-bg mb-3 rounded-lg px-5 py-4">
+                        <Text className="font-13 text-fg m-0 font-sans">
+                          <strong>Match Quality</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-2 mb-0 font-sans">
+                          Match rate:{" "}
+                          <strong>{sections.matchQuality.rate}%</strong>
+                        </Text>
+                        <Text className="font-13 text-fg-2 mt-1 mb-0 font-sans">
+                          Matched:{" "}
+                          <strong>{sections.matchQuality.matched}</strong> |
+                          Ambiguous:{" "}
+                          <strong>{sections.matchQuality.ambiguous}</strong> |
+                          No match: <strong>{sections.matchQuality.noMatch}</strong>
+                        </Text>
+                      </Section>
+                    )}
+                  </Section>
+
+                  <Section className="mb-6 text-center">
+                    <Button
+                      href={statsPageUrl}
+                      className="bg-fg font-16 text-fg-inverted inline-block rounded-lg px-7 py-4 text-center font-sans leading-6"
+                    >
+                      View full stats
+                    </Button>
+                  </Section>
+
+                  <Text className="font-13 text-fg-3 mx-auto mt-8 mb-0 max-w-[400px] text-center font-sans">
+                    You&apos;re receiving this because you enabled the daily
+                    stats digest. Update your preferences in Settings &gt;
+                    Notifications to change what you receive.
+                  </Text>
+                </Section>
+
+                <Section className="bg-bg">
+                  <Row>
+                    <Column className="px-6 py-10 text-center">
+                      <Text className="font-13 text-fg-3 mx-auto mt-0 mb-8 max-w-[280px] text-center font-sans">
+                        Turn inbound into revenue.
+                      </Text>
+
+                      <Text className="font-11 text-fg-3 mt-4 mb-5 text-center font-sans">
+                        Second Floor, A-48, Sector-67, Noida, Gautam Buddha Nagar
+                        <br />
+                        Uttar Pradesh, 201301
+                      </Text>
+                    </Column>
+                  </Row>
+                </Section>
+              </Section>
             </Section>
-          )}
-
-          {sections.rfqBreakdown && (
-            <Section style={sectionCard}>
-              <Text style={sectionTitle}>RFQ Breakdown</Text>
-              <Text style={metricRow}>
-                Total RFQs: <strong>{sections.rfqBreakdown.total}</strong>
-              </Text>
-              <Text style={metricRow}>
-                Processed: <strong>{sections.rfqBreakdown.processed}</strong>{" "}
-                &nbsp;|&nbsp; Failed:{" "}
-                <strong>{sections.rfqBreakdown.failed}</strong>
-              </Text>
-            </Section>
-          )}
-
-          {sections.productRequests && (
-            <Section style={sectionCard}>
-              <Text style={sectionTitle}>Product Requests</Text>
-              <Text style={metricRow}>
-                Total line items: <strong>{sections.productRequests.total}</strong>
-              </Text>
-              {sections.productRequests.topProducts.length > 0 && (
-                <>
-                  <Text style={metricRow}>Top products:</Text>
-                  {sections.productRequests.topProducts.map((product, index) => (
-                    <Text key={index} style={listItem}>
-                      • {product.name} (qty: {product.quantity})
-                    </Text>
-                  ))}
-                </>
-              )}
-            </Section>
-          )}
-
-          {sections.matchQuality && (
-            <Section style={sectionCard}>
-              <Text style={sectionTitle}>Match Quality</Text>
-              <Text style={metricRow}>
-                Match rate: <strong>{sections.matchQuality.rate}%</strong>
-              </Text>
-              <Text style={metricRow}>
-                Matched: <strong>{sections.matchQuality.matched}</strong>{" "}
-                &nbsp;|&nbsp; Ambiguous:{" "}
-                <strong>{sections.matchQuality.ambiguous}</strong> &nbsp;|&nbsp;
-                No match: <strong>{sections.matchQuality.noMatch}</strong>
-              </Text>
-            </Section>
-          )}
-
-          <Hr style={divider} />
-
-          <Section style={buttonWrap}>
-            <Button href={statsPageUrl} style={button}>
-              View full stats
-            </Button>
-          </Section>
-
-          <Text style={mutedText}>
-            You&apos;re receiving this because you enabled the daily stats digest.
-            Update your preferences in Settings &gt; Notifications to change
-            what you receive.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+          </Container>
+        </Body>
+      </Html>
+    </Tailwind>
   );
 }
 
+DailyDigest.PreviewProps = {
+  companyName: "Inboundr.co",
+  date: "May 27, 2026",
+  organizationName: "Acme",
+  sections: {
+    emailVolume: { total: 42, rfqs: 18, nonRfqs: 24 },
+    matchQuality: { matched: 15, ambiguous: 2, noMatch: 1, rate: 83 },
+  },
+  statsPageUrl: "https://example.com/",
+  userName: "there",
+} satisfies DailyDigestProps;
+
 export default DailyDigest;
-
-const body = {
-  backgroundColor: "#f6f7f9",
-  color: "#111827",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  margin: 0,
-};
-
-const container = {
-  backgroundColor: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  margin: "40px auto",
-  padding: "32px",
-  width: "100%",
-  maxWidth: "560px",
-};
-
-const heading = {
-  color: "#111827",
-  fontSize: "22px",
-  lineHeight: "30px",
-  margin: "0 0 24px",
-};
-
-const text = {
-  color: "#374151",
-  fontSize: "15px",
-  lineHeight: "24px",
-  margin: "0 0 16px",
-};
-
-const sectionCard = {
-  backgroundColor: "#f9fafb",
-  border: "1px solid #e5e7eb",
-  borderRadius: "8px",
-  padding: "16px",
-  marginBottom: "16px",
-};
-
-const sectionTitle = {
-  color: "#111827",
-  fontSize: "14px",
-  fontWeight: 600,
-  lineHeight: "20px",
-  margin: "0 0 8px",
-};
-
-const metricRow = {
-  color: "#374151",
-  fontSize: "14px",
-  lineHeight: "22px",
-  margin: "0 0 4px",
-};
-
-const listItem = {
-  color: "#4b5563",
-  fontSize: "13px",
-  lineHeight: "20px",
-  margin: "0 0 2px",
-  paddingLeft: "8px",
-};
-
-const divider = {
-  borderColor: "#e5e7eb",
-  margin: "24px 0",
-};
-
-const buttonWrap = {
-  margin: "0 0 24px",
-};
-
-const button = {
-  backgroundColor: "#111827",
-  borderRadius: "8px",
-  color: "#ffffff",
-  fontSize: "14px",
-  fontWeight: 600,
-  padding: "10px 18px",
-  textDecoration: "none",
-};
-
-const mutedText = {
-  color: "#6b7280",
-  fontSize: "12px",
-  lineHeight: "18px",
-  margin: "0",
-};
