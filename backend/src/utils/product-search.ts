@@ -69,6 +69,7 @@ export interface ProductSearchMatch {
   hsnCode: string | null;
   gstRate: number | null;
   link: string | null;
+  isTopSeller: boolean;
   score: number;
   matchReasons: string[];
 }
@@ -94,6 +95,7 @@ interface RankedProductRow {
   hsncode: string | null;
   gstrate: string | number | null;
   productlink: string | null;
+  is_top_seller: boolean | null;
   rank_score: string | number;
   match_reasons: string[] | null;
 }
@@ -122,6 +124,7 @@ const TEXT_SEARCH_SQL = `
       p.hsncode,
       p.gstrate,
       p.productlink,
+      COALESCE(p.is_top_seller, false) AS is_top_seller,
       CASE
         WHEN $1 <> '' AND lower(COALESCE(p.productcode, '')) = $1 THEN 220
         ELSE 0
@@ -184,7 +187,11 @@ const TEXT_SEARCH_SQL = `
         FROM unnest($7::text[]) AS dimension_token
         WHERE regexp_replace(lower(COALESCE(p.productdescription, '')), '[[:space:]]+', '', 'g') LIKE '%' || regexp_replace(dimension_token, '[[:space:]]+', '', 'g') || '%'
            OR regexp_replace(lower(COALESCE(p.productcode, '')), '[[:space:]]+', '', 'g') LIKE '%' || regexp_replace(dimension_token, '[[:space:]]+', '', 'g') || '%'
-      ), 0) AS dimension_score
+      ), 0) AS dimension_score,
+      CASE
+        WHEN COALESCE(p.is_top_seller, false) THEN 30
+        ELSE 0
+      END AS top_seller_score
     FROM products p
     WHERE
       p.organization_id = $11
@@ -247,7 +254,17 @@ const TEXT_SEARCH_SQL = `
         + brand_score
         + phrase_score
         + token_score
-        + dimension_score AS rank_score,
+        + dimension_score AS base_score,
+      exact_code_score
+        + normalized_exact_code_score
+        + normalized_prefix_code_score
+        + normalized_contains_code_score
+        + partial_code_score
+        + brand_score
+        + phrase_score
+        + token_score
+        + dimension_score
+        + top_seller_score AS rank_score,
       ARRAY_REMOVE(ARRAY[
         CASE WHEN exact_code_score > 0 THEN 'exact_code' END,
         CASE WHEN normalized_exact_code_score > 0 THEN 'normalized_exact_code' END,
@@ -257,7 +274,8 @@ const TEXT_SEARCH_SQL = `
         CASE WHEN brand_score > 0 THEN 'brand' END,
         CASE WHEN phrase_score > 0 THEN 'full_phrase' END,
         CASE WHEN token_score > 0 THEN 'token_overlap' END,
-        CASE WHEN dimension_score > 0 THEN 'dimension' END
+        CASE WHEN dimension_score > 0 THEN 'dimension' END,
+        CASE WHEN top_seller_score > 0 THEN 'top_seller' END
       ], NULL) AS match_reasons
     FROM candidate_products
   )
@@ -270,10 +288,11 @@ const TEXT_SEARCH_SQL = `
     hsncode,
     gstrate,
     productlink,
+    is_top_seller,
     rank_score,
     match_reasons
   FROM scored_products
-  WHERE rank_score >= $9
+  WHERE base_score >= $9
   ORDER BY rank_score DESC, char_length(COALESCE(productdescription, '')) ASC, id ASC
   LIMIT $10
 `;
@@ -331,6 +350,7 @@ export class TextProductSearcher {
         hsnCode: row.hsncode,
         gstRate: toNumberOrNull(row.gstrate),
         link: row.productlink,
+        isTopSeller: Boolean(row.is_top_seller),
         score: Number(row.rank_score),
         matchReasons: row.match_reasons ?? [],
       }));

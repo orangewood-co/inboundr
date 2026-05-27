@@ -47,6 +47,7 @@ type ProductImportField =
   | "maxupsell"
   | "calibrationcharges"
   | "unit"
+  | "is_top_seller"
   | "addedtime"
   | "addeduser"
 
@@ -87,6 +88,7 @@ const importFields: Array<{
   { key: "maxupsell", label: "Max upsell", aliases: ["maxupsell", "max upsell", "upsell", "margin"] },
   { key: "calibrationcharges", label: "Calibration charges", aliases: ["calibrationcharges", "calibration charges", "calibration"] },
   { key: "unit", label: "Unit", aliases: ["unit", "uom", "measure"] },
+  { key: "is_top_seller", label: "Top seller", aliases: ["is_top_seller", "top seller", "topseller", "best seller", "priority product"] },
   { key: "addedtime", label: "Added date", aliases: ["addedtime", "added time", "added date", "date"] },
   { key: "addeduser", label: "Added user", aliases: ["addeduser", "added user", "user", "created by"] },
 ]

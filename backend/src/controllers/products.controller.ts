@@ -38,6 +38,7 @@ const PRODUCT_COLUMNS = [
   "maxupsell",
   "calibrationcharges",
   "unit",
+  "is_top_seller",
   "addedtime",
   "addeduser",
 ] as const;
@@ -54,6 +55,7 @@ const EDITABLE_COLUMNS = [
   "maxupsell",
   "calibrationcharges",
   "unit",
+  "is_top_seller",
   "addedtime",
   "addeduser",
 ] as const;
@@ -97,7 +99,7 @@ function normalizeProductInput(body: Record<string, unknown>): ProductInput {
 
   for (const column of EDITABLE_COLUMNS) {
     if (column in body) {
-      input[column] = body[column] === "" ? null : body[column];
+      input[column] = column === "is_top_seller" ? parseBoolean(body[column]) : body[column] === "" ? null : body[column];
     }
   }
 
@@ -122,6 +124,17 @@ function normalizeImportProductInput(body: Record<string, unknown>): Partial<Pro
   }
 
   return input as Partial<ProductInput>;
+}
+
+function parseBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return ["true", "yes", "y", "1", "top seller", "top-seller", "topseller", "best seller", "priority product"].includes(normalized);
+  }
+
+  return false;
 }
 
 function validateRequiredProductFields(input: Partial<ProductInput>): string | null {

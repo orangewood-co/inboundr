@@ -43,6 +43,7 @@ const searchMatch = z.object({
   hsnCode: z.string().nullable(),
   gstRate: z.number().nullable(),
   link: z.string().nullable(),
+  isTopSeller: z.boolean().default(false),
   score: z.number(),
   matchReasons: z.array(z.string()),
 });
@@ -380,6 +381,7 @@ async function rerankProductMatches(
 
 Use only the provided candidates. Return candidate ids in best-match order.
 Prefer matches with the same brand, product family, dimensions/range, units, catalogue/model code, and clear synonyms.
+Prefer top seller candidates only when their product relevance is otherwise close.
 Penalize candidates with conflicting product type, range, or brand.
 If several candidates are close variants, keep them ranked but use lower confidence.`
       ),
@@ -393,6 +395,7 @@ If several candidates are close variants, keep them ranked but use lower confide
               brand: candidate.brand,
               code: candidate.code,
               description: candidate.description,
+              isTopSeller: candidate.isTopSeller,
               score: candidate.score,
               matchReasons: candidate.matchReasons,
             })),

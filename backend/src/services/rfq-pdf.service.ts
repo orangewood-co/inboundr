@@ -48,6 +48,7 @@ type PdfRFQ = {
       price: number | null;
       hsnCode: string | null;
       gstRate: number | null;
+      isTopSeller?: boolean;
       score: number;
       matchReasons: string[];
     }>;
@@ -151,7 +152,7 @@ function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): num
         })
         .font("Helvetica")
         .fillColor(PDF_COLORS.muted)
-        .text([match.brand, match.code, match.hsnCode ? `HSN ${match.hsnCode}` : null].filter(Boolean).join(" · ") || "-", PDF_PAGE.margin + 12, currentY + 14, {
+        .text([match.brand, match.code, match.isTopSeller ? "Top seller" : null, match.hsnCode ? `HSN ${match.hsnCode}` : null].filter(Boolean).join(" · ") || "-", PDF_PAGE.margin + 12, currentY + 14, {
           width: 300,
           height: 12,
           ellipsis: true,

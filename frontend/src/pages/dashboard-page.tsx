@@ -83,6 +83,7 @@ interface RFQSearchMatch {
   price: number | null
   hsnCode: string | null
   gstRate: number | null
+  isTopSeller?: boolean
   score: number
   matchReasons: string[]
 }
@@ -147,6 +148,7 @@ interface CatalogProduct {
   unitprice: number | string | null
   hsncode: string | null
   gstrate: number | string | null
+  is_top_seller?: boolean | null
 }
 
 interface ProductsResponse {
@@ -1302,6 +1304,11 @@ export function DashboardPage() {
                                           {j === 0 && sr.status === "matched" && (
                                             <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                                               Best
+                                            </span>
+                                          )}
+                                          {m.isTopSeller && (
+                                            <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                                              Top seller
                                             </span>
                                           )}
                                         </div>

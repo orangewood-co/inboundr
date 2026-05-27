@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
   SheetContent,
@@ -59,6 +60,7 @@ interface Product {
   maxupsell: number | string | null
   calibrationcharges: number | string | null
   unit: string | null
+  is_top_seller: boolean | null
   addedtime: string | null
   addeduser: string | null
 }
@@ -90,6 +92,7 @@ type ProductFormState = {
   maxupsell: string
   calibrationcharges: string
   unit: string
+  is_top_seller: boolean
   addedtime: string
   addeduser: string
 }
@@ -106,6 +109,7 @@ const emptyForm: ProductFormState = {
   maxupsell: "",
   calibrationcharges: "",
   unit: "",
+  is_top_seller: false,
   addedtime: "",
   addeduser: "",
 }
@@ -154,6 +158,7 @@ function productToForm(product: Product): ProductFormState {
     maxupsell: product.maxupsell?.toString() ?? "",
     calibrationcharges: product.calibrationcharges?.toString() ?? "",
     unit: product.unit ?? "",
+    is_top_seller: Boolean(product.is_top_seller),
     addedtime: toDateInput(product.addedtime),
     addeduser: product.addeduser ?? "",
   }
@@ -162,13 +167,18 @@ function productToForm(product: Product): ProductFormState {
 function formToPayload(form: ProductFormState) {
   return Object.fromEntries(
     Object.entries(form).map(([key, value]) => {
+      if (key === "is_top_seller") {
+        return [key, Boolean(value)]
+      }
       if (numericFields.includes(key as keyof ProductFormState)) {
-        return [key, value.trim() === "" ? null : Number(value)]
+        const stringValue = String(value)
+        return [key, stringValue.trim() === "" ? null : Number(stringValue)]
       }
       if (key === "addedtime") {
         return [key, value ? new Date(value).toISOString() : new Date().toISOString()]
       }
-      return [key, value.trim() === "" ? null : value.trim()]
+      const stringValue = String(value)
+      return [key, stringValue.trim() === "" ? null : stringValue.trim()]
     })
   )
 }
@@ -216,7 +226,7 @@ function ProductForm({
   onChange,
 }: {
   form: ProductFormState
-  onChange: (field: keyof ProductFormState, value: string) => void
+  onChange: (field: keyof ProductFormState, value: string | boolean) => void
 }) {
   return (
     <div className="grid gap-5 px-5 pb-5">
@@ -241,6 +251,20 @@ function ProductForm({
           <Label htmlFor="brand">Brand</Label>
           <Input id="brand" value={form.brand} onChange={(event) => onChange("brand", event.target.value)} />
         </div>
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border bg-muted/20 px-4 py-3">
+        <div className="space-y-0.5">
+          <Label htmlFor="is_top_seller">Top seller</Label>
+          <p className="text-xs text-muted-foreground">
+            Prioritize this product when RFQ matches are otherwise close.
+          </p>
+        </div>
+        <Switch
+          id="is_top_seller"
+          checked={form.is_top_seller}
+          onCheckedChange={(checked) => onChange("is_top_seller", checked)}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -487,6 +511,11 @@ function DashboardView({
                         <span className="inline-flex rounded-md border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-bold">
                           {product.productcode || `#${product.id}`}
                         </span>
+                        {product.is_top_seller && (
+                          <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                            Top seller
+                          </span>
+                        )}
                       </td>
                       <td className="max-w-xs truncate px-4 py-2.5 font-medium">
                         {product.productdescription || "Untitled product"}
@@ -790,6 +819,11 @@ export default function ProductsPage() {
                                 {product.productcode || `#${product.id}`}
                               </span>
                             </CopyableText>
+                            {product.is_top_seller && (
+                              <span className="mt-1.5 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                                Top seller
+                              </span>
+                            )}
                           </td>
                           <td className="max-w-xl px-5 py-3.5 align-top">
                             <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
@@ -876,7 +910,7 @@ export default function ProductsPage() {
           <Separator />
           <ProductForm
             form={form}
-            onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
+            onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }) as ProductFormState)}
           />
           {saveError && (
             <div className="mx-5 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">

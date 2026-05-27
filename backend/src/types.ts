@@ -12,6 +12,7 @@ export interface Product {
   maxupsell: number;
   calibrationcharges: number;
   unit: string;
+  is_top_seller: boolean;
   addedtime: Date;
   addeduser: string;
   embedding?: number[];

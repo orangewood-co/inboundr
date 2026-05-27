@@ -22,6 +22,7 @@ export interface IRFQSearchMatch {
   hsnCode: string | null;
   gstRate: number | null;
   link: string | null;
+  isTopSeller: boolean;
   score: number;
   matchReasons: string[];
 }
@@ -62,6 +63,7 @@ const rfqSearchMatchSchema = new Schema<IRFQSearchMatch>(
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },
     link: { type: String, default: null },
+    isTopSeller: { type: Boolean, default: false },
     score: { type: Number, required: true },
     matchReasons: { type: [String], default: [] },
   },
