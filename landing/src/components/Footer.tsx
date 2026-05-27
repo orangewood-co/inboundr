@@ -27,6 +27,7 @@ const footerLinks = [
       { label: "Privacy", to: "/privacy" },
       { label: "Terms", to: "/terms" },
       { label: "Security", to: "/security" },
+      { label: "Subprocessors", to: "/subprocessors" },
     ],
   },
 ]
