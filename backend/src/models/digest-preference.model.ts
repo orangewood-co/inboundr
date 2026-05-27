@@ -7,11 +7,18 @@ export interface IDigestSections {
   matchQuality: boolean;
 }
 
+export type DigestRecipientMode = "all_members" | "custom";
+
 export interface IDigestPreference extends Document {
   userId: string;
   organizationId: Types.ObjectId;
   enabled: boolean;
   sections: IDigestSections;
+  recipientMode: DigestRecipientMode;
+  memberRecipientUserIds: string[];
+  externalRecipientEmails: string[];
+  sendTimeLocal: string;
+  timezone: string;
   sendHourUtc: number;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +45,19 @@ const digestPreferenceSchema = new Schema<IDigestPreference>(
     },
     enabled: { type: Boolean, default: false },
     sections: { type: digestSectionsSchema, default: () => ({}) },
+    recipientMode: {
+      type: String,
+      enum: ["all_members", "custom"],
+      default: "all_members",
+    },
+    memberRecipientUserIds: { type: [String], default: [] },
+    externalRecipientEmails: { type: [String], default: [] },
+    sendTimeLocal: {
+      type: String,
+      default: "08:00",
+      validate: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    timezone: { type: String, default: "UTC" },
     sendHourUtc: { type: Number, default: 8, min: 0, max: 23 },
   },
   { timestamps: true }

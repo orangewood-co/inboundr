@@ -4,6 +4,7 @@ import { DigestPreference, type IDigestPreference } from "../models/digest-prefe
 import { Email } from "../models/email.model";
 import { RFQ } from "../models/rfq.model";
 import { Organization } from "../models/organization.model";
+import { OrganizationMember } from "../models/organization-member.model";
 import { DailyDigest, type DailyDigestProps } from "../emails/daily-digest";
 import { sendEmail } from "../lib/email";
 
@@ -33,6 +34,34 @@ async function getUsersByIds(userIds: string[]): Promise<Map<string, BetterAuthU
   return map;
 }
 
+async function resolveRecipients(pref: IDigestPreference): Promise<Array<{ email: string; name: string }>> {
+  const memberQuery =
+    pref.recipientMode === "custom"
+      ? { organizationId: pref.organizationId, userId: { $in: pref.memberRecipientUserIds } }
+      : { organizationId: pref.organizationId };
+
+  const members = await OrganizationMember.find(memberQuery).lean();
+  const users = await getUsersByIds(members.map((member) => member.userId));
+  const recipients = new Map<string, { email: string; name: string }>();
+
+  for (const member of members) {
+    const user = users.get(member.userId);
+    if (!user?.email) continue;
+    recipients.set(user.email.toLowerCase(), {
+      email: user.email,
+      name: user.name ?? "",
+    });
+  }
+
+  if (pref.recipientMode === "custom") {
+    for (const email of pref.externalRecipientEmails ?? []) {
+      recipients.set(email.toLowerCase(), { email, name: "" });
+    }
+  }
+
+  return [...recipients.values()];
+}
+
 function yesterdayRange(): { from: Date; to: Date; label: string } {
   const now = new Date();
   const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -55,13 +84,12 @@ async function aggregateForUser(
 ): Promise<DailyDigestProps["sections"]> {
   const sections: DailyDigestProps["sections"] = {};
   const orgId = pref.organizationId;
-  const userId = pref.userId;
 
   if (pref.sections.emailVolume) {
     const [total, rfqDocs] = await Promise.all([
-      Email.countDocuments({ organizationId: orgId, userId, date: { $gte: from, $lt: to } }),
+      Email.countDocuments({ organizationId: orgId, date: { $gte: from, $lt: to } }),
       RFQ.aggregate([
-        { $match: { organizationId: orgId, userId, createdAt: { $gte: from, $lt: to } } },
+        { $match: { organizationId: orgId, createdAt: { $gte: from, $lt: to } } },
         {
           $group: {
             _id: null,
@@ -77,15 +105,15 @@ async function aggregateForUser(
 
   if (pref.sections.rfqBreakdown) {
     const [total, failed] = await Promise.all([
-      RFQ.countDocuments({ organizationId: orgId, userId, isRFQ: true, createdAt: { $gte: from, $lt: to } }),
-      RFQ.countDocuments({ organizationId: orgId, userId, isRFQ: true, errorMessage: { $ne: null }, createdAt: { $gte: from, $lt: to } }),
+      RFQ.countDocuments({ organizationId: orgId, isRFQ: true, createdAt: { $gte: from, $lt: to } }),
+      RFQ.countDocuments({ organizationId: orgId, isRFQ: true, errorMessage: { $ne: null }, createdAt: { $gte: from, $lt: to } }),
     ]);
     sections.rfqBreakdown = { total, processed: total - failed, failed };
   }
 
   if (pref.sections.productRequests) {
     const productAgg = await RFQ.aggregate([
-      { $match: { organizationId: orgId, userId, isRFQ: true, createdAt: { $gte: from, $lt: to } } },
+      { $match: { organizationId: orgId, isRFQ: true, createdAt: { $gte: from, $lt: to } } },
       { $unwind: "$queryProducts" },
       {
         $group: {
@@ -104,7 +132,7 @@ async function aggregateForUser(
 
   if (pref.sections.matchQuality) {
     const matchAgg = await RFQ.aggregate([
-      { $match: { organizationId: orgId, userId, isRFQ: true, createdAt: { $gte: from, $lt: to } } },
+      { $match: { organizationId: orgId, isRFQ: true, createdAt: { $gte: from, $lt: to } } },
       { $unwind: "$searchResults" },
       { $group: { _id: "$searchResults.status", count: { $sum: 1 } } },
     ]);
@@ -135,39 +163,38 @@ export async function sendHourlyDigestBatch(): Promise<void> {
   if (preferences.length === 0) return;
 
   const { from, to, label: dateLabel } = yesterdayRange();
-  const userIds = preferences.map((pref) => pref.userId);
-  const userMap = await getUsersByIds(userIds);
-
   const orgIds = [...new Set(preferences.map((pref) => pref.organizationId.toString()))];
   const orgs = await Organization.find({ _id: { $in: orgIds } }).lean();
   const orgMap = new Map(orgs.map((org) => [org._id.toString(), org]));
 
   for (const pref of preferences) {
     try {
-      const user = userMap.get(pref.userId);
-      if (!user?.email) continue;
-
       const org = orgMap.get(pref.organizationId.toString());
       const orgName = org?.name ?? "Your organization";
+      const typedPref = pref as unknown as IDigestPreference;
+      const recipients = await resolveRecipients(typedPref);
+      if (recipients.length === 0) continue;
 
-      const sections = await aggregateForUser(pref as unknown as IDigestPreference, from, to);
+      const sections = await aggregateForUser(typedPref, from, to);
 
       const hasContent = Object.values(sections).some(
         (section) => section !== undefined
       );
       if (!hasContent) continue;
 
-      await sendEmail({
-        to: user.email,
-        subject: `Daily Stats Digest — ${dateLabel}`,
-        react: createElement(DailyDigest, {
-          userName: user.name ?? "",
-          organizationName: orgName,
-          date: dateLabel,
-          sections,
-          statsPageUrl: `${frontendOrigin}/stats`,
-        }),
-      });
+      for (const recipient of recipients) {
+        await sendEmail({
+          to: recipient.email,
+          subject: `Daily Stats Digest — ${dateLabel}`,
+          react: createElement(DailyDigest, {
+            userName: recipient.name,
+            organizationName: orgName,
+            date: dateLabel,
+            sections,
+            statsPageUrl: `${frontendOrigin}/stats`,
+          }),
+        });
+      }
     } catch (err) {
       console.error(`Failed to send digest to user ${pref.userId}:`, err);
     }

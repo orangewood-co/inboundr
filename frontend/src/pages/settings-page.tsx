@@ -1407,6 +1407,11 @@ export function SettingsPage() {
 
 interface DigestPreferences {
   enabled: boolean
+  recipientMode: "all_members" | "custom"
+  memberRecipientUserIds: string[]
+  externalRecipientEmails: string[]
+  sendTimeLocal: string
+  timezone: string
   sections: {
     emailVolume: boolean
     rfqBreakdown: boolean
@@ -1424,11 +1429,19 @@ const DIGEST_SECTIONS = [
 ]
 
 function NotificationsTab() {
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
   const [prefs, setPrefs] = useState<DigestPreferences>({
     enabled: false,
+    recipientMode: "all_members",
+    memberRecipientUserIds: [],
+    externalRecipientEmails: [],
+    sendTimeLocal: "08:00",
+    timezone: browserTimezone,
     sections: { emailVolume: true, rfqBreakdown: true, productRequests: true, matchQuality: true },
     sendHourUtc: 8,
   })
+  const [members, setMembers] = useState<OrganizationMember[]>([])
+  const [externalEmail, setExternalEmail] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
@@ -1437,8 +1450,16 @@ function NotificationsTab() {
     fetch(`${API_ORIGIN}/api/v1/digest/preferences`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
+        const loadedMembers = data.members ?? []
+        setMembers(loadedMembers)
         setPrefs({
           enabled: data.enabled ?? false,
+          recipientMode: data.recipientMode ?? "all_members",
+          memberRecipientUserIds:
+            data.memberRecipientUserIds ?? loadedMembers.map((member: OrganizationMember) => member.userId),
+          externalRecipientEmails: data.externalRecipientEmails ?? [],
+          sendTimeLocal: data.sendTimeLocal ?? "08:00",
+          timezone: data.timezone ?? browserTimezone,
           sections: {
             emailVolume: data.sections?.emailVolume ?? true,
             rfqBreakdown: data.sections?.rfqBreakdown ?? true,
@@ -1448,11 +1469,18 @@ function NotificationsTab() {
           sendHourUtc: data.sendHourUtc ?? 8,
         })
       })
-      .catch(() => {})
+      .catch(() => {
+        toast.error("Failed to load notification preferences")
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [browserTimezone])
 
   const handleSave = async () => {
+    if (prefs.recipientMode === "custom" && prefs.memberRecipientUserIds.length + prefs.externalRecipientEmails.length === 0) {
+      toast.error("Select at least one digest recipient")
+      return
+    }
+
     setSaving(true)
     try {
       const res = await fetch(`${API_ORIGIN}/api/v1/digest/preferences`, {
@@ -1461,9 +1489,10 @@ function NotificationsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(prefs),
       })
-      if (!res.ok) {
-        throw new Error("Failed to save notification preferences")
-      }
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save notification preferences")
+      setPrefs((prev) => ({ ...prev, ...data }))
+      if (data?.members) setMembers(data.members)
       toast.success("Notification preferences saved")
     } catch (err: any) {
       toast.error(err.message || "Failed to save notification preferences")
@@ -1499,6 +1528,67 @@ function NotificationsTab() {
     }))
   }
 
+  const selectedMemberIds =
+    prefs.recipientMode === "all_members"
+      ? members.map((member) => member.userId)
+      : prefs.memberRecipientUserIds
+  const selectedMemberCount = selectedMemberIds.length
+  const totalRecipientCount = selectedMemberCount + prefs.externalRecipientEmails.length
+  const selectedMemberSet = new Set(selectedMemberIds)
+  const externalEmailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(externalEmail.trim())
+  const disableSave =
+    saving ||
+    (prefs.recipientMode === "custom" && totalRecipientCount === 0)
+  const [sendHour = "08", sendMinute = "00"] = prefs.sendTimeLocal.split(":")
+  const sendHourNumber = Number(sendHour)
+  const sendPeriod = sendHourNumber >= 12 ? "PM" : "AM"
+  const sendDisplayHour = String(sendHourNumber % 12 || 12).padStart(2, "0")
+  const updateSendTime = (next: { hour?: string; minute?: string; period?: string }) => {
+    const hour12 = Number(next.hour ?? sendDisplayHour)
+    const minute = next.minute ?? sendMinute
+    const period = next.period ?? sendPeriod
+    const hour24 = period === "PM" ? (hour12 % 12) + 12 : hour12 % 12
+    setPrefs((prev) => ({
+      ...prev,
+      sendTimeLocal: `${String(hour24).padStart(2, "0")}:${minute}`,
+    }))
+  }
+
+  const toggleMemberRecipient = (userId: string) => {
+    setPrefs((prev) => {
+      const selected = new Set(prev.memberRecipientUserIds)
+      if (selected.has(userId)) selected.delete(userId)
+      else selected.add(userId)
+      return { ...prev, memberRecipientUserIds: [...selected] }
+    })
+  }
+
+  const addExternalEmail = () => {
+    const email = externalEmail.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Enter a valid email address")
+      return
+    }
+    const memberEmails = new Set(members.map((member) => member.userEmail?.toLowerCase()).filter(Boolean))
+    if (prefs.externalRecipientEmails.includes(email) || memberEmails.has(email)) {
+      toast.error("That recipient is already included")
+      return
+    }
+    setPrefs((prev) => ({
+      ...prev,
+      recipientMode: "custom",
+      externalRecipientEmails: [...prev.externalRecipientEmails, email],
+    }))
+    setExternalEmail("")
+  }
+
+  const removeExternalEmail = (email: string) => {
+    setPrefs((prev) => ({
+      ...prev,
+      externalRecipientEmails: prev.externalRecipientEmails.filter((item) => item !== email),
+    }))
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -1512,12 +1602,12 @@ function NotificationsTab() {
     <div className="space-y-6">
       <SectionHeader
         title="Notifications"
-        description="Configure how and when you receive updates from Inboundr."
+        description="Control who gets the daily operating digest and when it lands."
       />
 
       <SettingsCard
         title="Daily Stats Digest"
-        description="Receive a summary of your organization's activity every day."
+        description={`${totalRecipientCount} recipient${totalRecipientCount === 1 ? "" : "s"} · ${prefs.sendTimeLocal} ${prefs.timezone}`}
         action={
           <Switch
             checked={prefs.enabled}
@@ -1525,13 +1615,182 @@ function NotificationsTab() {
           />
         }
       >
-        <div className="space-y-4 px-5 py-4">
-          <p className="text-[13px] text-muted-foreground">
-            Choose which sections to include in your daily email. The digest is sent at{" "}
-            <strong>{prefs.sendHourUtc.toString().padStart(2, "0")}:00 UTC</strong> each day.
-          </p>
+        <div className="space-y-5 px-5 py-4">
+          <div className="rounded-xl border bg-muted/20 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Delivery window</p>
+                <p className="text-xs text-muted-foreground">
+                  Sent daily at {prefs.sendTimeLocal} in {prefs.timezone}. The backend queues it during hour {prefs.sendHourUtc.toString().padStart(2, "0")}:00 UTC.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Select
+                    value={sendDisplayHour}
+                    disabled={!prefs.enabled}
+                    onValueChange={(value) => updateSendTime({ hour: value })}
+                  >
+                    <SelectTrigger className="h-10 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((hour) => (
+                        <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">:</span>
+                  <Select
+                    value={sendMinute}
+                    disabled={!prefs.enabled}
+                    onValueChange={(value) => updateSendTime({ minute: value })}
+                  >
+                    <SelectTrigger className="h-10 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["00", "15", "30", "45"].map((minute) => (
+                        <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={sendPeriod}
+                    disabled={!prefs.enabled}
+                    onValueChange={(value) => updateSendTime({ period: value })}
+                  >
+                    <SelectTrigger className="h-10 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  disabled={!prefs.enabled}
+                  onClick={() => setPrefs((prev) => ({ ...prev, timezone: browserTimezone }))}
+                >
+                  Use local zone
+                </Button>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Recipients</p>
+              <p className="text-xs text-muted-foreground">
+                Send to every workspace member by default, or choose a tighter list and add outside emails.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                className={`rounded-xl border p-4 text-left transition-colors ${prefs.recipientMode === "all_members" ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}
+                disabled={!prefs.enabled}
+                onClick={() => setPrefs((prev) => ({ ...prev, recipientMode: "all_members" }))}
+              >
+                <p className="text-sm font-semibold">All members</p>
+                <p className="mt-1 text-xs text-muted-foreground">{members.length} current workspace members</p>
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl border p-4 text-left transition-colors ${prefs.recipientMode === "custom" ? "border-primary bg-primary/5" : "hover:bg-muted/40"}`}
+                disabled={!prefs.enabled}
+                onClick={() => setPrefs((prev) => ({
+                  ...prev,
+                  recipientMode: "custom",
+                  memberRecipientUserIds: prev.memberRecipientUserIds.length > 0 ? prev.memberRecipientUserIds : members.map((member) => member.userId),
+                }))}
+              >
+                <p className="text-sm font-semibold">Custom recipients</p>
+                <p className="mt-1 text-xs text-muted-foreground">{totalRecipientCount} selected recipients</p>
+              </button>
+            </div>
+
+            {prefs.recipientMode === "custom" && (
+              <div className="space-y-3 rounded-xl border p-3">
+                <div className="divide-y rounded-lg border">
+                  {members.map((member) => (
+                    <label key={member._id} className="flex cursor-pointer items-center justify-between gap-3 px-3 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{member.userName ?? member.userEmail ?? member.userId}</p>
+                        <p className="truncate text-xs text-muted-foreground">{member.userEmail ?? "No email on account"}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <RoleBadge role={toRoleLabel(member.role)} />
+                        <Switch
+                          size="sm"
+                          checked={selectedMemberSet.has(member.userId)}
+                          disabled={!prefs.enabled || !member.userEmail}
+                          onCheckedChange={() => toggleMemberRecipient(member.userId)}
+                        />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>External recipients</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={externalEmail}
+                      disabled={!prefs.enabled}
+                      onChange={(event) => setExternalEmail(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault()
+                          addExternalEmail()
+                        }
+                      }}
+                      placeholder="advisor@example.com"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addExternalEmail}
+                      disabled={!prefs.enabled || !externalEmailIsValid}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Outside recipients receive the digest email but do not get workspace access.
+                  </p>
+                  {prefs.externalRecipientEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {prefs.externalRecipientEmails.map((email) => (
+                        <span key={email} className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs">
+                          {email}
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => removeExternalEmail(email)}
+                            aria-label={`Remove ${email}`}
+                          >
+                            <Trash2Icon className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Included sections</p>
+              <p className="text-xs text-muted-foreground">Choose which stats should appear in the daily email.</p>
+            </div>
             {DIGEST_SECTIONS.map((section) => (
               <label
                 key={section.key}
@@ -1552,7 +1811,7 @@ function NotificationsTab() {
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={disableSave}>
               {saving && <Spinner data-icon="inline-start" />}
               Save preferences
             </Button>
