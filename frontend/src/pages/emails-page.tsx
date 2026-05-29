@@ -650,7 +650,7 @@ export function EmailsPage() {
               <DetailPlaceholder />
             ) : (
               <div className="animate-in fade-in-0 duration-300 flex flex-1 flex-col overflow-hidden">
-                <div className="space-y-4 px-8 pt-7 pb-6">
+                <div className="shrink-0 space-y-4 px-8 pt-7 pb-6">
                   <div className="flex items-start justify-between gap-4">
                     <h1 className="font-heading text-lg font-semibold leading-snug tracking-tight">
                       {detail.subject || "(no subject)"}
@@ -741,17 +741,17 @@ export function EmailsPage() {
                     </Tooltip>
                   </div>
 
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
-                    <span>
+                  <div className="flex max-h-24 flex-wrap gap-x-4 gap-y-1 overflow-y-auto text-[11px] text-muted-foreground/60">
+                    <span className="min-w-0 break-words">
                       <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">To</span>{" "}
-                      <CopyableText value={detail.to} label="Recipient copied">
+                      <CopyableText value={detail.to} label="Recipient copied" className="flex-wrap [overflow-wrap:anywhere]">
                         {detail.to}
                       </CopyableText>
                     </span>
                     {detail.cc && (
-                      <span>
+                      <span className="min-w-0 break-words">
                         <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cc</span>{" "}
-                        <CopyableText value={detail.cc} label="CC copied">
+                        <CopyableText value={detail.cc} label="CC copied" className="flex-wrap [overflow-wrap:anywhere]">
                           {detail.cc}
                         </CopyableText>
                       </span>
@@ -806,7 +806,7 @@ export function EmailsPage() {
                   )}
                 </div>
 
-                <div className="flex-1 overflow-hidden border-t border-border/30">
+                <div className="min-h-0 flex-1 overflow-hidden border-t border-border/30">
                   {emailDocument ? (
                     <iframe
                       title="Email content"
