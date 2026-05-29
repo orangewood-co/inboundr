@@ -1,8 +1,49 @@
 import { motion } from "motion/react"
+import { type FormEvent, useState } from "react"
 import { FadeIn } from "@/components/FadeIn"
 import { PageHeader } from "@/components/PageHeader"
 
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+
 export default function Contact() {
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
+  const [errorMessage, setErrorMessage] = useState("")
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setStatus("submitting")
+    setErrorMessage("")
+
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const payload = {
+      name: String(formData.get("name") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      message: String(formData.get("message") ?? ""),
+    }
+
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/contact`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(data?.error ?? "Unable to send your message right now.")
+      }
+
+      form.reset()
+      setStatus("success")
+    } catch (error) {
+      setStatus("error")
+      setErrorMessage(error instanceof Error ? error.message : "Unable to send your message right now.")
+    }
+  }
+
   return (
     <>
       <title>Contact — Inboundr</title>
@@ -45,9 +86,7 @@ export default function Contact() {
             <FadeIn delay={0.12}>
               <p className="label mb-10 text-text-muted">Send a message</p>
               <form
-                action="mailto:hello@inboundr.ai"
-                method="POST"
-                encType="text/plain"
+                onSubmit={handleSubmit}
                 className="space-y-5"
               >
                 <div>
@@ -91,12 +130,23 @@ export default function Contact() {
                 </div>
                 <motion.button
                   type="submit"
-                  className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
+                  disabled={status === "submitting"}
+                  className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  Send message
+                  {status === "submitting" ? "Sending..." : "Send message"}
                 </motion.button>
+                {status === "success" && (
+                  <p className="text-sm text-green-bright">
+                    Thanks, we received your message and sent a confirmation to your inbox.
+                  </p>
+                )}
+                {status === "error" && (
+                  <p className="text-sm text-red-400">
+                    {errorMessage}
+                  </p>
+                )}
               </form>
             </FadeIn>
           </div>
