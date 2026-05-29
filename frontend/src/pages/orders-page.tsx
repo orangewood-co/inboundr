@@ -1,21 +1,25 @@
-import { useCallback, useEffect, useState } from "react"
-import { AlertCircleIcon, CheckCircle2Icon, ClipboardListIcon, PackageIcon, RefreshCwIcon } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  AlertCircleIcon,
+  CheckCircle2Icon,
+  ClipboardListIcon,
+  MailIcon,
+  PackageIcon,
+  RefreshCwIcon,
+  UserIcon,
+} from "lucide-react"
+import { useDefaultLayout } from "react-resizable-panels"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { getAvatarColor } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
@@ -68,8 +72,19 @@ function parseSender(from: string): { name: string; email: string } {
   return { name: from, email: from }
 }
 
+function formatDate(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  }
+  return date.toLocaleDateString([], { month: "short", day: "numeric" })
+}
+
 function formatFullDate(iso: string): string {
   return new Date(iso).toLocaleString([], {
+    weekday: "short",
+    year: "numeric",
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -77,21 +92,73 @@ function formatFullDate(iso: string): string {
   })
 }
 
-function productSummary(products: RFQSavedQuoteProduct[]): string {
-  if (products.length === 0) return "No saved products"
-  return products
-    .slice(0, 3)
-    .map((product) => `${product.queryName} x ${product.quantity}`)
-    .join(", ")
+function formatPrice(value: number | null): string {
+  if (value == null) return "No price"
+  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
+      <div className="rounded-2xl border border-dashed border-muted-foreground/25 bg-muted/30 p-6">
+        <CheckCircle2Icon className="size-10 text-muted-foreground/50" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-muted-foreground">No draft RFQs</p>
+        <p className="text-xs text-muted-foreground/60">
+          Saved RFQ selections will appear here for quote number processing.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-0.5 p-1">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="flex flex-col gap-2 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DetailPlaceholder() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+      <div className="rounded-xl bg-muted/40 p-4">
+        <ClipboardListIcon className="size-8 text-muted-foreground/40" />
+      </div>
+      <p className="text-sm text-muted-foreground/60">Select a draft RFQ to review products</p>
+    </div>
+  )
 }
 
 export function OrdersPage() {
+  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
+    id: "btsa:layout:orders",
+    storage: localStorage,
+  })
+
   const [drafts, setDrafts] = useState<DraftRFQ[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [quoteNumbers, setQuoteNumbers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const selectedDraft = useMemo(
+    () => drafts.find((draft) => draft._id === selectedId) ?? null,
+    [drafts, selectedId]
+  )
 
   const fetchDrafts = useCallback(async () => {
     setError(null)
@@ -100,6 +167,10 @@ export function OrdersPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data: DraftsResponse = await res.json()
       setDrafts(data.rfqs)
+      setSelectedId((current) => {
+        if (current && data.rfqs.some((draft) => draft._id === current)) return current
+        return data.rfqs[0]?._id ?? null
+      })
     } catch (err: any) {
       setError(err.message || "Failed to load draft RFQs")
     } finally {
@@ -137,7 +208,14 @@ export function OrdersPage() {
         throw new Error(err.error || `HTTP ${res.status}`)
       }
 
-      setDrafts((current) => current.filter((draft) => draft._id !== rfqId))
+      setDrafts((current) => {
+        const next = current.filter((draft) => draft._id !== rfqId)
+        setSelectedId((selected) => {
+          if (selected !== rfqId) return selected
+          return next[0]?._id ?? null
+        })
+        return next
+      })
       setQuoteNumbers((current) => {
         const next = { ...current }
         delete next[rfqId]
@@ -155,142 +233,238 @@ export function OrdersPage() {
   return (
     <AppLayout>
       <SiteHeader />
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <ClipboardListIcon className="size-5 text-muted-foreground" />
-                <h1 className="text-xl font-semibold">Orders</h1>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Review draft RFQs and enter quote numbers when they are ready to process.
-              </p>
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="flex-1"
+        defaultLayout={defaultLayout}
+        onLayoutChanged={onLayoutChanged}
+      >
+        <ResizablePanel id="orders-list" defaultSize="30%" minSize="20%" maxSize="45%" className="flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <ClipboardListIcon className="size-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Draft RFQs</h2>
+              {!loading && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                  {drafts.length}
+                </span>
+              )}
             </div>
-            <Button variant="outline" className="gap-2" onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
           </div>
 
-          <div className="rounded-xl border bg-card">
-            <div className="flex items-center justify-between border-b px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold">Draft RFQs</p>
-                <p className="text-xs text-muted-foreground">
-                  {loading ? "Loading drafts..." : `${drafts.length} draft${drafts.length === 1 ? "" : "s"} waiting`}
-                </p>
-              </div>
-            </div>
-
+          <div className="flex-1 overflow-y-auto">
             {loading ? (
-              <div className="space-y-3 p-4">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton key={index} className="h-14 w-full" />
-                ))}
-              </div>
+              <ListSkeleton />
             ) : error ? (
-              <div className="flex flex-col items-center gap-3 p-10 text-center">
-                <AlertCircleIcon className="size-6 text-destructive" />
+              <div className="flex flex-col items-center gap-2 p-8 text-center">
+                <AlertCircleIcon className="size-5 text-destructive" />
                 <p className="text-sm text-destructive">{error}</p>
                 <Button variant="outline" size="sm" onClick={handleRefresh}>
                   Retry
                 </Button>
               </div>
             ) : drafts.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 p-12 text-center">
-                <div className="rounded-2xl border border-dashed border-muted-foreground/25 bg-muted/30 p-5">
-                  <CheckCircle2Icon className="size-8 text-muted-foreground/50" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">No draft RFQs</p>
-                  <p className="text-xs text-muted-foreground">
-                    Saved RFQ selections will appear here.
-                  </p>
-                </div>
-              </div>
+              <EmptyState />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>RFQ</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead>Saved</TableHead>
-                    <TableHead className="w-64">Quote Number</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {drafts.map((draft) => {
-                    const sender = parseSender(draft.emailId.from)
-                    const customerName = draft.customer?.company || draft.customer?.name || sender.name
-                    const products = draft.savedQuoteProducts ?? []
-                    return (
-                      <TableRow key={draft._id}>
-                        <TableCell>
-                          <div className="font-medium">{customerName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {draft.customer?.email || sender.email}
+              <div className="animate-in fade-in-0 space-y-0.5 p-1 duration-300">
+                {drafts.map((draft) => {
+                  const sender = parseSender(draft.emailId.from)
+                  const senderName = draft.customer?.company || draft.customer?.name || sender.name
+                  const avatarColors = getAvatarColor(senderName)
+                  const isSelected = selectedId === draft._id
+                  const savedAt = draft.draftSavedAt || draft.createdAt
+
+                  return (
+                    <button
+                      key={draft._id}
+                      onClick={() => setSelectedId(draft._id)}
+                      className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                        isSelected ? "bg-primary/8 ring-1 ring-primary/20" : "hover:bg-muted/60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div className={`flex size-8 shrink-0 items-center justify-center rounded-full ${avatarColors.bg} ${avatarColors.text} text-xs font-bold`}>
+                            {senderName.charAt(0).toUpperCase()}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="max-w-72 truncate font-medium">
-                            {draft.emailId.subject || "(no subject)"}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {draft.emailId.snippet}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 text-sm">
-                            <PackageIcon className="size-3.5 text-muted-foreground" />
-                            {products.length} product{products.length === 1 ? "" : "s"}
-                          </div>
-                          <div className="max-w-72 truncate text-xs text-muted-foreground">
-                            {productSummary(products)}
-                            {products.length > 3 ? `, +${products.length - 3} more` : ""}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatFullDate(draft.draftSavedAt || draft.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Input
-                              value={quoteNumbers[draft._id] ?? ""}
-                              onChange={(event) =>
-                                setQuoteNumbers((current) => ({
-                                  ...current,
-                                  [draft._id]: event.target.value,
-                                }))
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault()
-                                  handleMarkProcessed(draft._id)
-                                }
-                              }}
-                              placeholder="Enter quote no."
-                            />
-                            <Button
-                              className="shrink-0"
-                              onClick={() => handleMarkProcessed(draft._id)}
-                              disabled={processingId === draft._id}
-                            >
-                              {processingId === draft._id && <Spinner data-icon="inline-start" />}
-                              Mark Processed
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                          <span className="truncate text-sm font-semibold">{senderName}</span>
+                        </div>
+                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                          {formatDate(savedAt)}
+                        </span>
+                      </div>
+                      <div className="pl-[42px]">
+                        <p className="truncate text-sm font-medium leading-snug">
+                          {draft.emailId.subject || "(no subject)"}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <PackageIcon className="size-3" />
+                            {draft.savedQuoteProducts.length} product{draft.savedQuoteProducts.length === 1 ? "" : "s"}
+                          </span>
+                          <span className="rounded-full bg-violet-500/10 px-2 py-0.5 font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                            Draft
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             )}
           </div>
-        </div>
-      </main>
+        </ResizablePanel>
+
+        <ResizableHandle />
+
+        <ResizablePanel id="orders-detail" defaultSize="70%" minSize="45%" className="hidden flex-col overflow-hidden md:flex">
+          {!selectedDraft ? (
+            <DetailPlaceholder />
+          ) : (
+            <div className="animate-in fade-in-0 flex flex-1 flex-col overflow-y-auto duration-300">
+              <div className="space-y-4 border-b px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                        Draft
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Saved {formatFullDate(selectedDraft.draftSavedAt || selectedDraft.createdAt)}
+                      </span>
+                    </div>
+                    <h1 className="text-lg font-semibold leading-snug">
+                      {selectedDraft.emailId.subject || "(no subject)"}
+                    </h1>
+                    {selectedDraft.emailId.snippet && (
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                        {selectedDraft.emailId.snippet}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <UserIcon className="size-3" />
+                      Customer
+                    </div>
+                    <p className="mt-1 text-sm font-medium">
+                      {selectedDraft.customer?.company || selectedDraft.customer?.name || parseSender(selectedDraft.emailId.from).name}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <MailIcon className="size-3" />
+                      Email
+                    </div>
+                    <p className="mt-1 truncate text-sm font-medium">
+                      {selectedDraft.customer?.email || parseSender(selectedDraft.emailId.from).email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b px-6 py-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <PackageIcon className="size-4 text-muted-foreground" />
+                    <h2 className="text-sm font-semibold">Selected Products</h2>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedDraft.savedQuoteProducts.length} product{selectedDraft.savedQuoteProducts.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedDraft.savedQuoteProducts.map((product, index) => (
+                    <div key={`${product.productId}-${index}`} className="rounded-lg border bg-card p-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{product.queryName}</p>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
+                              Qty: {product.quantity}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {product.description || "No description"}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                            {product.brand && <span>{product.brand}</span>}
+                            {product.brand && product.code && <span>·</span>}
+                            {product.code && <span className="font-mono">{product.code}</span>}
+                            {(product.brand || product.code) && product.hsnCode && <span>·</span>}
+                            {product.hsnCode && <span>HSN: {product.hsnCode}</span>}
+                            {product.gstRate != null && <span>· GST: {product.gstRate}%</span>}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className={`text-sm font-bold tabular-nums ${product.price == null ? "text-muted-foreground" : ""}`}>
+                            {formatPrice(product.price)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-6 py-5">
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <div className="mb-3">
+                    <h2 className="text-sm font-semibold">Process RFQ</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Enter the quote number to mark this draft RFQ as Processed.
+                    </p>
+                  </div>
+                  <div className="flex max-w-xl gap-2">
+                    <Input
+                      value={quoteNumbers[selectedDraft._id] ?? ""}
+                      onChange={(event) =>
+                        setQuoteNumbers((current) => ({
+                          ...current,
+                          [selectedDraft._id]: event.target.value,
+                        }))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault()
+                          handleMarkProcessed(selectedDraft._id)
+                        }
+                      }}
+                      placeholder="Enter quote number"
+                    />
+                    <Button
+                      className="shrink-0"
+                      onClick={() => handleMarkProcessed(selectedDraft._id)}
+                      disabled={processingId === selectedDraft._id}
+                    >
+                      {processingId === selectedDraft._id && <Spinner data-icon="inline-start" />}
+                      Mark Processed
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </AppLayout>
   )
 }
