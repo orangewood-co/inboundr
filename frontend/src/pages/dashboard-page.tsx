@@ -573,7 +573,6 @@ export function DashboardPage() {
         const matchIndex = searchResult.matches.findIndex((match) => match.id === product.productId)
 
         if (matchIndex >= 0 && product.productId !== 0) {
-          const match = searchResult.matches[matchIndex]
           const overrideKey = `${searchResultIndex}-${matchIndex}`
           nextSelectedProducts[searchResultIndex] = matchIndex
           nextOverrides[overrideKey] = {
