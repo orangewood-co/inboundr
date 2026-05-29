@@ -14,7 +14,7 @@ import { useSession } from "@/lib/auth-client"
 import { getAdminMe } from "@/lib/admin"
 import { useEntitlements, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, CrownIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, CrownIcon, FileTextIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -40,6 +40,11 @@ const data = {
       title: "Products",
       url: "/products",
       icon: <PackageIcon />,
+    },
+    {
+      title: "Orders",
+      url: "/orders",
+      icon: <ShoppingCartIcon />,
     },
     {
       title: "Invoices",

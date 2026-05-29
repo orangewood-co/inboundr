@@ -36,6 +36,19 @@ export interface IRFQSearchResult {
   matches: IRFQSearchMatch[];
 }
 
+export interface IRFQSavedQuoteProduct {
+  queryName: string;
+  quantity: number;
+  productId: number;
+  brand: string | null;
+  description: string | null;
+  code: string | null;
+  price: number | null;
+  hsnCode: string | null;
+  gstRate: number | null;
+  discountPercent?: number;
+}
+
 export interface IRFQ extends Document {
   userId: string;
   organizationId: Types.ObjectId;
@@ -49,6 +62,11 @@ export interface IRFQ extends Document {
   searchResults: IRFQSearchResult[];
   errorMessage: string | null;
   isArchived: boolean;
+  workflowStatus: "new" | "draft" | "processed";
+  savedQuoteProducts: IRFQSavedQuoteProduct[];
+  quoteNumber: string | null;
+  draftSavedAt: Date | null;
+  processedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +103,22 @@ const rfqSearchResultSchema = new Schema<IRFQSearchResult>(
       required: true,
     },
     matches: { type: [rfqSearchMatchSchema], default: [] },
+  },
+  { _id: false }
+);
+
+const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
+  {
+    queryName: { type: String, required: true },
+    quantity: { type: Number, required: true },
+    productId: { type: Number, required: true },
+    brand: { type: String, default: null },
+    description: { type: String, default: null },
+    code: { type: String, default: null },
+    price: { type: Number, default: null },
+    hsnCode: { type: String, default: null },
+    gstRate: { type: Number, default: null },
+    discountPercent: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -135,11 +169,22 @@ const rfqSchema = new Schema<IRFQ>(
     searchResults: { type: [rfqSearchResultSchema], default: [] },
     errorMessage: { type: String, default: null },
     isArchived: { type: Boolean, default: false },
+    workflowStatus: {
+      type: String,
+      enum: ["new", "draft", "processed"],
+      default: "new",
+      index: true,
+    },
+    savedQuoteProducts: { type: [rfqSavedQuoteProductSchema], default: [] },
+    quoteNumber: { type: String, default: null },
+    draftSavedAt: { type: Date, default: null },
+    processedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
 
 rfqSchema.index({ userId: 1, isRFQ: 1, createdAt: -1 });
 rfqSchema.index({ organizationId: 1, isRFQ: 1, createdAt: -1 });
+rfqSchema.index({ organizationId: 1, workflowStatus: 1, draftSavedAt: -1 });
 
 export const RFQ = mongoose.model<IRFQ>("RFQ", rfqSchema);

@@ -95,6 +95,19 @@ interface RFQSearchResult {
   matches: RFQSearchMatch[]
 }
 
+interface RFQSavedQuoteProduct {
+  queryName: string
+  quantity: number
+  productId: number
+  brand: string | null
+  description: string | null
+  code: string | null
+  price: number | null
+  hsnCode: string | null
+  gstRate: number | null
+  discountPercent?: number
+}
+
 interface RFQSummary {
   _id: string
   emailId: RFQEmail
@@ -105,6 +118,11 @@ interface RFQSummary {
   queryProducts: RFQProduct[]
   searchResults: RFQSearchResult[]
   errorMessage: string | null
+  workflowStatus?: "new" | "draft" | "processed"
+  savedQuoteProducts?: RFQSavedQuoteProduct[]
+  quoteNumber?: string | null
+  draftSavedAt?: string | null
+  processedAt?: string | null
   createdAt: string
 }
 
@@ -236,16 +254,26 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
   }
 }
 
-type ProcessingStatus = "processing" | "processed" | "failed"
+type ProcessingStatus = "analyzing" | "ready" | "draft" | "processed" | "failed"
 
 const statusConfig: Record<
   ProcessingStatus,
   { icon: typeof LoaderIcon; label: string; className: string }
 > = {
-  processing: {
+  analyzing: {
     icon: LoaderIcon,
-    label: "Processing",
+    label: "Analyzing",
     className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  ready: {
+    icon: CheckCircle2Icon,
+    label: "Ready",
+    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  },
+  draft: {
+    icon: FileTextIcon,
+    label: "Draft",
+    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
   },
   processed: {
     icon: CheckCircle2Icon,
@@ -259,15 +287,32 @@ const statusConfig: Record<
   },
 }
 
-function StatusBadge({ isProcessed, errorMessage }: { isProcessed: boolean; errorMessage: string | null }) {
-  const status: ProcessingStatus = errorMessage ? "failed" : isProcessed ? "processed" : "processing"
+function getWorkflowStatus(rfq: Pick<RFQSummary, "isProcessed" | "errorMessage" | "workflowStatus">): ProcessingStatus {
+  if (rfq.errorMessage) return "failed"
+  if (!rfq.isProcessed) return "analyzing"
+  if (rfq.workflowStatus === "processed") return "processed"
+  if (rfq.workflowStatus === "draft") return "draft"
+  return "ready"
+}
+
+function getWorkflowStatusTooltip(rfq: Pick<RFQSummary, "isProcessed" | "errorMessage" | "workflowStatus" | "quoteNumber">): string {
+  const status = getWorkflowStatus(rfq)
+  if (status === "failed") return "Processing error occurred"
+  if (status === "analyzing") return "AI is extracting this RFQ"
+  if (status === "draft") return "Product selection saved as a draft"
+  if (status === "processed") return rfq.quoteNumber ? `Quote ${rfq.quoteNumber} entered` : "Quote number entered"
+  return "Ready for product selection"
+}
+
+function StatusBadge({ rfq }: { rfq: Pick<RFQSummary, "isProcessed" | "errorMessage" | "workflowStatus"> }) {
+  const status = getWorkflowStatus(rfq)
   const config = statusConfig[status]
   const Icon = config.icon
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${config.className}`}
     >
-      <Icon className={`size-3 ${status === "processing" ? "animate-spin" : ""}`} />
+      <Icon className={`size-3 ${status === "analyzing" ? "animate-spin" : ""}`} />
       {config.label}
     </span>
   )
@@ -396,6 +441,7 @@ export function DashboardPage() {
     gstRate: "",
     source: "custom",
   })
+  const [savingDraft, setSavingDraft] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
@@ -471,6 +517,61 @@ export function DashboardPage() {
       setProductSearchError(null)
     }
   }, [selectedId, fetchDetail, fetchReply])
+
+  useEffect(() => {
+    if (!detail?.savedQuoteProducts?.length) return
+
+    const nextSelectedProducts: Record<number, number> = {}
+    const nextOverrides: Record<string, ProductOverride> = {}
+    const unmatchedProducts: ManualProduct[] = []
+
+    detail.savedQuoteProducts.forEach((product, productIndex) => {
+      let matched = false
+
+      for (let searchResultIndex = 0; searchResultIndex < detail.searchResults.length; searchResultIndex += 1) {
+        const searchResult = detail.searchResults[searchResultIndex]
+        const matchIndex = searchResult.matches.findIndex((match) => match.id === product.productId)
+
+        if (matchIndex >= 0 && product.productId !== 0) {
+          const match = searchResult.matches[matchIndex]
+          const overrideKey = `${searchResultIndex}-${matchIndex}`
+          nextSelectedProducts[searchResultIndex] = matchIndex
+          nextOverrides[overrideKey] = {
+            description: product.description ?? "",
+            brand: product.brand ?? "",
+            code: product.code ?? "",
+            hsnCode: product.hsnCode ?? "",
+            gstRate: product.gstRate != null ? String(product.gstRate) : "",
+            price: product.price != null ? String(product.price) : "",
+            quantity: String(product.quantity),
+            discountPercent: product.discountPercent ? String(product.discountPercent) : "",
+          }
+          matched = true
+          break
+        }
+      }
+
+      if (!matched) {
+        unmatchedProducts.push({
+          id: `saved-${productIndex}-${product.productId}`,
+          queryName: product.queryName,
+          quantity: String(product.quantity),
+          productId: product.productId,
+          brand: product.brand ?? "",
+          description: product.description ?? "",
+          code: product.code ?? "",
+          price: product.price != null ? String(product.price) : "",
+          hsnCode: product.hsnCode ?? "",
+          gstRate: product.gstRate != null ? String(product.gstRate) : "",
+          source: product.productId ? "catalog" : "custom",
+        })
+      }
+    })
+
+    setSelectedProducts(nextSelectedProducts)
+    setProductOverrides(nextOverrides)
+    setManualProducts(unmatchedProducts)
+  }, [detail])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -711,6 +812,57 @@ export function DashboardPage() {
       console.error("Failed to generate quote:", err)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const buildDraftPayload = () => {
+    const selections = Object.entries(selectedProducts).map(([sri, mi]) => {
+      const overrideKey = `${sri}-${mi}`
+      const override = productOverrides[overrideKey]
+      return {
+        searchResultIndex: Number(sri),
+        matchIndex: mi,
+        ...(override ? { overrides: override } : {}),
+      }
+    })
+    const manualSelections = manualProducts.map((product) => ({
+      queryName: product.queryName.trim(),
+      quantity: Number(product.quantity),
+      productId: product.productId,
+      brand: product.brand.trim() || null,
+      description: product.description.trim() || null,
+      code: product.code.trim() || null,
+      price: product.price.trim() === "" ? null : Number(product.price),
+      hsnCode: product.hsnCode.trim() || null,
+      gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
+    }))
+
+    return { selectedProducts: selections, manualProducts: manualSelections }
+  }
+
+  const handleSaveDraft = async () => {
+    if (!detail) return
+    setSavingDraft(true)
+    try {
+      const res = await fetch(`${API_BASE}/${detail._id}/save-draft`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildDraftPayload()),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const data: RFQSummary = await res.json()
+      setDetail(data)
+      setRfqs((current) => current.map((rfq) => (rfq._id === data._id ? data : rfq)))
+      toast.success("RFQ draft saved")
+    } catch (err) {
+      toast.error("Failed to save RFQ draft")
+      console.error("Failed to save RFQ draft:", err)
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -1000,11 +1152,11 @@ export function DashboardPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span>
-                                  <StatusBadge isProcessed={rfq.isProcessed} errorMessage={rfq.errorMessage} />
+                                  <StatusBadge rfq={rfq} />
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {rfq.errorMessage ? "Processing error occurred" : rfq.isProcessed ? "Classification complete" : "AI is classifying this RFQ"}
+                                {getWorkflowStatusTooltip(rfq)}
                               </TooltipContent>
                             </Tooltip>
                             {rfq.queryProducts.length > 0 && (
@@ -1086,11 +1238,11 @@ export function DashboardPage() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span>
-                            <StatusBadge isProcessed={detail.isProcessed} errorMessage={detail.errorMessage} />
+                            <StatusBadge rfq={detail} />
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          {detail.errorMessage ? "Processing error occurred" : detail.isProcessed ? "Classification complete" : "AI is classifying this RFQ"}
+                          {getWorkflowStatusTooltip(detail)}
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
@@ -1137,6 +1289,16 @@ export function DashboardPage() {
                       </Tooltip>
                     </div>
                   </div>
+                  {detail.workflowStatus === "draft" && (
+                    <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-xs text-violet-700 dark:text-violet-300">
+                      Draft saved
+                      {detail.draftSavedAt ? ` ${formatFullDate(detail.draftSavedAt)}` : ""}
+                      {detail.savedQuoteProducts?.length
+                        ? ` with ${detail.savedQuoteProducts.length} product${detail.savedQuoteProducts.length === 1 ? "" : "s"}`
+                        : ""}
+                      .
+                    </div>
+                  )}
                 </div>
 
                 {/* Customer Info */}
@@ -1559,6 +1721,19 @@ export function DashboardPage() {
 
                     {/* Generate Quote Button */}
                     <div className="mt-5 flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={handleSaveDraft}
+                        disabled={!hasSelections || savingDraft}
+                        className="gap-2"
+                      >
+                        {savingDraft ? (
+                          <Spinner data-icon="inline-start" />
+                        ) : (
+                          <FileTextIcon className="size-4" />
+                        )}
+                        Save Draft
+                      </Button>
                       <Button
                         onClick={handleGenerateQuote}
                         disabled={!hasSelections || generating}

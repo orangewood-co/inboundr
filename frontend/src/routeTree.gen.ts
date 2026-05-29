@@ -16,6 +16,7 @@ import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProductsRouteImport } from './routes/products'
+import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LinksRouteImport } from './routes/links'
 import { Route as InvoicesRouteImport } from './routes/invoices'
@@ -72,6 +73,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersRoute = OrdersRouteImport.update({
+  id: '/orders',
+  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/invoices': typeof InvoicesRouteWithChildren
   '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
+  '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/emails': typeof EmailsRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/invoices': typeof InvoicesRouteWithChildren
   '/links': typeof LinksRouteWithChildren
   '/login': typeof LoginRoute
+  '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/links'
     | '/login'
+    | '/orders'
     | '/products'
     | '/register'
     | '/reset-password'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/emails'
     | '/forgot-password'
     | '/login'
+    | '/orders'
     | '/products'
     | '/register'
     | '/reset-password'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/links'
     | '/login'
+    | '/orders'
     | '/products'
     | '/register'
     | '/reset-password'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   InvoicesRoute: typeof InvoicesRouteWithChildren
   LinksRoute: typeof LinksRouteWithChildren
   LoginRoute: typeof LoginRoute
+  OrdersRoute: typeof OrdersRoute
   ProductsRoute: typeof ProductsRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -442,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products'
       preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders': {
+      id: '/orders'
+      path: '/orders'
+      fullPath: '/orders'
+      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   InvoicesRoute: InvoicesRouteWithChildren,
   LinksRoute: LinksRouteWithChildren,
   LoginRoute: LoginRoute,
+  OrdersRoute: OrdersRoute,
   ProductsRoute: ProductsRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,

@@ -13,6 +13,7 @@ import {
   hasRFQProcessableContent,
 } from "../services/rfq-input.service";
 import { streamRFQPdf } from "../services/rfq-pdf.service";
+import type { IRFQ } from "../models/rfq.model";
 
 export const archiveRFQ = async (
   req: Request,
@@ -115,6 +116,40 @@ function resolveManualProduct(product: ManualQuoteProduct) {
   };
 }
 
+function resolveSelectedProducts(
+  rfq: Pick<IRFQ, "searchResults">,
+  selections: SelectedRFQProduct[],
+  manualProducts: ManualQuoteProduct[]
+) {
+  const selectedProducts = selections.map((sel) => {
+    const sr = rfq.searchResults[sel.searchResultIndex];
+    if (!sr) throw new Error(`Invalid searchResultIndex: ${sel.searchResultIndex}`);
+    const match = sr.matches[sel.matchIndex];
+    if (!match) throw new Error(`Invalid matchIndex: ${sel.matchIndex}`);
+
+    const overrides = sel.overrides || {};
+    const overridePrice = nullableNumber(overrides.price);
+    const overrideDiscount = nullableNumber(overrides.discountPercent) ?? 0;
+    const basePrice = overridePrice ?? match.price;
+    const finalPrice = basePrice != null ? basePrice * (1 - overrideDiscount / 100) : null;
+
+    return {
+      queryName: sr.query.name,
+      quantity: positiveNumber(overrides.quantity) ?? sr.query.quantity,
+      productId: match.id,
+      brand: nullableString(overrides.brand) ?? match.brand,
+      description: nullableString(overrides.description) ?? match.description,
+      code: nullableString(overrides.code) ?? match.code,
+      price: finalPrice,
+      hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
+      gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
+      discountPercent: overrideDiscount,
+    };
+  });
+
+  return [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
+}
+
 export const listRFQs = async (
   req: Request,
   res: Response
@@ -168,6 +203,133 @@ export const getRFQ = async (
   } catch (err) {
     console.error("Error fetching RFQ:", err);
     res.status(500).json({ error: "Failed to fetch RFQ" });
+  }
+};
+
+export const listDraftRFQs = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+
+    const rfqs = await RFQ.find({
+      userId: authReq.user.id,
+      organizationId: organization._id,
+      isRFQ: true,
+      isArchived: { $ne: true },
+      workflowStatus: "draft",
+    })
+      .populate("emailId", "subject from date snippet status")
+      .sort({ draftSavedAt: -1, updatedAt: -1 })
+      .lean();
+
+    res.json({ rfqs });
+  } catch (err) {
+    console.error("Error listing draft RFQs:", err);
+    res.status(500).json({ error: "Failed to fetch draft RFQs" });
+  }
+};
+
+export const saveRFQDraft = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const rfq = await RFQ.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+
+    if (!rfq) {
+      res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    if (!rfq.isProcessed || !rfq.customer) {
+      res.status(400).json({ error: "RFQ is not ready for draft saving yet" });
+      return;
+    }
+
+    const selections: SelectedRFQProduct[] = Array.isArray(req.body?.selectedProducts)
+      ? req.body.selectedProducts
+      : [];
+    const manualProducts: ManualQuoteProduct[] = Array.isArray(req.body?.manualProducts)
+      ? req.body.manualProducts
+      : [];
+
+    if (selections.length === 0 && manualProducts.length === 0) {
+      res.status(400).json({ error: "No products selected" });
+      return;
+    }
+
+    const products = resolveSelectedProducts(rfq, selections, manualProducts);
+    const savedAt = new Date();
+    rfq.savedQuoteProducts = products;
+    rfq.workflowStatus = "draft";
+    rfq.draftSavedAt = savedAt;
+    rfq.quoteNumber = null;
+    rfq.processedAt = null;
+    await rfq.save();
+
+    const saved = await RFQ.findById(rfq._id)
+      .populate("emailId", "subject from date snippet status")
+      .lean();
+
+    res.json(saved);
+  } catch (err: any) {
+    console.error("Error saving RFQ draft:", err);
+    res.status(500).json({ error: err.message || "Failed to save RFQ draft" });
+  }
+};
+
+export const setRFQQuoteNumber = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const quoteNumber = nullableString(req.body?.quoteNumber);
+
+    if (!quoteNumber) {
+      res.status(400).json({ error: "Quote number is required" });
+      return;
+    }
+
+    const rfq = await RFQ.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: authReq.user.id,
+        organizationId: organization._id,
+        isRFQ: true,
+        isArchived: { $ne: true },
+      },
+      {
+        $set: {
+          quoteNumber,
+          workflowStatus: "processed",
+          processedAt: new Date(),
+        },
+      },
+      { new: true }
+    )
+      .populate("emailId", "subject from date snippet status")
+      .lean();
+
+    if (!rfq) {
+      res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    res.json(rfq);
+  } catch (err) {
+    console.error("Error setting RFQ quote number:", err);
+    res.status(500).json({ error: "Failed to set quote number" });
   }
 };
 
@@ -296,7 +458,6 @@ export const generateQuote = async (
       return;
     }
 
-    // selectedProducts: [{ searchResultIndex, matchIndex }]
     const selections: SelectedRFQProduct[] = Array.isArray(req.body?.selectedProducts)
       ? req.body.selectedProducts
       : [];
@@ -304,37 +465,15 @@ export const generateQuote = async (
       ? req.body.manualProducts
       : [];
 
-    if (selections.length === 0 && manualProducts.length === 0) {
+    if (selections.length === 0 && manualProducts.length === 0 && rfq.savedQuoteProducts.length === 0) {
       res.status(400).json({ error: "No products selected" });
       return;
     }
 
-    const selectedProducts = selections.map((sel) => {
-      const sr = rfq.searchResults[sel.searchResultIndex];
-      if (!sr) throw new Error(`Invalid searchResultIndex: ${sel.searchResultIndex}`);
-      const match = sr.matches[sel.matchIndex];
-      if (!match) throw new Error(`Invalid matchIndex: ${sel.matchIndex}`);
-
-      const overrides = sel.overrides || {};
-      const overridePrice = nullableNumber(overrides.price);
-      const overrideDiscount = nullableNumber(overrides.discountPercent) ?? 0;
-      const basePrice = overridePrice ?? match.price;
-      const finalPrice = basePrice != null ? basePrice * (1 - overrideDiscount / 100) : null;
-
-      return {
-        queryName: sr.query.name,
-        quantity: positiveNumber(overrides.quantity) ?? sr.query.quantity,
-        productId: match.id,
-        brand: nullableString(overrides.brand) ?? match.brand,
-        description: nullableString(overrides.description) ?? match.description,
-        code: nullableString(overrides.code) ?? match.code,
-        price: finalPrice,
-        hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
-        gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
-        discountPercent: overrideDiscount,
-      };
-    });
-    const products = [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
+    const products =
+      selections.length === 0 && manualProducts.length === 0
+        ? rfq.savedQuoteProducts
+        : resolveSelectedProducts(rfq, selections, manualProducts);
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
