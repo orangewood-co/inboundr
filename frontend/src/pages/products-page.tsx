@@ -667,14 +667,34 @@ export default function ProductsPage() {
     setSaveError(null)
 
     try {
-      const response = await fetch(editingProduct ? `${API_BASE}/${editingProduct.id}` : API_BASE, {
+      let response = await fetch(editingProduct ? `${API_BASE}/${editingProduct.id}` : API_BASE, {
         method: editingProduct ? "PUT" : "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formToPayload(form)),
       })
 
-      const payload = await response.json().catch(() => null)
+      let payload = await response.json().catch(() => null)
+      if (!response.ok && response.status === 404 && editingProduct?.productcode) {
+        const lookup = await fetch(`${API_BASE}?page=1&limit=10&search=${encodeURIComponent(editingProduct.productcode)}`, {
+          credentials: "include",
+        })
+        if (lookup.ok) {
+          const lookupData = (await lookup.json()) as ProductsResponse
+          const refreshed = lookupData.products.find(
+            (product) => product.productcode === editingProduct.productcode
+          )
+          if (refreshed?.id && refreshed.id !== editingProduct.id) {
+            response = await fetch(`${API_BASE}/${refreshed.id}`, {
+              method: "PUT",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formToPayload(form)),
+            })
+            payload = await response.json().catch(() => null)
+          }
+        }
+      }
       if (!response.ok) {
         throw new Error(payload?.error ?? "Unable to save product")
       }

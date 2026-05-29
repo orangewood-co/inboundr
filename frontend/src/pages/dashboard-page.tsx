@@ -481,6 +481,7 @@ export function DashboardPage() {
   })
   const [regrettedLines, setRegrettedLines] = useState<Record<number, RegrettedLine>>({})
   const [savingDraft, setSavingDraft] = useState(false)
+  const [savingCatalogProduct, setSavingCatalogProduct] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
@@ -910,6 +911,76 @@ export function DashboardPage() {
     })
   }
 
+  const canSaveCustomProductToCatalog =
+    customProduct.description.trim() !== "" &&
+    customProduct.code.trim() !== "" &&
+    customProduct.brand.trim() !== ""
+
+  const resetCustomProduct = () => {
+    setCustomProduct({
+      id: "custom-draft",
+      searchResultIndex: activeManualProductQueryIndex,
+      queryName: "",
+      quantity: "1",
+      productId: 0,
+      brand: "",
+      description: "",
+      code: "",
+      price: "",
+      hsnCode: "",
+      gstRate: "",
+      calibrationCharges: "",
+      deliveryTimeline: "",
+      source: "custom",
+    })
+  }
+
+  const handleAddCustomProductToCatalog = async () => {
+    if (!canSaveCustomProductToCatalog) return
+
+    setSavingCatalogProduct(true)
+    try {
+      const res = await fetch(PRODUCTS_API_BASE, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productdescription: customProduct.description.trim(),
+          productcode: customProduct.code.trim(),
+          brand: customProduct.brand.trim(),
+          unitprice: customProduct.price.trim() ? Number(customProduct.price) : null,
+          hsncode: customProduct.hsnCode.trim() || null,
+          gstrate: customProduct.gstRate.trim() ? Number(customProduct.gstRate) : null,
+          calibrationcharges: customProduct.calibrationCharges.trim()
+            ? Number(customProduct.calibrationCharges)
+            : null,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`)
+      }
+
+      setManualProducts((prev) => [
+        ...prev,
+        {
+          ...customProduct,
+          id: `catalog-${data.id}-${Date.now()}`,
+          searchResultIndex: activeManualProductQueryIndex,
+          productId: data.id,
+          source: "catalog",
+        },
+      ])
+      toast.success("Product added to catalogue")
+      resetCustomProduct()
+      setActiveManualProductQueryIndex(null)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add product to catalogue")
+    } finally {
+      setSavingCatalogProduct(false)
+    }
+  }
+
   const handleGenerateQuote = async () => {
     if (!detail) return
     setGenerating(true)
@@ -1212,19 +1283,41 @@ export function DashboardPage() {
             className="h-8 text-xs"
           />
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="mt-2 w-full gap-1.5 text-xs"
-          onClick={() => {
-            handleAddCustomProduct()
-            setActiveManualProductQueryIndex(null)
-          }}
-        >
-          <PlusIcon className="size-3.5" />
-          Add custom line
-        </Button>
+        {!canSaveCustomProductToCatalog && (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Description, code, and brand are required to save to catalogue.
+          </p>
+        )}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => {
+              handleAddCustomProduct()
+              setActiveManualProductQueryIndex(null)
+            }}
+          >
+            <PlusIcon className="size-3.5" />
+            Add custom line
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            disabled={!canSaveCustomProductToCatalog || savingCatalogProduct}
+            onClick={handleAddCustomProductToCatalog}
+          >
+            {savingCatalogProduct ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <PackageIcon className="size-3.5" />
+            )}
+            Add to catalogue
+          </Button>
+        </div>
       </div>
       </PopoverContent>
     </Popover>

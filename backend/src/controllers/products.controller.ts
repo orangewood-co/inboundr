@@ -247,11 +247,18 @@ export const createProduct = async (
       return;
     }
 
-    const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
-    const values = columns.map((column) =>
-      column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+    const columns = ["id", "organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+    const values = columns
+      .filter((column) => column !== "id")
+      .map((column) =>
+        column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+      );
+    let placeholderIndex = 0;
+    const placeholders = columns.map((column) =>
+      column === "id"
+        ? "(SELECT COALESCE(MAX(id), 0) + 1 FROM products)"
+        : `$${++placeholderIndex}`
     );
-    const placeholders = columns.map((_, index) => `$${index + 1}`);
 
     const result = await pool.query<Product>(
       `INSERT INTO products (${columns.join(", ")})
@@ -355,11 +362,18 @@ export const importProducts = async (
           continue;
         }
 
-        const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
-        const values = columns.map((column) =>
-          column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+        const columns = ["id", "organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+        const values = columns
+          .filter((column) => column !== "id")
+          .map((column) =>
+            column === "organization_id" ? organizationId : input[column as keyof ProductInput]
+          );
+        let placeholderIndex = 0;
+        const placeholders = columns.map((column) =>
+          column === "id"
+            ? "(SELECT COALESCE(MAX(id), 0) + 1 FROM products)"
+            : `$${++placeholderIndex}`
         );
-        const placeholders = columns.map((_, placeholderIndex) => `$${placeholderIndex + 1}`);
 
         await client.query(
           `INSERT INTO products (${columns.join(", ")})
@@ -411,13 +425,25 @@ export const updateProduct = async (
     const assignments = columns.map((column, index) => `${column} = $${index + 1}`);
     values.push(id, organizationId);
 
-    const result = await pool.query<Product>(
+    let result = await pool.query<Product>(
       `UPDATE products
        SET ${assignments.join(", ")}
        WHERE id = $${values.length - 1} AND organization_id = $${values.length}
        RETURNING ${PRODUCT_COLUMNS.join(", ")}`,
       values
     );
+
+    if (!result.rows[0] && input.productcode) {
+      const fallbackValues = columns.map((column) => input[column]);
+      fallbackValues.push(input.productcode, organizationId);
+      result = await pool.query<Product>(
+        `UPDATE products
+         SET ${assignments.join(", ")}
+         WHERE productcode = $${fallbackValues.length - 1} AND organization_id = $${fallbackValues.length}
+         RETURNING ${PRODUCT_COLUMNS.join(", ")}`,
+        fallbackValues
+      );
+    }
 
     const product = result.rows[0];
     if (!product) {
