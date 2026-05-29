@@ -42,6 +42,7 @@ interface RFQCustomer {
 }
 
 interface RFQSavedQuoteProduct {
+  searchResultIndex: number | null
   queryName: string
   quantity: number
   productId: number
@@ -51,6 +52,10 @@ interface RFQSavedQuoteProduct {
   price: number | null
   hsnCode: string | null
   gstRate: number | null
+  calibrationCharges?: number | null
+  deliveryTimeline?: string | null
+  lineStatus?: "quoted" | "regretted"
+  regretReason?: string | null
 }
 
 interface DraftRFQ {
@@ -393,32 +398,50 @@ export function OrdersPage() {
 
                 <div className="space-y-2">
                   {selectedDraft.savedQuoteProducts.map((product, index) => (
-                    <div key={`${product.productId}-${index}`} className="rounded-lg border bg-card p-3">
+                    <div key={`${product.productId}-${index}`} className={`rounded-lg border bg-card p-3 ${product.lineStatus === "regretted" ? "border-destructive/25 bg-destructive/5" : ""}`}>
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-medium">{product.queryName}</p>
+                            {product.searchResultIndex != null && (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                                Item {product.searchResultIndex + 1}
+                              </span>
+                            )}
+                            {product.lineStatus === "regretted" && (
+                              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-destructive">
+                                Regretted
+                              </span>
+                            )}
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
                               Qty: {product.quantity}
                             </span>
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            {product.description || "No description"}
+                            {product.lineStatus === "regretted"
+                              ? product.regretReason || "Not available in catalog"
+                              : product.description || "No description"}
                           </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                          {product.lineStatus !== "regretted" && (
+                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                             {product.brand && <span>{product.brand}</span>}
                             {product.brand && product.code && <span>·</span>}
                             {product.code && <span className="font-mono">{product.code}</span>}
                             {(product.brand || product.code) && product.hsnCode && <span>·</span>}
                             {product.hsnCode && <span>HSN: {product.hsnCode}</span>}
                             {product.gstRate != null && <span>· GST: {product.gstRate}%</span>}
-                          </div>
+                            {product.calibrationCharges != null && <span>· Calibration: {formatPrice(product.calibrationCharges)}</span>}
+                            {product.deliveryTimeline && <span>· Delivery: {product.deliveryTimeline}</span>}
+                            </div>
+                          )}
                         </div>
-                        <div className="shrink-0 text-right">
+                        {product.lineStatus !== "regretted" && (
+                          <div className="shrink-0 text-right">
                           <p className={`text-sm font-bold tabular-nums ${product.price == null ? "text-muted-foreground" : ""}`}>
                             {formatPrice(product.price)}
                           </p>
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

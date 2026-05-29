@@ -62,9 +62,12 @@ type SelectedRFQProduct = {
     gstRate?: unknown
     quantity?: unknown
     discountPercent?: unknown
+    calibrationCharges?: unknown
+    deliveryTimeline?: unknown
   }
 };
 type ManualQuoteProduct = {
+  searchResultIndex?: unknown;
   queryName?: unknown;
   quantity?: unknown;
   productId?: unknown;
@@ -74,6 +77,14 @@ type ManualQuoteProduct = {
   price?: unknown;
   hsnCode?: unknown;
   gstRate?: unknown;
+  calibrationCharges?: unknown;
+  deliveryTimeline?: unknown;
+};
+type RegrettedRFQLine = {
+  searchResultIndex?: unknown;
+  queryName?: unknown;
+  quantity?: unknown;
+  regretReason?: unknown;
 };
 
 function nullableString(value: unknown): string | null {
@@ -93,6 +104,11 @@ function positiveNumber(value: unknown): number | null {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+function indexNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : null;
+}
+
 function resolveManualProduct(product: ManualQuoteProduct) {
   const queryName = nullableString(product.queryName);
   const quantity = positiveNumber(product.quantity);
@@ -104,6 +120,7 @@ function resolveManualProduct(product: ManualQuoteProduct) {
   }
 
   return {
+    searchResultIndex: indexNumber(product.searchResultIndex),
     queryName,
     quantity,
     productId: nullableNumber(product.productId) ?? 0,
@@ -113,14 +130,37 @@ function resolveManualProduct(product: ManualQuoteProduct) {
     price: nullableNumber(product.price),
     hsnCode: nullableString(product.hsnCode),
     gstRate: nullableNumber(product.gstRate),
+    discountPercent: 0,
+    calibrationCharges: nullableNumber(product.calibrationCharges),
+    deliveryTimeline: nullableString(product.deliveryTimeline),
+    lineStatus: "quoted" as const,
+    regretReason: null,
   };
 }
 
 function resolveSelectedProducts(
   rfq: Pick<IRFQ, "searchResults">,
   selections: SelectedRFQProduct[],
-  manualProducts: ManualQuoteProduct[]
+  manualProducts: ManualQuoteProduct[],
+  regrettedLines: RegrettedRFQLine[] = []
 ) {
+  const regrettedIndexes = new Set(
+    regrettedLines
+      .map((line) => indexNumber(line.searchResultIndex))
+      .filter((index): index is number => index != null)
+  );
+  const quotedIndexes = new Set<number>();
+  selections.forEach((sel) => quotedIndexes.add(sel.searchResultIndex));
+  manualProducts.forEach((product) => {
+    const index = indexNumber(product.searchResultIndex);
+    if (index != null) quotedIndexes.add(index);
+  });
+  for (const index of regrettedIndexes) {
+    if (quotedIndexes.has(index)) {
+      throw new Error("A regretted line item cannot also have selected products");
+    }
+  }
+
   const selectedProducts = selections.map((sel) => {
     const sr = rfq.searchResults[sel.searchResultIndex];
     if (!sr) throw new Error(`Invalid searchResultIndex: ${sel.searchResultIndex}`);
@@ -134,6 +174,7 @@ function resolveSelectedProducts(
     const finalPrice = basePrice != null ? basePrice * (1 - overrideDiscount / 100) : null;
 
     return {
+      searchResultIndex: sel.searchResultIndex,
       queryName: sr.query.name,
       quantity: positiveNumber(overrides.quantity) ?? sr.query.quantity,
       productId: match.id,
@@ -144,10 +185,41 @@ function resolveSelectedProducts(
       hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
       gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
       discountPercent: overrideDiscount,
+      calibrationCharges: nullableNumber(overrides.calibrationCharges),
+      deliveryTimeline: nullableString(overrides.deliveryTimeline),
+      lineStatus: "quoted" as const,
+      regretReason: null,
     };
   });
 
-  return [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
+  const regrettedProducts = regrettedLines.map((line) => {
+    const searchResultIndex = indexNumber(line.searchResultIndex);
+    const searchResult = searchResultIndex != null ? rfq.searchResults[searchResultIndex] : null;
+    const queryName = nullableString(line.queryName) ?? searchResult?.query.name;
+    const quantity = positiveNumber(line.quantity) ?? searchResult?.query.quantity ?? 1;
+    if (!queryName) {
+      throw new Error("Regretted lines require a requested item");
+    }
+    return {
+      searchResultIndex,
+      queryName,
+      quantity,
+      productId: 0,
+      brand: null,
+      description: null,
+      code: null,
+      price: null,
+      hsnCode: null,
+      gstRate: null,
+      discountPercent: 0,
+      calibrationCharges: null,
+      deliveryTimeline: null,
+      lineStatus: "regretted" as const,
+      regretReason: nullableString(line.regretReason) ?? "Not available in catalog",
+    };
+  });
+
+  return [...selectedProducts, ...manualProducts.map(resolveManualProduct), ...regrettedProducts];
 }
 
 const rfqListStatuses = new Set(["all", "analyzing", "ready", "draft", "processed", "failed"]);
@@ -320,13 +392,16 @@ export const saveRFQDraft = async (
     const manualProducts: ManualQuoteProduct[] = Array.isArray(req.body?.manualProducts)
       ? req.body.manualProducts
       : [];
+    const regrettedLines: RegrettedRFQLine[] = Array.isArray(req.body?.regrettedLines)
+      ? req.body.regrettedLines
+      : [];
 
-    if (selections.length === 0 && manualProducts.length === 0) {
+    if (selections.length === 0 && manualProducts.length === 0 && regrettedLines.length === 0) {
       res.status(400).json({ error: "No products selected" });
       return;
     }
 
-    const products = resolveSelectedProducts(rfq, selections, manualProducts);
+    const products = resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
     const savedAt = new Date();
     rfq.savedQuoteProducts = products;
     rfq.workflowStatus = "draft";
@@ -523,16 +598,20 @@ export const generateQuote = async (
     const manualProducts: ManualQuoteProduct[] = Array.isArray(req.body?.manualProducts)
       ? req.body.manualProducts
       : [];
+    const regrettedLines: RegrettedRFQLine[] = Array.isArray(req.body?.regrettedLines)
+      ? req.body.regrettedLines
+      : [];
 
-    if (selections.length === 0 && manualProducts.length === 0 && rfq.savedQuoteProducts.length === 0) {
+    if (selections.length === 0 && manualProducts.length === 0 && regrettedLines.length === 0 && rfq.savedQuoteProducts.length === 0) {
       res.status(400).json({ error: "No products selected" });
       return;
     }
 
     const products =
-      selections.length === 0 && manualProducts.length === 0
+      selections.length === 0 && manualProducts.length === 0 && regrettedLines.length === 0
         ? rfq.savedQuoteProducts
-        : resolveSelectedProducts(rfq, selections, manualProducts);
+        : resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
+    const quotedProducts = products.filter((p) => p.lineStatus !== "regretted");
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
@@ -556,7 +635,7 @@ export const generateQuote = async (
       organizationContactPhone: organization.defaultContact?.phoneNumber,
       organizationDefaultTerms: organization.preferences?.defaultTerms,
       originalSubject: email?.subject || "",
-      products: products.map((p) => ({
+      products: quotedProducts.map((p) => ({
         queryName: p.queryName,
         quantity: p.quantity,
         brand: p.brand,
@@ -576,7 +655,7 @@ export const generateQuote = async (
         organizationId: organization._id,
         gmailAccountId: rfq.gmailAccountId,
         rfqId: rfq._id,
-        selectedProducts: products,
+        selectedProducts: quotedProducts,
         subject,
         body,
         to: originalSenderEmail,

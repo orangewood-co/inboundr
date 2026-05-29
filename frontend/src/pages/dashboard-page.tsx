@@ -105,6 +105,7 @@ interface RFQSearchResult {
 }
 
 interface RFQSavedQuoteProduct {
+  searchResultIndex: number | null
   queryName: string
   quantity: number
   productId: number
@@ -115,6 +116,10 @@ interface RFQSavedQuoteProduct {
   hsnCode: string | null
   gstRate: number | null
   discountPercent?: number
+  calibrationCharges?: number | null
+  deliveryTimeline?: string | null
+  lineStatus?: "quoted" | "regretted"
+  regretReason?: string | null
 }
 
 interface RFQSummary {
@@ -184,6 +189,7 @@ interface ProductsResponse {
 
 interface ManualProduct {
   id: string
+  searchResultIndex: number | null
   queryName: string
   quantity: string
   productId: number
@@ -193,6 +199,8 @@ interface ManualProduct {
   price: string
   hsnCode: string
   gstRate: string
+  calibrationCharges: string
+  deliveryTimeline: string
   source: "catalog" | "custom"
 }
 
@@ -205,11 +213,20 @@ interface ProductOverride {
   price?: string
   quantity?: string
   discountPercent?: string
+  calibrationCharges?: string
+  deliveryTimeline?: string
+}
+
+interface RegrettedLine {
+  searchResultIndex: number
+  queryName: string
+  quantity: number
+  regretReason: string
 }
 
 type ManualProductField = keyof Pick<
   ManualProduct,
-  "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "hsnCode" | "gstRate"
+  "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "hsnCode" | "gstRate" | "calibrationCharges" | "deliveryTimeline"
 >
 
 function parseSender(from: string): { name: string; email: string } {
@@ -250,6 +267,7 @@ function numberInputValue(value: number | string | null | undefined): string {
 function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult["query"]): ManualProduct {
   return {
     id: `${product.id}-${Date.now()}`,
+    searchResultIndex: null,
     queryName: query?.name || product.productdescription || product.productcode || "Catalog product",
     quantity: query ? String(query.quantity) : "1",
     productId: product.id,
@@ -259,6 +277,8 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
     price: numberInputValue(product.unitprice),
     hsnCode: product.hsncode ?? "",
     gstRate: numberInputValue(product.gstrate),
+    calibrationCharges: "",
+    deliveryTimeline: "",
     source: "catalog",
   }
 }
@@ -434,8 +454,8 @@ export function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [retrying, setRetrying] = useState(false)
 
-  // Product selection: searchResultIndex -> matchIndex
-  const [selectedProducts, setSelectedProducts] = useState<Record<number, number>>({})
+  // Product selection: searchResultIndex -> matchIndexes
+  const [selectedProducts, setSelectedProducts] = useState<Record<number, number[]>>({})
   const [productOverrides, setProductOverrides] = useState<Record<string, ProductOverride>>({})
   const [manualProducts, setManualProducts] = useState<ManualProduct[]>([])
   const [activeManualProductQueryIndex, setActiveManualProductQueryIndex] = useState<number | null>(null)
@@ -445,6 +465,7 @@ export function DashboardPage() {
   const [productSearchError, setProductSearchError] = useState<string | null>(null)
   const [customProduct, setCustomProduct] = useState<ManualProduct>({
     id: "custom-draft",
+    searchResultIndex: null,
     queryName: "",
     quantity: "1",
     productId: 0,
@@ -454,8 +475,11 @@ export function DashboardPage() {
     price: "",
     hsnCode: "",
     gstRate: "",
+    calibrationCharges: "",
+    deliveryTimeline: "",
     source: "custom",
   })
+  const [regrettedLines, setRegrettedLines] = useState<Record<number, RegrettedLine>>({})
   const [savingDraft, setSavingDraft] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
@@ -551,6 +575,7 @@ export function DashboardPage() {
       setSelectedProducts({})
       setProductOverrides({})
       setManualProducts([])
+      setRegrettedLines({})
       setActiveManualProductQueryIndex(null)
       setProductSearch("")
       setProductResults([])
@@ -561,11 +586,23 @@ export function DashboardPage() {
   useEffect(() => {
     if (!detail?.savedQuoteProducts?.length) return
 
-    const nextSelectedProducts: Record<number, number> = {}
+    const nextSelectedProducts: Record<number, number[]> = {}
     const nextOverrides: Record<string, ProductOverride> = {}
     const unmatchedProducts: ManualProduct[] = []
+    const nextRegrettedLines: Record<number, RegrettedLine> = {}
 
     detail.savedQuoteProducts.forEach((product, productIndex) => {
+      if (product.lineStatus === "regretted") {
+        const searchResultIndex = product.searchResultIndex ?? productIndex
+        nextRegrettedLines[searchResultIndex] = {
+          searchResultIndex,
+          queryName: product.queryName,
+          quantity: product.quantity,
+          regretReason: product.regretReason ?? "Not available in catalog",
+        }
+        return
+      }
+
       let matched = false
 
       for (let searchResultIndex = 0; searchResultIndex < detail.searchResults.length; searchResultIndex += 1) {
@@ -574,7 +611,10 @@ export function DashboardPage() {
 
         if (matchIndex >= 0 && product.productId !== 0) {
           const overrideKey = `${searchResultIndex}-${matchIndex}`
-          nextSelectedProducts[searchResultIndex] = matchIndex
+          nextSelectedProducts[searchResultIndex] = [
+            ...(nextSelectedProducts[searchResultIndex] ?? []),
+            matchIndex,
+          ]
           nextOverrides[overrideKey] = {
             description: product.description ?? "",
             brand: product.brand ?? "",
@@ -584,6 +624,8 @@ export function DashboardPage() {
             price: product.price != null ? String(product.price) : "",
             quantity: String(product.quantity),
             discountPercent: product.discountPercent ? String(product.discountPercent) : "",
+            calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+            deliveryTimeline: product.deliveryTimeline ?? "",
           }
           matched = true
           break
@@ -593,6 +635,7 @@ export function DashboardPage() {
       if (!matched) {
         unmatchedProducts.push({
           id: `saved-${productIndex}-${product.productId}`,
+          searchResultIndex: product.searchResultIndex ?? null,
           queryName: product.queryName,
           quantity: String(product.quantity),
           productId: product.productId,
@@ -602,6 +645,8 @@ export function DashboardPage() {
           price: product.price != null ? String(product.price) : "",
           hsnCode: product.hsnCode ?? "",
           gstRate: product.gstRate != null ? String(product.gstRate) : "",
+          calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+          deliveryTimeline: product.deliveryTimeline ?? "",
           source: product.productId ? "catalog" : "custom",
         })
       }
@@ -610,6 +655,7 @@ export function DashboardPage() {
     setSelectedProducts(nextSelectedProducts)
     setProductOverrides(nextOverrides)
     setManualProducts(unmatchedProducts)
+    setRegrettedLines(nextRegrettedLines)
   }, [detail])
 
   useEffect(() => {
@@ -689,15 +735,62 @@ export function DashboardPage() {
   }
 
   const handleSelectProduct = (searchResultIndex: number, matchIndex: number) => {
+    if (regrettedLines[searchResultIndex]) return
     setSelectedProducts((prev) => {
       const next = { ...prev }
-      if (next[searchResultIndex] === matchIndex) {
-        delete next[searchResultIndex]
+      const current = next[searchResultIndex] ?? []
+      if (current.includes(matchIndex)) {
+        const remaining = current.filter((index) => index !== matchIndex)
+        if (remaining.length > 0) {
+          next[searchResultIndex] = remaining
+        } else {
+          delete next[searchResultIndex]
+        }
       } else {
-        next[searchResultIndex] = matchIndex
+        next[searchResultIndex] = [...current, matchIndex]
       }
       return next
     })
+  }
+
+  const handleToggleRegretLine = (searchResultIndex: number) => {
+    const query = detail?.searchResults[searchResultIndex]?.query
+    if (!query) return
+
+    setRegrettedLines((prev) => {
+      const next = { ...prev }
+      if (next[searchResultIndex]) {
+        delete next[searchResultIndex]
+      } else {
+        next[searchResultIndex] = {
+          searchResultIndex,
+          queryName: query.name,
+          quantity: query.quantity,
+          regretReason: "Not available in catalog",
+        }
+        setSelectedProducts((current) => {
+          const updated = { ...current }
+          delete updated[searchResultIndex]
+          return updated
+        })
+        setManualProducts((current) => current.filter((product) => product.searchResultIndex !== searchResultIndex))
+      }
+      return next
+    })
+  }
+
+  const handleRegretReasonChange = (searchResultIndex: number, regretReason: string) => {
+    setRegrettedLines((prev) => ({
+      ...prev,
+      [searchResultIndex]: {
+        ...(prev[searchResultIndex] ?? {
+          searchResultIndex,
+          queryName: detail?.searchResults[searchResultIndex]?.query.name ?? "",
+          quantity: detail?.searchResults[searchResultIndex]?.query.quantity ?? 1,
+        }),
+        regretReason,
+      },
+    }))
   }
 
   const handleOverrideChange = (key: string, field: keyof ProductOverride, value: string) => {
@@ -744,6 +837,7 @@ export function DashboardPage() {
       if (query) {
         setCustomProduct((current) => ({
           ...current,
+          searchResultIndex,
           queryName: query.name,
           quantity: String(query.quantity),
         }))
@@ -759,7 +853,10 @@ export function DashboardPage() {
   const handleAddCatalogProduct = (product: CatalogProduct) => {
     setManualProducts((prev) => [
       ...prev,
-      catalogProductToManual(product, getManualProductQuery(activeManualProductQueryIndex)),
+      {
+        ...catalogProductToManual(product, getManualProductQuery(activeManualProductQueryIndex)),
+        searchResultIndex: activeManualProductQueryIndex,
+      },
     ])
   }
 
@@ -790,12 +887,14 @@ export function DashboardPage() {
       {
         ...customProduct,
         id: `custom-${Date.now()}`,
+        searchResultIndex: activeManualProductQueryIndex,
         source: "custom",
         productId: 0,
       },
     ])
     setCustomProduct({
       id: "custom-draft",
+      searchResultIndex: activeManualProductQueryIndex,
       queryName: "",
       quantity: "1",
       productId: 0,
@@ -805,6 +904,8 @@ export function DashboardPage() {
       price: "",
       hsnCode: "",
       gstRate: "",
+      calibrationCharges: "",
+      deliveryTimeline: "",
       source: "custom",
     })
   }
@@ -813,31 +914,11 @@ export function DashboardPage() {
     if (!detail) return
     setGenerating(true)
     try {
-      const selections = Object.entries(selectedProducts).map(([sri, mi]) => {
-        const overrideKey = `${sri}-${mi}`
-        const override = productOverrides[overrideKey]
-        return {
-          searchResultIndex: Number(sri),
-          matchIndex: mi,
-          ...(override ? { overrides: override } : {}),
-        }
-      })
-      const manualSelections = manualProducts.map((product) => ({
-        queryName: product.queryName.trim(),
-        quantity: Number(product.quantity),
-        productId: product.productId,
-        brand: product.brand.trim() || null,
-        description: product.description.trim() || null,
-        code: product.code.trim() || null,
-        price: product.price.trim() === "" ? null : Number(product.price),
-        hsnCode: product.hsnCode.trim() || null,
-        gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
-      }))
       const res = await fetch(`${API_BASE}/${detail._id}/generate-quote`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedProducts: selections, manualProducts: manualSelections }),
+        body: JSON.stringify(buildDraftPayload()),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -855,16 +936,19 @@ export function DashboardPage() {
   }
 
   const buildDraftPayload = () => {
-    const selections = Object.entries(selectedProducts).map(([sri, mi]) => {
-      const overrideKey = `${sri}-${mi}`
-      const override = productOverrides[overrideKey]
-      return {
-        searchResultIndex: Number(sri),
-        matchIndex: mi,
-        ...(override ? { overrides: override } : {}),
-      }
-    })
+    const selections = Object.entries(selectedProducts).flatMap(([sri, matchIndexes]) =>
+      matchIndexes.map((mi) => {
+        const overrideKey = `${sri}-${mi}`
+        const override = productOverrides[overrideKey]
+        return {
+          searchResultIndex: Number(sri),
+          matchIndex: mi,
+          ...(override ? { overrides: override } : {}),
+        }
+      })
+    )
     const manualSelections = manualProducts.map((product) => ({
+      searchResultIndex: product.searchResultIndex,
       queryName: product.queryName.trim(),
       quantity: Number(product.quantity),
       productId: product.productId,
@@ -874,9 +958,17 @@ export function DashboardPage() {
       price: product.price.trim() === "" ? null : Number(product.price),
       hsnCode: product.hsnCode.trim() || null,
       gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
+      calibrationCharges: product.calibrationCharges?.trim() ? Number(product.calibrationCharges) : null,
+      deliveryTimeline: product.deliveryTimeline?.trim() || null,
+    }))
+    const regrettedSelections = Object.values(regrettedLines).map((line) => ({
+      searchResultIndex: line.searchResultIndex,
+      queryName: line.queryName,
+      quantity: line.quantity,
+      regretReason: line.regretReason.trim() || null,
     }))
 
-    return { selectedProducts: selections, manualProducts: manualSelections }
+    return { selectedProducts: selections, manualProducts: manualSelections, regrettedLines: regrettedSelections }
   }
 
   const handleSaveDraft = async () => {
@@ -955,7 +1047,10 @@ export function DashboardPage() {
     }
   }
 
-  const hasSelections = Object.keys(selectedProducts).length > 0 || manualProducts.length > 0
+  const hasSelections =
+    Object.values(selectedProducts).some((matches) => matches.length > 0) ||
+    manualProducts.length > 0 ||
+    Object.keys(regrettedLines).length > 0
 
   const renderManualProductPanel = () => (
     <div className="mt-3 flex items-start gap-3 rounded-xl border bg-card p-3">
@@ -1527,10 +1622,12 @@ export function DashboardPage() {
                       <h2 className="text-sm font-semibold">Product Matches</h2>
                     </div>
                     <p className="mb-4 text-[11px] text-muted-foreground">
-                      Select a product for each query to include in the quotation.
+                      Select one or more products per query, or regret an item when it cannot be quoted.
                     </p>
                     <div className="space-y-5">
-                      {detail.searchResults.map((sr, i) => (
+                      {detail.searchResults.map((sr, i) => {
+                        const regrettedLine = regrettedLines[i]
+                        return (
                         <div key={i}>
                           {/* Query header */}
                           <div className="mb-2.5 flex items-center justify-between">
@@ -1543,23 +1640,46 @@ export function DashboardPage() {
                                 Qty: {sr.query.quantity}
                               </span>
                             </div>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <MatchStatusBadge status={sr.status} />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
-                              </TooltipContent>
-                            </Tooltip>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant={regrettedLine ? "destructive" : "ghost"}
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => handleToggleRegretLine(i)}
+                              >
+                                {regrettedLine ? "Remove regret" : "Regret item"}
+                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <MatchStatusBadge status={sr.status} />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {sr.status === "matched" ? "Product found in catalog" : sr.status === "ambiguous" ? "Multiple possible matches" : "No catalog match found"}
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
 
+                          {regrettedLine && (
+                            <div className="mb-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3">
+                              <p className="text-sm font-medium text-destructive">This requested item is regretted</p>
+                              <Input
+                                value={regrettedLine.regretReason}
+                                onChange={(event) => handleRegretReasonChange(i, event.target.value)}
+                                placeholder="Reason"
+                                className="mt-2 h-8 text-xs"
+                              />
+                            </div>
+                          )}
+
                           {/* Product cards */}
-                          {sr.matches.length > 0 ? (
+                          {!regrettedLine && sr.matches.length > 0 ? (
                             <div className="grid gap-2">
                               {sr.matches.map((m, j) => {
-                                const isSelected = selectedProducts[i] === j
+                                const isSelected = selectedProducts[i]?.includes(j) ?? false
                                 const overrideKey = `${i}-${j}`
                                 const override = productOverrides[overrideKey]
                                 const effectivePrice = override?.price != null && override.price !== "" ? Number(override.price) : m.price
@@ -1720,6 +1840,27 @@ export function DashboardPage() {
                                               </span>
                                             )}
                                           </div>
+                                          <div className="flex items-center gap-2 pt-1">
+                                            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Calib.</label>
+                                            <div className="relative">
+                                              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">₹</span>
+                                              <Input
+                                                value={override?.calibrationCharges ?? ""}
+                                                onChange={(e) => handleOverrideChange(overrideKey, "calibrationCharges", e.target.value)}
+                                                placeholder="0"
+                                                type="number"
+                                                min="0"
+                                                className="h-7 w-28 border-muted-foreground/15 bg-transparent pl-5 text-xs"
+                                              />
+                                            </div>
+                                            <label className="ml-1 w-14 shrink-0 text-[10px] text-muted-foreground">Delivery</label>
+                                            <Input
+                                              value={override?.deliveryTimeline ?? ""}
+                                              onChange={(e) => handleOverrideChange(overrideKey, "deliveryTimeline", e.target.value)}
+                                              placeholder="e.g. 2 weeks"
+                                              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+                                            />
+                                          </div>
                                         </div>
                                       </div>
                                     )}
@@ -1727,11 +1868,12 @@ export function DashboardPage() {
                                 )
                               })}
                             </div>
-                          ) : (
+                          ) : !regrettedLine ? (
                             <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-center text-xs text-muted-foreground">
                               No matching products found in the catalog
                             </div>
-                          )}
+                          ) : null}
+                          {!regrettedLine && (
                           <div className="mt-2 flex items-center justify-end">
                             <Button
                               type="button"
@@ -1744,9 +1886,11 @@ export function DashboardPage() {
                               {activeManualProductQueryIndex === i ? "Hide add product" : "Add another product for this request"}
                             </Button>
                           </div>
-                          {activeManualProductQueryIndex === i && renderManualProductPanel()}
+                          )}
+                          {!regrettedLine && activeManualProductQueryIndex === i && renderManualProductPanel()}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
 
                     <div className="mt-5 rounded-xl border border-dashed p-3">
@@ -1770,6 +1914,11 @@ export function DashboardPage() {
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                   {product.source === "catalog" ? "Catalog" : "Custom"}
                                 </span>
+                                {product.searchResultIndex != null && (
+                                  <span className="mr-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                                    For item {product.searchResultIndex + 1}
+                                  </span>
+                                )}
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -1842,6 +1991,22 @@ export function DashboardPage() {
                                   placeholder="GST %"
                                   type="number"
                                   min="0"
+                                />
+                                <Input
+                                  value={product.calibrationCharges ?? ""}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "calibrationCharges", event.target.value)
+                                  }
+                                  placeholder="Calibration charges"
+                                  type="number"
+                                  min="0"
+                                />
+                                <Input
+                                  value={product.deliveryTimeline ?? ""}
+                                  onChange={(event) =>
+                                    handleManualProductChange(product.id, "deliveryTimeline", event.target.value)
+                                  }
+                                  placeholder="Delivery timeline"
                                 />
                               </div>
                             </div>

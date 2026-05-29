@@ -37,6 +37,7 @@ export interface IRFQSearchResult {
 }
 
 export interface IRFQSavedQuoteProduct {
+  searchResultIndex: number | null;
   queryName: string;
   quantity: number;
   productId: number;
@@ -47,6 +48,10 @@ export interface IRFQSavedQuoteProduct {
   hsnCode: string | null;
   gstRate: number | null;
   discountPercent?: number;
+  calibrationCharges: number | null;
+  deliveryTimeline: string | null;
+  lineStatus: "quoted" | "regretted";
+  regretReason: string | null;
 }
 
 export interface IRFQ extends Document {
@@ -109,6 +114,7 @@ const rfqSearchResultSchema = new Schema<IRFQSearchResult>(
 
 const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
   {
+    searchResultIndex: { type: Number, default: null },
     queryName: { type: String, required: true },
     quantity: { type: Number, required: true },
     productId: { type: Number, required: true },
@@ -119,6 +125,14 @@ const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },
     discountPercent: { type: Number, default: 0 },
+    calibrationCharges: { type: Number, default: null },
+    deliveryTimeline: { type: String, default: null },
+    lineStatus: {
+      type: String,
+      enum: ["quoted", "regretted"],
+      default: "quoted",
+    },
+    regretReason: { type: String, default: null },
   },
   { _id: false }
 );
