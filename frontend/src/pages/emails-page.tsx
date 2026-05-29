@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SenderHoverCard } from "@/components/contact-hover-card"
-import { CopyableText } from "@/components/copy-button"
+import { CopyableText, CopyButton } from "@/components/copy-button"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { openDownload } from "@/lib/downloads"
 import { getAvatarColor } from "@/lib/utils"
 import {
@@ -23,6 +24,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
+  ChevronDownIcon,
 } from "lucide-react"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -162,6 +164,135 @@ function parseSender(from: string): { name: string; email: string } {
   const match = from.match(/^"?(.+?)"?\s*<(.+)>$/)
   if (match) return { name: match[1].trim(), email: match[2] }
   return { name: from, email: from }
+}
+
+function parseRecipients(raw: string | null): { name: string; email: string }[] {
+  if (!raw) return []
+  const parts: string[] = []
+  let buf = ""
+  let depth = 0
+  for (const ch of raw) {
+    if (ch === "<") depth++
+    else if (ch === ">") depth = Math.max(0, depth - 1)
+    if (ch === "," && depth === 0) {
+      parts.push(buf)
+      buf = ""
+    } else {
+      buf += ch
+    }
+  }
+  if (buf) parts.push(buf)
+  return parts.map((p) => p.trim()).filter(Boolean).map(parseSender)
+}
+
+function RecipientList({
+  recipients,
+}: {
+  recipients: { name: string; email: string }[]
+}) {
+  return (
+    <div className="max-h-56 space-y-0.5 overflow-y-auto pr-1">
+      {recipients.map((r, i) => {
+        const colors = getAvatarColor(r.name)
+        return (
+          <div
+            key={`${r.email}-${i}`}
+            className="group/row flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-muted/50"
+          >
+            <SenderHoverCard name={r.name} email={r.email} side="left">
+              <div
+                className={`flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-[11px] font-semibold ${colors.bg} ${colors.text}`}
+              >
+                {r.name.charAt(0).toUpperCase()}
+              </div>
+            </SenderHoverCard>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-medium leading-tight">{r.name}</p>
+              {r.email !== r.name && (
+                <p className="truncate text-[11px] leading-tight text-muted-foreground/60">
+                  {r.email}
+                </p>
+              )}
+            </div>
+            <CopyButton value={r.email} label="Email copied" className="shrink-0" />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function RecipientSection({
+  label,
+  raw,
+}: {
+  label: string
+  raw: string
+}) {
+  const recipients = parseRecipients(raw)
+  if (recipients.length === 0) return null
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="font-heading text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            {label}
+          </span>
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+            {recipients.length}
+          </span>
+        </div>
+        <CopyButton value={raw} label={`${label} copied`} className="opacity-100" />
+      </div>
+      <RecipientList recipients={recipients} />
+    </div>
+  )
+}
+
+function RecipientsBar({ to, cc }: { to: string; cc: string | null }) {
+  const toRecipients = parseRecipients(to)
+  const ccRecipients = parseRecipients(cc)
+  const total = toRecipients.length + ccRecipients.length
+
+  const preview = toRecipients
+    .slice(0, 2)
+    .map((r) => r.name)
+    .join(", ")
+  const extraTo = Math.max(0, toRecipients.length - 2)
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="group/recipients flex w-full items-center gap-2 rounded-md py-1 text-left text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground"
+        >
+          <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+            To
+          </span>
+          <span className="min-w-0 flex-1 truncate">
+            {preview}
+            {extraTo > 0 && <span className="text-muted-foreground/50"> +{extraTo}</span>}
+            {ccRecipients.length > 0 && (
+              <span className="text-muted-foreground/50">
+                {"  ·  "}
+                <span className="font-heading font-bold uppercase tracking-widest">Cc</span>{" "}
+                {ccRecipients.length}
+              </span>
+            )}
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/50 group-hover/recipients:text-muted-foreground">
+            {total} {total === 1 ? "recipient" : "recipients"}
+            <ChevronDownIcon className="size-3.5 transition-transform group-data-[state=open]/recipients:rotate-180" />
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[clamp(20rem,32vw,26rem)] space-y-4">
+        <RecipientSection label="To" raw={to} />
+        {cc && <RecipientSection label="Cc" raw={cc} />}
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 function formatDate(iso: string): string {
@@ -741,22 +872,7 @@ export function EmailsPage() {
                     </Tooltip>
                   </div>
 
-                  <div className="flex max-h-24 flex-wrap gap-x-4 gap-y-1 overflow-y-auto text-[11px] text-muted-foreground/60">
-                    <span className="min-w-0 break-words">
-                      <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">To</span>{" "}
-                      <CopyableText value={detail.to} label="Recipient copied" className="flex-wrap [overflow-wrap:anywhere]">
-                        {detail.to}
-                      </CopyableText>
-                    </span>
-                    {detail.cc && (
-                      <span className="min-w-0 break-words">
-                        <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cc</span>{" "}
-                        <CopyableText value={detail.cc} label="CC copied" className="flex-wrap [overflow-wrap:anywhere]">
-                          {detail.cc}
-                        </CopyableText>
-                      </span>
-                    )}
-                  </div>
+                  <RecipientsBar to={detail.to} cc={detail.cc} />
 
                   {detail.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-2">
