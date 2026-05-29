@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   FileTextIcon,
   RefreshCwIcon,
@@ -33,6 +41,7 @@ import {
   Trash2Icon,
   DownloadIcon,
   ArchiveIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -255,6 +264,8 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
 }
 
 type ProcessingStatus = "analyzing" | "ready" | "draft" | "processed" | "failed"
+type RFQStatusFilter = "all" | ProcessingStatus
+type RFQSortOption = "created_desc" | "created_asc" | "updated_desc" | "updated_asc"
 
 const statusConfig: Record<
   ProcessingStatus,
@@ -411,6 +422,10 @@ export function DashboardPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<RFQStatusFilter>("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [sortOption, setSortOption] = useState<RFQSortOption>("created_desc")
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<RFQSummary | null>(null)
@@ -448,11 +463,29 @@ export function DashboardPage() {
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archivingRfq, setArchivingRfq] = useState(false)
 
+  const hasActiveFilters =
+    statusFilter !== "all" ||
+    dateFrom.trim() !== "" ||
+    dateTo.trim() !== "" ||
+    sortOption !== "created_desc"
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) +
+    (dateFrom.trim() !== "" || dateTo.trim() !== "" ? 1 : 0) +
+    (sortOption !== "created_desc" ? 1 : 0)
+
   const fetchList = useCallback(async (p: number) => {
     setListLoading(true)
     setListError(null)
     try {
-      const res = await fetch(`${API_BASE}?page=${p}&limit=20`, {
+      const params = new URLSearchParams({
+        page: String(p),
+        limit: "20",
+        status: statusFilter,
+        sort: sortOption,
+      })
+      if (dateFrom) params.set("dateFrom", dateFrom)
+      if (dateTo) params.set("dateTo", dateTo)
+      const res = await fetch(`${API_BASE}?${params.toString()}`, {
         credentials: "include",
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -468,7 +501,7 @@ export function DashboardPage() {
     } finally {
       setListLoading(false)
     }
-  }, [])
+  }, [dateFrom, dateTo, sortOption, statusFilter])
 
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
@@ -487,6 +520,13 @@ export function DashboardPage() {
   useEffect(() => {
     fetchList(1)
   }, [fetchList])
+
+  const clearFilters = () => {
+    setStatusFilter("all")
+    setDateFrom("")
+    setDateTo("")
+    setSortOption("created_desc")
+  }
 
   const fetchReply = useCallback(async (id: string) => {
     try {
@@ -1077,20 +1117,112 @@ export function DashboardPage() {
                   </span>
                 )}
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                  >
-                    <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Refresh (R)</TooltipContent>
-              </Tooltip>
+              <div className="flex items-center gap-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={hasActiveFilters ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-8 gap-1.5 px-2 text-xs"
+                    >
+                      <SlidersHorizontalIcon className="size-4" />
+                      Filter
+                      {activeFilterCount > 0 && (
+                        <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 space-y-3 p-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Filters
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Refine RFQs by workflow status, date, and sort order.
+                      </p>
+                    </div>
+                    <div className="grid gap-2">
+                      <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as RFQStatusFilter)}>
+                        <SelectTrigger size="sm" className="w-full text-xs">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All statuses</SelectItem>
+                          <SelectItem value="analyzing">Analyzing</SelectItem>
+                          <SelectItem value="ready">Ready</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="processed">Processed</SelectItem>
+                          <SelectItem value="failed">Failed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={sortOption} onValueChange={(value) => setSortOption(value as RFQSortOption)}>
+                        <SelectTrigger size="sm" className="w-full text-xs">
+                          <SelectValue placeholder="Sort" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="created_desc">Newest created</SelectItem>
+                          <SelectItem value="created_asc">Oldest created</SelectItem>
+                          <SelectItem value="updated_desc">Recently updated</SelectItem>
+                          <SelectItem value="updated_asc">Oldest updated</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                          From
+                        </label>
+                        <Input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(event) => setDateFrom(event.target.value)}
+                          className="h-8 text-xs"
+                          aria-label="RFQ date from"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                          To
+                        </label>
+                        <Input
+                          type="date"
+                          value={dateTo}
+                          onChange={(event) => setDateTo(event.target.value)}
+                          className="h-8 text-xs"
+                          aria-label="RFQ date to"
+                        />
+                      </div>
+                    </div>
+                    {hasActiveFilters && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-full text-xs text-muted-foreground"
+                        onClick={clearFilters}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </PopoverContent>
+                </Popover>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                    >
+                      <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh (R)</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">

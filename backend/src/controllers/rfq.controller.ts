@@ -150,6 +150,29 @@ function resolveSelectedProducts(
   return [...selectedProducts, ...manualProducts.map(resolveManualProduct)];
 }
 
+const rfqListStatuses = new Set(["all", "analyzing", "ready", "draft", "processed", "failed"]);
+const rfqListSorts = new Set(["created_desc", "created_asc", "updated_desc", "updated_asc"]);
+
+function parseRFQListStatus(value: unknown): string {
+  const status = typeof value === "string" ? value : "all";
+  return rfqListStatuses.has(status) ? status : "all";
+}
+
+function parseRFQListSort(value: unknown): string {
+  const sort = typeof value === "string" ? value : "created_desc";
+  return rfqListSorts.has(sort) ? sort : "created_desc";
+}
+
+function parseDateParam(value: unknown, endOfDay = false): Date | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    date.setHours(23, 59, 59, 999);
+  }
+  return date;
+}
+
 export const listRFQs = async (
   req: Request,
   res: Response
@@ -160,12 +183,48 @@ export const listRFQs = async (
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
+    const status = parseRFQListStatus(req.query.status);
+    const sort = parseRFQListSort(req.query.sort);
+    const dateFrom = parseDateParam(req.query.dateFrom);
+    const dateTo = parseDateParam(req.query.dateTo, true);
 
-    const listFilter = { userId: authReq.user.id, organizationId: organization._id, isRFQ: true, isArchived: { $ne: true } };
+    const listFilter: Record<string, any> = {
+      userId: authReq.user.id,
+      organizationId: organization._id,
+      isRFQ: true,
+      isArchived: { $ne: true },
+    };
+    if (dateFrom || dateTo) {
+      listFilter.createdAt = {};
+      if (dateFrom) listFilter.createdAt.$gte = dateFrom;
+      if (dateTo) listFilter.createdAt.$lte = dateTo;
+    }
+    if (status === "analyzing") {
+      listFilter.isProcessed = false;
+      listFilter.errorMessage = null;
+    } else if (status === "failed") {
+      listFilter.errorMessage = { $ne: null };
+    } else if (status === "ready") {
+      listFilter.isProcessed = true;
+      listFilter.errorMessage = null;
+      listFilter.$or = [
+        { workflowStatus: { $exists: false } },
+        { workflowStatus: "new" },
+      ];
+    } else if (status === "draft" || status === "processed") {
+      listFilter.workflowStatus = status;
+    }
+
+    const sortOptions: Record<string, Record<string, 1 | -1>> = {
+      created_desc: { createdAt: -1 },
+      created_asc: { createdAt: 1 },
+      updated_desc: { updatedAt: -1 },
+      updated_asc: { updatedAt: 1 },
+    };
     const [rfqs, total] = await Promise.all([
       RFQ.find(listFilter)
         .populate("emailId", "subject from date snippet status")
-        .sort({ createdAt: -1 })
+        .sort(sortOptions[sort])
         .skip(skip)
         .limit(limit)
         .lean(),
