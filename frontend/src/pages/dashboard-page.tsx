@@ -1052,12 +1052,38 @@ export function DashboardPage() {
     manualProducts.length > 0 ||
     Object.keys(regrettedLines).length > 0
 
-  const renderManualProductPanel = () => (
-    <div className="mt-3 flex items-start gap-3 rounded-xl border bg-card p-3">
-      <div className="min-w-0 flex-1 rounded-lg border bg-card p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Search catalog
-        </p>
+  const renderManualProductPopover = (searchResultIndex: number, query: RFQSearchResult["query"]) => (
+    <Popover
+      open={activeManualProductQueryIndex === searchResultIndex}
+      onOpenChange={(open) => {
+        if (open) {
+          handleToggleManualProductPanel(searchResultIndex)
+        } else {
+          setActiveManualProductQueryIndex(null)
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          <PlusIcon className="size-3" />
+          Add product
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[420px] space-y-3 p-3">
+        <div>
+          <p className="truncate text-sm font-semibold">{query.name}</p>
+          <p className="text-[11px] text-muted-foreground">Qty: {query.quantity}</p>
+        </div>
+
+        <div className="rounded-lg border bg-muted/20 p-2.5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Search catalog
+          </p>
         <div className="flex gap-2">
           <Input
             value={productSearch}
@@ -1069,10 +1095,12 @@ export function DashboardPage() {
               }
             }}
             placeholder="Search product code, brand, HSN..."
+            className="h-8 text-xs"
           />
           <Button
             type="button"
             variant="secondary"
+            size="sm"
             onClick={handleSearchProducts}
             disabled={productSearchLoading}
           >
@@ -1084,11 +1112,11 @@ export function DashboardPage() {
           <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
         )}
         {productResults.length > 0 && (
-          <div className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+          <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
             {productResults.map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border bg-card px-2.5 py-2"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
@@ -1111,7 +1139,10 @@ export function DashboardPage() {
                   variant="ghost"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => handleAddCatalogProduct(product)}
+                  onClick={() => {
+                    handleAddCatalogProduct(product)
+                    setActiveManualProductQueryIndex(null)
+                  }}
                 >
                   Add
                 </Button>
@@ -1121,11 +1152,11 @@ export function DashboardPage() {
         )}
       </div>
 
-      <div className="w-52 shrink-0 rounded-lg border bg-card p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="rounded-lg border bg-muted/20 p-2.5">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Custom line
         </p>
-        <div className="grid gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           <Input
             value={customProduct.queryName}
             onChange={(event) => handleCustomProductChange("queryName", event.target.value)}
@@ -1144,7 +1175,7 @@ export function DashboardPage() {
             value={customProduct.description}
             onChange={(event) => handleCustomProductChange("description", event.target.value)}
             placeholder="Description"
-            className="h-8 text-xs"
+            className="col-span-2 h-8 text-xs"
           />
           <Input
             value={customProduct.code}
@@ -1186,13 +1217,17 @@ export function DashboardPage() {
           variant="secondary"
           size="sm"
           className="mt-2 w-full gap-1.5 text-xs"
-          onClick={handleAddCustomProduct}
+          onClick={() => {
+            handleAddCustomProduct()
+            setActiveManualProductQueryIndex(null)
+          }}
         >
           <PlusIcon className="size-3.5" />
           Add custom line
         </Button>
       </div>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 
   return (
@@ -1874,41 +1909,72 @@ export function DashboardPage() {
                             </div>
                           ) : null}
                           {!regrettedLine && (
-                          <div className="mt-2 flex items-center justify-end">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                              onClick={() => handleToggleManualProductPanel(i)}
-                            >
-                              <PlusIcon className="size-3" />
-                              {activeManualProductQueryIndex === i ? "Hide add product" : "Add another product for this request"}
-                            </Button>
-                          </div>
+                            <div className="mt-2 flex items-center justify-end">
+                              {renderManualProductPopover(i, sr.query)}
+                            </div>
                           )}
-                          {!regrettedLine && activeManualProductQueryIndex === i && renderManualProductPanel()}
+                          {!regrettedLine && manualProducts.some((product) => product.searchResultIndex === i) && (
+                            <div className="mt-3 space-y-2 rounded-xl border border-dashed bg-muted/10 p-3">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                Added for this item
+                              </p>
+                              {manualProducts
+                                .filter((product) => product.searchResultIndex === i)
+                                .map((product) => (
+                                  <div key={product.id} className="flex items-start justify-between gap-3 rounded-lg border bg-card p-3">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                          {product.source === "catalog" ? "Catalog" : "Custom"}
+                                        </span>
+                                        <p className="truncate text-sm font-semibold">
+                                          {product.description || product.queryName}
+                                        </p>
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                                        <span>Qty: {product.quantity}</span>
+                                        {product.brand && <span>· {product.brand}</span>}
+                                        {product.code && <span>· <span className="font-mono">{product.code}</span></span>}
+                                        {product.price && <span>· ₹{Number(product.price).toLocaleString("en-IN")}</span>}
+                                        {product.calibrationCharges && <span>· Calibration: ₹{Number(product.calibrationCharges).toLocaleString("en-IN")}</span>}
+                                        {product.deliveryTimeline && <span>· Delivery: {product.deliveryTimeline}</span>}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-7 shrink-0 text-muted-foreground"
+                                      onClick={() => handleRemoveManualProduct(product.id)}
+                                    >
+                                      <Trash2Icon className="size-3.5" />
+                                    </Button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
                         </div>
                         )
                       })}
                     </div>
 
+                    {manualProducts.some((product) => product.searchResultIndex == null) && (
                     <div className="mt-5 rounded-xl border border-dashed p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium">Added products</p>
+                          <p className="text-sm font-medium">Unassigned added products</p>
                           <p className="text-[11px] text-muted-foreground">
-                            Extra catalog or custom quote lines added from product rows.
+                            Legacy or unassigned quote lines not linked to a requested item.
                           </p>
                         </div>
                       </div>
 
-                      {manualProducts.length > 0 && (
+                      {manualProducts.some((product) => product.searchResultIndex == null) && (
                         <div className="mt-4 space-y-2">
                           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Added products
+                            Unassigned products
                           </p>
-                          {manualProducts.map((product) => (
+                          {manualProducts.filter((product) => product.searchResultIndex == null).map((product) => (
                             <div key={product.id} className="rounded-lg border p-3">
                               <div className="mb-2 flex items-center justify-between gap-3">
                                 <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2014,6 +2080,7 @@ export function DashboardPage() {
                         </div>
                       )}
                     </div>
+                    )}
 
                     {/* Generate Quote Button */}
                     <div className="mt-5 flex items-center gap-3">
