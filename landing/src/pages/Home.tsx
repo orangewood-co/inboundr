@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react"
 import { AuroraBackground } from "@/components/AuroraBackground"
 import { FadeIn } from "@/components/FadeIn"
 import { CtaSection } from "@/components/CtaSection"
+import { Faq } from "@/components/Faq"
 
 const features = [
   { num: "01", text: "AI reads inbound leads" },
@@ -12,6 +13,25 @@ const features = [
   { num: "04", text: "AI follows up" },
   { num: "05", text: "AI calls leads" },
   { num: "06", text: "AI chats on website & WhatsApp" },
+]
+
+const faqs = [
+  {
+    q: "How does Inboundr connect to my inbox, website, and WhatsApp?",
+    a: "Inboundr plugs in through standard integrations — connect your email inbox, drop a snippet on your website, and link your WhatsApp Business number. No engineering work required; most teams are connected in a few clicks.",
+  },
+  {
+    q: "How accurate are the AI-generated quotes?",
+    a: "Quotes are generated from your own catalog, pricing rules, and past deals, so they come back ready to send. You can keep a human in the loop to approve before anything goes out until you're confident.",
+  },
+  {
+    q: "Is my data secure?",
+    a: "Your data is encrypted in transit and at rest, and it's never used to train shared models. Access is scoped to your workspace, and you stay in full control of what Inboundr can read and send.",
+  },
+  {
+    q: "How long does setup take?",
+    a: "Most teams are live the same day. Connect your channels, point Inboundr at your catalog, and it starts reading and replying to inbound right away — no long onboarding or migration.",
+  },
 ]
 
 const testimonials = [
@@ -219,6 +239,21 @@ export default function Home() {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="border-t border-border px-6 py-24 sm:py-36 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <FadeIn>
+            <p className="label mb-4 text-text-muted">Questions</p>
+            <h2 className="mb-12 text-3xl font-bold tracking-[-0.02em] sm:text-4xl">
+              Frequently asked.
+            </h2>
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <Faq items={faqs} />
+          </FadeIn>
         </div>
       </section>
 
