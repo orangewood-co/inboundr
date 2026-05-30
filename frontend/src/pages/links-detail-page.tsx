@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "@tanstack/react-router"
 import {
   Area,
@@ -17,6 +17,7 @@ import {
   LinkIcon,
   LoaderIcon,
   LockIcon,
+  MailIcon,
   MapPinIcon,
   Maximize2Icon,
   ShareIcon,
@@ -48,7 +49,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Table,
   TableBody,
@@ -186,6 +190,9 @@ export default function LinksDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [emailRecipient, setEmailRecipient] = useState("")
+  const [emailSending, setEmailSending] = useState(false)
 
   const fetchLink = useCallback(async () => {
     setLoading(true)
@@ -313,6 +320,29 @@ export default function LinksDetailPage() {
     await fetch(`${API_BASE}/${link._id}`, { method: "DELETE", credentials: "include" })
     toast.success("Link archived")
     window.history.back()
+  }
+
+  async function sendLinkEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!link) return
+    setEmailSending(true)
+    try {
+      const response = await fetch(`${API_BASE}/${link._id}/send`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: emailRecipient.trim() }),
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to send email")
+      toast.success("Link email sent")
+      setEmailOpen(false)
+      setEmailRecipient("")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send email")
+    } finally {
+      setEmailSending(false)
+    }
   }
 
   async function downloadQrCode() {
@@ -493,6 +523,10 @@ export default function LinksDetailPage() {
                       <DropdownMenuItem onClick={() => void copyLink()}>
                         <CopyIcon className="size-4" />
                         <span>Copy short link</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setEmailOpen(true)}>
+                        <MailIcon className="size-4" />
+                        <span>Email link</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => window.open(link.destinationUrl, "_blank")}>
                         <ExternalLinkIcon className="size-4" />
@@ -749,6 +783,43 @@ export default function LinksDetailPage() {
                     Download PNG
                   </Button>
                 </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Email link</DialogTitle>
+                  <DialogDescription>
+                    Send this tracked short link to one recipient.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={(event) => void sendLinkEmail(event)} className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="emailRecipient">Recipient email</Label>
+                    <Input
+                      id="emailRecipient"
+                      type="email"
+                      required
+                      value={emailRecipient}
+                      onChange={(event) => setEmailRecipient(event.target.value)}
+                      placeholder="customer@example.com"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEmailOpen(false)}
+                      disabled={emailSending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={emailSending}>
+                      {emailSending && <Spinner data-icon="inline-start" />}
+                      Send email
+                    </Button>
+                  </div>
+                </form>
               </DialogContent>
             </Dialog>
           </div>

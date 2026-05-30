@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
+import { createElement } from "react";
 import mongoose from "mongoose";
+import { LinkShareEmail } from "../emails/link-share";
+import { sendEmail } from "../lib/email";
 import { ShortLink, type ShortLinkStatus, type ShortLinkTrackingMode } from "../models/short-link.model";
 import { ShortLinkEvent } from "../models/short-link-event.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
@@ -17,11 +20,33 @@ import {
 
 const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
 
+function apiOrigin(): string {
+  return process.env.API_ORIGIN ?? process.env.PUBLIC_API_ORIGIN ?? process.env.BACKEND_ORIGIN ?? "http://localhost:3000";
+}
+
 function embedLinkUrl(code: string, sourceValue: unknown): string {
   const url = new URL(`/l/${encodeURIComponent(code)}`, embedOrigin);
   const source = normalizeLinkEventSource(sourceValue);
   if (source) url.searchParams.set("source", source);
   return url.toString();
+}
+
+function trackedShortUrl(code: string, source: string): string {
+  const url = new URL(`/l/${encodeURIComponent(code)}`, apiOrigin());
+  url.searchParams.set("source", source);
+  return url.toString();
+}
+
+function stringValue(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function destinationHost(destinationUrl: string): string | null {
+  try {
+    return new URL(destinationUrl).hostname;
+  } catch {
+    return null;
+  }
 }
 
 function parseNullableDate(value: unknown): Date | null {
@@ -235,6 +260,51 @@ export async function listLinkEvents(req: Request, res: Response): Promise<void>
   } catch (err) {
     console.error("Error listing link events:", err);
     res.status(500).json({ error: "Failed to fetch link events" });
+  }
+}
+
+export async function sendLinkEmail(req: Request, res: Response): Promise<void> {
+  try {
+    const id = String(req.params.id ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid link id" });
+      return;
+    }
+
+    const to = stringValue(req.body?.to).toLowerCase();
+    if (!to || !to.includes("@")) {
+      res.status(400).json({ error: "A valid recipient email is required" });
+      return;
+    }
+
+    const { organization, user } = req as OrganizationRequest;
+    const link = await ShortLink.findOne({ _id: id, organizationId: organization._id }).lean();
+    if (!link || link.status === "archived") {
+      res.status(404).json({ error: "Link not found" });
+      return;
+    }
+
+    const shortUrl = trackedShortUrl(link.code, "email");
+    const title = link.title || destinationHost(link.destinationUrl) || "a link";
+    await sendEmail({
+      to,
+      subject: `${user.name || organization.name} shared ${title} with you`,
+      react: createElement(LinkShareEmail, {
+        organizationName: organization.name,
+        senderName: user.name,
+        linkTitle: link.title,
+        destinationHost: destinationHost(link.destinationUrl),
+        shortUrl,
+        hasPassword: Boolean(link.passwordHash),
+        requiresPreciseLocation: link.trackingMode === "precise_location",
+      }),
+      replyTo: user.email ? [user.email] : undefined,
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error sending link email:", err);
+    res.status(500).json({ error: "Failed to send link email" });
   }
 }
 

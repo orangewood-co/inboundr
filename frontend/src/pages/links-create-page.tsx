@@ -25,6 +25,10 @@ const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/links`
 const SHORT_DOMAIN = `${API_ORIGIN.replace(/^https?:\/\//, "")}/l`
 
+type CreatedLink = {
+  _id: string
+}
+
 function generateCode() {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
   let code = ""
@@ -51,6 +55,8 @@ export default function LinksCreatePage() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [sendEmail, setSendEmail] = useState(false)
+  const [recipientEmail, setRecipientEmail] = useState("")
 
   function set<K extends keyof ReturnType<typeof emptyForm>>(key: K, value: string) {
     setForm((cur) => ({ ...cur, [key]: value }))
@@ -60,6 +66,10 @@ export default function LinksCreatePage() {
     e.preventDefault()
     if (form.expiresAt && new Date(form.expiresAt).getTime() <= Date.now()) {
       toast.error("Expiry must be in the future")
+      return
+    }
+    if (sendEmail && !recipientEmail.trim()) {
+      toast.error("Recipient email is required")
       return
     }
     setSaving(true)
@@ -76,8 +86,25 @@ export default function LinksCreatePage() {
       })
       const body = await response.json().catch(() => null)
       if (!response.ok) throw new Error(body?.error ?? "Failed to create link")
-      toast.success("Short link created")
-      void navigate({ to: "/links" })
+      const created = body as CreatedLink
+      if (sendEmail) {
+        const sendResponse = await fetch(`${API_BASE}/${created._id}/send`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: recipientEmail.trim() }),
+        })
+        const sendBody = await sendResponse.json().catch(() => null)
+        if (!sendResponse.ok) {
+          toast.warning(sendBody?.error ?? "Link created, but email could not be sent")
+          void navigate({ to: "/links/$id", params: { id: created._id } })
+          return
+        }
+        toast.success("Short link created and emailed")
+      } else {
+        toast.success("Short link created")
+      }
+      void navigate({ to: "/links/$id", params: { id: created._id } })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create link")
     } finally {
@@ -255,17 +282,35 @@ export default function LinksCreatePage() {
               </div>
               <Separator />
               <div className="grid gap-0 divide-y">
-                <div className="flex items-center justify-between px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
-                      <MailIcon className="size-4 text-muted-foreground" />
+                <div className="grid gap-4 px-6 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
+                        <MailIcon className="size-4 text-muted-foreground" />
+                      </div>
+                      <div className="grid gap-0.5">
+                        <span className="text-sm font-medium">Send link via email</span>
+                        <span className="text-xs text-muted-foreground">
+                          Email the tracked short link after it is created.
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium">Send link via email</span>
+                    <Switch checked={sendEmail} onCheckedChange={setSendEmail} />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Coming soon</span>
-                    <Switch disabled />
-                  </div>
+                  {sendEmail && (
+                    <div className="grid gap-2 pl-12">
+                      <Label htmlFor="recipientEmail">Recipient email</Label>
+                      <Input
+                        id="recipientEmail"
+                        type="email"
+                        required={sendEmail}
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        placeholder="customer@example.com"
+                        className="h-11"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import {
   getLink,
   listLinkEvents,
   listLinks,
+  sendLinkEmail,
   updateLink,
 } from "../controllers/links.controller";
 import {
