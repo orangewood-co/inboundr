@@ -1,6 +1,5 @@
 // Main Agent for RFQ Generation
 
-import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-search";
 
