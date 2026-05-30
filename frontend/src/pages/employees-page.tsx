@@ -7,8 +7,6 @@ import {
   FileTextIcon,
   IdCardIcon,
   LinkIcon,
-  MailIcon,
-  PhoneIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -379,16 +377,14 @@ function EmployeeForm({
 
 function DirectorySkeleton() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 9 }).map((_, index) => (
-        <div key={index} className="rounded-3xl border bg-card p-5">
-          <div className="flex gap-4">
-            <Skeleton className="size-16 rounded-2xl" />
-            <div className="flex-1 space-y-3">
-              <Skeleton className="h-5 w-36" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-44" />
-            </div>
+    <div className="grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="flex min-h-56 flex-col items-center justify-center rounded-sm border bg-card p-6">
+          <Skeleton className="size-28 rounded-full" />
+          <div className="mt-6 flex w-full flex-col items-center gap-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-20" />
           </div>
         </div>
       ))}
@@ -661,9 +657,6 @@ export default function EmployeesPage() {
     }
   }
 
-  const activeCount = employees.filter((employee) => employee.status === "active").length
-  const accessCount = employees.filter((employee) => employee.platformAccess.enabled).length
-
   return (
     <AppLayout>
       <SiteHeader
@@ -681,123 +674,80 @@ export default function EmployeesPage() {
           </>
         }
       />
-      <main className="flex-1 overflow-auto bg-[radial-gradient(circle_at_top_left,var(--muted),transparent_34rem)] p-4 md:p-6">
-        <section className="mb-6 overflow-hidden rounded-[2rem] border bg-card">
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.4fr_.9fr]">
-            <div>
-              <Badge variant="outline" className="mb-4 border-primary/30 bg-primary/10 text-primary">
-                Employee command center
-              </Badge>
-              <h1 className="max-w-3xl text-3xl font-semibold tracking-tight md:text-5xl">
-                People, access, and HR documents in one place.
-              </h1>
-              <p className="mt-4 max-w-2xl text-muted-foreground">
-                Keep the directory visual, link employees to Inboundr members only when they need access,
-                and generate identity cards or proof-of-employment letters from the same profile.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              <div className="rounded-3xl border bg-background/70 p-4">
-                <div className="text-3xl font-semibold">{employees.length}</div>
-                <div className="text-sm text-muted-foreground">Visible employees</div>
-              </div>
-              <div className="rounded-3xl border bg-background/70 p-4">
-                <div className="text-3xl font-semibold">{activeCount}</div>
-                <div className="text-sm text-muted-foreground">Active records</div>
-              </div>
-              <div className="rounded-3xl border bg-background/70 p-4">
-                <div className="text-3xl font-semibold">{accessCount}</div>
-                <div className="text-sm text-muted-foreground">Platform access enabled</div>
-              </div>
-            </div>
+      <main className="flex-1 overflow-auto bg-muted/20 p-5 md:p-8">
+        <section className="mx-auto mb-8 flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-sm font-semibold tracking-tight">
+            {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
           </div>
-        </section>
-
-        <section className="mb-5 flex flex-col gap-3 rounded-3xl border bg-card p-4 md:flex-row md:items-center">
-          <div className="relative flex-1">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="relative md:w-72">
             <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-9"
-              placeholder="Search by name, email, phone, title, or employee ID"
+              className="h-9 rounded-full border-transparent bg-background pl-9 shadow-none"
+              placeholder="Search employees"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9 w-full border-transparent bg-transparent shadow-none md:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                {Object.entries(statusLabels).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="h-9 w-full border-transparent bg-transparent shadow-none md:w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All teams</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" onClick={() => void fetchEmployees()}>
+              <RefreshCwIcon />
+            </Button>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-full md:w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All teams</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" onClick={() => void fetchEmployees()}>
-            <RefreshCwIcon />
-          </Button>
         </section>
 
         {loading ? (
           <DirectorySkeleton />
         ) : employees.length === 0 ? (
-          <div className="rounded-3xl border bg-card p-12 text-center">
+          <div className="mx-auto max-w-7xl rounded-sm border bg-card p-12 text-center">
             <IdCardIcon className="mx-auto mb-3 size-10 text-muted-foreground" />
             <h2 className="text-lg font-semibold">No employees found</h2>
             <p className="mt-1 text-sm text-muted-foreground">Add the first profile or adjust your filters.</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {employees.map((employee) => (
               <button
                 key={employee._id}
                 type="button"
                 onClick={() => openEmployee(employee)}
-                className="group overflow-hidden rounded-3xl border bg-card text-left shadow-xs transition hover:-translate-y-0.5 hover:shadow-lg"
+                className="relative flex min-h-56 flex-col items-center justify-center rounded-sm border bg-card p-6 text-center shadow-xs"
               >
-                <div className="h-2 bg-gradient-to-r from-primary via-primary/50 to-transparent" />
-                <div className="p-5">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="size-18 rounded-2xl" size="lg">
-                      <AvatarImage src={employee.profileImageUrl ?? undefined} />
-                      <AvatarFallback className="rounded-2xl text-lg font-semibold">{initials(employee.fullName)}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h2 className="truncate text-lg font-semibold">{employee.fullName}</h2>
-                          <p className="truncate text-sm text-muted-foreground">{employee.title || "No title"}</p>
-                        </div>
-                        <Badge variant={employee.status === "active" ? "default" : "outline"}>
-                          {statusLabels[employee.status]}
-                        </Badge>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Badge variant="secondary">{employee.team?.name ?? "No team"}</Badge>
-                        {employee.platformAccess.enabled ? (
-                          <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">Access on</Badge>
-                        ) : (
-                          <Badge variant="outline">No access</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-2"><MailIcon className="size-4" />{employee.email}</span>
-                    <span className="flex items-center gap-2"><PhoneIcon className="size-4" />{employee.phone || "No phone"}</span>
-                  </div>
+                <span
+                  className={cn(
+                    "absolute top-4 right-4 size-2 rounded-full",
+                    employee.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"
+                  )}
+                />
+                <Avatar className="size-28 rounded-full" size="lg">
+                  <AvatarImage src={employee.profileImageUrl ?? undefined} />
+                  <AvatarFallback className="rounded-full text-4xl font-semibold">{initials(employee.fullName)}</AvatarFallback>
+                </Avatar>
+                <div className="mt-6 min-w-0">
+                  <h2 className="truncate text-base font-semibold">{employee.fullName}</h2>
+                  <p className="mt-1 truncate text-sm text-foreground/80">{employee.title || "No title"}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">{employee.team?.name ?? "No team"}</p>
                 </div>
               </button>
             ))}
