@@ -109,19 +109,15 @@ export default function Home() {
             transition={{ duration: 0.7, delay: 0.55 }}
           >
             <motion.a
-              href="mailto:hello@inboundr.ai?subject=Try Inboundr"
+              href="https://calendly.com/tushgaurav/15min"
+              target="_blank"
+              rel="noopener noreferrer"
               className="bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              Start free
+              Book a Demo
             </motion.a>
-            <a
-              href="mailto:hello@inboundr.ai?subject=Contact Sales"
-              className="px-7 py-3.5 text-sm font-medium text-text-muted transition hover:text-text"
-            >
-              Book a demo →
-            </a>
           </motion.div>
         </div>
       </AuroraBackground>
