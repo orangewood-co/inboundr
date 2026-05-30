@@ -24,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -32,15 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
 import { cn } from "@/lib/utils"
@@ -88,42 +78,6 @@ interface Employee {
   updatedAt: string
 }
 
-type EmployeeFormState = {
-  fullName: string
-  email: string
-  phone: string
-  title: string
-  employeeCode: string
-  profileImageUrl: string
-  teamId: string
-  status: EmployeeStatus
-  startDate: string
-  emergencyName: string
-  emergencyRelationship: string
-  emergencyPhone: string
-  emergencyEmail: string
-  accessEnabled: boolean
-  allowedModules: EmployeeAccessModule[]
-}
-
-const emptyEmployeeForm: EmployeeFormState = {
-  fullName: "",
-  email: "",
-  phone: "",
-  title: "",
-  employeeCode: "",
-  profileImageUrl: "",
-  teamId: "none",
-  status: "active",
-  startDate: "",
-  emergencyName: "",
-  emergencyRelationship: "",
-  emergencyPhone: "",
-  emergencyEmail: "",
-  accessEnabled: false,
-  allowedModules: [],
-}
-
 const statusLabels: Record<EmployeeStatus, string> = {
   active: "Active",
   inactive: "Inactive",
@@ -138,51 +92,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "IN"
-}
-
-function employeeToForm(employee: Employee): EmployeeFormState {
-  return {
-    fullName: employee.fullName ?? "",
-    email: employee.email ?? "",
-    phone: employee.phone ?? "",
-    title: employee.title ?? "",
-    employeeCode: employee.employeeCode ?? "",
-    profileImageUrl: employee.profileImageUrl ?? "",
-    teamId: employee.teamId ?? "none",
-    status: employee.status ?? "active",
-    startDate: employee.startDate ? employee.startDate.slice(0, 10) : "",
-    emergencyName: employee.emergencyContact?.name ?? "",
-    emergencyRelationship: employee.emergencyContact?.relationship ?? "",
-    emergencyPhone: employee.emergencyContact?.phone ?? "",
-    emergencyEmail: employee.emergencyContact?.email ?? "",
-    accessEnabled: employee.platformAccess?.enabled ?? false,
-    allowedModules: employee.platformAccess?.allowedModules ?? [],
-  }
-}
-
-function formToPayload(form: EmployeeFormState) {
-  return {
-    fullName: form.fullName.trim(),
-    email: form.email.trim().toLowerCase(),
-    phone: form.phone.trim() || null,
-    title: form.title.trim() || null,
-    employeeCode: form.employeeCode.trim() || null,
-    profileImageUrl: form.profileImageUrl.trim() || null,
-    teamId: form.teamId === "none" ? null : form.teamId,
-    status: form.status,
-    startDate: form.startDate || null,
-    emergencyContact: {
-      name: form.emergencyName.trim(),
-      relationship: form.emergencyRelationship.trim(),
-      phone: form.emergencyPhone.trim(),
-      email: form.emergencyEmail.trim().toLowerCase(),
-    },
-    platformAccess: {
-      enabled: form.accessEnabled,
-      allowedModules: form.allowedModules,
-      restrictedModules: [],
-    },
-  }
 }
 
 function toggleModule(
@@ -221,124 +130,6 @@ function ModuleChecklist({
   )
 }
 
-function EmployeeForm({
-  form,
-  teams,
-  modules,
-  onChange,
-}: {
-  form: EmployeeFormState
-  teams: EmployeeTeam[]
-  modules: { key: EmployeeAccessModule; label: string }[]
-  onChange: <K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) => void
-}) {
-  return (
-    <div className="grid gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Name</Label>
-          <Input value={form.fullName} onChange={(event) => onChange("fullName", event.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Email</Label>
-          <Input type="email" value={form.email} onChange={(event) => onChange("email", event.target.value)} />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Phone</Label>
-          <Input value={form.phone} onChange={(event) => onChange("phone", event.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Title</Label>
-          <Input value={form.title} onChange={(event) => onChange("title", event.target.value)} />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="grid gap-2">
-          <Label>Employee ID</Label>
-          <Input value={form.employeeCode} onChange={(event) => onChange("employeeCode", event.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Start date</Label>
-          <Input type="date" value={form.startDate} onChange={(event) => onChange("startDate", event.target.value)} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Status</Label>
-          <Select value={form.status} onValueChange={(value) => onChange("status", value as EmployeeStatus)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-[1fr_1.2fr]">
-        <div className="grid gap-2">
-          <Label>Team</Label>
-          <Select value={form.teamId} onValueChange={(value) => onChange("teamId", value)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No team</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label>Profile image URL</Label>
-          <Input value={form.profileImageUrl} onChange={(event) => onChange("profileImageUrl", event.target.value)} />
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="grid gap-4">
-        <div>
-          <h3 className="text-sm font-semibold">Emergency contact</h3>
-          <p className="text-sm text-muted-foreground">Kept lightweight for directory and document workflows.</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input placeholder="Name" value={form.emergencyName} onChange={(event) => onChange("emergencyName", event.target.value)} />
-          <Input placeholder="Relationship" value={form.emergencyRelationship} onChange={(event) => onChange("emergencyRelationship", event.target.value)} />
-          <Input placeholder="Phone" value={form.emergencyPhone} onChange={(event) => onChange("emergencyPhone", event.target.value)} />
-          <Input placeholder="Email" value={form.emergencyEmail} onChange={(event) => onChange("emergencyEmail", event.target.value)} />
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="grid gap-4">
-        <label className="flex items-center gap-3 rounded-2xl border bg-muted/30 p-4">
-          <Checkbox
-            checked={form.accessEnabled}
-            onCheckedChange={(checked) => onChange("accessEnabled", checked === true)}
-          />
-          <span>
-            <span className="block text-sm font-semibold">Enable Inboundr access</span>
-            <span className="block text-sm text-muted-foreground">Only linked or invited employees can use these module permissions.</span>
-          </span>
-        </label>
-        <ModuleChecklist
-          modules={modules}
-          value={form.allowedModules}
-          onChange={(value) => onChange("allowedModules", value)}
-        />
-      </div>
-    </div>
-  )
-}
-
 function DirectorySkeleton() {
   return (
     <div className="grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -365,10 +156,8 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [teamFilter, setTeamFilter] = useState("all")
-  const [createOpen, setCreateOpen] = useState(false)
   const [teamsOpen, setTeamsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<EmployeeFormState>(emptyEmployeeForm)
   const [teamName, setTeamName] = useState("")
   const [teamDescription, setTeamDescription] = useState("")
   const [teamModules, setTeamModules] = useState<EmployeeAccessModule[]>([])
@@ -415,45 +204,12 @@ export default function EmployeesPage() {
     return () => window.clearTimeout(timeout)
   }, [fetchEmployees])
 
-  function updateForm<K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
-
   function openCreate() {
-    setForm(emptyEmployeeForm)
-    setCreateOpen(true)
+    void navigate({ to: "/employees/new" })
   }
 
   function openEmployee(employee: Employee) {
     void navigate({ to: "/employees/$id", params: { id: employee._id } })
-  }
-
-  async function saveEmployee() {
-    const payload = formToPayload(form)
-    if (!payload.fullName || !payload.email) {
-      toast.error("Name and email are required")
-      return
-    }
-
-    setSaving(true)
-    try {
-      const response = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to save employee")
-      toast.success("Employee added")
-      setCreateOpen(false)
-      await fetchEmployees()
-      await fetchReferenceData()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save employee")
-    } finally {
-      setSaving(false)
-    }
   }
 
   async function createTeam() {
@@ -602,22 +358,6 @@ export default function EmployeesPage() {
           </div>
         )}
       </main>
-
-      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader>
-            <SheetTitle>Add employee</SheetTitle>
-            <SheetDescription>Create a directory record first; login access can be linked or invited later.</SheetDescription>
-          </SheetHeader>
-          <div className="px-4">
-            <EmployeeForm form={form} teams={teams} modules={modules} onChange={updateForm} />
-          </div>
-          <SheetFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={saveEmployee} disabled={saving}>Save employee</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
 
       <Dialog open={teamsOpen} onOpenChange={setTeamsOpen}>
         <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">

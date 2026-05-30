@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/customers/$id": "Customer Details",
   "/emails": "Emails",
   "/employees": "Employees",
+  "/employees/new": "New Employee",
   "/forgot-password": "Forgot Password",
   "/forms": "Forms",
   "/invoices": "Invoices",
@@ -63,7 +64,7 @@ function RootRouteComponent() {
       return
     }
 
-    if (pathname.startsWith("/employees/")) {
+    if (pathname.startsWith("/employees/") && pathname !== "/employees/new") {
       document.title = `Employee Details - ${APP_TITLE}`
       return
     }

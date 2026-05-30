@@ -37,6 +37,7 @@ import { Route as InvoicesNewRouteImport } from './routes/invoices.new'
 import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
+import { Route as EmployeesNewRouteImport } from './routes/employees_.new'
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
@@ -182,6 +183,11 @@ const FormsSlugRoute = FormsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => FormsRoute,
 } as any)
+const EmployeesNewRoute = EmployeesNewRouteImport.update({
+  id: '/employees_/new',
+  path: '/employees/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmployeesIdRoute = EmployeesIdRouteImport.update({
   id: '/employees_/$id',
   path: '/employees/$id',
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
+  '/employees/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
+  '/employees/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
+  '/employees_/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
   '/invoices/$id': typeof InvoicesIdRoute
@@ -327,6 +336,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
+    | '/employees/new'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -358,6 +368,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
+    | '/employees/new'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
+    | '/employees_/new'
     | '/forms/$slug'
     | '/invite/$token'
     | '/invoices/$id'
@@ -427,6 +439,7 @@ export interface RootRouteChildren {
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
+  EmployeesNewRoute: typeof EmployeesNewRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
@@ -630,6 +643,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormsSlugRouteImport
       parentRoute: typeof FormsRoute
     }
+    '/employees_/new': {
+      id: '/employees_/new'
+      path: '/employees/new'
+      fullPath: '/employees/new'
+      preLoaderRoute: typeof EmployeesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/employees_/$id': {
       id: '/employees_/$id'
       path: '/employees/$id'
@@ -725,6 +745,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,
+  EmployeesNewRoute: EmployeesNewRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
