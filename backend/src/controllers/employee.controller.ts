@@ -19,6 +19,7 @@ import {
 } from "../models/organization-member.model";
 import { EmployeeDocument, type EmployeeDocumentType } from "../models/employee-document.model";
 import { sendEmail } from "../lib/email";
+import { streamEmployeeDocumentPdf } from "../services/employee-document-pdf.service";
 
 const SEARCH_FIELDS = ["fullName", "email", "phone", "title", "employeeCode"] as const;
 const EMPLOYEE_STATUSES: EmployeeStatus[] = ["active", "inactive", "terminated", "archived"];
@@ -666,88 +667,6 @@ export async function archiveEmployeeTeam(req: Request, res: Response): Promise<
   }
 }
 
-function formatDate(value: Date | string | null | undefined): string {
-  if (!value) return "Not specified";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not specified";
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "long" }).format(date);
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function renderDocumentHtml({
-  type,
-  employee,
-  teamName,
-  organization,
-}: {
-  type: EmployeeDocumentType;
-  employee: any;
-  teamName: string | null;
-  organization: OrganizationRequest["organization"];
-}) {
-  const primaryColor = organization.preferences?.primaryColor ?? "#f5b400";
-  const orgName = escapeHtml(organization.name);
-  const name = escapeHtml(employee.fullName);
-  const title = escapeHtml(employee.title || "Employee");
-  const employeeCode = escapeHtml(employee.employeeCode || String(employee._id).slice(-6).toUpperCase());
-  const startDate = formatDate(employee.startDate);
-
-  if (type === "id_card") {
-    return `<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>${name} ID Card</title></head>
-<body style="margin:0;background:#f4f4f5;font-family:Arial,sans-serif;color:#18181b;">
-  <main style="width:360px;margin:40px auto;border-radius:28px;overflow:hidden;background:white;border:1px solid #e4e4e7;box-shadow:0 24px 80px rgba(24,24,27,.18);">
-    <section style="background:${primaryColor};padding:24px;color:#111827;">
-      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;">${orgName}</div>
-      <h1 style="margin:30px 0 0;font-size:28px;line-height:1.05;">Employee Identity Card</h1>
-    </section>
-    <section style="padding:28px;">
-      <div style="width:96px;height:96px;border-radius:24px;background:#e4e4e7;margin-bottom:22px;overflow:hidden;">
-        ${employee.profileImageUrl ? `<img src="${escapeHtml(employee.profileImageUrl)}" alt="${name}" style="width:100%;height:100%;object-fit:cover;">` : `<div style="font-size:36px;font-weight:800;line-height:96px;text-align:center;">${name.charAt(0)}</div>`}
-      </div>
-      <h2 style="margin:0;font-size:24px;">${name}</h2>
-      <p style="margin:6px 0 20px;color:#52525b;">${title}</p>
-      <dl style="display:grid;gap:12px;margin:0;">
-        <div><dt style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:.12em;">Employee ID</dt><dd style="margin:2px 0 0;font-weight:700;">${employeeCode}</dd></div>
-        <div><dt style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:.12em;">Team</dt><dd style="margin:2px 0 0;">${escapeHtml(teamName || "Unassigned")}</dd></div>
-        <div><dt style="font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:.12em;">Email</dt><dd style="margin:2px 0 0;">${escapeHtml(employee.email)}</dd></div>
-      </dl>
-    </section>
-  </main>
-</body>
-</html>`;
-  }
-
-  return `<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Proof of Employment</title></head>
-<body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#111827;">
-  <main style="max-width:760px;margin:48px auto;background:white;border:1px solid #e5e7eb;padding:56px;box-shadow:0 18px 70px rgba(15,23,42,.12);">
-    <header style="border-bottom:4px solid ${primaryColor};padding-bottom:20px;margin-bottom:42px;">
-      <div style="font-size:14px;text-transform:uppercase;letter-spacing:.18em;font-weight:700;color:#475569;">${orgName}</div>
-      <h1 style="font-size:36px;margin:14px 0 0;">Proof of Employment</h1>
-    </header>
-    <p style="font-size:17px;line-height:1.8;">This is to certify that <strong>${name}</strong> is employed with <strong>${orgName}</strong> as <strong>${title}</strong>${teamName ? ` in the <strong>${escapeHtml(teamName)}</strong> team` : ""}.</p>
-    <p style="font-size:17px;line-height:1.8;">Employment start date: <strong>${startDate}</strong>.</p>
-    <p style="font-size:17px;line-height:1.8;">This document was generated from Inboundr employee records on <strong>${formatDate(new Date())}</strong>.</p>
-    <footer style="margin-top:72px;display:flex;justify-content:space-between;gap:32px;">
-      <div><div style="width:220px;border-top:1px solid #94a3b8;padding-top:10px;">Authorized Signatory</div></div>
-      <div style="text-align:right;color:#64748b;">${escapeHtml(organization.defaultContact?.name || organization.name)}</div>
-    </footer>
-  </main>
-</body>
-</html>`;
-}
-
 export async function generateEmployeeDocument(req: Request, res: Response): Promise<void> {
   try {
     const authReq = req as OrganizationRequest;
@@ -774,14 +693,12 @@ export async function generateEmployeeDocument(req: Request, res: Response): Pro
     const teamName = employee.teamId && typeof employee.teamId === "object"
       ? String((employee.teamId as any).name ?? "")
       : null;
-    const html = renderDocumentHtml({ type, employee, teamName, organization });
     const title = type === "id_card" ? "Employee ID Card" : "Proof of Employment";
     const document = await EmployeeDocument.create({
       organizationId: organization._id,
       employeeId: employee._id,
       type,
       title,
-      html,
       generatedByUserId: authReq.user.id,
       employeeSnapshot: {
         fullName: employee.fullName,
@@ -825,7 +742,7 @@ export async function listEmployeeDocuments(req: Request, res: Response): Promis
   }
 }
 
-export async function getEmployeeDocumentHtml(req: Request, res: Response): Promise<void> {
+export async function downloadEmployeeDocumentPdf(req: Request, res: Response): Promise<void> {
   try {
     const organization = (req as OrganizationRequest).organization;
     const { id, documentId } = req.params;
@@ -844,9 +761,20 @@ export async function getEmployeeDocumentHtml(req: Request, res: Response): Prom
       return;
     }
 
-    res.type("html").send(document.html);
+    streamEmployeeDocumentPdf({
+      document,
+      organization: {
+        name: organization.name,
+        email: organization.defaultContact?.email,
+        phoneNumber: organization.defaultContact?.phoneNumber,
+        address: organization.address,
+        website: organization.website,
+        primaryColor: organization.preferences?.primaryColor,
+      },
+      res,
+    });
   } catch (err) {
-    console.error("Error fetching employee document HTML:", err);
+    console.error("Error downloading employee document PDF:", err);
     res.status(500).json({ error: "Failed to fetch employee document" });
   }
 }

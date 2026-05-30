@@ -665,7 +665,7 @@ export default function EmployeeDetailPage() {
       if (!response.ok) throw new Error(data.error ?? "Failed to generate document")
       toast.success(`${documentLabels[type]} generated`)
       await fetchDocuments()
-      window.open(`${API_BASE}/${employee._id}/documents/${data.document._id}/html`, "_blank")
+      window.open(`${API_BASE}/${employee._id}/documents/${data.document._id}/pdf`, "_blank")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to generate document")
     } finally {
@@ -880,7 +880,7 @@ export default function EmployeeDetailPage() {
                           <button
                             key={document._id}
                             type="button"
-                            onClick={() => window.open(`${API_BASE}/${employee._id}/documents/${document._id}/html`, "_blank")}
+                            onClick={() => window.open(`${API_BASE}/${employee._id}/documents/${document._id}/pdf`, "_blank")}
                             className="flex items-center justify-between rounded-2xl border px-3 py-2 text-left"
                           >
                             <span>

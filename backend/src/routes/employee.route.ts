@@ -4,9 +4,9 @@ import {
   archiveEmployeeTeam,
   createEmployee,
   createEmployeeTeam,
+  downloadEmployeeDocumentPdf,
   generateEmployeeDocument,
   getEmployee,
-  getEmployeeDocumentHtml,
   inviteEmployee,
   linkEmployeeMember,
   listEmployeeDocuments,
@@ -45,6 +45,6 @@ router.post("/:id/invite", requireOrganizationRole(["owner", "admin"]), inviteEm
 router.post("/:id/link-member", requireOrganizationRole(["owner", "admin"]), linkEmployeeMember);
 router.get("/:id/documents", listEmployeeDocuments);
 router.post("/:id/documents", requireOrganizationRole(["owner", "admin"]), generateEmployeeDocument);
-router.get("/:id/documents/:documentId/html", getEmployeeDocumentHtml);
+router.get("/:id/documents/:documentId/pdf", downloadEmployeeDocumentPdf);
 
 export default router;

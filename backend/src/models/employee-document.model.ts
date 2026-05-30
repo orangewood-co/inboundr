@@ -17,7 +17,7 @@ export interface IEmployeeDocument extends Document {
   employeeId: Types.ObjectId;
   type: EmployeeDocumentType;
   title: string;
-  html: string;
+  html: string | null;
   employeeSnapshot: IEmployeeDocumentSnapshot;
   issuedAt: Date;
   generatedByUserId: string;
@@ -59,7 +59,7 @@ const employeeDocumentSchema = new Schema<IEmployeeDocument>(
       index: true,
     },
     title: { type: String, required: true, trim: true },
-    html: { type: String, required: true },
+    html: { type: String, default: null },
     employeeSnapshot: {
       type: employeeDocumentSnapshotSchema,
       required: true,
