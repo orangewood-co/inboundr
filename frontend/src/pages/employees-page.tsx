@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
+import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -92,6 +93,33 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "IN"
+}
+
+function EmployeeAvatarImage({ source }: { source: string | null }) {
+  const [displayUrl, setDisplayUrl] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+    const value = source?.trim() ?? ""
+    if (!value) {
+      setDisplayUrl("")
+      return
+    }
+
+    void resolveUploadedImageUrl(value)
+      .then((url) => {
+        if (!cancelled) setDisplayUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setDisplayUrl("")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [source])
+
+  return <AvatarImage src={displayUrl || undefined} />
 }
 
 function toggleModule(
@@ -345,7 +373,7 @@ export default function EmployeesPage() {
                   )}
                 />
                 <Avatar className="size-28 rounded-full" size="lg">
-                  <AvatarImage src={employee.profileImageUrl ?? undefined} />
+                  <EmployeeAvatarImage source={employee.profileImageUrl} />
                   <AvatarFallback className="rounded-full text-4xl font-semibold">{initials(employee.fullName)}</AvatarFallback>
                 </Avatar>
                 <div className="mt-6 min-w-0">

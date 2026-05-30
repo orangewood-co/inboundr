@@ -6,6 +6,7 @@ import {
   ArrowLeftIcon,
   BadgeCheckIcon,
   BriefcaseBusinessIcon,
+  CameraIcon,
   FileBadgeIcon,
   FileTextIcon,
   IdCardIcon,
@@ -15,6 +16,7 @@ import {
   SaveIcon,
   SendIcon,
   ShieldCheckIcon,
+  UploadIcon,
   UserRoundIcon,
   XIcon,
 } from "lucide-react"
@@ -47,6 +49,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
+import { resolveUploadedImageUrl, uploadEmployeeImage } from "@/lib/uploaded-image"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
@@ -238,12 +241,20 @@ function EmployeeForm({
   form,
   teams,
   modules,
+  photoPreviewUrl,
+  uploadingPhoto,
   onChange,
+  onUploadPhoto,
+  onRemovePhoto,
 }: {
   form: EmployeeFormState
   teams: EmployeeTeam[]
   modules: { key: EmployeeAccessModule; label: string }[]
+  photoPreviewUrl: string
+  uploadingPhoto: boolean
   onChange: <K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) => void
+  onUploadPhoto: (file: File) => void
+  onRemovePhoto: () => void
 }) {
   return (
     <div className="grid gap-5 rounded-2xl border bg-card p-5">
@@ -308,9 +319,53 @@ function EmployeeForm({
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
-          <Label>Profile image URL</Label>
-          <Input value={form.profileImageUrl} onChange={(event) => onChange("profileImageUrl", event.target.value)} />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Profile picture</Label>
+        <div className="flex flex-col gap-4 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
+          <Avatar className="size-20 rounded-2xl" size="lg">
+            <AvatarImage src={photoPreviewUrl || undefined} />
+            <AvatarFallback className="rounded-2xl text-2xl font-semibold">
+              {initials(form.fullName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 space-y-2">
+            <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
+                <label className="cursor-pointer">
+                  <UploadIcon className="size-4" />
+                  Upload photo
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="sr-only"
+                    disabled={uploadingPhoto}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (file) onUploadPhoto(file)
+                      event.target.value = ""
+                    }}
+                  />
+                </label>
+              </Button>
+              {form.profileImageUrl && (
+                <Button type="button" variant="outline" size="sm" onClick={onRemovePhoto}>
+                  <XIcon className="size-4" />
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
+          {uploadingPhoto ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner data-icon="inline-start" />
+              Uploading
+            </div>
+          ) : !photoPreviewUrl ? (
+            <CameraIcon className="hidden size-5 text-muted-foreground sm:block" />
+          ) : null}
         </div>
       </div>
 
@@ -397,6 +452,8 @@ export default function EmployeeDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [form, setForm] = useState<EmployeeFormState | null>(null)
 
@@ -446,12 +503,60 @@ export default function EmployeeDetailPage() {
     void fetchDocuments()
   }, [fetchEmployee, fetchReferenceData, fetchDocuments])
 
+  useEffect(() => {
+    let cancelled = false
+    const source = employee?.profileImageUrl?.trim() ?? ""
+    if (!source) {
+      setPhotoPreviewUrl("")
+      return
+    }
+
+    void resolveUploadedImageUrl(source)
+      .then((url) => {
+        if (!cancelled) setPhotoPreviewUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoPreviewUrl("")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [employee?.profileImageUrl])
+
   function updateForm<K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) {
     setForm((current) => current ? { ...current, [field]: value } : current)
   }
 
+  async function uploadProfilePicture(file: File) {
+    setUploadingPhoto(true)
+    try {
+      const uploaded = await uploadEmployeeImage(file)
+      updateForm("profileImageUrl", uploaded.key)
+      setPhotoPreviewUrl(uploaded.displayUrl)
+      toast.success("Profile picture uploaded")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload profile picture")
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  function removeProfilePicture() {
+    updateForm("profileImageUrl", "")
+    setPhotoPreviewUrl("")
+  }
+
   function cancelEditing() {
     if (employee) setForm(employeeToForm(employee))
+    const source = employee?.profileImageUrl?.trim() ?? ""
+    if (source) {
+      void resolveUploadedImageUrl(source)
+        .then(setPhotoPreviewUrl)
+        .catch(() => setPhotoPreviewUrl(""))
+    } else {
+      setPhotoPreviewUrl("")
+    }
     setEditing(false)
   }
 
@@ -602,7 +707,7 @@ export default function EmployeeDetailPage() {
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-5">
                     <Avatar className="size-24 rounded-3xl" size="lg">
-                      <AvatarImage src={employee.profileImageUrl ?? undefined} />
+                      <AvatarImage src={photoPreviewUrl || undefined} />
                       <AvatarFallback className="rounded-3xl text-4xl font-semibold">{initials(employee.fullName)}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -648,7 +753,16 @@ export default function EmployeeDetailPage() {
               </section>
 
               {editing && form ? (
-                <EmployeeForm form={form} teams={teams} modules={modules} onChange={updateForm} />
+                <EmployeeForm
+                  form={form}
+                  teams={teams}
+                  modules={modules}
+                  photoPreviewUrl={photoPreviewUrl}
+                  uploadingPhoto={uploadingPhoto}
+                  onChange={updateForm}
+                  onUploadPhoto={(file) => void uploadProfilePicture(file)}
+                  onRemovePhoto={removeProfilePicture}
+                />
               ) : (
                 <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
                   <div className="space-y-6">

@@ -2,16 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
+  CameraIcon,
   CheckCircle2Icon,
   IdCardIcon,
   ShieldCheckIcon,
+  UploadIcon,
   UserRoundIcon,
   UsersIcon,
+  XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,6 +31,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
+import { uploadEmployeeImage } from "@/lib/uploaded-image"
 import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -128,6 +133,15 @@ function Stepper({ currentStep }: { currentStep: StepId }) {
   )
 }
 
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "IN"
+}
+
 function toggleModule(
   modules: EmployeeAccessModule[],
   module: EmployeeAccessModule,
@@ -169,6 +183,8 @@ export default function EmployeeNewPage() {
   const [teams, setTeams] = useState<EmployeeTeam[]>([])
   const [modules, setModules] = useState<{ key: EmployeeAccessModule; label: string }[]>([])
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
 
   const currentIndex = steps.findIndex((item) => item.id === step)
   const validationErrors = useMemo(() => {
@@ -196,6 +212,25 @@ export default function EmployeeNewPage() {
 
   function updateForm<K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  async function uploadProfilePicture(file: File) {
+    setUploadingPhoto(true)
+    try {
+      const uploaded = await uploadEmployeeImage(file)
+      updateForm("profileImageUrl", uploaded.key)
+      setPhotoPreviewUrl(uploaded.displayUrl)
+      toast.success("Profile picture uploaded")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload profile picture")
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  function removeProfilePicture() {
+    updateForm("profileImageUrl", "")
+    setPhotoPreviewUrl("")
   }
 
   function goNext() {
@@ -298,8 +333,50 @@ export default function EmployeeNewPage() {
                     <Input value={form.title} onChange={(event) => updateForm("title", event.target.value)} />
                   </div>
                   <div className="grid gap-2 sm:col-span-2">
-                    <Label>Profile image URL</Label>
-                    <Input value={form.profileImageUrl} onChange={(event) => updateForm("profileImageUrl", event.target.value)} />
+                    <Label>Profile picture</Label>
+                    <div className="flex flex-col gap-4 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
+                      <Avatar className="size-24 rounded-2xl" size="lg">
+                        <AvatarImage src={photoPreviewUrl || undefined} />
+                        <AvatarFallback className="rounded-2xl text-3xl font-semibold">
+                          {initials(form.fullName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 space-y-2">
+                        <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB.</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
+                            <label className="cursor-pointer">
+                              <UploadIcon className="size-4" />
+                              Upload photo
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                className="sr-only"
+                                disabled={uploadingPhoto}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0]
+                                  if (file) void uploadProfilePicture(file)
+                                  event.target.value = ""
+                                }}
+                              />
+                            </label>
+                          </Button>
+                          {form.profileImageUrl && (
+                            <Button type="button" variant="outline" size="sm" onClick={removeProfilePicture}>
+                              <XIcon className="size-4" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {uploadingPhoto && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Spinner data-icon="inline-start" />
+                          Uploading
+                        </div>
+                      )}
+                      {!uploadingPhoto && !photoPreviewUrl && <CameraIcon className="hidden size-5 text-muted-foreground sm:block" />}
+                    </div>
                   </div>
                 </div>
               </section>
