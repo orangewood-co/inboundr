@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { requireSession } from "@/lib/auth-guards"
+import { requireModuleAccess } from "@/lib/auth-guards"
 import ProductsImportPage from "@/pages/products-import-page"
 
 export const Route = createFileRoute("/products_/import")({
-  beforeLoad: requireSession,
+  beforeLoad: () => requireModuleAccess("products"),
   component: ProductsImportPage,
 })

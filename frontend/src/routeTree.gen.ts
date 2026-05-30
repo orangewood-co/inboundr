@@ -22,6 +22,7 @@ import { Route as LinksRouteImport } from './routes/links'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -103,6 +104,11 @@ const FormsRoute = FormsRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmployeesRoute = EmployeesRouteImport.update({
+  id: '/employees',
+  path: '/employees',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailsRoute = EmailsRouteImport.update({
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
+  '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
   '/invoices': typeof InvoicesRouteWithChildren
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
+  '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/customers': typeof CustomersRoute
   '/emails': typeof EmailsRoute
+  '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
   '/invoices': typeof InvoicesRouteWithChildren
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/customers'
     | '/emails'
+    | '/employees'
     | '/forgot-password'
     | '/forms'
     | '/invoices'
@@ -324,6 +334,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/customers'
     | '/emails'
+    | '/employees'
     | '/forgot-password'
     | '/login'
     | '/orders'
@@ -353,6 +364,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/customers'
     | '/emails'
+    | '/employees'
     | '/forgot-password'
     | '/forms'
     | '/invoices'
@@ -386,6 +398,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   CustomersRoute: typeof CustomersRoute
   EmailsRoute: typeof EmailsRoute
+  EmployeesRoute: typeof EmployeesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FormsRoute: typeof FormsRouteWithChildren
   InvoicesRoute: typeof InvoicesRouteWithChildren
@@ -497,6 +510,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/employees': {
+      id: '/employees'
+      path: '/employees'
+      fullPath: '/employees'
+      preLoaderRoute: typeof EmployeesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/emails': {
@@ -668,6 +688,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   CustomersRoute: CustomersRoute,
   EmailsRoute: EmailsRoute,
+  EmployeesRoute: EmployeesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FormsRoute: FormsRouteWithChildren,
   InvoicesRoute: InvoicesRouteWithChildren,

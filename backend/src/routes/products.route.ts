@@ -9,6 +9,7 @@ import {
 } from "../controllers/products.controller";
 import {
   requireAuth,
+  requireEmployeeModule,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -17,6 +18,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireEmployeeModule("products"));
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
 router.post("/import", requireOrganizationRole(["owner", "admin"]), importProducts);

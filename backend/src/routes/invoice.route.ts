@@ -14,13 +14,14 @@ import {
   updateInvoice,
   writeOffInvoice,
 } from "../controllers/invoice.controller";
-import { requireAuth, requireFeature, requireOrganization } from "../middleware/auth.middleware";
+import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
 router.use(requireFeature("invoices"));
+router.use(requireEmployeeModule("invoices"));
 
 router.get("/", listInvoices);
 router.get("/stats", getInvoiceStats);

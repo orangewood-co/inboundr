@@ -12,6 +12,10 @@ import {
   isFeatureKey,
   type FeatureKey,
 } from "../services/entitlement.service";
+import {
+  getEmployeeAccessState,
+} from "../services/employee-access.service";
+import type { EmployeeAccessModule } from "../models/employee-team.model";
 
 export interface AuthenticatedRequest extends Request {
   user: Session["user"];
@@ -97,6 +101,34 @@ export function requireFeature(feature: FeatureKey) {
     }
 
     next();
+  };
+}
+
+export function requireEmployeeModule(module: EmployeeAccessModule) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const orgReq = req as OrganizationRequest;
+      const access = await getEmployeeAccessState({
+        organizationId: orgReq.organization._id,
+        organizationMemberId: orgReq.organizationMembership?._id ?? null,
+        role: orgReq.organizationMembership.role,
+      });
+
+      if (!access.enabled) {
+        res.status(403).json({ error: "Employee platform access is disabled" });
+        return;
+      }
+
+      if (access.restricted && !access.allowedModules.includes(module)) {
+        res.status(403).json({ error: "Employee module access is restricted" });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      console.error("Employee module access validation failed:", err);
+      res.status(500).json({ error: "Failed to validate employee access" });
+    }
   };
 }
 

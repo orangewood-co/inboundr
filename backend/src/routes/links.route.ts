@@ -10,6 +10,7 @@ import {
 } from "../controllers/links.controller";
 import {
   requireAuth,
+  requireEmployeeModule,
   requireFeature,
   requireOrganization,
   requireOrganizationRole,
@@ -20,10 +21,12 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireOrganization);
 router.use(requireFeature("links"));
+router.use(requireEmployeeModule("links"));
 
 router.get("/", listLinks);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createLink);
 router.get("/:id", getLink);
+router.post("/:id/send", requireOrganizationRole(["owner", "admin"]), sendLinkEmail);
 router.put("/:id", requireOrganizationRole(["owner", "admin"]), updateLink);
 router.delete("/:id", requireOrganizationRole(["owner", "admin"]), archiveLink);
 router.get("/:id/events", listLinkEvents);

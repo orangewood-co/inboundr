@@ -22,6 +22,7 @@ import searchRouter from "./routes/search.route";
 import invoiceRouter from "./routes/invoice.route";
 import adminRouter from "./routes/admin.route";
 import contactRouter from "./routes/contact.route";
+import employeeRouter from "./routes/employee.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -68,6 +69,7 @@ app.use("/api/v1/links", linksRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/invoices", invoiceRouter);
 app.use("/api/v1/contact", contactRouter);
+app.use("/api/v1/employees", employeeRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/l", publicLinksRouter);
 app.use("/api/v1/stats", statsRouter);

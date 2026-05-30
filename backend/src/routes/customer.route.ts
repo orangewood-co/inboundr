@@ -8,12 +8,13 @@ import {
   listCustomers,
   updateCustomer,
 } from "../controllers/customer.controller";
-import { requireAuth, requireOrganization, requireOrganizationRole } from "../middleware/auth.middleware";
+import { requireAuth, requireEmployeeModule, requireOrganization, requireOrganizationRole } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireEmployeeModule("customers"));
 router.get("/", listCustomers);
 router.get("/export", exportCustomers);
 router.post("/import", requireOrganizationRole(["owner", "admin"]), importCustomers);

@@ -12,6 +12,7 @@ import {
 } from "../controllers/forms.controller";
 import {
   requireAuth,
+  requireEmployeeModule,
   requireFeature,
   requireOrganization,
   requireOrganizationRole,
@@ -22,6 +23,7 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireOrganization);
 router.use(requireFeature("forms"));
+router.use(requireEmployeeModule("forms"));
 
 router.get("/", listForms);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createForm);

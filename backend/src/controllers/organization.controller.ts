@@ -12,6 +12,7 @@ import {
 import { Organization } from "../models/organization.model";
 import { sendEmail } from "../lib/email";
 import { serializeEntitlements } from "../services/entitlement.service";
+import { getEmployeeAccessState } from "../services/employee-access.service";
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -112,8 +113,19 @@ export async function getMyOrganization(
   res: Response
 ): Promise<void> {
   try {
-    const organization = (req as OrganizationRequest).organization;
-    res.json({ organization, entitlements: serializeEntitlements(organization) });
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+    const employeeAccess = await getEmployeeAccessState({
+      organizationId: organization._id,
+      organizationMemberId: orgReq.organizationMembership?._id ?? null,
+      role: orgReq.organizationMembership.role,
+    });
+
+    res.json({
+      organization,
+      entitlements: serializeEntitlements(organization),
+      employeeAccess,
+    });
   } catch (err) {
     console.error("Error fetching organization:", err);
     res.status(500).json({ error: "Failed to fetch organization" });

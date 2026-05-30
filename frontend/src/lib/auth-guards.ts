@@ -2,7 +2,7 @@ import { redirect } from "@tanstack/react-router"
 
 import { getSession } from "@/lib/auth-client"
 import { getAdminMe } from "@/lib/admin"
-import type { FeatureKey } from "@/lib/entitlements"
+import type { EmployeeAccessModule, FeatureKey } from "@/lib/entitlements"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
@@ -47,4 +47,26 @@ export async function requireFeatureAccess(feature: FeatureKey) {
   if (!data.entitlements?.effectiveFeatures?.includes(feature)) {
     throw redirect({ to: "/" })
   }
+}
+
+export async function requireModuleAccess(module: EmployeeAccessModule) {
+  await requireSession()
+  const response = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
+    credentials: "include",
+  })
+
+  if (!response.ok) {
+    throw redirect({ to: "/" })
+  }
+
+  const data = await response.json()
+  const access = data.employeeAccess
+  if (access && (!access.enabled || (access.restricted && !access.allowedModules?.includes(module)))) {
+    throw redirect({ to: "/" })
+  }
+}
+
+export async function requireFeatureAndModuleAccess(feature: FeatureKey, module: EmployeeAccessModule) {
+  await requireFeatureAccess(feature)
+  await requireModuleAccess(module)
 }
