@@ -1,17 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
 import {
-  ArchiveIcon,
-  BadgeCheckIcon,
-  BriefcaseBusinessIcon,
-  FileBadgeIcon,
-  FileTextIcon,
   IdCardIcon,
-  LinkIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
-  SendIcon,
-  ShieldCheckIcon,
   UsersIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -54,7 +47,6 @@ import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
-const ORGANIZATION_API = `${API_ORIGIN}/api/v1/organization`
 const PAGE_LIMIT = 24
 
 type EmployeeStatus = "active" | "inactive" | "terminated" | "archived"
@@ -69,7 +61,6 @@ interface EmployeeTeam {
 
 interface Employee {
   _id: string
-  organizationMemberId: string | null
   teamId: string | null
   team: EmployeeTeam | null
   employeeCode: string | null
@@ -95,21 +86,6 @@ interface Employee {
   }
   createdAt: string
   updatedAt: string
-}
-
-interface EmployeeDocument {
-  _id: string
-  type: "id_card" | "proof_of_employment"
-  title: string
-  issuedAt: string
-  createdAt: string
-}
-
-interface OrganizationMember {
-  _id: string
-  role: "owner" | "admin" | "member"
-  userName: string | null
-  userEmail: string | null
 }
 
 type EmployeeFormState = {
@@ -155,11 +131,6 @@ const statusLabels: Record<EmployeeStatus, string> = {
   archived: "Archived",
 }
 
-const documentLabels = {
-  id_card: "Employee ID card",
-  proof_of_employment: "Proof of employment",
-} as const
-
 function initials(name: string) {
   return name
     .split(" ")
@@ -167,13 +138,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "IN"
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
 }
 
 function employeeToForm(employee: Employee): EmployeeFormState {
@@ -393,31 +357,21 @@ function DirectorySkeleton() {
 }
 
 export default function EmployeesPage() {
+  const navigate = useNavigate()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [teams, setTeams] = useState<EmployeeTeam[]>([])
   const [modules, setModules] = useState<{ key: EmployeeAccessModule; label: string }[]>([])
-  const [members, setMembers] = useState<OrganizationMember[]>([])
-  const [documents, setDocuments] = useState<EmployeeDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [teamFilter, setTeamFilter] = useState("all")
-  const [selected, setSelected] = useState<Employee | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [teamsOpen, setTeamsOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<EmployeeFormState>(emptyEmployeeForm)
   const [teamName, setTeamName] = useState("")
   const [teamDescription, setTeamDescription] = useState("")
   const [teamModules, setTeamModules] = useState<EmployeeAccessModule[]>([])
-
-  const selectedTeamModules = selected?.team?.defaultModules ?? []
-  const effectiveSelectedModules = useMemo(() => {
-    if (!selected) return []
-    return [...new Set([...selectedTeamModules, ...(selected.platformAccess.allowedModules ?? [])])]
-      .filter((module) => !(selected.platformAccess.restrictedModules ?? []).includes(module))
-  }, [selected, selectedTeamModules])
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -438,10 +392,9 @@ export default function EmployeesPage() {
   }, [search, statusFilter, teamFilter])
 
   const fetchReferenceData = useCallback(async () => {
-    const [teamsResponse, modulesResponse, membersResponse] = await Promise.all([
+    const [teamsResponse, modulesResponse] = await Promise.all([
       fetch(`${API_BASE}/teams`, { credentials: "include" }),
       fetch(`${API_BASE}/modules`, { credentials: "include" }),
-      fetch(`${ORGANIZATION_API}/members`, { credentials: "include" }),
     ])
     if (teamsResponse.ok) {
       const data = await teamsResponse.json()
@@ -451,17 +404,6 @@ export default function EmployeesPage() {
       const data = await modulesResponse.json()
       setModules(data.modules ?? [])
     }
-    if (membersResponse.ok) {
-      const data = await membersResponse.json()
-      setMembers(data.members ?? [])
-    }
-  }, [])
-
-  const fetchDocuments = useCallback(async (employeeId: string) => {
-    const response = await fetch(`${API_BASE}/${employeeId}/documents`, { credentials: "include" })
-    if (!response.ok) return
-    const data = await response.json()
-    setDocuments(data.documents ?? [])
   }, [])
 
   useEffect(() => {
@@ -473,10 +415,6 @@ export default function EmployeesPage() {
     return () => window.clearTimeout(timeout)
   }, [fetchEmployees])
 
-  useEffect(() => {
-    if (selected) void fetchDocuments(selected._id)
-  }, [fetchDocuments, selected])
-
   function updateForm<K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
   }
@@ -487,9 +425,7 @@ export default function EmployeesPage() {
   }
 
   function openEmployee(employee: Employee) {
-    setSelected(employee)
-    setForm(employeeToForm(employee))
-    setEditing(false)
+    void navigate({ to: "/employees/$id", params: { id: employee._id } })
   }
 
   async function saveEmployee() {
@@ -501,42 +437,20 @@ export default function EmployeesPage() {
 
     setSaving(true)
     try {
-      const response = await fetch(selected && editing ? `${API_BASE}/${selected._id}` : API_BASE, {
-        method: selected && editing ? "PUT" : "POST",
+      const response = await fetch(API_BASE, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error ?? "Failed to save employee")
-      toast.success(selected && editing ? "Employee updated" : "Employee added")
+      toast.success("Employee added")
       setCreateOpen(false)
-      setEditing(false)
-      setSelected(data)
       await fetchEmployees()
       await fetchReferenceData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save employee")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function archiveSelectedEmployee() {
-    if (!selected) return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${selected._id}/archive`, {
-        method: "PATCH",
-        credentials: "include",
-      })
-      if (!response.ok) throw new Error("Failed to archive employee")
-      toast.success("Employee archived")
-      setSelected(null)
-      await fetchEmployees()
-      await fetchReferenceData()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to archive employee")
     } finally {
       setSaving(false)
     }
@@ -586,72 +500,6 @@ export default function EmployeesPage() {
       await fetchReferenceData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to archive team")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function inviteSelectedEmployee() {
-    if (!selected) return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${selected._id}/invite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: selected.email, role: "member" }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to invite employee")
-      toast.success(data.linked ? "Employee linked to existing member" : "Invitation sent")
-      await fetchEmployees()
-      await fetchReferenceData()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to invite employee")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function linkMember(memberId: string) {
-    if (!selected || memberId === "none") return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${selected._id}/link-member`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ memberId }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to link member")
-      toast.success("Employee linked")
-      setSelected(data)
-      await fetchEmployees()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to link member")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function generateDocument(type: EmployeeDocument["type"]) {
-    if (!selected) return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${selected._id}/documents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ type }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to generate document")
-      toast.success(`${documentLabels[type]} generated`)
-      await fetchDocuments(selected._id)
-      window.open(`${API_BASE}/${selected._id}/documents/${data.document._id}/html`, "_blank")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate document")
     } finally {
       setSaving(false)
     }
@@ -768,148 +616,6 @@ export default function EmployeesPage() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button onClick={saveEmployee} disabled={saving}>Save employee</Button>
           </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
-          {selected ? (
-            <>
-              <SheetHeader>
-                <div className="flex items-center gap-4">
-                  <Avatar className="size-16 rounded-2xl" size="lg">
-                    <AvatarImage src={selected.profileImageUrl ?? undefined} />
-                    <AvatarFallback className="rounded-2xl text-lg font-semibold">{initials(selected.fullName)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <SheetTitle>{selected.fullName}</SheetTitle>
-                    <SheetDescription>{selected.title || "Employee profile"} · {selected.team?.name ?? "No team"}</SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
-
-              <div className="grid gap-6 px-4">
-                {editing ? (
-                  <EmployeeForm form={form} teams={teams} modules={modules} onChange={updateForm} />
-                ) : (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border p-4">
-                        <BriefcaseBusinessIcon className="mb-3 size-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">Employee ID</div>
-                        <div className="font-semibold">{selected.employeeCode || "Not set"}</div>
-                      </div>
-                      <div className="rounded-2xl border p-4">
-                        <BadgeCheckIcon className="mb-3 size-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">Start date</div>
-                        <div className="font-semibold">{formatDate(selected.startDate)}</div>
-                      </div>
-                      <div className="rounded-2xl border p-4">
-                        <ShieldCheckIcon className="mb-3 size-5 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">Access</div>
-                        <div className="font-semibold">{selected.platformAccess.enabled ? "Enabled" : "Disabled"}</div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border p-4">
-                      <h3 className="mb-3 font-semibold">Module access</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {effectiveSelectedModules.length > 0 ? (
-                          effectiveSelectedModules.map((module) => (
-                            <Badge key={module} variant="secondary">{modules.find((item) => item.key === module)?.label ?? module}</Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-muted-foreground">No module restrictions configured.</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold">Login linking</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {selected.organizationMemberId ? "Linked to an organization member." : "Invite or link this employee when they need platform access."}
-                          </p>
-                        </div>
-                        <Button variant="outline" onClick={inviteSelectedEmployee} disabled={saving || Boolean(selected.organizationMemberId)}>
-                          <SendIcon />
-                          Invite
-                        </Button>
-                      </div>
-                      <Select value="none" onValueChange={linkMember}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Link existing member" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Link existing member</SelectItem>
-                          {members.map((member) => (
-                            <SelectItem key={member._id} value={member._id}>
-                              {(member.userName || member.userEmail || member._id)} · {member.role}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="rounded-3xl border p-4">
-                      <div className="mb-4 flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-semibold">Documents</h3>
-                          <p className="text-sm text-muted-foreground">Generate built-in templates using current org branding.</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => generateDocument("id_card")} disabled={saving}>
-                            <FileBadgeIcon />
-                            ID card
-                          </Button>
-                          <Button variant="outline" onClick={() => generateDocument("proof_of_employment")} disabled={saving}>
-                            <FileTextIcon />
-                            Proof
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="grid gap-2">
-                        {documents.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No generated documents yet.</p>
-                        ) : documents.map((document) => (
-                          <button
-                            key={document._id}
-                            type="button"
-                            onClick={() => window.open(`${API_BASE}/${selected._id}/documents/${document._id}/html`, "_blank")}
-                            className="flex items-center justify-between rounded-2xl border px-3 py-2 text-left hover:bg-muted/50"
-                          >
-                            <span>
-                              <span className="block text-sm font-medium">{document.title}</span>
-                              <span className="block text-xs text-muted-foreground">{formatDate(document.createdAt)}</span>
-                            </span>
-                            <LinkIcon className="size-4 text-muted-foreground" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <SheetFooter className="gap-2 sm:justify-between">
-                <Button variant="destructive" onClick={archiveSelectedEmployee} disabled={saving}>
-                  <ArchiveIcon />
-                  Archive
-                </Button>
-                <div className="flex gap-2">
-                  {editing ? (
-                    <>
-                      <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
-                      <Button onClick={saveEmployee} disabled={saving}>Save changes</Button>
-                    </>
-                  ) : (
-                    <Button onClick={() => setEditing(true)}>Edit profile</Button>
-                  )}
-                </div>
-              </SheetFooter>
-            </>
-          ) : null}
         </SheetContent>
       </Sheet>
 

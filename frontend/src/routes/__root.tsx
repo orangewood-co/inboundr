@@ -63,6 +63,11 @@ function RootRouteComponent() {
       return
     }
 
+    if (pathname.startsWith("/employees/")) {
+      document.title = `Employee Details - ${APP_TITLE}`
+      return
+    }
+
     document.title = APP_TITLE
   }, [pathname])
 
