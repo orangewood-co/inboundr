@@ -8,6 +8,7 @@ import {
   hashPassword,
   makeShortCode,
   normalizeDestinationUrl,
+  normalizeLinkEventSource,
   normalizeShortCode,
   normalizeTrackingMode,
   recordLinkEvent,
@@ -15,6 +16,13 @@ import {
 } from "../services/short-link.service";
 
 const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
+
+function embedLinkUrl(code: string, sourceValue: unknown): string {
+  const url = new URL(`/l/${encodeURIComponent(code)}`, embedOrigin);
+  const source = normalizeLinkEventSource(sourceValue);
+  if (source) url.searchParams.set("source", source);
+  return url.toString();
+}
 
 function parseNullableDate(value: unknown): Date | null {
   const raw = String(value ?? "").trim();
@@ -247,7 +255,7 @@ export async function redirectShortLink(req: Request, res: Response): Promise<vo
     }
     if (link.passwordHash || link.trackingMode === "precise_location") {
       recordLinkEvent(req, link.passwordHash ? "password_required" : "precise_location_required", link);
-      res.redirect(302, `${embedOrigin}/l/${encodeURIComponent(code)}`);
+      res.redirect(302, embedLinkUrl(code, req.query.source));
       return;
     }
     const updated = await ShortLink.findOneAndUpdate(

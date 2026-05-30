@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react"
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react"
 import { AlertCircleIcon, LoaderIcon, LockIcon, MapPinIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -21,9 +21,18 @@ export default function LinkPage({ code }: { code: string }) {
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const source = useMemo(() => new URLSearchParams(window.location.search).get("source"), [])
+  const linkApiUrl = useCallback(
+    (suffix = "") => {
+      const url = new URL(`/l/${code}${suffix}`, API_ORIGIN)
+      if (source) url.searchParams.set("source", source)
+      return url.toString()
+    },
+    [code, source]
+  )
 
   useEffect(() => {
-    fetch(`${API_ORIGIN}/l/${code}/check`)
+    fetch(linkApiUrl("/check"))
       .then(async (response) => {
         const body = await response.json().catch(() => null)
         if (response.ok) return body
@@ -37,19 +46,19 @@ export default function LinkPage({ code }: { code: string }) {
       .then((data: LinkCheck) => {
         setLink(data)
         if (!data.requiresPassword && !data.requiresPreciseLocation) {
-          window.location.href = `${API_ORIGIN}/l/${code}`
+          window.location.href = linkApiUrl()
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "This link is not available"))
       .finally(() => setLoading(false))
-  }, [code])
+  }, [linkApiUrl])
 
   async function unlock(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()
     setWorking(true)
     setError(null)
     try {
-      const response = await fetch(`${API_ORIGIN}/l/${code}/unlock`, {
+      const response = await fetch(linkApiUrl("/unlock"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -78,7 +87,7 @@ export default function LinkPage({ code }: { code: string }) {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const response = await fetch(`${API_ORIGIN}/l/${code}/track-location`, {
+          const response = await fetch(linkApiUrl("/track-location"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

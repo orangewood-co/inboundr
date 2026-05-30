@@ -7,17 +7,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
+import { toCanvas } from "qrcode"
 import {
   ArrowLeftIcon,
-  BarChart3Icon,
   CopyIcon,
+  DownloadIcon,
   EllipsisIcon,
   ExternalLinkIcon,
   LinkIcon,
   LoaderIcon,
   LockIcon,
   MapPinIcon,
-  QrCodeIcon,
+  Maximize2Icon,
   ShareIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -33,6 +34,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,6 +126,21 @@ function shortUrl(code: string) {
   return `${API_ORIGIN}/l/${code}`
 }
 
+function qrShortUrl(code: string) {
+  const url = new URL(shortUrl(code))
+  url.searchParams.set("source", "qr")
+  return url.toString()
+}
+
+function filenameSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+}
+
 function extractDomain(url: string) {
   try {
     return new URL(url).hostname
@@ -162,6 +185,7 @@ export default function LinksDetailPage() {
   const [events, setEvents] = useState<LinkEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const fetchLink = useCallback(async () => {
     setLoading(true)
@@ -195,6 +219,24 @@ export default function LinksDetailPage() {
     void fetchLink()
     void fetchEvents()
   }, [fetchLink, fetchEvents])
+
+  const renderQrCanvas = useCallback((canvas: HTMLCanvasElement | null, width: number) => {
+    if (!link || !canvas) return
+    void toCanvas(canvas, qrShortUrl(link.code), {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width,
+      color: {
+        dark: "#111827",
+        light: "#ffffff",
+      },
+    })
+      .then(() => {
+        canvas.style.width = "100%"
+        canvas.style.height = "100%"
+      })
+      .catch(() => toast.error("Unable to generate QR code"))
+  }, [link])
 
   const stats = useMemo(() => {
     const now = Date.now()
@@ -271,6 +313,25 @@ export default function LinksDetailPage() {
     await fetch(`${API_BASE}/${link._id}`, { method: "DELETE", credentials: "include" })
     toast.success("Link archived")
     window.history.back()
+  }
+
+  async function downloadQrCode() {
+    if (!link) return
+    const canvas = document.createElement("canvas")
+    await toCanvas(canvas, qrShortUrl(link.code), {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 1024,
+      color: {
+        dark: "#111827",
+        light: "#ffffff",
+      },
+    })
+    const name = filenameSlug(link.title || extractDomain(link.destinationUrl) || link.code) || link.code
+    const anchor = document.createElement("a")
+    anchor.href = canvas.toDataURL("image/png")
+    anchor.download = `${name}-qr.png`
+    anchor.click()
   }
 
   if (loading) {
@@ -470,20 +531,39 @@ export default function LinksDetailPage() {
               </div>
             </div>
 
-            {/* QR Code placeholder */}
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <div className="rounded-xl border bg-card p-6">
+            <div className="mt-4 grid grid-cols-[max-content_minmax(0,1fr)] gap-4">
+              <div className="w-fit rounded-xl border bg-card p-6">
                 <h2 className="text-lg font-semibold">QR Code</h2>
                 <div className="mt-4 flex items-center gap-4">
-                  <div className="flex size-24 items-center justify-center rounded-lg border-2 border-dashed bg-muted/30">
-                    <QrCodeIcon className="size-10 text-muted-foreground/50" />
+                  <div className="flex size-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white p-2">
+                    <canvas
+                      ref={(canvas) => renderQrCanvas(canvas, 240)}
+                      aria-label={`QR code for ${shortUrl(link.code)}`}
+                      className="h-full w-full"
+                    />
                   </div>
-                  <Button variant="outline" disabled>
-                    <BarChart3Icon className="size-4" />
-                    Create QR Code
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => setQrOpen(true)}>
+                          <Maximize2Icon className="size-4" />
+                          <span className="sr-only">Expand QR code</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Expand</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => void downloadQrCode()}>
+                          <DownloadIcon className="size-4" />
+                          <span className="sr-only">Download QR code PNG</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download PNG</TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground">Coming soon</p>
+                <p className="mt-3 text-xs text-muted-foreground">Scans open the tracked short link.</p>
               </div>
               <div className="rounded-xl border bg-card p-6">
                 <h2 className="text-lg font-semibold">Link Performance</h2>
@@ -650,6 +730,27 @@ export default function LinksDetailPage() {
                 </div>
               )}
             </div>
+            <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>{link.title || "QR Code"}</DialogTitle>
+                  <DialogDescription>Scan this QR code to open the tracked short link.</DialogDescription>
+                </DialogHeader>
+                <div className="mx-auto flex w-full max-w-[min(70vh,560px)] items-center justify-center overflow-hidden rounded-xl border bg-white p-4">
+                  <canvas
+                    ref={(canvas) => renderQrCanvas(canvas, 640)}
+                    aria-label={`Expanded QR code for ${shortUrl(link.code)}`}
+                    className="aspect-square h-auto w-full"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => void downloadQrCode()}>
+                    <DownloadIcon className="size-4" />
+                    Download PNG
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </main>
     </AppLayout>

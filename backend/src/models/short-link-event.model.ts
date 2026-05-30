@@ -16,6 +16,7 @@ export interface IShortLinkEvent extends Document {
   code: string;
   openedAt: Date;
   result: ShortLinkEventResult;
+  source: string | null;
   referrer: string | null;
   ipHash: string | null;
   userAgent: {
@@ -59,6 +60,7 @@ const shortLinkEventSchema = new Schema<IShortLinkEvent>(
       ],
       index: true,
     },
+    source: { type: String, default: null, trim: true, lowercase: true, index: true },
     referrer: { type: String, default: null },
     ipHash: { type: String, default: null },
     userAgent: {

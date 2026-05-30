@@ -67,6 +67,17 @@ export function getBlockResult(link: Pick<IShortLink, "status" | "expiresAt" | "
   return null;
 }
 
+export function normalizeLinkEventSource(value: unknown): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const source = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return source || null;
+}
+
 function getClientIp(req: Request): string {
   const forwarded = req.header("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || req.ip || req.socket.remoteAddress || "";
@@ -87,6 +98,7 @@ export function buildEventPayload(req: Request, result: ShortLinkEventResult, li
     code: normalizeShortCode(String(req.params.code ?? link?.code ?? "")) || String(link?.code ?? ""),
     openedAt: new Date(),
     result,
+    source: normalizeLinkEventSource(req.query.source),
     referrer: req.header("referer") || null,
     ipHash: hashIp(getClientIp(req)),
     userAgent: {

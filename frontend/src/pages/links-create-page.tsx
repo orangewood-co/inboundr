@@ -3,7 +3,6 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ChevronDownIcon,
   MailIcon,
-  QrCodeIcon,
   SparklesIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -256,18 +255,6 @@ export default function LinksCreatePage() {
               </div>
               <Separator />
               <div className="grid gap-0 divide-y">
-                <div className="flex items-center justify-between px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
-                      <QrCodeIcon className="size-4 text-muted-foreground" />
-                    </div>
-                    <span className="text-sm font-medium">Generate a QR Code</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Coming soon</span>
-                    <Switch disabled />
-                  </div>
-                </div>
                 <div className="flex items-center justify-between px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="flex size-9 items-center justify-center rounded-lg border bg-muted/50">
