@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useSession } from "@/lib/auth-client"
+import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { getAdminMe } from "@/lib/admin"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
@@ -122,11 +123,34 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [isSuperAdmin, setIsSuperAdmin] = React.useState(false)
   const { hasFeature, hasModuleAccess } = useEntitlements()
   const { branding, loading } = useOrganizationBranding()
+  const [avatarUrl, setAvatarUrl] = React.useState("")
+  const sessionImage = session?.user.image ?? ""
   const user = {
     name: session?.user.name ?? "Inboundr User",
     email: session?.user.email ?? "Signed in",
-    avatar: session?.user.image ?? "",
+    avatar: avatarUrl,
   }
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    if (!sessionImage) {
+      setAvatarUrl("")
+      return
+    }
+
+    void resolveUploadedImageUrl(sessionImage)
+      .then((url) => {
+        if (!cancelled) setAvatarUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setAvatarUrl("")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [sessionImage])
   const organizationName = branding?.name?.trim() || "Inboundr"
   const logoUrl = branding?.logoDisplayUrl?.trim()
   const navCategories = React.useMemo(() => {

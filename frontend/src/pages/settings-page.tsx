@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,11 +20,13 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ThemePicker } from "@/components/theme-picker"
-import { useSession } from "@/lib/auth-client"
+import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { setActiveOrganizationId } from "@/lib/organization-context"
+import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
   Building2Icon,
+  CameraIcon,
   KeyIcon,
   MailIcon,
   PlusIcon,
@@ -565,6 +569,11 @@ function AccountTab() {
   const [connecting, setConnecting] = useState(false)
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
   const [gmailError, setGmailError] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState("")
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [removingAvatar, setRemovingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const fetchGmailAccounts = useCallback(async () => {
     setLoadingAccounts(true)
@@ -626,6 +635,68 @@ function AccountTab() {
   const displayName = user?.name || user?.email || "Signed-in user"
   const displayEmail = user?.email || "Email unavailable"
   const initials = getInitials(displayName)
+  const sessionImage = user?.image ?? ""
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!sessionImage) {
+      setAvatarUrl("")
+      return
+    }
+
+    void resolveUploadedImageUrl(sessionImage)
+      .then((url) => {
+        if (!cancelled) setAvatarUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setAvatarUrl("")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [sessionImage])
+
+  const handleAvatarFileSelected = (file: File) => {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Please choose a PNG, JPG, or WebP image.")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be 10MB or smaller.")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setCropImageSrc(typeof reader.result === "string" ? reader.result : null)
+      setCropOpen(true)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAvatarUploaded = async (result: AvatarCropResult) => {
+    try {
+      await updateUser({ image: result.key })
+      setAvatarUrl(result.displayUrl)
+      toast.success("Profile picture updated")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update profile picture")
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    setRemovingAvatar(true)
+    try {
+      await updateUser({ image: null })
+      setAvatarUrl("")
+      toast.success("Profile picture removed")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to remove profile picture")
+    } finally {
+      setRemovingAvatar(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -640,19 +711,70 @@ function AccountTab() {
       >
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-xl font-bold text-primary shadow-sm">
-              {loadingSession ? <Spinner /> : initials}
-            </div>
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              className="group relative size-16 shrink-0 overflow-hidden rounded-2xl border shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              aria-label="Change profile picture"
+            >
+              <Avatar className="size-full rounded-2xl">
+                <AvatarImage src={avatarUrl || undefined} alt={displayName} className="object-cover" />
+                <AvatarFallback className="rounded-2xl bg-primary/10 text-xl font-bold text-primary">
+                  {loadingSession ? <Spinner /> : initials}
+                </AvatarFallback>
+              </Avatar>
+              <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                <CameraIcon className="size-5" />
+              </span>
+            </button>
             <div className="min-w-0">
               <p className="truncate text-base font-semibold">{loadingSession ? "Loading account..." : displayName}</p>
               <p className="truncate text-sm text-muted-foreground">{loadingSession ? "Checking current session" : displayEmail}</p>
+              <div className="mt-1.5 flex items-center gap-3">
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  Change photo
+                </button>
+                {sessionImage && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-50"
+                    onClick={handleRemoveAvatar}
+                    disabled={removingAvatar}
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="rounded-full border bg-muted/30 px-3 py-1 text-xs font-medium text-muted-foreground">
             Authenticated
           </div>
         </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) handleAvatarFileSelected(file)
+            event.target.value = ""
+          }}
+        />
       </SettingsCard>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        onOpenChange={setCropOpen}
+        onUploaded={handleAvatarUploaded}
+        onError={(message) => toast.error(message)}
+      />
 
       <SettingsCard
         title="Connected Gmail"

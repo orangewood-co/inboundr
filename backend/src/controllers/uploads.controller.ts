@@ -16,6 +16,8 @@ const DEFAULT_ALLOWED_MIME_TYPES = [
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const AVATAR_ALLOWED_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"];
+const AVATAR_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding"] as const;
 
 function normalizeUploadRequest(body: Record<string, unknown>) {
@@ -47,6 +49,26 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
   try {
     const orgReq = req as OrganizationRequest;
     const input = normalizeUploadRequest(req.body ?? {});
+
+    if (input.scope === "avatar") {
+      const validationError = validateUploadBasics(input, AVATAR_ALLOWED_MIME_TYPES, AVATAR_MAX_FILE_SIZE);
+      if (validationError) {
+        res.status(400).json({ error: validationError });
+        return;
+      }
+
+      const presigned = await createPresignedUpload({
+        scope: "avatar",
+        organizationId: String(orgReq.user.id),
+        fileName: input.fileName,
+        contentType: input.contentType,
+        size: input.size,
+      });
+
+      res.json(presigned);
+      return;
+    }
+
     if (!AUTHENTICATED_UPLOAD_SCOPES.includes(input.scope as any)) {
       res.status(400).json({ error: "Invalid upload scope" });
       return;
@@ -93,9 +115,11 @@ export async function createAuthenticatedViewUrl(req: Request, res: Response): P
       return;
     }
 
-    const allowed = AUTHENTICATED_UPLOAD_SCOPES.some((scope) =>
-      keyBelongsToPrefix(key, [scope, String(orgReq.organization._id)])
-    );
+    const allowed =
+      keyBelongsToPrefix(key, ["avatar", String(orgReq.user.id)]) ||
+      AUTHENTICATED_UPLOAD_SCOPES.some((scope) =>
+        keyBelongsToPrefix(key, [scope, String(orgReq.organization._id)])
+      );
     if (!allowed) {
       res.status(403).json({ error: "File access denied" });
       return;
