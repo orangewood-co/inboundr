@@ -5,7 +5,7 @@ export function LoginPage() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
-          <a href="/" className="flex items-center gap-2 font-medium">
+          <a href="https://inboundr.co" className="flex items-center gap-2 font-medium">
             <img src="/logo.png" alt="logo" className="object-contain max-w-30" />
           </a>
         </div>
