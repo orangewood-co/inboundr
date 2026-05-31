@@ -24,77 +24,97 @@ type SidebarNavItem = {
   module?: EmployeeAccessModule
 }
 
+type SidebarCategory = {
+  category: string
+  items: SidebarNavItem[]
+}
+
 const data = {
   navMain: [
     {
-      title: "RFQ",
-      url: "/rfq",
-      icon: <FileTextIcon />,
-      feature: "rfq",
-      module: "rfq",
+      category: "Quotation",
+      items: [
+        {
+          title: "RFQ",
+          url: "/rfq",
+          icon: <FileTextIcon />,
+          feature: "rfq",
+          module: "rfq",
+        },
+        {
+          title: "Inbox",
+          url: "/emails",
+          icon: <InboxIcon />,
+          module: "inbox",
+        },
+        {
+          title: "Orders",
+          url: "/orders",
+          icon: <ShoppingCartIcon />,
+        },
+      ],
     },
     {
-      title: "Inbox",
-      url: "/emails",
-      icon: <InboxIcon />,
-      module: "inbox",
+      category: "Business",
+      items: [
+        {
+          title: "Products",
+          url: "/products",
+          icon: <PackageIcon />,
+          module: "products",
+        },
+        {
+          title: "Invoices",
+          url: "/invoices",
+          icon: <ReceiptTextIcon />,
+          feature: "invoices",
+          module: "invoices",
+        },
+        {
+          title: "Stats",
+          url: "/stats",
+          icon: <BarChart3Icon />,
+          module: "stats",
+        },
+        {
+          title: "Customers",
+          url: "/customers",
+          icon: <UsersIcon />,
+          module: "customers",
+        },
+        {
+          title: "Employees",
+          url: "/employees",
+          icon: <IdCardIcon />,
+          module: "employees",
+        },
+        {
+          title: "Forms",
+          url: "/forms",
+          icon: <ClipboardListIcon />,
+          feature: "forms",
+          module: "forms",
+        },
+        {
+          title: "Links",
+          url: "/links",
+          icon: <LinkIcon />,
+          feature: "links",
+          module: "links",
+        },
+      ],
     },
     {
-      title: "Products",
-      url: "/products",
-      icon: <PackageIcon />,
-      module: "products",
+      category: "Admin",
+      items: [
+        {
+          title: "Settings",
+          url: "/settings",
+          icon: <Settings2Icon />,
+        },
+      ],
     },
-    {
-      title: "Orders",
-      url: "/orders",
-      icon: <ShoppingCartIcon />,
-    },
-    {
-      title: "Invoices",
-      url: "/invoices",
-      icon: <ReceiptTextIcon />,
-      feature: "invoices",
-      module: "invoices",
-    },
-    {
-      title: "Stats",
-      url: "/stats",
-      icon: <BarChart3Icon />,
-      module: "stats",
-    },
-    {
-      title: "Customers",
-      url: "/customers",
-      icon: <UsersIcon />,
-      module: "customers",
-    },
-    {
-      title: "Employees",
-      url: "/employees",
-      icon: <IdCardIcon />,
-      module: "employees",
-    },
-    {
-      title: "Forms",
-      url: "/forms",
-      icon: <ClipboardListIcon />,
-      feature: "forms",
-      module: "forms",
-    },
-    {
-      title: "Links",
-      url: "/links",
-      icon: <LinkIcon />,
-      feature: "links",
-      module: "links",
-    },
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: <Settings2Icon />,
-    },
-  ] satisfies SidebarNavItem[],
+  ] satisfies SidebarCategory[],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -109,20 +129,33 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
   const organizationName = branding?.name?.trim() || "Inboundr"
   const logoUrl = branding?.logoDisplayUrl?.trim()
-  const navItems = React.useMemo(() => {
-    const items = data.navMain.filter((item) => {
-      if (item.feature && !hasFeature(item.feature)) return false
-      if (item.module && !hasModuleAccess(item.module)) return false
-      return true
-    })
+  const navCategories = React.useMemo(() => {
+    const categories: SidebarCategory[] = data.navMain
+      .map((category) => ({
+        ...category,
+        items: category.items.filter((item) => {
+          if (item.feature && !hasFeature(item.feature)) return false
+          if (item.module && !hasModuleAccess(item.module)) return false
+          return true
+        }),
+      }))
+      .filter((category) => category.items.length > 0)
+
     if (isSuperAdmin) {
-      items.push({
+      const adminCategory = categories.find((category) => category.category === "Admin")
+      const superAdminItem: SidebarNavItem = {
         title: "Super Admin",
         url: "/admin",
         icon: <CrownIcon />,
-      })
+      }
+      if (adminCategory) {
+        adminCategory.items.push(superAdminItem)
+      } else {
+        categories.push({ category: "Admin", items: [superAdminItem] })
+      }
     }
-    return items
+
+    return categories
   }, [hasFeature, hasModuleAccess, isSuperAdmin])
 
   React.useEffect(() => {
@@ -174,7 +207,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navItems} />
+        <NavMain categories={navCategories} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
