@@ -132,6 +132,32 @@ export async function createPresignedViewUrl(key: string): Promise<{ url: string
   return { url, expiresInSeconds: VIEW_EXPIRES_IN_SECONDS };
 }
 
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const { bucket } = getStorageConfig();
+  const response = await getS3Client().send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error("Storage object has no body");
+  }
+
+  const body = response.Body as { transformToByteArray?: () => Promise<Uint8Array> };
+  if (body.transformToByteArray) {
+    return Buffer.from(await body.transformToByteArray());
+  }
+
+  const stream = response.Body as NodeJS.ReadableStream;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 export function keyBelongsToPrefix(key: string, prefixParts: string[]): boolean {
   const prefix = prefixParts.map(sanitizePathPart).filter(Boolean).join("/");
   return key === prefix || key.startsWith(`${prefix}/`);

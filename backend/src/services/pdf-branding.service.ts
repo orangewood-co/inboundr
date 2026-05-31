@@ -25,6 +25,7 @@ export type PdfOrganizationBranding = {
   website?: string | null;
   primaryColor?: string | null;
   logoBuffer?: Buffer | null;
+  letterheadBuffer?: Buffer | null;
 };
 
 export function safePdfFilename(value: string, fallback = "download"): string {
@@ -84,6 +85,56 @@ export function drawPdfBrandHeader(
     organization: PdfOrganizationBranding;
   }
 ): number {
+  if (options.organization.letterheadBuffer) {
+    try {
+      const primary = normalizePdfColor(options.organization.primaryColor);
+      const imageX = PDF_PAGE.margin;
+      const imageY = PDF_PAGE.margin - 12;
+      const imageWidth = PDF_PAGE.width - PDF_PAGE.margin * 2;
+      const imageHeight = 72;
+
+      doc.image(options.organization.letterheadBuffer, imageX, imageY, {
+        fit: [imageWidth, imageHeight],
+        align: "center",
+        valign: "center",
+      });
+
+      const titleY = imageY + imageHeight + 12;
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(18)
+        .fillColor(PDF_COLORS.text)
+        .text(options.title, PDF_PAGE.margin, titleY, {
+          width: 260,
+          lineGap: 2,
+        });
+
+      if (options.subtitle) {
+        doc
+          .font("Helvetica")
+          .fontSize(9)
+          .fillColor(PDF_COLORS.muted)
+          .text(options.subtitle, PDF_PAGE.margin, titleY + 24, {
+            width: PDF_PAGE.width - PDF_PAGE.margin * 2,
+            lineGap: 2,
+          });
+      }
+
+      doc
+        .moveTo(PDF_PAGE.margin, titleY + 48)
+        .lineTo(PDF_PAGE.width - PDF_PAGE.margin, titleY + 48)
+        .lineWidth(2)
+        .strokeColor(primary)
+        .stroke()
+        .lineWidth(1)
+        .strokeColor(PDF_COLORS.border);
+
+      return titleY + 68;
+    } catch {
+      // Some uploaded image formats, especially SVG variants, cannot be embedded by PDFKit.
+    }
+  }
+
   const primary = normalizePdfColor(options.organization.primaryColor);
 
   doc

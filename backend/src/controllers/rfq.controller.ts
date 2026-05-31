@@ -13,6 +13,8 @@ import {
   hasRFQProcessableContent,
 } from "../services/rfq-input.service";
 import { streamRFQPdf } from "../services/rfq-pdf.service";
+import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
+import { renderRFQQuotePdfBuffer, rfqQuotePdfFilename } from "../services/rfq-quote-pdf.service";
 import type { IRFQ } from "../models/rfq.model";
 
 export const archiveRFQ = async (
@@ -487,18 +489,7 @@ export const downloadRFQPdf = async (
       return;
     }
 
-    streamRFQPdf(
-      rfq as any,
-      {
-        name: organization.name,
-        email: organization.defaultContact?.email,
-        phoneNumber: organization.defaultContact?.phoneNumber,
-        address: organization.address,
-        website: organization.website,
-        primaryColor: organization.preferences?.primaryColor,
-      },
-      res
-    );
+    streamRFQPdf(rfq as any, await resolveOrganizationPdfBranding(organization), res);
   } catch (err) {
     console.error("Error rendering RFQ PDF:", err);
     res.status(500).json({ error: "Failed to render RFQ PDF" });
@@ -758,12 +749,25 @@ export const sendQuoteReply = async (
     );
 
     try {
+      const quotePdf = await renderRFQQuotePdfBuffer({
+        rfq: rfq as any,
+        reply: reply as any,
+        organization: await resolveOrganizationPdfBranding(organization),
+        terms: organization.preferences?.defaultTerms,
+      });
       const gmailMessageId = await sendQuoteOnGmailThread({
         account,
         email,
         to: reply.to,
         subject: reply.subject,
         body: reply.body,
+        attachments: [
+          {
+            filename: rfqQuotePdfFilename(rfq as any),
+            contentType: "application/pdf",
+            content: quotePdf,
+          },
+        ],
       });
 
       const sentReply = await RFQReply.findOneAndUpdate(

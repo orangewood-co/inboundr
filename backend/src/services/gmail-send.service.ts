@@ -2,6 +2,12 @@ import { getGmailClientForAccount } from "../config/gmail.config";
 import type { IEmail } from "../models/email.model";
 import type { IGmailAccount } from "../models/gmail-account.model";
 
+type GmailAttachment = {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+};
+
 function normalizeReplySubject(subject: string): string {
   return /^re:/i.test(subject) ? subject : `Re: ${subject || "(no subject)"}`;
 }
@@ -12,6 +18,32 @@ function base64UrlEncode(value: string): string {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
+}
+
+function buildTextMimeMessage(headers: string[], body: string, attachments: GmailAttachment[] = []): string {
+  if (attachments.length === 0) return `${headers.join("\r\n")}\r\n\r\n${body}`;
+
+  const boundary = `btsa_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 7bit",
+    "",
+    body,
+    ...attachments.flatMap((attachment) => [
+      `--${boundary}`,
+      `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      "",
+      attachment.content.toString("base64").replace(/(.{76})/g, "$1\r\n"),
+    ]),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
 }
 
 export async function sendStandaloneEmail({
@@ -25,45 +57,17 @@ export async function sendStandaloneEmail({
   to: string;
   subject: string;
   body: string;
-  attachments?: Array<{
-    filename: string;
-    contentType: string;
-    content: Buffer;
-  }>;
+  attachments?: GmailAttachment[];
 }): Promise<string | null> {
   const gmail = await getGmailClientForAccount(account);
-  const boundary = `btsa_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const headers = [
     `From: ${account.emailAddress}`,
     `To: ${to}`,
     `Subject: ${subject || "(no subject)"}`,
     "MIME-Version: 1.0",
-    attachments.length > 0
-      ? `Content-Type: multipart/mixed; boundary="${boundary}"`
-      : "Content-Type: text/plain; charset=UTF-8",
   ];
-  const message =
-    attachments.length > 0
-      ? [
-          headers.join("\r\n"),
-          "",
-          `--${boundary}`,
-          "Content-Type: text/plain; charset=UTF-8",
-          "Content-Transfer-Encoding: 7bit",
-          "",
-          body,
-          ...attachments.flatMap((attachment) => [
-            `--${boundary}`,
-            `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
-            "Content-Transfer-Encoding: base64",
-            `Content-Disposition: attachment; filename="${attachment.filename}"`,
-            "",
-            attachment.content.toString("base64").replace(/(.{76})/g, "$1\r\n"),
-          ]),
-          `--${boundary}--`,
-          "",
-        ].join("\r\n")
-      : `${headers.join("\r\n")}\r\n\r\n${body}`;
+  if (attachments.length === 0) headers.push("Content-Type: text/plain; charset=UTF-8");
+  const message = buildTextMimeMessage(headers, body, attachments);
   const raw = base64UrlEncode(message);
   const res = await gmail.users.messages.send({
     userId: "me",
@@ -87,12 +91,14 @@ export async function sendQuoteOnGmailThread({
   to,
   subject,
   body,
+  attachments = [],
 }: {
   account: IGmailAccount;
   email: IEmail;
   to: string;
   subject: string;
   body: string;
+  attachments?: GmailAttachment[];
 }): Promise<string | null> {
   const gmail = await getGmailClientForAccount(account);
   const headers = [
@@ -100,7 +106,6 @@ export async function sendQuoteOnGmailThread({
     `To: ${to}`,
     `Subject: ${normalizeReplySubject(subject)}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
   ];
 
   if (email.rfcMessageId) {
@@ -112,7 +117,8 @@ export async function sendQuoteOnGmailThread({
     headers.push(`References: ${references}`);
   }
 
-  const raw = base64UrlEncode(`${headers.join("\r\n")}\r\n\r\n${body}`);
+  if (attachments.length === 0) headers.push("Content-Type: text/plain; charset=UTF-8");
+  const raw = base64UrlEncode(buildTextMimeMessage(headers, body, attachments));
   const res = await gmail.users.messages.send({
     userId: "me",
     requestBody: {

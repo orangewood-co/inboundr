@@ -2271,7 +2271,7 @@ export function DashboardPage() {
                           : "Send Quote"}
                       </Button>
                       <p className="text-xs text-muted-foreground">
-                        Sends from the connected Gmail account on the original thread.
+                        Sends from the connected Gmail account on the original thread with a quote PDF attached.
                       </p>
                     </div>
                   </div>
