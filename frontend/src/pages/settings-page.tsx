@@ -23,10 +23,13 @@ import { ThemePicker } from "@/components/theme-picker"
 import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { setActiveOrganizationId } from "@/lib/organization-context"
+import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
   Building2Icon,
   CameraIcon,
+  CheckCircle2Icon,
+  ImageIcon,
   KeyIcon,
   MailIcon,
   PlusIcon,
@@ -66,9 +69,20 @@ interface Organization {
     pricing: string
     defaultTerms: string
   }
+  letterheads: OrganizationLetterhead[]
+  activeLetterheadId: string
 }
 
-type OrganizationFormState = Omit<Organization, "_id">
+interface OrganizationLetterhead {
+  id: string
+  key: string
+  originalName: string
+  contentType: string
+  size: number
+  createdAt: string
+}
+
+type OrganizationFormState = Omit<Organization, "_id" | "letterheads" | "activeLetterheadId">
 
 type OrganizationRole = "owner" | "admin" | "member"
 
@@ -195,6 +209,22 @@ function getInitials(value?: string | null) {
   return parts.map((part) => part[0]?.toUpperCase()).join("") || "U"
 }
 
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown size"
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Unknown date"
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
 async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
   const source = logoUrl.trim()
   if (!source || /^https?:\/\//i.test(source)) {
@@ -217,11 +247,41 @@ async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
 
 function OrganizationTab() {
   const [form, setForm] = useState<OrganizationFormState>(emptyOrganizationForm)
+  const [letterheads, setLetterheads] = useState<OrganizationLetterhead[]>([])
+  const [activeLetterheadId, setActiveLetterheadId] = useState("")
+  const [letterheadPreviewUrls, setLetterheadPreviewUrls] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingLetterhead, setUploadingLetterhead] = useState(false)
+  const [settingActiveLetterheadId, setSettingActiveLetterheadId] = useState<string | null>(null)
+  const [deletingLetterheadId, setDeletingLetterheadId] = useState<string | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const letterheadInputRef = useRef<HTMLInputElement>(null)
+
+  const applyOrganization = useCallback((organization: Organization) => {
+    setForm({
+      name: organization.name ?? "",
+      defaultContact: {
+        name: organization.defaultContact?.name ?? "",
+        email: organization.defaultContact?.email ?? "",
+        phoneNumber: organization.defaultContact?.phoneNumber ?? "",
+      },
+      website: organization.website ?? "",
+      logoUrl: organization.logoUrl ?? "",
+      address: organization.address ?? "",
+      preferences: {
+        primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
+        theme: organization.preferences?.theme ?? "dark",
+        colorTheme: organization.preferences?.colorTheme ?? "default",
+        pricing: organization.preferences?.pricing ?? "INR",
+        defaultTerms: organization.preferences?.defaultTerms ?? "",
+      },
+    })
+    setLetterheads(organization.letterheads ?? [])
+    setActiveLetterheadId(organization.activeLetterheadId ?? "")
+  }, [])
 
   const fetchOrganization = useCallback(async () => {
     setLoading(true)
@@ -233,30 +293,13 @@ function OrganizationTab() {
       const data: { organization: Organization } = await res.json()
       if (!res.ok) throw new Error((data as any)?.error || "Failed to load organization")
 
-      setForm({
-        name: data.organization.name ?? "",
-        defaultContact: {
-          name: data.organization.defaultContact?.name ?? "",
-          email: data.organization.defaultContact?.email ?? "",
-          phoneNumber: data.organization.defaultContact?.phoneNumber ?? "",
-        },
-        website: data.organization.website ?? "",
-        logoUrl: data.organization.logoUrl ?? "",
-        address: data.organization.address ?? "",
-        preferences: {
-          primaryColor: data.organization.preferences?.primaryColor ?? "#f5b400",
-          theme: data.organization.preferences?.theme ?? "dark",
-          colorTheme: data.organization.preferences?.colorTheme ?? "default",
-          pricing: data.organization.preferences?.pricing ?? "INR",
-          defaultTerms: data.organization.preferences?.defaultTerms ?? "",
-        },
-      })
+      applyOrganization(data.organization)
     } catch (err: any) {
       setError(err.message || "Failed to load organization")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applyOrganization])
 
   useEffect(() => {
     void fetchOrganization()
@@ -282,6 +325,28 @@ function OrganizationTab() {
       cancelled = true
     }
   }, [form.logoUrl])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (letterheads.length === 0) return
+
+    void Promise.all(
+      letterheads.map(async (letterhead) => {
+        try {
+          return [letterhead.id, await resolveUploadedImageUrl(letterhead.key)] as const
+        } catch {
+          return [letterhead.id, ""] as const
+        }
+      }),
+    ).then((entries) => {
+      if (!cancelled) setLetterheadPreviewUrls(Object.fromEntries(entries))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [letterheads])
 
   const saveOrganization = async () => {
     setSaving(true)
@@ -374,6 +439,95 @@ function OrganizationTab() {
     }
   }
 
+  const uploadLetterhead = async (file: File) => {
+    if (letterheads.length >= MAX_LETTERHEADS) {
+      toast.error(`You can save up to ${MAX_LETTERHEADS} letterheads.`)
+      return
+    }
+
+    setUploadingLetterhead(true)
+    setError(null)
+
+    try {
+      const uploaded = await uploadLetterheadImage(file)
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/letterheads`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uploaded),
+      })
+      const data: { organization?: Organization; error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok || !data.organization) throw new Error(data.error || "Failed to save letterhead")
+
+      setLetterheads(data.organization.letterheads ?? [])
+      setActiveLetterheadId(data.organization.activeLetterheadId ?? "")
+      const added = data.organization.letterheads?.find((letterhead) => letterhead.key === uploaded.key)
+      if (added) {
+        setLetterheadPreviewUrls((current) => ({ ...current, [added.id]: uploaded.displayUrl }))
+      }
+      toast.success("Letterhead uploaded")
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to upload letterhead")
+      setError(message)
+      toast.error(message)
+    } finally {
+      setUploadingLetterhead(false)
+    }
+  }
+
+  const setActiveLetterhead = async (id: string) => {
+    setSettingActiveLetterheadId(id)
+    setError(null)
+
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/letterheads/${encodeURIComponent(id)}/active`, {
+        method: "PATCH",
+        credentials: "include",
+      })
+      const data: { organization?: Organization; error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok || !data.organization) throw new Error(data.error || "Failed to update active letterhead")
+
+      setLetterheads(data.organization.letterheads ?? [])
+      setActiveLetterheadId(data.organization.activeLetterheadId ?? "")
+      toast.success("Active letterhead updated")
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to update active letterhead")
+      setError(message)
+      toast.error(message)
+    } finally {
+      setSettingActiveLetterheadId(null)
+    }
+  }
+
+  const deleteLetterhead = async (id: string) => {
+    setDeletingLetterheadId(id)
+    setError(null)
+
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/letterheads/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data: { organization?: Organization; error?: string } = await res.json().catch(() => ({}))
+      if (!res.ok || !data.organization) throw new Error(data.error || "Failed to delete letterhead")
+
+      setLetterheads(data.organization.letterheads ?? [])
+      setActiveLetterheadId(data.organization.activeLetterheadId ?? "")
+      setLetterheadPreviewUrls((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      toast.success("Letterhead deleted")
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to delete letterhead")
+      setError(message)
+      toast.error(message)
+    } finally {
+      setDeletingLetterheadId(null)
+    }
+  }
+
   const updatePreference = (field: keyof OrganizationFormState["preferences"], value: string) => {
     setForm((current) => ({
       ...current,
@@ -460,6 +614,121 @@ function OrganizationTab() {
 
       {!loading && (
         <>
+          <SettingsCard
+            title="Letterheads"
+            description="Manage image letterheads for future PDFs and emails."
+            action={
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5"
+                disabled={uploadingLetterhead || letterheads.length >= MAX_LETTERHEADS}
+                onClick={() => letterheadInputRef.current?.click()}
+              >
+                {uploadingLetterhead ? <Spinner data-icon="inline-start" /> : <PlusIcon className="size-4" />}
+                Upload
+              </Button>
+            }
+          >
+            <div className="space-y-4 p-5">
+              <input
+                ref={letterheadInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="hidden"
+                disabled={uploadingLetterhead || letterheads.length >= MAX_LETTERHEADS}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void uploadLetterhead(file)
+                  event.target.value = ""
+                }}
+              />
+
+              <div className="flex flex-col gap-2 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">{letterheads.length} of {MAX_LETTERHEADS} letterheads saved</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB each. Active changes save immediately.</p>
+                </div>
+                {letterheads.length >= MAX_LETTERHEADS && (
+                  <p className="text-xs font-medium text-muted-foreground">Delete one to upload another.</p>
+                )}
+              </div>
+
+              {letterheads.length === 0 ? (
+                <div className="flex items-center gap-3 rounded-xl border border-dashed p-5">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <ImageIcon className="size-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">No letterheads uploaded</p>
+                    <p className="text-xs text-muted-foreground">
+                      Upload organization letterhead images now so PDFs and emails can use them later.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {letterheads.map((letterhead) => {
+                    const isActive = letterhead.id === activeLetterheadId
+                    const previewUrl = letterheadPreviewUrls[letterhead.id]
+                    const busy = settingActiveLetterheadId === letterhead.id || deletingLetterheadId === letterhead.id
+
+                    return (
+                      <div key={letterhead.id} className={`overflow-hidden rounded-xl border bg-background ${isActive ? "border-primary" : ""}`}>
+                        <div className="flex h-36 items-center justify-center bg-muted/30">
+                          {previewUrl ? (
+                            <img src={previewUrl} alt={letterhead.originalName || "Organization letterhead"} className="max-h-32 max-w-full object-contain" />
+                          ) : (
+                            <ImageIcon className="size-8 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{letterhead.originalName || "Letterhead image"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(letterhead.size)} · {formatShortDate(letterhead.createdAt)}
+                              </p>
+                            </div>
+                            {isActive && (
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                <CheckCircle2Icon className="size-3" />
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant={isActive ? "secondary" : "outline"}
+                              size="sm"
+                              disabled={isActive || busy}
+                              onClick={() => void setActiveLetterhead(letterhead.id)}
+                            >
+                              {settingActiveLetterheadId === letterhead.id && <Spinner data-icon="inline-start" />}
+                              {isActive ? "In use" : "Use this"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              disabled={busy}
+                              onClick={() => void deleteLetterhead(letterhead.id)}
+                            >
+                              {deletingLetterheadId === letterhead.id ? <Spinner data-icon="inline-start" /> : <Trash2Icon className="size-4" />}
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </SettingsCard>
+
           <SettingsCard
             title="Default Contact"
             description="Primary person shown for organization-level communication."

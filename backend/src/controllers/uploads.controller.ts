@@ -18,7 +18,8 @@ const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "i
 const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const AVATAR_ALLOWED_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"];
 const AVATAR_MAX_FILE_SIZE = 2 * 1024 * 1024;
-const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding"] as const;
+const IMAGE_UPLOAD_SCOPES = ["branding", "letterhead"] as const;
+const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding", "letterhead"] as const;
 
 function normalizeUploadRequest(body: Record<string, unknown>) {
   return {
@@ -76,8 +77,8 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
 
     const validationError = validateUploadBasics(
       input,
-      input.scope === "branding" ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES,
-      input.scope === "branding" ? BRANDING_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE
+      IMAGE_UPLOAD_SCOPES.includes(input.scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES,
+      IMAGE_UPLOAD_SCOPES.includes(input.scope as any) ? BRANDING_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE
     );
     if (validationError) {
       res.status(400).json({ error: validationError });

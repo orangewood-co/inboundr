@@ -17,6 +17,15 @@ export interface IOrganizationPreferences {
   defaultTerms: string;
 }
 
+export interface IOrganizationLetterhead {
+  id: string;
+  key: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+  createdAt: Date;
+}
+
 export interface IOrganization extends Document {
   name: string;
   ownerUserId: string;
@@ -29,6 +38,8 @@ export interface IOrganization extends Document {
   logoUrl: string;
   address: string;
   preferences: IOrganizationPreferences;
+  letterheads: IOrganizationLetterhead[];
+  activeLetterheadId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +64,18 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   { _id: false }
 );
 
+const organizationLetterheadSchema = new Schema<IOrganizationLetterhead>(
+  {
+    id: { type: String, required: true },
+    key: { type: String, required: true, trim: true },
+    originalName: { type: String, default: "", trim: true },
+    contentType: { type: String, required: true, trim: true },
+    size: { type: Number, required: true, min: 1 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const organizationSchema = new Schema<IOrganization>(
   {
     name: { type: String, required: true, trim: true },
@@ -71,6 +94,8 @@ const organizationSchema = new Schema<IOrganization>(
     logoUrl: { type: String, default: "", trim: true },
     address: { type: String, default: "" },
     preferences: { type: organizationPreferencesSchema, default: () => ({}) },
+    letterheads: { type: [organizationLetterheadSchema], default: [] },
+    activeLetterheadId: { type: String, default: "", trim: true },
   },
   { timestamps: true }
 );

@@ -1,13 +1,16 @@
 import { Router } from "express";
 import {
   acceptOrganizationInvitation,
+  addOrganizationLetterhead,
   cancelOrganizationInvitation,
+  deleteOrganizationLetterhead,
   getMyOrganization,
   inviteOrganizationMember,
   listOrganizationInvitations,
   listOrganizationMembers,
   previewOrganizationInvitation,
   removeOrganizationMember,
+  setActiveOrganizationLetterhead,
   updateMyOrganization,
   updateOrganizationMemberRole,
 } from "../controllers/organization.controller";
@@ -25,6 +28,21 @@ router.post("/invitations/accept", acceptOrganizationInvitation);
 router.use(requireOrganization);
 router.get("/me", getMyOrganization);
 router.put("/me", requireOrganizationRole(["owner", "admin"]), updateMyOrganization);
+router.post(
+  "/letterheads",
+  requireOrganizationRole(["owner", "admin"]),
+  addOrganizationLetterhead
+);
+router.patch(
+  "/letterheads/:id/active",
+  requireOrganizationRole(["owner", "admin"]),
+  setActiveOrganizationLetterhead
+);
+router.delete(
+  "/letterheads/:id",
+  requireOrganizationRole(["owner", "admin"]),
+  deleteOrganizationLetterhead
+);
 router.get("/members", listOrganizationMembers);
 router.patch(
   "/members/:id",

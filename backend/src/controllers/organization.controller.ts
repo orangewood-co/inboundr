@@ -13,6 +13,11 @@ import { Organization } from "../models/organization.model";
 import { sendEmail } from "../lib/email";
 import { serializeEntitlements } from "../services/entitlement.service";
 import { getEmployeeAccessState } from "../services/employee-access.service";
+import { keyBelongsToPrefix } from "../services/storage.service";
+
+const LETTERHEAD_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+const LETTERHEAD_MAX_FILE_SIZE = 2 * 1024 * 1024;
+const MAX_ORGANIZATION_LETTERHEADS = 10;
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -151,6 +156,127 @@ export async function updateMyOrganization(
   } catch (err) {
     console.error("Error updating organization:", err);
     res.status(500).json({ error: "Failed to update organization" });
+  }
+}
+
+export async function addOrganizationLetterhead(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const key = stringValue(req.body?.key);
+    const originalName = stringValue(req.body?.originalName);
+    const contentType = stringValue(req.body?.contentType).toLowerCase();
+    const size = Number(req.body?.size ?? 0);
+
+    if (!key) {
+      res.status(400).json({ error: "Letterhead file key is required" });
+      return;
+    }
+
+    if (!keyBelongsToPrefix(key, ["letterhead", String(organization._id)])) {
+      res.status(400).json({ error: "Letterhead file does not belong to this organization" });
+      return;
+    }
+
+    if (!LETTERHEAD_ALLOWED_MIME_TYPES.includes(contentType)) {
+      res.status(400).json({ error: "This file type is not allowed" });
+      return;
+    }
+
+    if (!Number.isFinite(size) || size <= 0 || size > LETTERHEAD_MAX_FILE_SIZE) {
+      res.status(400).json({ error: "Letterhead must be 2MB or smaller" });
+      return;
+    }
+
+    if (organization.letterheads.length >= MAX_ORGANIZATION_LETTERHEADS) {
+      res.status(400).json({ error: `Organizations can save up to ${MAX_ORGANIZATION_LETTERHEADS} letterheads` });
+      return;
+    }
+
+    if (organization.letterheads.some((letterhead) => letterhead.key === key)) {
+      res.status(409).json({ error: "Letterhead has already been added" });
+      return;
+    }
+
+    const letterhead = {
+      id: crypto.randomUUID(),
+      key,
+      originalName,
+      contentType,
+      size,
+      createdAt: new Date(),
+    };
+
+    organization.letterheads.push(letterhead);
+    if (!organization.activeLetterheadId) {
+      organization.activeLetterheadId = letterhead.id;
+    }
+
+    await organization.save();
+    res.status(201).json({ organization });
+  } catch (err) {
+    console.error("Error adding organization letterhead:", err);
+    res.status(500).json({ error: "Failed to add letterhead" });
+  }
+}
+
+export async function setActiveOrganizationLetterhead(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const { id } = req.params;
+    const letterhead = organization.letterheads.find((item) => item.id === id);
+
+    if (!letterhead) {
+      res.status(404).json({ error: "Letterhead not found" });
+      return;
+    }
+
+    organization.activeLetterheadId = letterhead.id;
+    await organization.save();
+    res.json({ organization });
+  } catch (err) {
+    console.error("Error setting active organization letterhead:", err);
+    res.status(500).json({ error: "Failed to set active letterhead" });
+  }
+}
+
+export async function deleteOrganizationLetterhead(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const { id } = req.params;
+    const existing = organization.letterheads.find((letterhead) => letterhead.id === id);
+
+    if (!existing) {
+      res.status(404).json({ error: "Letterhead not found" });
+      return;
+    }
+
+    organization.letterheads = organization.letterheads.filter((letterhead) => letterhead.id !== id);
+
+    if (organization.activeLetterheadId === id) {
+      const newest = organization.letterheads.reduce<typeof organization.letterheads[number] | null>(
+        (current, letterhead) => {
+          if (!current) return letterhead;
+          return letterhead.createdAt > current.createdAt ? letterhead : current;
+        },
+        null
+      );
+      organization.activeLetterheadId = newest?.id ?? "";
+    }
+
+    await organization.save();
+    res.json({ organization });
+  } catch (err) {
+    console.error("Error deleting organization letterhead:", err);
+    res.status(500).json({ error: "Failed to delete letterhead" });
   }
 }
 
