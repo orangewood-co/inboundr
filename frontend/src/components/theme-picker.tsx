@@ -68,7 +68,12 @@ export function ThemePicker({
   const handleChange = onChange ?? setColorTheme
 
   return (
-    <div className={cn("grid grid-cols-4 gap-2", className)}>
+    <div
+      className={cn(
+        "grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-2",
+        className
+      )}
+    >
       {availableThemes.map((theme) => (
         <ThemeSwatch
           key={theme.name}
