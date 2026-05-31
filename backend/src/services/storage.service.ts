@@ -1,5 +1,15 @@
 import crypto from "crypto";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  UploadPartCommand,
+  type CompletedPart,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getStorageConfig } from "../config/storage.config";
 
@@ -30,6 +40,17 @@ export interface PresignedUpload {
   };
   file: UploadMetadata;
   expiresInSeconds: number;
+}
+
+export interface MultipartUploadSession {
+  key: string;
+  bucket: string;
+  uploadId: string;
+}
+
+export interface CompletedMultipartPart {
+  partNumber: number;
+  etag: string;
 }
 
 const PRESIGN_EXPIRES_IN_SECONDS = 60 * 5;
@@ -88,6 +109,10 @@ export function fileUrlForKey(key: string): string | null {
   return publicBaseUrl ? `${publicBaseUrl}/${key}` : null;
 }
 
+export function storageBucket(): string {
+  return getStorageConfig().bucket;
+}
+
 export async function createPresignedUpload(input: PresignUploadInput): Promise<PresignedUpload> {
   const { bucket } = getStorageConfig();
   const key = createUploadKey(input);
@@ -130,6 +155,106 @@ export async function createPresignedViewUrl(key: string): Promise<{ url: string
   });
 
   return { url, expiresInSeconds: VIEW_EXPIRES_IN_SECONDS };
+}
+
+export async function createMultipartUpload(input: PresignUploadInput): Promise<MultipartUploadSession> {
+  const { bucket } = getStorageConfig();
+  const key = createUploadKey(input);
+  const response = await getS3Client().send(
+    new CreateMultipartUploadCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: input.contentType,
+    })
+  );
+
+  if (!response.UploadId) {
+    throw new Error("Storage did not return a multipart upload id");
+  }
+
+  return { key, bucket, uploadId: response.UploadId };
+}
+
+export async function createPresignedUploadPartUrl(input: {
+  key: string;
+  uploadId: string;
+  partNumber: number;
+}): Promise<{ url: string; expiresInSeconds: number }> {
+  const { bucket } = getStorageConfig();
+  const command = new UploadPartCommand({
+    Bucket: bucket,
+    Key: input.key,
+    UploadId: input.uploadId,
+    PartNumber: input.partNumber,
+  });
+  const url = await getSignedUrl(getS3Client(), command, {
+    expiresIn: PRESIGN_EXPIRES_IN_SECONDS,
+  });
+
+  return { url, expiresInSeconds: PRESIGN_EXPIRES_IN_SECONDS };
+}
+
+export async function completeMultipartUpload(input: {
+  key: string;
+  uploadId: string;
+  parts: CompletedMultipartPart[];
+}): Promise<void> {
+  const { bucket } = getStorageConfig();
+  const parts: CompletedPart[] = input.parts
+    .map((part) => ({
+      PartNumber: part.partNumber,
+      ETag: part.etag,
+    }))
+    .sort((a, b) => (a.PartNumber ?? 0) - (b.PartNumber ?? 0));
+
+  await getS3Client().send(
+    new CompleteMultipartUploadCommand({
+      Bucket: bucket,
+      Key: input.key,
+      UploadId: input.uploadId,
+      MultipartUpload: { Parts: parts },
+    })
+  );
+}
+
+export async function abortMultipartUpload(input: {
+  key: string;
+  uploadId: string;
+}): Promise<void> {
+  const { bucket } = getStorageConfig();
+  await getS3Client().send(
+    new AbortMultipartUploadCommand({
+      Bucket: bucket,
+      Key: input.key,
+      UploadId: input.uploadId,
+    })
+  );
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  const { bucket } = getStorageConfig();
+  await getS3Client().send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
+}
+
+export async function putObjectBuffer(input: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+}): Promise<void> {
+  const { bucket } = getStorageConfig();
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: input.key,
+      Body: input.body,
+      ContentType: input.contentType,
+    })
+  );
 }
 
 export async function getObjectBuffer(key: string): Promise<Buffer> {

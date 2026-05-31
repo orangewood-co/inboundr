@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
-export type FeatureKey = "rfq" | "invoices" | "links" | "forms"
+export type FeatureKey = "rfq" | "invoices" | "links" | "forms" | "drive"
 export type EmployeeAccessModule =
   | "rfq"
   | "inbox"
@@ -11,6 +11,7 @@ export type EmployeeAccessModule =
   | "invoices"
   | "forms"
   | "links"
+  | "drive"
   | "stats"
   | "employees"
 
@@ -32,7 +33,7 @@ interface EntitlementContextValue extends EntitlementState {
 }
 
 const DEFAULT_ENTITLEMENTS: EntitlementState = {
-  effectiveFeatures: ["rfq", "invoices", "links", "forms"],
+  effectiveFeatures: ["rfq", "invoices", "links", "forms", "drive"],
   planSlug: "all_features",
   employeeAccess: {
     restricted: false,

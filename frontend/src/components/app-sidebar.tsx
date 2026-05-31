@@ -15,7 +15,7 @@ import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { getAdminMe } from "@/lib/admin"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, ClipboardListIcon, CrownIcon, FileTextIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, ClipboardListIcon, CrownIcon, FileTextIcon, HardDriveIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -102,6 +102,13 @@ const data = {
           icon: <LinkIcon />,
           feature: "links",
           module: "links",
+        },
+        {
+          title: "Drive",
+          url: "/drive",
+          icon: <HardDriveIcon />,
+          feature: "drive",
+          module: "drive",
         },
       ],
     },

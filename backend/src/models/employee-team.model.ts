@@ -8,6 +8,7 @@ export const EMPLOYEE_ACCESS_MODULES = [
   "invoices",
   "forms",
   "links",
+  "drive",
   "stats",
   "employees",
 ] as const;

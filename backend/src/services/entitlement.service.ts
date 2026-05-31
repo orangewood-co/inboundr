@@ -1,6 +1,6 @@
 import type { IOrganization } from "../models/organization.model";
 
-export const FEATURE_KEYS = ["rfq", "invoices", "links", "forms"] as const;
+export const FEATURE_KEYS = ["rfq", "invoices", "links", "forms", "drive"] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export interface FeatureDefinition {
@@ -21,6 +21,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "invoices", label: "Invoices", description: "Create, send, and manage invoices." },
   { key: "links", label: "Links", description: "Trackable short links and engagement analytics." },
   { key: "forms", label: "Forms", description: "Published forms, submissions, and exports." },
+  { key: "drive", label: "Drive", description: "Shared file storage, folders, previews, and secure sharing." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [
@@ -34,19 +35,19 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     slug: "growth",
     name: "Growth",
     description: "Sales operations with billing and link tracking.",
-    features: ["rfq", "invoices", "links", "forms"],
+    features: ["rfq", "invoices", "links", "forms", "drive"],
   },
   {
     slug: "enterprise",
     name: "Enterprise",
     description: "Full platform access for production customers.",
-    features: ["rfq", "invoices", "links", "forms"],
+    features: ["rfq", "invoices", "links", "forms", "drive"],
   },
   {
     slug: "all_features",
     name: "All Features",
     description: "Compatibility plan for existing organizations.",
-    features: ["rfq", "invoices", "links", "forms"],
+    features: ["rfq", "invoices", "links", "forms", "drive"],
   },
 ];
 
