@@ -123,7 +123,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { hasFeature, hasModuleAccess } = useEntitlements()
   const { branding, loading } = useOrganizationBranding()
   const user = {
-    name: session?.user.name ?? "BTSA User",
+    name: session?.user.name ?? "Inboundr User",
     email: session?.user.email ?? "Signed in",
     avatar: session?.user.image ?? "",
   }
