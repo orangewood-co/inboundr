@@ -23,14 +23,21 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
   theme: Mode
   setTheme: (mode: Mode) => void
+  previewTheme: (mode: Mode) => void
   colorTheme: string
   setColorTheme: (name: string) => void
   setOrgColorTheme: (name: string | null) => void
+  previewColorTheme: (name: string | null) => void
   availableThemes: ThemeConfig[]
 }
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const MODE_VALUES: Mode[] = ["dark", "light", "system"]
+const FONT_VARIABLE_MAP: Record<string, string> = {
+  "--font-sans": "--app-font-sans",
+  "--font-serif": "--app-font-serif",
+  "--font-mono": "--app-font-mono",
+}
 
 const ThemeProviderContext = React.createContext<
   ThemeProviderState | undefined
@@ -78,6 +85,7 @@ function applyColorThemeToDOM(themeName: string, currentMode: ResolvedMode) {
   const root = document.documentElement
 
   THEME_CSS_VARIABLES.forEach((v) => root.style.removeProperty(v))
+  Object.values(FONT_VARIABLE_MAP).forEach((v) => root.style.removeProperty(v))
 
   if (themeName === DEFAULT_THEME_NAME) return
 
@@ -88,6 +96,8 @@ function applyColorThemeToDOM(themeName: string, currentMode: ResolvedMode) {
   for (const [variable, value] of Object.entries(values)) {
     if (value !== undefined) {
       root.style.setProperty(variable, value)
+      const fontVariable = FONT_VARIABLE_MAP[variable]
+      if (fontVariable) root.style.setProperty(fontVariable, value)
     }
   }
 }
@@ -129,9 +139,12 @@ export function ThemeProvider({
   const [orgColorTheme, setOrgColorThemeState] = React.useState<string | null>(
     null
   )
+  const [previewColorThemeName, setPreviewColorThemeName] = React.useState<
+    string | null
+  >(null)
 
   const resolvedColorTheme =
-    userColorTheme ?? orgColorTheme ?? DEFAULT_THEME_NAME
+    previewColorThemeName ?? userColorTheme ?? orgColorTheme ?? DEFAULT_THEME_NAME
 
   const setTheme = React.useCallback(
     (nextMode: Mode) => {
@@ -140,6 +153,10 @@ export function ThemeProvider({
     },
     [modeStorageKey]
   )
+
+  const previewTheme = React.useCallback((nextMode: Mode) => {
+    setModeState(nextMode)
+  }, [])
 
   const setColorTheme = React.useCallback(
     (name: string) => {
@@ -160,6 +177,10 @@ export function ThemeProvider({
     },
     []
   )
+
+  const previewColorTheme = React.useCallback((name: string | null) => {
+    setPreviewColorThemeName(name)
+  }, [])
 
   React.useEffect(() => {
     const resolved = applyModeToDOM(mode, disableTransitionOnChange)
@@ -224,12 +245,22 @@ export function ThemeProvider({
     () => ({
       theme: mode,
       setTheme,
+      previewTheme,
       colorTheme: resolvedColorTheme,
       setColorTheme,
       setOrgColorTheme,
+      previewColorTheme,
       availableThemes: themes,
     }),
-    [mode, setTheme, resolvedColorTheme, setColorTheme, setOrgColorTheme]
+    [
+      mode,
+      setTheme,
+      previewTheme,
+      resolvedColorTheme,
+      setColorTheme,
+      setOrgColorTheme,
+      previewColorTheme,
+    ]
   )
 
   return (

@@ -20,6 +20,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ThemePicker } from "@/components/theme-picker"
+import { useTheme } from "@/components/theme-provider"
 import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { setActiveOrganizationId } from "@/lib/organization-context"
@@ -246,6 +247,7 @@ async function resolveLogoDisplayUrl(logoUrl: string): Promise<string> {
 // ─── Tab Content ─────────────────────────────────────────────
 
 function OrganizationTab() {
+  const { previewTheme, previewColorTheme } = useTheme()
   const [form, setForm] = useState<OrganizationFormState>(emptyOrganizationForm)
   const [letterheads, setLetterheads] = useState<OrganizationLetterhead[]>([])
   const [activeLetterheadId, setActiveLetterheadId] = useState("")
@@ -259,8 +261,22 @@ function OrganizationTab() {
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("")
   const [error, setError] = useState<string | null>(null)
   const letterheadInputRef = useRef<HTMLInputElement>(null)
+  const savedThemeRef = useRef<Pick<Organization["preferences"], "theme" | "colorTheme"> | null>(null)
 
   const applyOrganization = useCallback((organization: Organization) => {
+    const preferences = {
+      primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
+      theme: organization.preferences?.theme ?? "dark",
+      colorTheme: organization.preferences?.colorTheme ?? "default",
+      pricing: organization.preferences?.pricing ?? "INR",
+      defaultTerms: organization.preferences?.defaultTerms ?? "",
+    }
+
+    savedThemeRef.current = {
+      theme: preferences.theme,
+      colorTheme: preferences.colorTheme,
+    }
+
     setForm({
       name: organization.name ?? "",
       defaultContact: {
@@ -271,13 +287,7 @@ function OrganizationTab() {
       website: organization.website ?? "",
       logoUrl: organization.logoUrl ?? "",
       address: organization.address ?? "",
-      preferences: {
-        primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
-        theme: organization.preferences?.theme ?? "dark",
-        colorTheme: organization.preferences?.colorTheme ?? "default",
-        pricing: organization.preferences?.pricing ?? "INR",
-        defaultTerms: organization.preferences?.defaultTerms ?? "",
-      },
+      preferences,
     })
     setLetterheads(organization.letterheads ?? [])
     setActiveLetterheadId(organization.activeLetterheadId ?? "")
@@ -304,6 +314,14 @@ function OrganizationTab() {
   useEffect(() => {
     void fetchOrganization()
   }, [fetchOrganization])
+
+  useEffect(() => {
+    return () => {
+      const savedTheme = savedThemeRef.current
+      if (savedTheme) previewTheme(savedTheme.theme)
+      previewColorTheme(null)
+    }
+  }, [previewTheme, previewColorTheme])
 
   useEffect(() => {
     let cancelled = false
@@ -361,6 +379,10 @@ function OrganizationTab() {
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to save organization")
+      savedThemeRef.current = {
+        theme: form.preferences.theme,
+        colorTheme: form.preferences.colorTheme,
+      }
       toast.success("Organization settings saved")
       notifyOrganizationBrandingChanged()
     } catch (err: any) {
@@ -533,6 +555,16 @@ function OrganizationTab() {
       ...current,
       preferences: { ...current.preferences, [field]: value },
     }))
+  }
+
+  const updateThemePreference = (value: OrganizationFormState["preferences"]["theme"]) => {
+    updatePreference("theme", value)
+    previewTheme(value)
+  }
+
+  const updateColorThemePreference = (name: string) => {
+    updatePreference("colorTheme", name)
+    previewColorTheme(name)
   }
 
   return (
@@ -776,7 +808,9 @@ function OrganizationTab() {
                   <Label htmlFor="theme">Mode</Label>
                   <Select
                     value={form.preferences.theme}
-                    onValueChange={(value) => updatePreference("theme", value)}
+                    onValueChange={(value) =>
+                      updateThemePreference(value as OrganizationFormState["preferences"]["theme"])
+                    }
                   >
                     <SelectTrigger id="theme" className="w-full">
                       <SelectValue />
@@ -800,7 +834,7 @@ function OrganizationTab() {
                 </p>
                 <ThemePicker
                   value={form.preferences.colorTheme}
-                  onChange={(name) => updatePreference("colorTheme", name)}
+                  onChange={updateColorThemePreference}
                   className="pt-1"
                 />
               </div>

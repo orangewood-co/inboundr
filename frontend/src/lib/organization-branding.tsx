@@ -139,7 +139,7 @@ export function OrganizationBrandingProvider({
 }: {
   children: React.ReactNode
 }) {
-  const { setTheme, setOrgColorTheme } = useTheme()
+  const { previewTheme, setOrgColorTheme } = useTheme()
   const [branding, setBranding] = React.useState<OrganizationBranding | null>(readCachedBranding)
   const [loading, setLoading] = React.useState(true)
 
@@ -204,12 +204,12 @@ export function OrganizationBrandingProvider({
 
   React.useEffect(() => {
     if (branding?.theme) {
-      setTheme(branding.theme)
+      previewTheme(branding.theme)
     }
 
     setOrgColorTheme(branding?.colorTheme ?? null)
     applyPrimaryColor(branding?.primaryColor)
-  }, [branding?.primaryColor, branding?.theme, branding?.colorTheme, setTheme, setOrgColorTheme])
+  }, [branding?.primaryColor, branding?.theme, branding?.colorTheme, previewTheme, setOrgColorTheme])
 
   const value = React.useMemo(
     () => ({
