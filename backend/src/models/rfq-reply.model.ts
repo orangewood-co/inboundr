@@ -18,6 +18,9 @@ export interface IRFQReply extends Document {
   gmailAccountId: Types.ObjectId;
   rfqId: Types.ObjectId;
   selectedProducts: IRFQReplyProduct[];
+  paymentTermTemplateId: string | null;
+  paymentTermName: string | null;
+  paymentTerms: string;
   subject: string;
   body: string;
   to: string;
@@ -67,6 +70,9 @@ const rfqReplySchema = new Schema<IRFQReply>(
       unique: true,
     },
     selectedProducts: { type: [rfqReplyProductSchema], default: [] },
+    paymentTermTemplateId: { type: String, default: null, trim: true },
+    paymentTermName: { type: String, default: null, trim: true },
+    paymentTerms: { type: String, default: "", trim: true },
     subject: { type: String, required: true },
     body: { type: String, required: true },
     to: { type: String, required: true },

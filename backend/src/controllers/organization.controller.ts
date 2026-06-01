@@ -23,6 +23,60 @@ function stringValue(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+function validationError(message: string): Error {
+  const error = new Error(message);
+  (error as any).statusCode = 400;
+  return error;
+}
+
+function normalizePaymentTerms(value: unknown, defaultTerms: string) {
+  if (!Array.isArray(value)) {
+    return defaultTerms
+      ? [
+          {
+            id: crypto.randomUUID(),
+            name: "Default",
+            text: defaultTerms,
+            isDefault: true,
+          },
+        ]
+      : [];
+  }
+
+  const seenNames = new Set<string>();
+  const terms = value.map((item, index) => {
+    const source = item as Record<string, unknown>;
+    const name = stringValue(source.name);
+    const text = stringValue(source.text);
+
+    if (!name) throw validationError("Payment term name is required");
+    if (!text) throw validationError("Payment term text is required");
+
+    const normalizedName = name.toLowerCase();
+    if (seenNames.has(normalizedName)) {
+      throw validationError(`Duplicate payment term name: ${name}`);
+    }
+    seenNames.add(normalizedName);
+
+    return {
+      id: stringValue(source.id) || crypto.randomUUID(),
+      name,
+      text,
+      isDefault: Boolean(source.isDefault),
+      _index: index,
+    };
+  });
+
+  if (terms.length > 0) {
+    const defaultCount = terms.filter((term) => term.isDefault).length;
+    if (defaultCount !== 1) {
+      throw validationError("Exactly one payment term must be marked as default");
+    }
+  }
+
+  return terms.map(({ _index, ...term }) => term);
+}
+
 async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) return new Map<string, { name?: string; email?: string }>();
@@ -63,6 +117,7 @@ function normalizeHexColor(value: unknown): string {
 function normalizeOrganizationInput(body: Record<string, unknown>) {
   const defaultContact = body.defaultContact as Record<string, unknown> | undefined;
   const preferences = body.preferences as Record<string, unknown> | undefined;
+  const defaultTerms = preferences ? stringValue(preferences.defaultTerms) : "";
 
   return {
     ...(body.name !== undefined ? { name: stringValue(body.name) } : {}),
@@ -85,7 +140,8 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
             theme: preferences.theme === "light" ? "light" : "dark",
             colorTheme: stringValue(preferences.colorTheme) || "default",
             pricing: stringValue(preferences.pricing) || "INR",
-            defaultTerms: stringValue(preferences.defaultTerms),
+            defaultTerms,
+            paymentTerms: normalizePaymentTerms(preferences.paymentTerms, defaultTerms),
           },
         }
       : {}),
@@ -155,7 +211,10 @@ export async function updateMyOrganization(
     res.json({ organization });
   } catch (err) {
     console.error("Error updating organization:", err);
-    res.status(500).json({ error: "Failed to update organization" });
+    const statusCode = (err as any)?.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 400 ? (err as Error).message : "Failed to update organization",
+    });
   }
 }
 

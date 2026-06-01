@@ -62,6 +62,39 @@ const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
 const PRODUCTS_API_BASE = `${API_ORIGIN}/api/v1/products`
 
+interface PaymentTermTemplate {
+  id: string
+  name: string
+  text: string
+  isDefault: boolean
+}
+
+const normalizePaymentTermTemplates = (
+  paymentTerms: PaymentTermTemplate[] | undefined,
+  defaultTerms: string,
+): PaymentTermTemplate[] => {
+  const validTerms = (paymentTerms ?? [])
+    .map((term) => ({
+      id: term.id,
+      name: term.name ?? "",
+      text: term.text ?? "",
+      isDefault: Boolean(term.isDefault),
+    }))
+    .filter((term) => term.id && term.name.trim() && term.text.trim())
+
+  if (validTerms.length > 0) {
+    const defaultIndex = validTerms.findIndex((term) => term.isDefault)
+    return validTerms.map((term, index) => ({
+      ...term,
+      isDefault: defaultIndex >= 0 ? index === defaultIndex : index === 0,
+    }))
+  }
+
+  return defaultTerms.trim()
+    ? [{ id: "default", name: "Default", text: defaultTerms.trim(), isDefault: true }]
+    : []
+}
+
 interface RFQEmail {
   _id: string
   subject: string
@@ -134,6 +167,9 @@ interface RFQSummary {
   errorMessage: string | null
   workflowStatus?: "new" | "draft" | "processed"
   savedQuoteProducts?: RFQSavedQuoteProduct[]
+  paymentTermTemplateId?: string | null
+  paymentTermName?: string | null
+  paymentTerms?: string | null
   quoteNumber?: string | null
   draftSavedAt?: string | null
   processedAt?: string | null
@@ -162,6 +198,9 @@ interface RFQReply {
     hsnCode: string | null
     gstRate: number | null
   }[]
+  paymentTermTemplateId: string | null
+  paymentTermName: string | null
+  paymentTerms: string
   subject: string
   body: string
   to: string
@@ -485,6 +524,10 @@ export function DashboardPage() {
   const [generating, setGenerating] = useState(false)
   const [sendingQuote, setSendingQuote] = useState(false)
   const [reply, setReply] = useState<RFQReply | null>(null)
+  const [paymentTermTemplates, setPaymentTermTemplates] = useState<PaymentTermTemplate[]>([])
+  const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>("")
+  const [paymentTermName, setPaymentTermName] = useState<string>("")
+  const [paymentTermsText, setPaymentTermsText] = useState<string>("")
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archivingRfq, setArchivingRfq] = useState(false)
 
@@ -528,6 +571,23 @@ export function DashboardPage() {
     }
   }, [dateFrom, dateTo, sortOption, statusFilter])
 
+  const fetchPaymentTermTemplates = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
+      const preferences = data?.organization?.preferences
+      setPaymentTermTemplates(
+        normalizePaymentTermTemplates(preferences?.paymentTerms, preferences?.defaultTerms ?? ""),
+      )
+    } catch (err) {
+      console.error("Failed to load payment terms:", err)
+      setPaymentTermTemplates([])
+    }
+  }, [])
+
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
     try {
@@ -544,7 +604,8 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchList(1)
-  }, [fetchList])
+    fetchPaymentTermTemplates()
+  }, [fetchList, fetchPaymentTermTemplates])
 
   const clearFilters = () => {
     setStatusFilter("all")
@@ -581,6 +642,9 @@ export function DashboardPage() {
       setProductSearch("")
       setProductResults([])
       setProductSearchError(null)
+      setSelectedPaymentTermId("")
+      setPaymentTermName("")
+      setPaymentTermsText("")
     }
   }, [selectedId, fetchDetail, fetchReply])
 
@@ -658,6 +722,22 @@ export function DashboardPage() {
     setManualProducts(unmatchedProducts)
     setRegrettedLines(nextRegrettedLines)
   }, [detail])
+
+  useEffect(() => {
+    if (!detail) return
+
+    if (detail.paymentTerms) {
+      setSelectedPaymentTermId(detail.paymentTermTemplateId ?? "")
+      setPaymentTermName(detail.paymentTermName ?? "")
+      setPaymentTermsText(detail.paymentTerms)
+      return
+    }
+
+    const defaultTemplate = paymentTermTemplates.find((term) => term.isDefault) ?? paymentTermTemplates[0]
+    setSelectedPaymentTermId(defaultTemplate?.id ?? "")
+    setPaymentTermName(defaultTemplate?.name ?? "")
+    setPaymentTermsText(defaultTemplate?.text ?? "")
+  }, [detail, paymentTermTemplates])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -983,6 +1063,10 @@ export function DashboardPage() {
 
   const handleGenerateQuote = async () => {
     if (!detail) return
+    if (!paymentTermsText.trim()) {
+      toast.error("Payment terms are required to generate a quote")
+      return
+    }
     setGenerating(true)
     try {
       const res = await fetch(`${API_BASE}/${detail._id}/generate-quote`, {
@@ -1039,7 +1123,22 @@ export function DashboardPage() {
       regretReason: line.regretReason.trim() || null,
     }))
 
-    return { selectedProducts: selections, manualProducts: manualSelections, regrettedLines: regrettedSelections }
+    return {
+      selectedProducts: selections,
+      manualProducts: manualSelections,
+      regrettedLines: regrettedSelections,
+      paymentTermTemplateId: selectedPaymentTermId || null,
+      paymentTermName: paymentTermName.trim() || null,
+      paymentTerms: paymentTermsText.trim(),
+    }
+  }
+
+  const handleSelectPaymentTerm = (id: string) => {
+    const template = paymentTermTemplates.find((term) => term.id === id)
+    if (!template) return
+    setSelectedPaymentTermId(template.id)
+    setPaymentTermName(template.name)
+    setPaymentTermsText(template.text)
   }
 
   const handleSaveDraft = async () => {
@@ -1070,6 +1169,10 @@ export function DashboardPage() {
 
   const handleSendQuote = async () => {
     if (!detail || !reply) return
+    if (!paymentTermsText.trim() && !reply.paymentTerms?.trim()) {
+      toast.error("Payment terms are required to send a quote")
+      return
+    }
     setSendingQuote(true)
     try {
       const res = await fetch(`${API_BASE}/${detail._id}/send-quote`, {
@@ -1122,6 +1225,7 @@ export function DashboardPage() {
     Object.values(selectedProducts).some((matches) => matches.length > 0) ||
     manualProducts.length > 0 ||
     Object.keys(regrettedLines).length > 0
+  const hasPaymentTerms = paymentTermsText.trim().length > 0
 
   const renderManualProductPopover = (searchResultIndex: number, query: RFQSearchResult["query"]) => (
     <Popover
@@ -2175,6 +2279,45 @@ export function DashboardPage() {
                     </div>
                     )}
 
+                    <div className="mt-5 rounded-xl border bg-muted/15 p-4">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold">Payment terms</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Pick an organization template, then edit the final wording for this RFQ.
+                          </p>
+                        </div>
+                        <Select
+                          value={selectedPaymentTermId || undefined}
+                          onValueChange={handleSelectPaymentTerm}
+                          disabled={paymentTermTemplates.length === 0}
+                        >
+                          <SelectTrigger className="h-8 w-full text-xs sm:w-56">
+                            <SelectValue placeholder="Select payment term" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentTermTemplates.map((term) => (
+                              <SelectItem key={term.id} value={term.id}>
+                                {term.name}{term.isDefault ? " (default)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={paymentTermsText}
+                        onChange={(event) => setPaymentTermsText(event.target.value)}
+                        placeholder="Enter payment terms for this quote..."
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      {!hasPaymentTerms && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Payment terms are required before generating or sending the quote.
+                        </p>
+                      )}
+                    </div>
+
                     {/* Generate Quote Button */}
                     <div className="mt-5 flex items-center gap-3">
                       <Button
@@ -2192,7 +2335,7 @@ export function DashboardPage() {
                       </Button>
                       <Button
                         onClick={handleGenerateQuote}
-                        disabled={!hasSelections || generating}
+                        disabled={!hasSelections || !hasPaymentTerms || generating}
                         className="gap-2"
                       >
                         {generating ? (
@@ -2205,6 +2348,11 @@ export function DashboardPage() {
                       {!hasSelections && (
                         <p className="text-xs text-muted-foreground">
                           Select at least one product to generate a quote
+                        </p>
+                      )}
+                      {hasSelections && !hasPaymentTerms && (
+                        <p className="text-xs text-muted-foreground">
+                          Add payment terms to generate a quote
                         </p>
                       )}
                     </div>
@@ -2258,7 +2406,11 @@ export function DashboardPage() {
                     <div className="mt-3 flex items-center gap-3">
                       <Button
                         onClick={handleSendQuote}
-                        disabled={sendingQuote || reply.sendStatus === "sent"}
+                        disabled={
+                          sendingQuote ||
+                          reply.sendStatus === "sent" ||
+                          (!hasPaymentTerms && !reply.paymentTerms?.trim())
+                        }
                         className="gap-2"
                       >
                         {sendingQuote || reply.sendStatus === "sending" ? (

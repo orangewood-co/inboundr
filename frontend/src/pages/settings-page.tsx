@@ -41,6 +41,46 @@ import { toast } from "sonner"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
+const createPaymentTermId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID()
+  }
+  return `payment-term-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+const normalizePaymentTermTemplates = (
+  paymentTerms: PaymentTermTemplate[] | undefined,
+  defaultTerms: string,
+): PaymentTermTemplate[] => {
+  const validTerms = (paymentTerms ?? [])
+    .map((term) => ({
+      id: term.id || createPaymentTermId(),
+      name: term.name ?? "",
+      text: term.text ?? "",
+      isDefault: Boolean(term.isDefault),
+    }))
+    .filter((term) => term.name.trim() && term.text.trim())
+
+  if (validTerms.length > 0) {
+    const defaultIndex = validTerms.findIndex((term) => term.isDefault)
+    return validTerms.map((term, index) => ({
+      ...term,
+      isDefault: defaultIndex >= 0 ? index === defaultIndex : index === 0,
+    }))
+  }
+
+  return defaultTerms.trim()
+    ? [
+        {
+          id: createPaymentTermId(),
+          name: "Default",
+          text: defaultTerms.trim(),
+          isDefault: true,
+        },
+      ]
+    : []
+}
+
 interface GmailAccount {
   _id: string
   emailAddress: string
@@ -69,6 +109,7 @@ interface Organization {
     colorTheme: string
     pricing: string
     defaultTerms: string
+    paymentTerms: PaymentTermTemplate[]
   }
   letterheads: OrganizationLetterhead[]
   activeLetterheadId: string
@@ -81,6 +122,13 @@ interface OrganizationLetterhead {
   contentType: string
   size: number
   createdAt: string
+}
+
+interface PaymentTermTemplate {
+  id: string
+  name: string
+  text: string
+  isDefault: boolean
 }
 
 type OrganizationFormState = Omit<Organization, "_id" | "letterheads" | "activeLetterheadId">
@@ -129,6 +177,7 @@ const emptyOrganizationForm: OrganizationFormState = {
     colorTheme: "default",
     pricing: "INR",
     defaultTerms: "",
+    paymentTerms: [],
   },
 }
 
@@ -264,12 +313,18 @@ function OrganizationTab() {
   const savedThemeRef = useRef<Pick<Organization["preferences"], "theme" | "colorTheme"> | null>(null)
 
   const applyOrganization = useCallback((organization: Organization) => {
+    const paymentTerms = normalizePaymentTermTemplates(
+      organization.preferences?.paymentTerms,
+      organization.preferences?.defaultTerms ?? "",
+    )
+    const defaultPaymentTerm = paymentTerms.find((term) => term.isDefault)
     const preferences = {
       primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
       theme: organization.preferences?.theme ?? "dark",
       colorTheme: organization.preferences?.colorTheme ?? "default",
       pricing: organization.preferences?.pricing ?? "INR",
-      defaultTerms: organization.preferences?.defaultTerms ?? "",
+      defaultTerms: defaultPaymentTerm?.text ?? organization.preferences?.defaultTerms ?? "",
+      paymentTerms,
     }
 
     savedThemeRef.current = {
@@ -371,11 +426,19 @@ function OrganizationTab() {
     setError(null)
 
     try {
+      const defaultPaymentTerm = form.preferences.paymentTerms.find((term) => term.isDefault)
+      const payload = {
+        ...form,
+        preferences: {
+          ...form.preferences,
+          defaultTerms: defaultPaymentTerm?.text ?? "",
+        },
+      }
       const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to save organization")
@@ -550,11 +613,67 @@ function OrganizationTab() {
     }
   }
 
-  const updatePreference = (field: keyof OrganizationFormState["preferences"], value: string) => {
+  const updatePreference = (
+    field: Exclude<keyof OrganizationFormState["preferences"], "paymentTerms">,
+    value: string,
+  ) => {
     setForm((current) => ({
       ...current,
       preferences: { ...current.preferences, [field]: value },
     }))
+  }
+
+  const updatePaymentTerms = (paymentTerms: PaymentTermTemplate[]) => {
+    const defaultPaymentTerm = paymentTerms.find((term) => term.isDefault)
+    setForm((current) => ({
+      ...current,
+      preferences: {
+        ...current.preferences,
+        paymentTerms,
+        defaultTerms: defaultPaymentTerm?.text ?? "",
+      },
+    }))
+  }
+
+  const addPaymentTerm = () => {
+    const nextTerm: PaymentTermTemplate = {
+      id: createPaymentTermId(),
+      name: "",
+      text: "",
+      isDefault: form.preferences.paymentTerms.length === 0,
+    }
+    updatePaymentTerms([...form.preferences.paymentTerms, nextTerm])
+  }
+
+  const updatePaymentTerm = (
+    id: string,
+    field: "name" | "text",
+    value: string,
+  ) => {
+    updatePaymentTerms(
+      form.preferences.paymentTerms.map((term) =>
+        term.id === id ? { ...term, [field]: value } : term,
+      ),
+    )
+  }
+
+  const setDefaultPaymentTerm = (id: string) => {
+    updatePaymentTerms(
+      form.preferences.paymentTerms.map((term) => ({
+        ...term,
+        isDefault: term.id === id,
+      })),
+    )
+  }
+
+  const deletePaymentTerm = (id: string) => {
+    const term = form.preferences.paymentTerms.find((item) => item.id === id)
+    if (!term) return
+    if (term.isDefault) {
+      toast.error("Choose another default payment term before deleting this one")
+      return
+    }
+    updatePaymentTerms(form.preferences.paymentTerms.filter((item) => item.id !== id))
   }
 
   const updateThemePreference = (value: OrganizationFormState["preferences"]["theme"]) => {
@@ -566,6 +685,13 @@ function OrganizationTab() {
     updatePreference("colorTheme", name)
     previewColorTheme(name)
   }
+
+  const paymentTerms = form.preferences.paymentTerms
+  const hasInvalidPaymentTerms = paymentTerms.some(
+    (term) => !term.name.trim() || !term.text.trim(),
+  )
+  const hasPaymentTermsWithoutDefault =
+    paymentTerms.length > 0 && !paymentTerms.some((term) => term.isDefault)
 
   return (
     <div className="space-y-6">
@@ -839,20 +965,81 @@ function OrganizationTab() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="defaultTerms">Default terms</Label>
-                <textarea
-                  id="defaultTerms"
-                  rows={5}
-                  value={form.preferences.defaultTerms}
-                  onChange={(event) => updatePreference("defaultTerms", event.target.value)}
-                  placeholder="Payment terms, quote validity, delivery terms..."
-                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                />
+              <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label>Payment terms</Label>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Save reusable templates for RFQs. The default is preselected when a quote is created.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addPaymentTerm} className="gap-2">
+                    <PlusIcon className="size-3.5" />
+                    Add term
+                  </Button>
+                </div>
+
+                {paymentTerms.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    Add a payment term template to make it available in RFQs.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {paymentTerms.map((term) => (
+                      <div key={term.id} className="rounded-lg border bg-card/70 p-3">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Input
+                            value={term.name}
+                            onChange={(event) => updatePaymentTerm(term.id, "name", event.target.value)}
+                            placeholder="Term name, e.g. Net 30"
+                            className="h-9 min-w-44 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant={term.isDefault ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => setDefaultPaymentTerm(term.id)}
+                            className="gap-1.5"
+                          >
+                            {term.isDefault && <CheckCircle2Icon className="size-3.5" />}
+                            {term.isDefault ? "Default" : "Make default"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deletePaymentTerm(term.id)}
+                            disabled={term.isDefault}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={term.text}
+                          onChange={(event) => updatePaymentTerm(term.id, "text", event.target.value)}
+                          placeholder="Payment due within 30 days from invoice date..."
+                          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {hasInvalidPaymentTerms && (
+                  <p className="text-xs text-destructive">Each payment term needs a name and text before saving.</p>
+                )}
+                {hasPaymentTermsWithoutDefault && (
+                  <p className="text-xs text-destructive">Choose one payment term as the default.</p>
+                )}
               </div>
 
               <div className="flex">
-                <Button onClick={saveOrganization} disabled={saving || !form.name.trim()}>
+                <Button
+                  onClick={saveOrganization}
+                  disabled={saving || !form.name.trim() || hasInvalidPaymentTerms || hasPaymentTermsWithoutDefault}
+                >
                   {saving && <Spinner data-icon="inline-start" />}
                   Save Organization
                 </Button>

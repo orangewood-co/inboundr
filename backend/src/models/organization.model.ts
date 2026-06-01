@@ -15,6 +15,14 @@ export interface IOrganizationPreferences {
   colorTheme: string;
   pricing: string;
   defaultTerms: string;
+  paymentTerms: IOrganizationPaymentTerm[];
+}
+
+export interface IOrganizationPaymentTerm {
+  id: string;
+  name: string;
+  text: string;
+  isDefault: boolean;
 }
 
 export interface IOrganizationLetterhead {
@@ -60,6 +68,17 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     colorTheme: { type: String, default: "default", trim: true },
     pricing: { type: String, default: "INR" },
     defaultTerms: { type: String, default: "" },
+    paymentTerms: {
+      type: [
+        {
+          id: { type: String, required: true, trim: true },
+          name: { type: String, required: true, trim: true },
+          text: { type: String, required: true, trim: true },
+          isDefault: { type: Boolean, default: false },
+        },
+      ],
+      default: [],
+    },
   },
   { _id: false }
 );

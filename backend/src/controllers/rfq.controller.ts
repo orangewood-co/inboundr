@@ -88,6 +88,11 @@ type RegrettedRFQLine = {
   quantity?: unknown;
   regretReason?: unknown;
 };
+type QuotePaymentTerms = {
+  paymentTermTemplateId: string | null;
+  paymentTermName: string | null;
+  paymentTerms: string | null;
+};
 
 function nullableString(value: unknown): string | null {
   if (value == null) return null;
@@ -99,6 +104,60 @@ function nullableNumber(value: unknown): number | null {
   if (value == null || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function defaultPaymentTermsFromOrganization(organization: any): QuotePaymentTerms {
+  const paymentTerms = organization.preferences?.paymentTerms;
+  const defaultTemplate = Array.isArray(paymentTerms)
+    ? paymentTerms.find((term) => term?.isDefault) ?? paymentTerms[0]
+    : null;
+
+  if (defaultTemplate?.text) {
+    return {
+      paymentTermTemplateId: nullableString(defaultTemplate.id),
+      paymentTermName: nullableString(defaultTemplate.name),
+      paymentTerms: nullableString(defaultTemplate.text),
+    };
+  }
+
+  return {
+    paymentTermTemplateId: null,
+    paymentTermName: organization.preferences?.defaultTerms ? "Default" : null,
+    paymentTerms: nullableString(organization.preferences?.defaultTerms),
+  };
+}
+
+function resolveQuotePaymentTerms(
+  body: Record<string, unknown> | undefined,
+  rfq: Partial<IRFQ>,
+  organization: any,
+  requireTerms = false
+): QuotePaymentTerms {
+  const source = body ?? {};
+  const hasPaymentTermPayload =
+    "paymentTerms" in source || "paymentTermTemplateId" in source || "paymentTermName" in source;
+
+  const terms = hasPaymentTermPayload
+    ? {
+        paymentTermTemplateId: nullableString(source.paymentTermTemplateId),
+        paymentTermName: nullableString(source.paymentTermName),
+        paymentTerms: nullableString(source.paymentTerms),
+      }
+    : rfq.paymentTerms
+      ? {
+          paymentTermTemplateId: nullableString(rfq.paymentTermTemplateId),
+          paymentTermName: nullableString(rfq.paymentTermName),
+          paymentTerms: nullableString(rfq.paymentTerms),
+        }
+      : defaultPaymentTermsFromOrganization(organization);
+
+  if (requireTerms && !terms.paymentTerms) {
+    const error = new Error("Payment terms are required to generate or send a quote");
+    (error as any).statusCode = 400;
+    throw error;
+  }
+
+  return terms;
 }
 
 function positiveNumber(value: unknown): number | null {
@@ -404,8 +463,12 @@ export const saveRFQDraft = async (
     }
 
     const products = resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
+    const paymentTerms = resolveQuotePaymentTerms(req.body ?? {}, rfq, organization);
     const savedAt = new Date();
     rfq.savedQuoteProducts = products;
+    rfq.paymentTermTemplateId = paymentTerms.paymentTermTemplateId;
+    rfq.paymentTermName = paymentTerms.paymentTermName;
+    rfq.paymentTerms = paymentTerms.paymentTerms;
     rfq.workflowStatus = "draft";
     rfq.draftSavedAt = savedAt;
     rfq.quoteNumber = null;
@@ -603,6 +666,7 @@ export const generateQuote = async (
         ? rfq.savedQuoteProducts
         : resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
     const quotedProducts = products.filter((p) => p.lineStatus !== "regretted");
+    const paymentTerms = resolveQuotePaymentTerms(req.body ?? {}, rfq, organization, true);
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
@@ -624,7 +688,7 @@ export const generateQuote = async (
       organizationContactName: organization.defaultContact?.name,
       organizationContactEmail: organization.defaultContact?.email,
       organizationContactPhone: organization.defaultContact?.phoneNumber,
-      organizationDefaultTerms: organization.preferences?.defaultTerms,
+      quotePaymentTerms: paymentTerms.paymentTerms,
       originalSubject: email?.subject || "",
       products: quotedProducts.map((p) => ({
         queryName: p.queryName,
@@ -639,6 +703,22 @@ export const generateQuote = async (
     });
 
     // Upsert: replace existing reply if regenerating
+    await RFQ.updateOne(
+      { _id: rfq._id },
+      {
+        $set: {
+          savedQuoteProducts: products,
+          paymentTermTemplateId: paymentTerms.paymentTermTemplateId,
+          paymentTermName: paymentTerms.paymentTermName,
+          paymentTerms: paymentTerms.paymentTerms,
+          workflowStatus: "draft",
+          draftSavedAt: new Date(),
+          quoteNumber: null,
+          processedAt: null,
+        },
+      }
+    );
+
     const reply = await RFQReply.findOneAndUpdate(
       { rfqId: rfq._id },
       {
@@ -647,6 +727,9 @@ export const generateQuote = async (
         gmailAccountId: rfq.gmailAccountId,
         rfqId: rfq._id,
         selectedProducts: quotedProducts,
+        paymentTermTemplateId: paymentTerms.paymentTermTemplateId,
+        paymentTermName: paymentTerms.paymentTermName,
+        paymentTerms: paymentTerms.paymentTerms ?? "",
         subject,
         body,
         to: originalSenderEmail,
@@ -662,7 +745,9 @@ export const generateQuote = async (
     res.json(reply);
   } catch (err: any) {
     console.error("Error generating quote:", err);
-    res.status(500).json({ error: err.message || "Failed to generate quote" });
+    res.status(err.statusCode || 500).json({
+      error: err.message || "Failed to generate quote",
+    });
   }
 };
 
@@ -743,6 +828,12 @@ export const sendQuoteReply = async (
       return;
     }
 
+    const paymentTerms = reply.paymentTerms || rfq.paymentTerms;
+    if (!paymentTerms?.trim()) {
+      res.status(400).json({ error: "Payment terms are required to send a quote" });
+      return;
+    }
+
     await RFQReply.updateOne(
       { _id: reply._id },
       { sendStatus: "sending", sendErrorMessage: null }
@@ -753,7 +844,7 @@ export const sendQuoteReply = async (
         rfq: rfq as any,
         reply: reply as any,
         organization: await resolveOrganizationPdfBranding(organization),
-        terms: organization.preferences?.defaultTerms,
+        terms: paymentTerms,
       });
       const gmailMessageId = await sendQuoteOnGmailThread({
         account,

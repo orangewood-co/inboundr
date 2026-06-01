@@ -47,7 +47,7 @@ Hard rules:
   2) One short line thanking them for the enquiry and confirming the quote below.
   3) An itemised table-like list of products. For each item include: serial number, product description, brand, product code, HSN code, GST rate, quantity, unit price, line total. Use aligned plain-text columns or a clean numbered list — pick whichever renders cleanly in plain text.
   4) Pricing summary: subtotal, discount (only if non-zero), GST total, grand total. Use the exact values from the "Pricing summary" block.
-  5) Standard terms — use the organization's default terms verbatim if provided; otherwise mention: prices subject to availability, validity 15 days from quote date, payment terms as per discussion, GST extra as applicable, delivery timeline to be confirmed on order.
+  5) Standard terms — use the quote payment terms verbatim if provided; otherwise mention: prices subject to availability, validity 15 days from quote date, payment terms as per discussion, GST extra as applicable, delivery timeline to be confirmed on order.
   6) A short closing line inviting questions.
   7) Sign-off using the organization's contact name, organization name, email and phone when provided. Do not invent contact details.
 
@@ -75,7 +75,7 @@ export interface QuoteInput {
   organizationContactName?: string | null;
   organizationContactEmail?: string | null;
   organizationContactPhone?: string | null;
-  organizationDefaultTerms?: string | null;
+  quotePaymentTerms?: string | null;
   originalSubject: string;
   products: {
     queryName: string;
@@ -247,7 +247,7 @@ Organization:
 - Contact name: ${input.organizationContactName || "BTSA Sales Team"}
 - Contact email: ${input.organizationContactEmail || "N/A"}
 - Contact phone: ${input.organizationContactPhone || "N/A"}
-- Default terms: ${input.organizationDefaultTerms || "Prices subject to availability. Validity 15 days from quote date. Payment terms as per discussion. GST extra as applicable. Delivery timeline to be confirmed on order."}
+- Payment terms: ${input.quotePaymentTerms || "Prices subject to availability. Validity 15 days from quote date. Payment terms as per discussion. GST extra as applicable. Delivery timeline to be confirmed on order."}
 
 ${customerContext}
 
