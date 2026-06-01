@@ -1766,6 +1766,13 @@ export function DashboardPage() {
                       .
                     </div>
                   )}
+                  {detail.workflowStatus === "processed" && (
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                      <span className="font-semibold">Quote number:</span>{" "}
+                      {detail.quoteNumber || "Entered"}
+                      {detail.processedAt ? ` · Processed ${formatFullDate(detail.processedAt)}` : ""}
+                    </div>
+                  )}
                 </div>
 
                 {/* Customer Info */}
