@@ -66,6 +66,7 @@ interface DraftRFQ {
   savedQuoteProducts: RFQSavedQuoteProduct[]
   paymentTermName?: string | null
   paymentTerms?: string | null
+  quoteNotes?: string | null
   draftSavedAt: string | null
   createdAt: string
 }
@@ -471,6 +472,26 @@ export function OrdersPage() {
                   <div className="rounded-lg border border-dashed bg-muted/10 px-3 py-2.5">
                     <p className="text-sm text-muted-foreground">
                       No payment terms were saved with this draft.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-b px-6 py-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <ClipboardListIcon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Internal Quote Notes</h2>
+                </div>
+                {selectedDraft.quoteNotes?.trim() ? (
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                      {selectedDraft.quoteNotes}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed bg-muted/10 px-3 py-2.5">
+                    <p className="text-sm text-muted-foreground">
+                      No internal quote notes were saved with this draft.
                     </p>
                   </div>
                 )}

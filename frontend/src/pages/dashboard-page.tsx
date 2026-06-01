@@ -170,6 +170,7 @@ interface RFQSummary {
   paymentTermTemplateId?: string | null
   paymentTermName?: string | null
   paymentTerms?: string | null
+  quoteNotes?: string | null
   quoteNumber?: string | null
   draftSavedAt?: string | null
   processedAt?: string | null
@@ -528,6 +529,7 @@ export function DashboardPage() {
   const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>("")
   const [paymentTermName, setPaymentTermName] = useState<string>("")
   const [paymentTermsText, setPaymentTermsText] = useState<string>("")
+  const [quoteNotes, setQuoteNotes] = useState<string>("")
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archivingRfq, setArchivingRfq] = useState(false)
 
@@ -645,6 +647,7 @@ export function DashboardPage() {
       setSelectedPaymentTermId("")
       setPaymentTermName("")
       setPaymentTermsText("")
+      setQuoteNotes("")
     }
   }, [selectedId, fetchDetail, fetchReply])
 
@@ -738,6 +741,11 @@ export function DashboardPage() {
     setPaymentTermName(defaultTemplate?.name ?? "")
     setPaymentTermsText(defaultTemplate?.text ?? "")
   }, [detail, paymentTermTemplates])
+
+  useEffect(() => {
+    if (!detail) return
+    setQuoteNotes(detail.quoteNotes ?? "")
+  }, [detail])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1130,6 +1138,7 @@ export function DashboardPage() {
       paymentTermTemplateId: selectedPaymentTermId || null,
       paymentTermName: paymentTermName.trim() || null,
       paymentTerms: paymentTermsText.trim(),
+      quoteNotes: quoteNotes.trim(),
     }
   }
 
@@ -2316,6 +2325,22 @@ export function DashboardPage() {
                           Payment terms are required before generating or sending the quote.
                         </p>
                       )}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border bg-muted/15 p-4">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold">Internal Quote Notes</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          These notes stay inside and are not included in the quote email or PDF.
+                        </p>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={quoteNotes}
+                        onChange={(event) => setQuoteNotes(event.target.value)}
+                        placeholder="Add follow-up context, approvals, or internal reminders for this quote..."
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      />
                     </div>
 
                     {/* Generate Quote Button */}

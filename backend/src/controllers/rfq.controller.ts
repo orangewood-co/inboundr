@@ -464,11 +464,14 @@ export const saveRFQDraft = async (
 
     const products = resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
     const paymentTerms = resolveQuotePaymentTerms(req.body ?? {}, rfq, organization);
+    const quoteNotes =
+      req.body && "quoteNotes" in req.body ? nullableString(req.body.quoteNotes) : rfq.quoteNotes ?? null;
     const savedAt = new Date();
     rfq.savedQuoteProducts = products;
     rfq.paymentTermTemplateId = paymentTerms.paymentTermTemplateId;
     rfq.paymentTermName = paymentTerms.paymentTermName;
     rfq.paymentTerms = paymentTerms.paymentTerms;
+    rfq.quoteNotes = quoteNotes;
     rfq.workflowStatus = "draft";
     rfq.draftSavedAt = savedAt;
     rfq.quoteNumber = null;
@@ -667,6 +670,8 @@ export const generateQuote = async (
         : resolveSelectedProducts(rfq, selections, manualProducts, regrettedLines);
     const quotedProducts = products.filter((p) => p.lineStatus !== "regretted");
     const paymentTerms = resolveQuotePaymentTerms(req.body ?? {}, rfq, organization, true);
+    const quoteNotes =
+      req.body && "quoteNotes" in req.body ? nullableString(req.body.quoteNotes) : rfq.quoteNotes ?? null;
 
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
@@ -711,6 +716,7 @@ export const generateQuote = async (
           paymentTermTemplateId: paymentTerms.paymentTermTemplateId,
           paymentTermName: paymentTerms.paymentTermName,
           paymentTerms: paymentTerms.paymentTerms,
+          quoteNotes,
           workflowStatus: "draft",
           draftSavedAt: new Date(),
           quoteNumber: null,

@@ -72,6 +72,7 @@ export interface IRFQ extends Document {
   paymentTermTemplateId: string | null;
   paymentTermName: string | null;
   paymentTerms: string | null;
+  quoteNotes: string | null;
   quoteNumber: string | null;
   draftSavedAt: Date | null;
   processedAt: Date | null;
@@ -196,6 +197,7 @@ const rfqSchema = new Schema<IRFQ>(
     paymentTermTemplateId: { type: String, default: null, trim: true },
     paymentTermName: { type: String, default: null, trim: true },
     paymentTerms: { type: String, default: null, trim: true },
+    quoteNotes: { type: String, default: null, trim: true },
     quoteNumber: { type: String, default: null },
     draftSavedAt: { type: Date, default: null },
     processedAt: { type: Date, default: null },
