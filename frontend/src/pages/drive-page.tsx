@@ -2,20 +2,42 @@ import * as React from "react"
 import { toast } from "sonner"
 import {
   DownloadIcon,
+  Edit3Icon,
   EyeIcon,
+  FileArchiveIcon,
+  FileAudioIcon,
   FileIcon,
+  FileTextIcon,
+  FileVideoIcon,
   FolderIcon,
+  FolderInputIcon,
+  FolderPlusIcon,
+  HardDriveIcon,
+  ImageIcon,
+  LayoutGridIcon,
   LinkIcon,
+  ListIcon,
   MoreHorizontalIcon,
   RotateCcwIcon,
   SearchIcon,
   Share2Icon,
   Trash2Icon,
   UploadIcon,
+  Users2Icon,
 } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
+import { CopyableText } from "@/components/copy-button"
+import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import {
   Dialog,
   DialogContent,
@@ -34,13 +56,22 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 import {
   canPreview,
   createDriveExport,
@@ -67,18 +98,90 @@ import {
 } from "@/lib/drive"
 
 type DriveView = "my" | "shared" | "trash"
+type LayoutMode = "list" | "grid"
+
+const LAYOUT_STORAGE_KEY = "drive:layout"
+
+function getInitialLayout(): LayoutMode {
+  if (typeof window === "undefined") return "list"
+  return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "grid" ? "grid" : "list"
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000)
+  const divisions = [
+    { amount: 60, unit: "second" },
+    { amount: 60, unit: "minute" },
+    { amount: 24, unit: "hour" },
+    { amount: 7, unit: "day" },
+    { amount: 4.345, unit: "week" },
+    { amount: 12, unit: "month" },
+    { amount: Number.POSITIVE_INFINITY, unit: "year" },
+  ] as const
+
+  let duration = diffInSeconds
+  for (const division of divisions) {
+    if (Math.abs(duration) < division.amount) {
+      return new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" }).format(
+        Math.round(duration),
+        division.unit
+      )
+    }
+    duration /= division.amount
+  }
+
+  return "-"
+}
+
+function iconForNode(node: DriveNode): { Icon: typeof FileIcon; className: string } {
+  if (node.type === "folder") return { Icon: FolderIcon, className: "text-sky-500" }
+  const type = node.contentType ?? ""
+  const name = node.name.toLowerCase()
+  if (type.startsWith("image/")) return { Icon: ImageIcon, className: "text-violet-500" }
+  if (type.startsWith("video/")) return { Icon: FileVideoIcon, className: "text-rose-500" }
+  if (type.startsWith("audio/")) return { Icon: FileAudioIcon, className: "text-amber-500" }
+  if (type === "application/pdf" || type.startsWith("text/")) {
+    return { Icon: FileTextIcon, className: "text-emerald-500" }
+  }
+  if (/\.(zip|rar|7z|tar|gz|bz2)$/.test(name) || type.includes("zip") || type.includes("compressed")) {
+    return { Icon: FileArchiveIcon, className: "text-orange-500" }
+  }
+  return { Icon: FileIcon, className: "text-muted-foreground" }
+}
 
 export default function DrivePage() {
   const [nodes, setNodes] = React.useState<DriveNode[]>([])
   const [view, setView] = React.useState<DriveView>("my")
+  const [layout, setLayout] = React.useState<LayoutMode>(getInitialLayout)
   const [parent, setParent] = React.useState<DriveNode | null>(null)
   const [breadcrumbs, setBreadcrumbs] = React.useState<DriveNode[]>([])
   const [search, setSearch] = React.useState("")
+  const [debouncedSearch, setDebouncedSearch] = React.useState("")
   const [loading, setLoading] = React.useState(true)
-  const [uploadProgress, setUploadProgress] = React.useState<number | null>(null)
+  const [upload, setUpload] = React.useState<{ name: string; progress: number } | null>(null)
   const [viewer, setViewer] = React.useState<{ node: DriveNode; url: string } | null>(null)
   const [sharingNode, setSharingNode] = React.useState<DriveNode | null>(null)
+  const [folderDialog, setFolderDialog] = React.useState<{ mode: "create" | "rename"; node?: DriveNode } | null>(null)
+  const [moveNodeTarget, setMoveNodeTarget] = React.useState<DriveNode | null>(null)
+  const [deleteTarget, setDeleteTarget] = React.useState<DriveNode | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => window.clearTimeout(timeout)
+  }, [search])
 
   const loadNodes = React.useCallback(async () => {
     setLoading(true)
@@ -86,7 +189,7 @@ export default function DrivePage() {
       const response = await listDriveNodes({
         parentId: view === "my" ? parent?._id : null,
         view,
-        search,
+        search: debouncedSearch,
       })
       setNodes(response.nodes)
     } catch (err: any) {
@@ -94,11 +197,22 @@ export default function DrivePage() {
     } finally {
       setLoading(false)
     }
-  }, [parent?._id, search, view])
+  }, [parent?._id, debouncedSearch, view])
 
   React.useEffect(() => {
     void loadNodes()
   }, [loadNodes])
+
+  function changeLayout(next: LayoutMode) {
+    setLayout(next)
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, next)
+  }
+
+  function changeView(next: DriveView) {
+    setView(next)
+    setParent(null)
+    setBreadcrumbs([])
+  }
 
   function openFolder(node: DriveNode) {
     setView("my")
@@ -120,15 +234,17 @@ export default function DrivePage() {
   async function handleUpload(files: FileList | null) {
     const file = files?.[0]
     if (!file) return
-    setUploadProgress(0)
+    setUpload({ name: file.name, progress: 0 })
     try {
-      await uploadDriveFile(file, parent?._id ?? null, setUploadProgress)
+      await uploadDriveFile(file, parent?._id ?? null, (progress) =>
+        setUpload({ name: file.name, progress })
+      )
       toast.success("File uploaded")
       await loadNodes()
     } catch (err: any) {
       toast.error(err.message || "Upload failed")
     } finally {
-      setUploadProgress(null)
+      setUpload(null)
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
@@ -174,52 +290,16 @@ export default function DrivePage() {
     toast.info("Export is still running. Try download again shortly.")
   }
 
-  async function createFolder() {
-    const name = window.prompt("Folder name")
-    if (!name?.trim()) return
-    try {
-      await createDriveFolder(name, parent?._id ?? null)
-      toast.success("Folder created")
-      await loadNodes()
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create folder")
-    }
+  function activateNode(node: DriveNode) {
+    if (node.type === "folder") openFolder(node)
+    else if (canPreview(node)) void openViewer(node)
+    else void downloadNode(node)
   }
 
-  async function renameNode(node: DriveNode) {
-    const name = window.prompt("New name", node.name)
-    if (!name?.trim() || name === node.name) return
+  async function moveToTrash(node: DriveNode) {
     try {
-      await renameDriveNode(node._id, name)
-      toast.success("Renamed")
-      await loadNodes()
-    } catch (err: any) {
-      toast.error(err.message || "Rename failed")
-    }
-  }
-
-  async function moveNode(node: DriveNode) {
-    const parentId = window.prompt("Destination folder ID. Leave empty for root.")
-    if (parentId === null) return
-    try {
-      await moveDriveNode(node._id, parentId.trim() || null)
-      toast.success("Moved")
-      await loadNodes()
-    } catch (err: any) {
-      toast.error(err.message || "Move failed")
-    }
-  }
-
-  async function removeNode(node: DriveNode) {
-    try {
-      if (view === "trash") {
-        if (!window.confirm(`Permanently delete ${node.name}? This cannot be undone.`)) return
-        await permanentlyDeleteDriveNode(node._id)
-        toast.success("Deleted permanently")
-      } else {
-        await trashDriveNode(node._id)
-        toast.success("Moved to Trash")
-      }
+      await trashDriveNode(node._id)
+      toast.success("Moved to Trash")
       await loadNodes()
     } catch (err: any) {
       toast.error(err.message || "Delete failed")
@@ -236,151 +316,612 @@ export default function DrivePage() {
     }
   }
 
+  const isEmpty = !loading && nodes.length === 0
+
+  function renderActions(node: DriveNode) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+            <MoreHorizontalIcon className="size-4" />
+            <span className="sr-only">Actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          {node.type === "file" && canPreview(node) && (
+            <DropdownMenuItem onClick={() => void openViewer(node)}>
+              <EyeIcon className="size-4" />
+              Preview
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => void downloadNode(node)}>
+            <DownloadIcon className="size-4" />
+            Download
+          </DropdownMenuItem>
+          {view !== "trash" && (
+            <>
+              <DropdownMenuItem onClick={() => setFolderDialog({ mode: "rename", node })}>
+                <Edit3Icon className="size-4" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMoveNodeTarget(node)}>
+                <FolderInputIcon className="size-4" />
+                Move
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSharingNode(node)}>
+                <Share2Icon className="size-4" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {view === "trash" && (
+            <DropdownMenuItem onClick={() => void restoreNode(node)}>
+              <RotateCcwIcon className="size-4" />
+              Restore
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => (view === "trash" ? setDeleteTarget(node) : void moveToTrash(node))}
+          >
+            <Trash2Icon className="size-4" />
+            {view === "trash" ? "Delete forever" : "Move to Trash"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
   return (
-    <AppLayout>
-      <div className="flex h-svh flex-col overflow-hidden p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-heading text-2xl font-semibold">Drive</h1>
-            <p className="text-sm text-muted-foreground">Store, preview, organize, and share organization files.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" className="hidden" onChange={(event) => void handleUpload(event.target.files)} />
-            <Button variant="outline" onClick={createFolder}>
-              <FolderIcon className="size-4" />
-              New folder
-            </Button>
-            <Button onClick={() => fileInputRef.current?.click()}>
-              <UploadIcon className="size-4" />
-              Upload
-            </Button>
-          </div>
-        </div>
+    <TooltipProvider>
+      <AppLayout>
+        <SiteHeader breadcrumbs={[{ label: "Drive" }]} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(event) => void handleUpload(event.target.files)}
+          />
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          {(["my", "shared", "trash"] as DriveView[]).map((item) => (
-            <Button key={item} variant={view === item ? "default" : "outline"} size="sm" onClick={() => { setView(item); setParent(null); setBreadcrumbs([]) }}>
-              {item === "my" ? "My files" : item === "shared" ? "Shared with me" : "Trash"}
-            </Button>
-          ))}
-          <div className="relative ml-auto min-w-64">
-            <SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Drive" className="pl-9" />
-          </div>
-        </div>
-
-        {view === "my" && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <button className="hover:text-foreground" onClick={() => jumpToCrumb(-1)}>Drive</button>
-            {breadcrumbs.map((crumb, index) => (
-              <React.Fragment key={crumb._id}>
-                <span>/</span>
-                <button className="hover:text-foreground" onClick={() => jumpToCrumb(index)}>{crumb.name}</button>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-
-        {uploadProgress !== null && (
-          <div className="mt-4 rounded-lg border bg-card p-3 text-sm">
-            Uploading file: {uploadProgress}%
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-              <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} />
+          <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <HardDriveIcon className="size-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Drive</h2>
+              {!loading && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                  {nodes.length.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setFolderDialog({ mode: "create" })}>
+                <FolderPlusIcon className="size-4" />
+                New folder
+              </Button>
+              <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+                <UploadIcon className="size-4" />
+                Upload
+              </Button>
             </div>
           </div>
-        )}
 
-        <div className="mt-4 min-h-0 flex-1 overflow-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Size</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {nodes.map((node) => (
-                <TableRow key={node._id}>
-                  <TableCell>
-                    <button
-                      className="flex items-center gap-2 font-medium hover:text-primary"
-                      onClick={() => node.type === "folder" ? openFolder(node) : canPreview(node) ? void openViewer(node) : void downloadNode(node)}
+          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+            <Tabs value={view} onValueChange={(value) => changeView(value as DriveView)}>
+              <TabsList>
+                <TabsTrigger value="my">My files</TabsTrigger>
+                <TabsTrigger value="shared">Shared with me</TabsTrigger>
+                <TabsTrigger value="trash">Trash</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="relative ml-auto min-w-56 flex-1 sm:max-w-xs">
+              <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search Drive"
+                className="pl-9"
+              />
+            </div>
+
+            <div className="flex items-center rounded-lg border p-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={layout === "list" ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    onClick={() => changeLayout("list")}
+                  >
+                    <ListIcon className="size-4" />
+                    <span className="sr-only">List view</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>List view</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={layout === "grid" ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    onClick={() => changeLayout("grid")}
+                  >
+                    <LayoutGridIcon className="size-4" />
+                    <span className="sr-only">Grid view</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Grid view</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+
+          {view === "my" && (
+            <div className="border-b px-4 py-2.5">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    {breadcrumbs.length === 0 ? (
+                      <BreadcrumbPage className="flex items-center gap-1.5">
+                        <HardDriveIcon className="size-3.5" />
+                        Drive
+                      </BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5"
+                          onClick={() => jumpToCrumb(-1)}
+                        >
+                          <HardDriveIcon className="size-3.5" />
+                          Drive
+                        </button>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                  {breadcrumbs.map((crumb, index) => {
+                    const isLast = index === breadcrumbs.length - 1
+                    return (
+                      <React.Fragment key={crumb._id}>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          {isLast ? (
+                            <BreadcrumbPage>{crumb.name}</BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink asChild>
+                              <button type="button" onClick={() => jumpToCrumb(index)}>
+                                {crumb.name}
+                              </button>
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    )
+                  })}
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          )}
+
+          {upload && (
+            <div className="mx-4 mt-3 flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-sm shadow-xs">
+              <Spinner className="size-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">{upload.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{upload.progress}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${upload.progress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loading ? (
+            <DriveSkeleton layout={layout} />
+          ) : isEmpty ? (
+            <DriveEmptyState view={view} search={debouncedSearch} hasParent={Boolean(parent)} />
+          ) : layout === "list" ? (
+            <div className="flex-1 overflow-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <th className="px-5 py-2.5">Name</th>
+                    <th className="px-5 py-2.5">Type</th>
+                    <th className="px-5 py-2.5">Size</th>
+                    <th className="px-5 py-2.5">Access</th>
+                    <th className="px-5 py-2.5">Updated</th>
+                    <th className="w-12 px-3 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody className="animate-in fade-in-0 duration-300">
+                  {nodes.map((node) => {
+                    const { Icon, className } = iconForNode(node)
+                    return (
+                      <tr
+                        key={node._id}
+                        className="group cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/30"
+                        onClick={() => activateNode(node)}
+                      >
+                        <td className="px-5 py-3 align-middle">
+                          <div className="flex items-center gap-2.5 font-medium">
+                            <Icon className={cn("size-4 shrink-0", className)} />
+                            <span className="truncate">{node.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-muted-foreground">
+                          {node.type === "folder" ? "Folder" : node.contentType || "File"}
+                        </td>
+                        <td className="px-5 py-3 align-middle tabular-nums text-muted-foreground">
+                          {node.type === "folder" ? "-" : formatBytes(node.size)}
+                        </td>
+                        <td className="px-5 py-3 align-middle capitalize text-muted-foreground">
+                          {node.role ?? "viewer"}
+                        </td>
+                        <td className="px-5 py-3 align-middle text-muted-foreground">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default">{formatRelativeTime(node.updatedAt)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>{formatDate(node.updatedAt)}</TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="px-3 py-3 align-middle" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end opacity-0 transition-opacity group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                            {renderActions(node)}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-auto p-4">
+              <div className="grid grid-cols-2 gap-3 animate-in fade-in-0 duration-300 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {nodes.map((node) => {
+                  const { Icon, className } = iconForNode(node)
+                  return (
+                    <div
+                      key={node._id}
+                      className="group relative flex cursor-pointer flex-col gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-muted/30"
+                      onClick={() => activateNode(node)}
                     >
-                      {node.type === "folder" ? <FolderIcon className="size-4 text-primary" /> : <FileIcon className="size-4 text-muted-foreground" />}
-                      {node.name}
-                    </button>
-                  </TableCell>
-                  <TableCell>{node.type === "folder" ? "Folder" : node.contentType || "File"}</TableCell>
-                  <TableCell>{node.type === "folder" ? "-" : formatBytes(node.size)}</TableCell>
-                  <TableCell>{node.role ?? "viewer"}</TableCell>
-                  <TableCell>{new Date(node.updatedAt).toLocaleString()}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm">
-                          <MoreHorizontalIcon className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {node.type === "file" && canPreview(node) && (
-                          <DropdownMenuItem onClick={() => void openViewer(node)}>
-                            <EyeIcon className="size-4" />
-                            Preview
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => void downloadNode(node)}>
-                          <DownloadIcon className="size-4" />
-                          Download
-                        </DropdownMenuItem>
-                        {view !== "trash" && (
-                          <>
-                            <DropdownMenuItem onClick={() => renameNode(node)}>Rename</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => moveNode(node)}>Move</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setSharingNode(node)}>
-                              <Share2Icon className="size-4" />
-                              Share
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        {view === "trash" ? (
-                          <DropdownMenuItem onClick={() => void restoreNode(node)}>
-                            <RotateCcwIcon className="size-4" />
-                            Restore
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem variant="destructive" onClick={() => void removeNode(node)}>
-                          <Trash2Icon className="size-4" />
-                          {view === "trash" ? "Delete forever" : "Move to Trash"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!loading && nodes.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No Drive items found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                      <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                        {renderActions(node)}
+                      </div>
+                      <div className="flex h-20 items-center justify-center rounded-lg bg-muted/40">
+                        <Icon className={cn("size-9", className)} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium" title={node.name}>
+                          {node.name}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {node.type === "folder" ? "Folder" : formatBytes(node.size)}
+                          {" · "}
+                          {formatRelativeTime(node.updatedAt)}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </AppLayout>
 
       <FileViewerDialog viewer={viewer} onOpenChange={(open) => !open && setViewer(null)} />
       <ShareDialog node={sharingNode} onOpenChange={(open) => !open && setSharingNode(null)} />
-    </AppLayout>
+      <FolderNameDialog
+        state={folderDialog}
+        onOpenChange={(open) => !open && setFolderDialog(null)}
+        onDone={loadNodes}
+        parentId={parent?._id ?? null}
+      />
+      <MoveDialog
+        node={moveNodeTarget}
+        onOpenChange={(open) => !open && setMoveNodeTarget(null)}
+        onDone={loadNodes}
+      />
+      <DeleteDialog
+        node={deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onDone={loadNodes}
+      />
+    </TooltipProvider>
   )
 }
 
-function FileViewerDialog({ viewer, onOpenChange }: { viewer: { node: DriveNode; url: string } | null; onOpenChange: (open: boolean) => void }) {
+function DriveSkeleton({ layout }: { layout: LayoutMode }) {
+  if (layout === "grid") {
+    return (
+      <div className="flex-1 overflow-auto p-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-3 rounded-xl border bg-card p-3">
+              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="flex-1 divide-y overflow-hidden">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div key={index} className="grid grid-cols-[2fr_1fr_0.6fr_0.6fr_1fr_3rem] items-center gap-4 px-5 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="size-4 rounded" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="size-8 rounded-lg justify-self-end" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DriveEmptyState({
+  view,
+  search,
+  hasParent,
+}: {
+  view: DriveView
+  search: string
+  hasParent: boolean
+}) {
+  let Icon = FolderIcon
+  let title = "This folder is empty"
+  let description = "Upload a file or create a folder to get started."
+
+  if (search) {
+    Icon = SearchIcon
+    title = "No matches found"
+    description = "Try a different file or folder name."
+  } else if (view === "shared") {
+    Icon = Users2Icon
+    title = "Nothing shared with you"
+    description = "Files and folders shared by your team will appear here."
+  } else if (view === "trash") {
+    Icon = Trash2Icon
+    title = "Trash is empty"
+    description = "Items you delete will rest here before being removed permanently."
+  } else if (!hasParent) {
+    Icon = HardDriveIcon
+    title = "Your Drive is empty"
+    description = "Upload a file or create a folder to get started."
+  }
+
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+      <div className="flex size-11 items-center justify-center rounded-full bg-muted">
+        <Icon className="size-5 text-muted-foreground" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function FolderNameDialog({
+  state,
+  onOpenChange,
+  onDone,
+  parentId,
+}: {
+  state: { mode: "create" | "rename"; node?: DriveNode } | null
+  onOpenChange: (open: boolean) => void
+  onDone: () => Promise<void> | void
+  parentId: string | null
+}) {
+  const [name, setName] = React.useState("")
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (state) setName(state.mode === "rename" ? state.node?.name ?? "" : "")
+  }, [state])
+
+  const isRename = state?.mode === "rename"
+
+  async function submit() {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    if (isRename && trimmed === state?.node?.name) {
+      onOpenChange(false)
+      return
+    }
+    setSaving(true)
+    try {
+      if (isRename && state?.node) {
+        await renameDriveNode(state.node._id, trimmed)
+        toast.success("Renamed")
+      } else {
+        await createDriveFolder(trimmed, parentId)
+        toast.success("Folder created")
+      }
+      onOpenChange(false)
+      await onDone()
+    } catch (err: any) {
+      toast.error(err.message || (isRename ? "Rename failed" : "Failed to create folder"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(state)} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{isRename ? "Rename" : "New folder"}</DialogTitle>
+          <DialogDescription>
+            {isRename ? "Enter a new name for this item." : "Give your folder a name."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor="drive-folder-name">Name</Label>
+          <Input
+            id="drive-folder-name"
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault()
+                void submit()
+              }
+            }}
+            placeholder={isRename ? "Item name" : "Untitled folder"}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving || !name.trim()}>
+            {saving && <Spinner data-icon="inline-start" />}
+            {isRename ? "Save" : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function MoveDialog({
+  node,
+  onOpenChange,
+  onDone,
+}: {
+  node: DriveNode | null
+  onOpenChange: (open: boolean) => void
+  onDone: () => Promise<void> | void
+}) {
+  const [target, setTarget] = React.useState("")
+  const [saving, setSaving] = React.useState(false)
+
+  React.useEffect(() => {
+    if (node) setTarget("")
+  }, [node])
+
+  async function submit() {
+    if (!node) return
+    setSaving(true)
+    try {
+      await moveDriveNode(node._id, target.trim() || null)
+      toast.success("Moved")
+      onOpenChange(false)
+      await onDone()
+    } catch (err: any) {
+      toast.error(err.message || "Move failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Move {node?.name}</DialogTitle>
+          <DialogDescription>
+            Paste the destination folder ID, or leave it empty to move to the Drive root.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor="drive-move-target">Destination folder ID</Label>
+          <Input
+            id="drive-move-target"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder="Leave empty for Drive root"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={() => void submit()} disabled={saving}>
+            {saving && <Spinner data-icon="inline-start" />}
+            Move
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteDialog({
+  node,
+  onOpenChange,
+  onDone,
+}: {
+  node: DriveNode | null
+  onOpenChange: (open: boolean) => void
+  onDone: () => Promise<void> | void
+}) {
+  const [deleting, setDeleting] = React.useState(false)
+
+  async function submit() {
+    if (!node) return
+    setDeleting(true)
+    try {
+      await permanentlyDeleteDriveNode(node._id)
+      toast.success("Deleted permanently")
+      onOpenChange(false)
+      await onDone()
+    } catch (err: any) {
+      toast.error(err.message || "Delete failed")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>Delete forever</DialogTitle>
+          <DialogDescription>
+            Permanently delete <span className="font-medium text-foreground">{node?.name}</span>? This
+            cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={() => void submit()} disabled={deleting}>
+            {deleting && <Spinner data-icon="inline-start" />}
+            Delete forever
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function FileViewerDialog({
+  viewer,
+  onOpenChange,
+}: {
+  viewer: { node: DriveNode; url: string } | null
+  onOpenChange: (open: boolean) => void
+}) {
   const type = viewer?.node.contentType ?? ""
   return (
     <Dialog open={Boolean(viewer)} onOpenChange={onOpenChange}>
@@ -419,7 +960,10 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
   const refresh = React.useCallback(async () => {
     if (!node) return
     try {
-      const [shareResponse, linkResponse] = await Promise.all([listDriveShares(node._id), listDrivePublicLinks(node._id)])
+      const [shareResponse, linkResponse] = await Promise.all([
+        listDriveShares(node._id),
+        listDrivePublicLinks(node._id),
+      ])
       setShares(shareResponse.shares)
       setLinks(linkResponse.links)
     } catch (err: any) {
@@ -461,24 +1005,46 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Share {node?.name}</DialogTitle>
-          <DialogDescription>Internal editors can modify content. Public links are view-only and expire in 30 days by default.</DialogDescription>
+          <DialogDescription>
+            Internal editors can modify content. Public links are view-only and expire in 30 days by default.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <div className="space-y-2">
             <Label>Share with organization user</Label>
             <div className="flex gap-2">
-              <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@company.com" />
-              <select className="rounded-md border bg-background px-3 text-sm" value={role} onChange={(event) => setRole(event.target.value as "viewer" | "editor")}>
-                <option value="viewer">Viewer</option>
-                <option value="editor">Editor</option>
-              </select>
+              <Input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="teammate@company.com"
+              />
+              <Select value={role} onValueChange={(value) => setRole(value as "viewer" | "editor")}>
+                <SelectTrigger className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                </SelectContent>
+              </Select>
               <Button onClick={() => void addShare()}>Share</Button>
             </div>
             <div className="space-y-2">
               {shares.map((share) => (
-                <div key={share.userId} className="flex items-center justify-between rounded-md border p-2 text-sm">
-                  <span>{share.user?.email ?? share.userId} · {share.role}</span>
-                  <Button variant="ghost" size="sm" onClick={() => node && void unshareDriveNode(node._id, share.userId).then(refresh)}>Remove</Button>
+                <div
+                  key={share.userId}
+                  className="flex items-center justify-between rounded-md border p-2 text-sm"
+                >
+                  <span>
+                    {share.user?.email ?? share.userId} · <span className="capitalize">{share.role}</span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => node && void unshareDriveNode(node._id, share.userId).then(refresh)}
+                  >
+                    Remove
+                  </Button>
                 </div>
               ))}
             </div>
@@ -486,7 +1052,11 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
           <div className="space-y-2">
             <Label>Public view link</Label>
             <div className="flex gap-2">
-              <Input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Optional password" />
+              <Input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Optional password"
+              />
               <Button onClick={() => void createLink()}>
                 <LinkIcon className="size-4" />
                 Create
@@ -494,9 +1064,20 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
             </div>
             <div className="space-y-2">
               {links.map((link) => (
-                <div key={link._id} className="flex items-center justify-between gap-2 rounded-md border p-2 text-sm">
-                  <button className="truncate text-left hover:text-primary" onClick={() => void navigator.clipboard.writeText(link.shareUrl).then(() => toast.success("Copied"))}>{link.shareUrl}</button>
-                  <Button variant="ghost" size="sm" onClick={() => node && void revokeDrivePublicLink(node._id, link._id).then(refresh)}>Revoke</Button>
+                <div
+                  key={link._id}
+                  className="group flex items-center justify-between gap-2 rounded-md border p-2 text-sm"
+                >
+                  <CopyableText value={link.shareUrl} label="Link copied" className="min-w-0">
+                    <span className="truncate">{link.shareUrl}</span>
+                  </CopyableText>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => node && void revokeDrivePublicLink(node._id, link._id).then(refresh)}
+                  >
+                    Revoke
+                  </Button>
                 </div>
               ))}
             </div>
