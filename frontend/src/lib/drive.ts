@@ -110,6 +110,12 @@ export async function renameDriveNode(id: string, name: string) {
   })
 }
 
+export async function suggestDriveNodeName(id: string) {
+  return api<{ name: string }>(`/api/v1/drive/${encodeURIComponent(id)}/suggest-name`, {
+    method: "POST",
+  })
+}
+
 export async function moveDriveNode(id: string, parentId: string | null) {
   return api<{ node: DriveNode }>(`/api/v1/drive/${encodeURIComponent(id)}/move`, {
     method: "POST",

@@ -39,6 +39,7 @@ import {
   RotateCcwIcon,
   SearchIcon,
   Share2Icon,
+  SparklesIcon,
   Trash2Icon,
   UploadCloudIcon,
   UploadIcon,
@@ -108,6 +109,7 @@ import {
   restoreDriveNode,
   revokeDrivePublicLink,
   shareDriveNode,
+  suggestDriveNodeName,
   trashDriveNode,
   unshareDriveNode,
   type DriveNode,
@@ -1382,12 +1384,28 @@ function FolderNameDialog({
 }) {
   const [name, setName] = React.useState("")
   const [saving, setSaving] = React.useState(false)
+  const [generating, setGenerating] = React.useState(false)
 
   React.useEffect(() => {
     if (state) setName(state.mode === "rename" ? state.node?.name ?? "" : "")
   }, [state])
 
   const isRename = state?.mode === "rename"
+  const canSuggest = isRename && state?.node?.type === "file"
+
+  async function generateName() {
+    if (!state?.node) return
+    setGenerating(true)
+    try {
+      const { name: suggested } = await suggestDriveNodeName(state.node._id)
+      if (suggested) setName(suggested)
+      else toast.error("Could not generate a name")
+    } catch (err: any) {
+      toast.error(err.message || "Could not generate a name")
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function submit() {
     const trimmed = name.trim()
@@ -1425,25 +1443,45 @@ function FolderNameDialog({
         </DialogHeader>
         <div className="grid gap-2">
           <Label htmlFor="drive-folder-name">Name</Label>
-          <Input
-            id="drive-folder-name"
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault()
-                void submit()
-              }
-            }}
-            placeholder={isRename ? "Item name" : "Untitled folder"}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="drive-folder-name"
+              autoFocus
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  void submit()
+                }
+              }}
+              placeholder={isRename ? "Item name" : "Untitled folder"}
+              className="flex-1"
+            />
+            {canSuggest && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void generateName()}
+                disabled={generating || saving}
+                title="Generate a name from the file's contents with AI"
+              >
+                {generating ? <Spinner data-icon="inline-start" /> : <SparklesIcon className="size-4" />}
+                AI
+              </Button>
+            )}
+          </div>
+          {canSuggest && (
+            <p className="text-xs text-muted-foreground">
+              Use AI to suggest a name based on the file&apos;s contents.
+            </p>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || generating}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={saving || !name.trim()}>
+          <Button onClick={() => void submit()} disabled={saving || generating || !name.trim()}>
             {saving && <Spinner data-icon="inline-start" />}
             {isRename ? "Save" : "Create"}
           </Button>

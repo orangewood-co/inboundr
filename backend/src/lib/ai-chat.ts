@@ -29,3 +29,45 @@ export async function chatWithModel(type: "cheap" | "intelligent", messages: Hum
     );
     return String(response.content);
 }
+
+export interface SuggestFileNameInput {
+    currentName: string;
+    contentType: string;
+    size: number;
+    textSnippet?: string | null;
+    imageUrl?: string | null;
+}
+
+function cleanName(raw: string): string {
+    let name = String(raw ?? "").trim();
+    // Models sometimes wrap the answer in quotes or add a trailing period.
+    name = name.replace(/^["'`]+|["'`]+$/g, "").trim();
+    // Collapse any whitespace/newlines into single spaces.
+    name = name.replace(/\s+/g, " ");
+    // Drop a trailing extension the model may have appended (e.g. "Report.pdf").
+    name = name.replace(/\.[A-Za-z0-9]{1,8}$/, "").trim();
+    // Remove characters that are unsafe for file names.
+    name = name.replace(/[\\/:*?"<>|]+/g, "").trim();
+    return name.slice(0, 60).trim();
+}
+
+const NAME_INSTRUCTION =
+    "Suggest ONE concise, descriptive, human-readable file name (3-8 words, natural capitalization, NO file extension, max 60 characters). Reply with ONLY the name, no quotes or explanation.";
+
+export async function suggestFileName(input: SuggestFileNameInput): Promise<string> {
+    const hints = `Current name: ${input.currentName}\nType: ${input.contentType || "unknown"}\nSize: ${input.size} bytes`;
+
+    if (input.imageUrl) {
+        const message = new HumanMessage({
+            content: [
+                { type: "text", text: `${NAME_INSTRUCTION}\n\n${hints}` },
+                { type: "image_url", image_url: { url: input.imageUrl } },
+            ],
+        });
+        return cleanName(await chatWithModel("intelligent", [message]));
+    }
+
+    const body = input.textSnippet ? `\n\nFile content (truncated):\n${input.textSnippet}` : "";
+    const message = new HumanMessage(`${NAME_INSTRUCTION}\n\n${hints}${body}`);
+    return cleanName(await chatWithModel("cheap", [message]));
+}

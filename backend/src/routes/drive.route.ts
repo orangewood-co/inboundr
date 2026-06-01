@@ -19,6 +19,7 @@ import {
   restoreDriveNode,
   revokeDrivePublicLink,
   shareDriveNode,
+  suggestDriveNodeName,
   trashDriveNode,
   unshareDriveNode,
   updateDriveNode,
@@ -48,6 +49,7 @@ router.get("/exports/:jobId", getDriveExport);
 router.get("/exports/:jobId/download", getDriveExport);
 router.get("/:id", getDriveNode);
 router.patch("/:id", updateDriveNode);
+router.post("/:id/suggest-name", suggestDriveNodeName);
 router.post("/:id/move", moveDriveNode);
 router.post("/:id/trash", trashDriveNode);
 router.post("/:id/restore", restoreDriveNode);

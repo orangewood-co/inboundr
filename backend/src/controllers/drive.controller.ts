@@ -14,7 +14,9 @@ import {
   createPresignedUploadPartUrl,
   createPresignedViewUrl,
   deleteObject,
+  getObjectBuffer,
 } from "../services/storage.service";
+import { suggestFileName } from "../lib/ai-chat";
 import { createDriveExportJob } from "../services/drive-export.service";
 import { recordDriveAuditEvent } from "../services/drive-audit.service";
 import {
@@ -536,6 +538,91 @@ export async function updateDriveNode(req: Request, res: Response): Promise<void
     res.json({ node: await serializeNodeForUser(node, orgReq) });
   } catch (err: any) {
     res.status(400).json({ error: err.message || "Failed to update Drive item" });
+  }
+}
+
+const AI_TEXT_MAX_BYTES = 256 * 1024;
+const AI_TEXT_SNIPPET_CHARS = 6000;
+
+function isTextLikeForAi(contentType: string, name: string): boolean {
+  const type = (contentType || "").toLowerCase();
+  if (type.startsWith("text/")) return true;
+  if (
+    [
+      "application/json",
+      "application/xml",
+      "application/javascript",
+      "application/typescript",
+      "application/csv",
+      "application/x-yaml",
+      "application/yaml",
+    ].includes(type)
+  ) {
+    return true;
+  }
+  return /\.(txt|md|markdown|csv|tsv|json|xml|ya?ml|jsx?|tsx?|py|java|c|cpp|h|cs|go|rb|rs|php|sh|sql|html?|css|scss|ini|log|toml)$/i.test(
+    name || ""
+  );
+}
+
+function fileExtension(name: string): string {
+  const match = /\.[A-Za-z0-9]{1,8}$/.exec(name);
+  return match ? match[0] : "";
+}
+
+export async function suggestDriveNodeName(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const node = await requireDriveNode({ organizationId: orgReq.organization._id, nodeId: paramValue(req, "id") });
+    await assertDriveAccess({
+      node,
+      userId: orgReq.user.id,
+      organizationRole: orgReq.organizationMembership.role,
+      minimumRole: "editor",
+    });
+
+    if (node.type !== "file" || !node.storageKey) {
+      res.status(400).json({ error: "Only files can be named with AI" });
+      return;
+    }
+
+    const contentType = node.contentType ?? "";
+    const size = node.size ?? 0;
+    let imageUrl: string | null = null;
+    let textSnippet: string | null = null;
+
+    if (contentType.toLowerCase().startsWith("image/")) {
+      const { url } = await createPresignedViewUrl(node.storageKey);
+      imageUrl = url;
+    } else if (isTextLikeForAi(contentType, node.name) && size > 0 && size <= AI_TEXT_MAX_BYTES) {
+      try {
+        const buffer = await getObjectBuffer(node.storageKey);
+        textSnippet = buffer.toString("utf8").slice(0, AI_TEXT_SNIPPET_CHARS);
+      } catch {
+        textSnippet = null;
+      }
+    }
+
+    const base = await suggestFileName({
+      currentName: node.name,
+      contentType,
+      size,
+      textSnippet,
+      imageUrl,
+    });
+
+    if (!base) {
+      res.status(502).json({ error: "AI did not return a name. Please try again." });
+      return;
+    }
+
+    const extension = fileExtension(node.name);
+    const name =
+      extension && !base.toLowerCase().endsWith(extension.toLowerCase()) ? `${base}${extension}` : base;
+
+    res.json({ name });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "Failed to suggest a name" });
   }
 }
 
