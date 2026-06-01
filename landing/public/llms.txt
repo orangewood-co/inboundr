@@ -10,6 +10,14 @@ Inboundr is AI-native sales infrastructure for turning inbound inquiries into re
   Product updates and new features shipping to Inboundr.
 - /features/forms
   Form Studio, a form builder for creating branded forms, collecting submissions, tracking responses, and feeding leads into Inboundr's AI workflow.
+- /features/invoices
+  Invoices, GST-ready billing in INR with product-backed line items, Gmail sending with PDF, payment tracking, recurring schedules, and a receivables dashboard.
+- /features/employees
+  Employees, a team directory with guided onboarding, teams, granular Inboundr module access control, login linking, and branded HR documents.
+- /features/drive
+  Drive, an in-app file workspace to upload, preview, and organize files and folders, then share them with teammates or customers via secure links.
+- /features/links
+  Links, tracked short links with engagement analytics, device and location insight, passwords, expiry, view limits, and QR codes.
 
 ## Product
 

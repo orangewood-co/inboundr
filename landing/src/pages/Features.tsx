@@ -5,12 +5,44 @@ import { PageHeader } from "@/components/PageHeader"
 
 const features = [
   {
+    title: "Invoices",
+    description: "GST-ready invoicing in INR with product-backed line items, Gmail sending, payment tracking, and a receivables dashboard — built right into Inboundr.",
+    date: "June 2026",
+    tag: "New",
+    to: "/features/invoices",
+    bg: "#1a5c3a",
+  },
+  {
     title: "Form Studio",
     description: "A full-featured form builder with drag-and-drop, custom themes, embeds, and submission tracking — built right into Inboundr.",
     date: "May 2026",
-    tag: "New",
+    tag: "Feature",
     to: "/features/forms",
-    bg: "#1a5c3a",
+    bg: "#8a6d1b",
+  },
+  {
+    title: "Employees",
+    description: "A team directory with guided onboarding, teams, granular module access control, login linking, and branded HR documents.",
+    date: "April 2026",
+    tag: "Feature",
+    to: "/features/employees",
+    bg: "#1a6a5c",
+  },
+  {
+    title: "Drive",
+    description: "An in-app file workspace to upload, preview, and organize files and folders, then share them with your team or customers.",
+    date: "March 2026",
+    tag: "Feature",
+    to: "/features/drive",
+    bg: "#2d5a4a",
+  },
+  {
+    title: "Links",
+    description: "Tracked short links with engagement analytics, device and location insight, passwords, expiry, view limits, and QR codes.",
+    date: "February 2026",
+    tag: "Feature",
+    to: "/features/links",
+    bg: "#7a5a1b",
   },
 ]
 
