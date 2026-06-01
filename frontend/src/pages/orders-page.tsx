@@ -3,6 +3,7 @@ import {
   AlertCircleIcon,
   CheckCircle2Icon,
   ClipboardListIcon,
+  FileTextIcon,
   MailIcon,
   PackageIcon,
   RefreshCwIcon,
@@ -63,6 +64,8 @@ interface DraftRFQ {
   emailId: RFQEmail
   customer: RFQCustomer | null
   savedQuoteProducts: RFQSavedQuoteProduct[]
+  paymentTermName?: string | null
+  paymentTerms?: string | null
   draftSavedAt: string | null
   createdAt: string
 }
@@ -446,6 +449,31 @@ export function OrdersPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="border-b px-6 py-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <FileTextIcon className="size-4 text-muted-foreground" />
+                  <h2 className="text-sm font-semibold">Payment Terms</h2>
+                  {selectedDraft.paymentTermName && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      {selectedDraft.paymentTermName}
+                    </span>
+                  )}
+                </div>
+                {selectedDraft.paymentTerms?.trim() ? (
+                  <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                      {selectedDraft.paymentTerms}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed bg-muted/10 px-3 py-2.5">
+                    <p className="text-sm text-muted-foreground">
+                      No payment terms were saved with this draft.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="px-6 py-5">
