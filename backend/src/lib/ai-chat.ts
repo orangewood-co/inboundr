@@ -16,6 +16,24 @@ const model_intelligent = new ChatOpenRouter({
     },
 })
 
+// PDF-capable model. gpt-5.5 (OpenAI) supports PDF file input natively, so we use
+// the "native" engine: the PDF is passed straight to the model rather than going
+// through OpenRouter's separate parser (which can fail on some PDFs).
+const model_pdf = new ChatOpenRouter({
+    model: "openai/gpt-5.5",
+    temperature: 0,
+    modelKwargs: {
+        plugins: [
+            {
+                id: "file-parser",
+                pdf: {
+                    engine: "native",
+                },
+            },
+        ],
+    },
+})
+
 export async function chatWithModel(type: "cheap" | "intelligent", messages: HumanMessage[]): Promise<string> {
     const model = type === "cheap" ? model_cheap : model_intelligent;
     const response = await model.invoke(
@@ -36,6 +54,7 @@ export interface SuggestFileNameInput {
     size: number;
     textSnippet?: string | null;
     imageUrl?: string | null;
+    pdf?: { fileName: string; fileData: string } | null;
 }
 
 function cleanName(raw: string): string {
@@ -56,6 +75,20 @@ const NAME_INSTRUCTION =
 
 export async function suggestFileName(input: SuggestFileNameInput): Promise<string> {
     const hints = `Current name: ${input.currentName}\nType: ${input.contentType || "unknown"}\nSize: ${input.size} bytes`;
+
+    if (input.pdf) {
+        const message = new HumanMessage({
+            content: [
+                { type: "text", text: `${NAME_INSTRUCTION}\n\n${hints}` },
+                { type: "file", file: { filename: input.pdf.fileName, file_data: input.pdf.fileData } },
+            ],
+        });
+        const response = await model_pdf.invoke([
+            { role: "system", content: "You are a helpful assistant" },
+            message,
+        ]);
+        return cleanName(String(response.content));
+    }
 
     if (input.imageUrl) {
         const message = new HumanMessage({

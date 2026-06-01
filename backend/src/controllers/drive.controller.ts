@@ -543,6 +543,12 @@ export async function updateDriveNode(req: Request, res: Response): Promise<void
 
 const AI_TEXT_MAX_BYTES = 256 * 1024;
 const AI_TEXT_SNIPPET_CHARS = 6000;
+const AI_PDF_MAX_BYTES = 20 * 1024 * 1024;
+
+function isPdfForAi(contentType: string, name: string): boolean {
+  const type = (contentType || "").toLowerCase();
+  return type === "application/pdf" || type === "application/x-pdf" || /\.pdf$/i.test(name || "");
+}
 
 function isTextLikeForAi(contentType: string, name: string): boolean {
   const type = (contentType || "").toLowerCase();
@@ -590,10 +596,14 @@ export async function suggestDriveNodeName(req: Request, res: Response): Promise
     const size = node.size ?? 0;
     let imageUrl: string | null = null;
     let textSnippet: string | null = null;
+    let pdf: { fileName: string; fileData: string } | null = null;
 
     if (contentType.toLowerCase().startsWith("image/")) {
       const { url } = await createPresignedViewUrl(node.storageKey);
       imageUrl = url;
+    } else if (isPdfForAi(contentType, node.name) && size > 0 && size <= AI_PDF_MAX_BYTES) {
+      const buffer = await getObjectBuffer(node.storageKey);
+      pdf = { fileName: node.name, fileData: `data:application/pdf;base64,${buffer.toString("base64")}` };
     } else if (isTextLikeForAi(contentType, node.name) && size > 0 && size <= AI_TEXT_MAX_BYTES) {
       try {
         const buffer = await getObjectBuffer(node.storageKey);
@@ -609,6 +619,7 @@ export async function suggestDriveNodeName(req: Request, res: Response): Promise
       size,
       textSnippet,
       imageUrl,
+      pdf,
     });
 
     if (!base) {
