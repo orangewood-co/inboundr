@@ -55,7 +55,6 @@ function drawIdCard(
   const cardY = 110;
   const sidebarWidth = 48;
   const contentWidth = cardWidth - sidebarWidth;
-  const contentCenterX = cardX + contentWidth / 2;
   const headerHeight = 86;
 
   // Card background, header band, and sidebar (clipped to rounded corners).
@@ -121,83 +120,94 @@ function drawIdCard(
     });
   doc.restore();
 
+  // Clean left-aligned content column within the white area.
+  const colX = cardX + 28;
+  const colWidth = contentWidth - 56;
+
   // Employee photo (or initials fallback).
-  const photoSize = 150;
-  const photoX = contentCenterX - photoSize / 2;
+  const photoSize = 140;
   const photoY = cardY + headerHeight + 24;
   if (assets.photoBuffer) {
     try {
       doc.save();
-      doc.roundedRect(photoX, photoY, photoSize, photoSize, 14).clip();
-      doc.image(assets.photoBuffer, photoX, photoY, {
+      doc.roundedRect(colX, photoY, photoSize, photoSize, 14).clip();
+      doc.image(assets.photoBuffer, colX, photoY, {
         cover: [photoSize, photoSize],
         align: "center",
         valign: "center",
       });
       doc.restore();
       doc
-        .roundedRect(photoX, photoY, photoSize, photoSize, 14)
+        .roundedRect(colX, photoY, photoSize, photoSize, 14)
         .lineWidth(2)
         .strokeColor(primary)
         .stroke();
     } catch {
-      drawInitialsBlock(doc, snapshot.fullName, photoX, photoY, photoSize, primary);
+      drawInitialsBlock(doc, snapshot.fullName, colX, photoY, photoSize, primary);
     }
   } else {
-    drawInitialsBlock(doc, snapshot.fullName, photoX, photoY, photoSize, primary);
+    drawInitialsBlock(doc, snapshot.fullName, colX, photoY, photoSize, primary);
   }
 
-  // Name + role + team.
-  const nameY = photoY + photoSize + 20;
+  // Name + role/team.
+  const nameY = photoY + photoSize + 18;
   doc
     .font("Helvetica-Bold")
-    .fontSize(21)
-    .fillColor(primary)
-    .text(snapshot.fullName, cardX + 24, nameY, {
-      width: contentWidth - 48,
-      align: "center",
+    .fontSize(22)
+    .fillColor(PDF_COLORS.text)
+    .text(snapshot.fullName, colX, nameY, {
+      width: colWidth,
       lineBreak: true,
     });
 
-  const metaY = nameY + 30;
+  const metaY = doc.y + 2;
   doc
     .font("Helvetica")
     .fontSize(11)
-    .fillColor(PDF_COLORS.muted)
-    .text(`${snapshot.title || "Employee"} · ${snapshot.teamName || "Unassigned"}`, cardX + 24, metaY, {
-      width: contentWidth - 48,
-      align: "center",
+    .fillColor(primary)
+    .text(`${snapshot.title || "Employee"}${snapshot.teamName ? ` · ${snapshot.teamName}` : ""}`, colX, metaY, {
+      width: colWidth,
       lineBreak: false,
       ellipsis: true,
     });
 
+  // Divider.
+  const dividerY = metaY + 24;
+  doc
+    .moveTo(colX, dividerY)
+    .lineTo(colX + colWidth, dividerY)
+    .lineWidth(1)
+    .strokeColor(PDF_COLORS.border)
+    .stroke();
+
   // Info rows: ID No / Email / Phone.
-  const infoX = cardX + 30;
-  const valueX = infoX + 66;
-  const infoWidth = contentWidth - 60;
-  let infoY = metaY + 28;
+  const labelX = colX;
+  const valueX = colX + 72;
+  const valueWidth = colWidth - 72;
+  let infoY = dividerY + 16;
   const infoRows: Array<[string, string]> = [
     ["ID No", employeeCode(document)],
     ["Email", snapshot.email || "-"],
     ["Phone", snapshot.phone || "-"],
   ];
   infoRows.forEach(([label, value]) => {
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(PDF_COLORS.muted).text(label, infoX, infoY, {
-      width: 60,
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(PDF_COLORS.muted).text(label.toUpperCase(), labelX, infoY + 1, {
+      width: 66,
+      characterSpacing: 0.4,
       lineBreak: false,
     });
-    doc.font("Helvetica").fontSize(10).fillColor(PDF_COLORS.text).text(value, valueX, infoY - 1, {
-      width: infoWidth - 66,
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(PDF_COLORS.text).text(value, valueX, infoY, {
+      width: valueWidth,
       lineBreak: false,
       ellipsis: true,
     });
-    infoY += 22;
+    infoY += 24;
   });
 
-  // vCard QR + issued date near the bottom.
+  // vCard QR + issued date below the info block.
   const qrSize = 84;
-  const qrX = contentCenterX - qrSize / 2;
-  const qrY = cardY + cardHeight - qrSize - 40;
+  const qrX = colX;
+  const qrY = Math.min(infoY + 64, cardY + cardHeight - qrSize - 36);
   if (assets.qrBuffer) {
     try {
       doc.image(assets.qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
@@ -210,9 +220,8 @@ function drawIdCard(
     .font("Helvetica")
     .fontSize(8)
     .fillColor(PDF_COLORS.muted)
-    .text(`Issued ${formatPdfDate(document.issuedAt || document.createdAt)}`, cardX + 24, cardY + cardHeight - 24, {
-      width: contentWidth - 48,
-      align: "center",
+    .text(`Issued ${formatPdfDate(document.issuedAt || document.createdAt)}`, colX, cardY + cardHeight - 26, {
+      width: colWidth,
       lineBreak: false,
     });
 }
