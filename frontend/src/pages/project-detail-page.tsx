@@ -1,35 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Link, useParams } from "@tanstack/react-router"
+import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import {
   ActivityIcon,
-  ArchiveIcon,
   ArrowLeftIcon,
-  CalendarRangeIcon,
-  ClockIcon,
   FolderKanbanIcon,
   GanttChartSquareIcon,
-  GlobeIcon,
   KanbanSquareIcon,
-  LockIcon,
   PlusIcon,
   SaveIcon,
   Settings2Icon,
-  UsersIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { ProjectBoard } from "@/components/projects/project-board"
+import { MultiEmployeePicker } from "@/components/projects/people-picker"
 import {
-  DueDatePill,
   EmployeeStack,
   dateInputValue,
-  employeeName,
   formatDate,
-  formatMinutes,
   stageColor,
-  todayInputValue,
   toggleValue,
 } from "@/components/projects/board-ui"
 import { Badge } from "@/components/ui/badge"
@@ -52,23 +43,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   archiveProjectStage,
-  archiveProjectTask,
   createProjectStage,
-  createProjectSubtask,
   createProjectTask,
-  createProjectTimeEntry,
   getProject,
   getProjectReferenceData,
   moveProjectTask,
   reorderProjectStages,
   updateProject,
   updateProjectStage,
-  updateProjectTask,
   type Project,
   type ProjectDetail,
   type ProjectEmployee,
@@ -77,7 +63,6 @@ import {
   type ProjectTeam,
   type ProjectVisibility,
 } from "@/lib/projects"
-import { cn } from "@/lib/utils"
 
 type TaskForm = {
   title: string
@@ -110,48 +95,6 @@ const emptyTaskForm: TaskForm = {
   startDate: "",
   dueDate: "",
   estimatedMinutes: "",
-}
-
-const STATUS_TONE: Record<Project["status"], string> = {
-  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  completed: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  archived: "bg-muted text-muted-foreground",
-}
-
-const VISIBILITY_META: Record<
-  ProjectVisibility,
-  { icon: typeof GlobeIcon; label: string }
-> = {
-  internal: { icon: GlobeIcon, label: "All internal users" },
-  private: { icon: LockIcon, label: "Invited users" },
-  teams: { icon: UsersIcon, label: "Respective teams" },
-}
-
-function MultiEmployeePicker({
-  employees,
-  value,
-  onChange,
-}: {
-  employees: ProjectEmployee[]
-  value: string[]
-  onChange: (value: string[]) => void
-}) {
-  return (
-    <div className="grid max-h-52 gap-2 overflow-auto rounded-xl border bg-muted/20 p-2 sm:grid-cols-2">
-      {employees.map((employee) => (
-        <label key={employee._id} className="flex items-center gap-2 rounded-lg bg-background/80 p-2 text-sm">
-          <Checkbox
-            checked={value.includes(employee._id)}
-            onCheckedChange={(checked) => onChange(toggleValue(value, employee._id, checked === true))}
-          />
-          <span className="min-w-0">
-            <span className="block truncate font-medium">{employee.fullName}</span>
-            <span className="block truncate text-xs text-muted-foreground">{employee.email}</span>
-          </span>
-        </label>
-      ))}
-    </div>
-  )
 }
 
 function MultiTeamPicker({
@@ -368,17 +311,22 @@ function GanttView({
 
 export default function ProjectDetailPage() {
   const { id } = useParams({ from: "/projects_/$id" })
+  const navigate = useNavigate()
   const [detail, setDetail] = useState<ProjectDetail | null>(null)
   const [employees, setEmployees] = useState<ProjectEmployee[]>([])
   const [teams, setTeams] = useState<ProjectTeam[]>([])
   const [loading, setLoading] = useState(true)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [taskForm, setTaskForm] = useState<TaskForm>(emptyTaskForm)
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsForm, setSettingsForm] = useState<ProjectSettingsForm | null>(null)
-  const [timeEntryForm, setTimeEntryForm] = useState({ employeeId: "", minutes: "", workDate: todayInputValue(), notes: "" })
-  const [subtaskTitle, setSubtaskTitle] = useState("")
+
+  const openTask = useCallback(
+    (taskId: string) => {
+      void navigate({ to: "/projects/$id/tasks/$taskId", params: { id, taskId } })
+    },
+    [id, navigate]
+  )
 
   const refresh = useCallback(async () => {
     const [projectDetail, referenceData] = await Promise.all([getProject(id), getProjectReferenceData()])
@@ -413,28 +361,6 @@ export default function ProjectDetailPage() {
   const timeEntries = detail?.timeEntries ?? []
   const activities = detail?.activities ?? []
   const topTasks = tasks.filter((task) => !task.parentTaskId)
-  const selectedTask = tasks.find((task) => task._id === selectedTaskId) ?? null
-  const selectedSubtasks = selectedTask ? tasks.filter((task) => task.parentTaskId === selectedTask._id) : []
-  const selectedTimeEntries = selectedTask ? timeEntries.filter((entry) => entry.taskId === selectedTask._id) : []
-
-  useEffect(() => {
-    if (!selectedTask) return
-    setTaskForm({
-      title: selectedTask.title,
-      description: selectedTask.description ?? "",
-      stageId: selectedTask.stageId,
-      assigneeIds: selectedTask.assigneeIds,
-      startDate: dateInputValue(selectedTask.startDate),
-      dueDate: dateInputValue(selectedTask.dueDate),
-      estimatedMinutes: selectedTask.estimatedMinutes ? String(selectedTask.estimatedMinutes) : "",
-    })
-    setTimeEntryForm({
-      employeeId: selectedTask.assigneeIds[0] ?? employees[0]?._id ?? "",
-      minutes: "",
-      workDate: todayInputValue(),
-      notes: "",
-    })
-  }, [employees, selectedTask])
 
   const trackedByTask = useMemo(() => {
     const totals: Record<string, number> = {}
@@ -632,76 +558,6 @@ export default function ProjectDetailPage() {
     [patchDetail, project, refresh]
   )
 
-  async function handleSaveSelectedTask() {
-    if (!project || !selectedTask) return
-    try {
-      await updateProjectTask(project._id, selectedTask._id, {
-        title: taskForm.title.trim(),
-        description: taskForm.description.trim() || null,
-        stageId: taskForm.stageId,
-        assigneeIds: taskForm.assigneeIds,
-        startDate: taskForm.startDate || null,
-        dueDate: taskForm.dueDate || null,
-        estimatedMinutes: taskForm.estimatedMinutes ? Number(taskForm.estimatedMinutes) : null,
-      })
-      toast.success("Task saved")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save task")
-    }
-  }
-
-  async function handleArchiveSelectedTask() {
-    if (!project || !selectedTask) return
-    try {
-      await archiveProjectTask(project._id, selectedTask._id)
-      setSelectedTaskId(null)
-      toast.success("Task archived")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to archive task")
-    }
-  }
-
-  async function handleCreateSubtask(event: React.FormEvent) {
-    event.preventDefault()
-    if (!project || !selectedTask || !subtaskTitle.trim()) return
-    try {
-      await createProjectSubtask(project._id, selectedTask._id, {
-        title: subtaskTitle.trim(),
-        description: null,
-        stageId: selectedTask.stageId,
-        assigneeIds: selectedTask.assigneeIds,
-        startDate: selectedTask.startDate ? dateInputValue(selectedTask.startDate) : null,
-        dueDate: selectedTask.dueDate ? dateInputValue(selectedTask.dueDate) : null,
-        estimatedMinutes: null,
-      })
-      setSubtaskTitle("")
-      toast.success("Subtask added")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add subtask")
-    }
-  }
-
-  async function handleCreateTimeEntry(event: React.FormEvent) {
-    event.preventDefault()
-    if (!project || !selectedTask) return
-    try {
-      await createProjectTimeEntry(project._id, selectedTask._id, {
-        employeeId: timeEntryForm.employeeId,
-        minutes: Number(timeEntryForm.minutes),
-        workDate: timeEntryForm.workDate,
-        notes: timeEntryForm.notes.trim() || null,
-      })
-      setTimeEntryForm((current) => ({ ...current, minutes: "", notes: "" }))
-      toast.success("Time logged")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to log time")
-    }
-  }
-
   async function handleSaveSettings() {
     if (!project || !settingsForm) return
     try {
@@ -778,58 +634,6 @@ export default function ProjectDetailPage() {
         }
       />
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
-        <section className="mb-5 overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <div
-            className="h-1.5 w-full"
-            style={{
-              backgroundImage: stages.length
-                ? `linear-gradient(to right, ${stages.map((stage) => stageColor(stage.color)).join(", ")})`
-                : undefined,
-              backgroundColor: stages.length ? undefined : "var(--primary)",
-            }}
-          />
-          <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
-                    STATUS_TONE[project.status]
-                  )}
-                >
-                  {project.status}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  {project.visibility === "internal" ? (
-                    <GlobeIcon className="size-3" />
-                  ) : project.visibility === "private" ? (
-                    <LockIcon className="size-3" />
-                  ) : (
-                    <UsersIcon className="size-3" />
-                  )}
-                  {VISIBILITY_META[project.visibility].label}
-                </span>
-              </div>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight">{project.title}</h1>
-              <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
-                {project.description || "No description yet."}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-4">
-                <EmployeeStack
-                  employees={employees}
-                  ids={[...new Set([...project.managerIds, ...project.memberIds])]}
-                  limit={6}
-                  emptyLabel="No members yet"
-                />
-                <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <CalendarRangeIcon className="size-4" />
-                  {formatDate(project.startDate)} - {formatDate(project.dueDate)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <Tabs defaultValue="kanban" className="min-h-0 flex-1">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <TabsList>
@@ -860,7 +664,7 @@ export default function ProjectDetailPage() {
                 employees={employees}
                 trackedByTask={trackedByTask}
                 subtaskCountByTask={subtaskCountByTask}
-                onOpenTask={(taskId) => setSelectedTaskId(taskId)}
+                onOpenTask={openTask}
                 onMoveTask={(taskId, stageId, order) => void handlePersistTaskMove(taskId, stageId, order)}
                 onReorderStages={(ids) => void handleReorderStages(ids)}
                 onRenameStage={(stageId, name) => void handleRenameStage(stageId, name)}
@@ -879,7 +683,7 @@ export default function ProjectDetailPage() {
               stages={stages}
               tasks={tasks}
               employees={employees}
-              onOpenTask={(task) => setSelectedTaskId(task._id)}
+              onOpenTask={(task) => openTask(task._id)}
               onMoveTask={handleGanttMove}
             />
           </TabsContent>
@@ -957,167 +761,6 @@ export default function ProjectDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
-
-      <Sheet open={Boolean(selectedTask)} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-        <SheetContent className="w-full overflow-auto sm:max-w-2xl">
-          {selectedTask && (
-            <>
-              <SheetHeader className="border-b">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="size-2.5 rounded-full"
-                    style={{
-                      backgroundColor: stageColor(
-                        stages.find((stage) => stage._id === selectedTask.stageId)?.color
-                      ),
-                    }}
-                  />
-                  <SheetTitle className="flex-1 truncate">{selectedTask.title}</SheetTitle>
-                  {selectedTask.parentTaskId && <Badge variant="secondary">Subtask</Badge>}
-                  <DueDatePill due={selectedTask.dueDate} />
-                </div>
-              </SheetHeader>
-              <div className="grid gap-5 px-4 pb-8">
-                <Field>
-                  <FieldLabel>Title</FieldLabel>
-                  <Input value={taskForm.title} onChange={(event) => setTaskForm((current) => ({ ...current, title: event.target.value }))} />
-                </Field>
-                <Field>
-                  <FieldLabel>Description</FieldLabel>
-                  <textarea
-                    value={taskForm.description}
-                    onChange={(event) => setTaskForm((current) => ({ ...current, description: event.target.value }))}
-                    className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </Field>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel>Stage</FieldLabel>
-                    <Select value={taskForm.stageId} onValueChange={(stageId) => setTaskForm((current) => ({ ...current, stageId }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stages.map((stage) => (
-                          <SelectItem key={stage._id} value={stage._id}>
-                            {stage.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel>Estimate (minutes)</FieldLabel>
-                    <Input type="number" value={taskForm.estimatedMinutes} onChange={(event) => setTaskForm((current) => ({ ...current, estimatedMinutes: event.target.value }))} />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Start</FieldLabel>
-                    <Input type="date" value={taskForm.startDate} onChange={(event) => setTaskForm((current) => ({ ...current, startDate: event.target.value }))} />
-                  </Field>
-                  <Field>
-                    <FieldLabel>Due</FieldLabel>
-                    <Input type="date" value={taskForm.dueDate} onChange={(event) => setTaskForm((current) => ({ ...current, dueDate: event.target.value }))} />
-                  </Field>
-                </div>
-                <Field>
-                  <FieldLabel>Assignees</FieldLabel>
-                  <MultiEmployeePicker employees={employees} value={taskForm.assigneeIds} onChange={(assigneeIds) => setTaskForm((current) => ({ ...current, assigneeIds }))} />
-                </Field>
-                <div className="flex gap-2">
-                  <Button onClick={() => void handleSaveSelectedTask()}>
-                    <SaveIcon />
-                    Save task
-                  </Button>
-                  <Button variant="outline" onClick={() => void handleArchiveSelectedTask()}>
-                    <ArchiveIcon />
-                    Archive
-                  </Button>
-                </div>
-
-                <section className="rounded-2xl border p-4">
-                  <h3 className="font-semibold">Subtasks</h3>
-                  <form onSubmit={handleCreateSubtask} className="mt-3 flex gap-2">
-                    <Input value={subtaskTitle} onChange={(event) => setSubtaskTitle(event.target.value)} placeholder="Add a subtask..." />
-                    <Button type="submit">
-                      <PlusIcon />
-                      Add
-                    </Button>
-                  </form>
-                  <div className="mt-3 space-y-2">
-                    {selectedSubtasks.map((subtask) => (
-                      <button
-                        key={subtask._id}
-                        type="button"
-                        onClick={() => setSelectedTaskId(subtask._id)}
-                        className="flex w-full items-center justify-between rounded-xl bg-muted/40 p-3 text-left text-sm"
-                      >
-                        <span>{subtask.title}</span>
-                        <Badge variant="secondary">{employeeName(employees, subtask.assigneeIds[0] ?? "")}</Badge>
-                      </button>
-                    ))}
-                    {selectedSubtasks.length === 0 && <p className="text-sm text-muted-foreground">No subtasks yet.</p>}
-                  </div>
-                </section>
-
-                <section className="rounded-2xl border p-4">
-                  <h3 className="font-semibold">Manual time tracking</h3>
-                  <form onSubmit={handleCreateTimeEntry} className="mt-3 grid gap-3">
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <Select value={timeEntryForm.employeeId} onValueChange={(employeeId) => setTimeEntryForm((current) => ({ ...current, employeeId }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Employee" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {employees.map((employee) => (
-                            <SelectItem key={employee._id} value={employee._id}>
-                              {employee.fullName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={timeEntryForm.minutes}
-                        onChange={(event) => setTimeEntryForm((current) => ({ ...current, minutes: event.target.value }))}
-                        placeholder="Minutes"
-                      />
-                      <Input
-                        type="date"
-                        value={timeEntryForm.workDate}
-                        onChange={(event) => setTimeEntryForm((current) => ({ ...current, workDate: event.target.value }))}
-                      />
-                    </div>
-                    <Input
-                      value={timeEntryForm.notes}
-                      onChange={(event) => setTimeEntryForm((current) => ({ ...current, notes: event.target.value }))}
-                      placeholder="Notes"
-                    />
-                    <Button type="submit" variant="outline">
-                      <ClockIcon />
-                      Log time
-                    </Button>
-                  </form>
-                  <div className="mt-4 space-y-2">
-                    {selectedTimeEntries.map((entry) => (
-                      <div key={entry._id} className="rounded-xl bg-muted/40 p-3 text-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-medium">{formatMinutes(entry.minutes)}</span>
-                          <span className="text-xs text-muted-foreground">{formatDate(entry.workDate)}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {employeeName(employees, entry.employeeId)}{entry.notes ? ` - ${entry.notes}` : ""}
-                        </p>
-                      </div>
-                    ))}
-                    {selectedTimeEntries.length === 0 && <p className="text-sm text-muted-foreground">No time logged yet.</p>}
-                  </div>
-                </section>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="max-h-[90svh] max-w-3xl overflow-auto">

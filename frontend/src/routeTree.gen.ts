@@ -47,6 +47,7 @@ import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 import { Route as DriveShareTokenRouteImport } from './routes/drive.share.$token'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
+import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
@@ -238,6 +239,11 @@ const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
   path: '/admin/organizations/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
+  id: '/projects_/$id_/tasks/$taskId',
+  path: '/projects/$id/tasks/$taskId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -278,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/links/': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/drive/share/$token': typeof DriveShareTokenRoute
+  '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/links': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/drive/share/$token': typeof DriveShareTokenRoute
+  '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/links/': typeof LinksIndexRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
   '/drive/share/$token': typeof DriveShareTokenRoute
+  '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/links/'
     | '/admin/organizations/$id'
     | '/drive/share/$token'
+    | '/projects/$id/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -435,6 +445,7 @@ export interface FileRouteTypes {
     | '/links'
     | '/admin/organizations/$id'
     | '/drive/share/$token'
+    | '/projects/$id/tasks/$taskId'
   id:
     | '__root__'
     | '/'
@@ -475,6 +486,7 @@ export interface FileRouteTypes {
     | '/links/'
     | '/admin_/organizations/$id'
     | '/drive/share/$token'
+    | '/projects_/$id_/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -507,6 +519,7 @@ export interface RootRouteChildren {
   ProjectsIdRoute: typeof ProjectsIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
+  ProjectsIdTasksTaskIdRoute: typeof ProjectsIdTasksTaskIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -777,6 +790,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrganizationsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects_/$id_/tasks/$taskId': {
+      id: '/projects_/$id_/tasks/$taskId'
+      path: '/projects/$id/tasks/$taskId'
+      fullPath: '/projects/$id/tasks/$taskId'
+      preLoaderRoute: typeof ProjectsIdTasksTaskIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -862,6 +882,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsIdRoute: ProjectsIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
+  ProjectsIdTasksTaskIdRoute: ProjectsIdTasksTaskIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -305,7 +305,7 @@ function BoardColumn({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex max-h-full w-80 shrink-0 flex-col rounded-2xl border bg-muted/30",
+        "flex max-h-full w-80 shrink-0 flex-col overflow-hidden rounded-2xl border bg-muted/30",
         isDragging && "opacity-60"
       )}
     >
@@ -391,7 +391,7 @@ function BoardColumn({
         </DropdownMenu>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+      <div className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto p-2">
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {taskIds.map((taskId) => {
             const task = tasksById.get(taskId)
@@ -452,12 +452,6 @@ function BoardColumn({
             <PlusIcon className="size-4" />
             Add a task
           </button>
-        )}
-
-        {taskIds.length === 0 && !adding && (
-          <div className="rounded-xl border border-dashed bg-background/40 p-4 text-center text-xs text-muted-foreground">
-            Drop tasks here
-          </div>
         )}
       </div>
     </section>
