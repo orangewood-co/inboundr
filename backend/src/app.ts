@@ -25,6 +25,7 @@ import invoiceRouter from "./routes/invoice.route";
 import adminRouter from "./routes/admin.route";
 import contactRouter from "./routes/contact.route";
 import employeeRouter from "./routes/employee.route";
+import projectRouter from "./routes/project.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { auth } from "./lib/auth";
 import {
@@ -73,6 +74,7 @@ app.use("/api/v1/drive", driveRouter);
 app.use("/api/v1/invoices", invoiceRouter);
 app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/employees", employeeRouter);
+app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/public/drive", publicDriveRouter);
 app.use("/l", publicLinksRouter);

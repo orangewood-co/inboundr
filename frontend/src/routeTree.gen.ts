@@ -15,6 +15,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
@@ -31,6 +32,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
+import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as LinksIdRouteImport } from './routes/links.$id'
@@ -73,6 +76,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductsRoute = ProductsRouteImport.update({
@@ -155,6 +163,16 @@ const FormsIndexRoute = FormsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => FormsRoute,
 } as any)
+const ProjectsNewRoute = ProjectsNewRouteImport.update({
+  id: '/projects_/new',
+  path: '/projects/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsIdRoute = ProjectsIdRouteImport.update({
+  id: '/projects_/$id',
+  path: '/projects/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsImportRoute = ProductsImportRouteImport.update({
   id: '/products_/import',
   path: '/products/import',
@@ -235,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -252,6 +271,8 @@ export interface FileRoutesByFullPath {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
+  '/projects/$id': typeof ProjectsIdRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -269,6 +290,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -286,6 +308,8 @@ export interface FileRoutesByTo {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
+  '/projects/$id': typeof ProjectsIdRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
@@ -307,6 +331,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
+  '/projects': typeof ProjectsRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -324,6 +349,8 @@ export interface FileRoutesById {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products_/import': typeof ProductsImportRoute
+  '/projects_/$id': typeof ProjectsIdRoute
+  '/projects_/new': typeof ProjectsNewRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -346,6 +373,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/products'
+    | '/projects'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -363,6 +391,8 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products/import'
+    | '/projects/$id'
+    | '/projects/new'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -380,6 +410,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/products'
+    | '/projects'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -397,6 +428,8 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products/import'
+    | '/projects/$id'
+    | '/projects/new'
     | '/forms'
     | '/invoices'
     | '/links'
@@ -417,6 +450,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/orders'
     | '/products'
+    | '/projects'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -434,6 +468,8 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products_/import'
+    | '/projects_/$id'
+    | '/projects_/new'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -455,6 +491,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRoute
   ProductsRoute: typeof ProductsRoute
+  ProjectsRoute: typeof ProjectsRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RfqRoute: typeof RfqRoute
@@ -467,6 +504,8 @@ export interface RootRouteChildren {
   EmployeesNewRoute: typeof EmployeesNewRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
+  ProjectsIdRoute: typeof ProjectsIdRoute
+  ProjectsNewRoute: typeof ProjectsNewRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
 }
 
@@ -512,6 +551,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products': {
@@ -625,6 +671,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/forms/'
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
+    }
+    '/projects_/new': {
+      id: '/projects_/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof ProjectsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects_/$id': {
+      id: '/projects_/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ProjectsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/products_/import': {
       id: '/products_/import'
@@ -786,6 +846,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrdersRoute: OrdersRoute,
   ProductsRoute: ProductsRoute,
+  ProjectsRoute: ProjectsRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RfqRoute: RfqRoute,
@@ -798,6 +859,8 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesNewRoute: EmployeesNewRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,
+  ProjectsIdRoute: ProjectsIdRoute,
+  ProjectsNewRoute: ProjectsNewRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
 }
 export const routeTree = rootRouteImport
