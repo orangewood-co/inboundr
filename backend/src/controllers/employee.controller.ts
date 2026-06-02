@@ -19,11 +19,15 @@ import {
 } from "../models/organization-member.model";
 import { EmployeeDocument, type EmployeeDocumentType } from "../models/employee-document.model";
 import { sendEmail } from "../lib/email";
+import {
+  EMPLOYEE_DOCUMENT_TYPES,
+  ensureEmployeeDocuments,
+  upsertEmployeeDocument,
+} from "../services/employee-document.service";
 import { streamEmployeeDocumentPdf } from "../services/employee-document-pdf.service";
 
 const SEARCH_FIELDS = ["fullName", "email", "phone", "title", "employeeCode"] as const;
 const EMPLOYEE_STATUSES: EmployeeStatus[] = ["active", "inactive", "terminated", "archived"];
-const DOCUMENT_TYPES: EmployeeDocumentType[] = ["id_card", "proof_of_employment"];
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -240,7 +244,8 @@ export async function listEmployees(req: Request, res: Response): Promise<void> 
 
 export async function createEmployee(req: Request, res: Response): Promise<void> {
   try {
-    const organization = (req as OrganizationRequest).organization;
+    const authReq = req as OrganizationRequest;
+    const organization = authReq.organization;
     const body = req.body ?? {};
     const input = normalizeEmployeeInput(body);
     const validationError = validateEmployeeInput(input);
@@ -262,6 +267,13 @@ export async function createEmployee(req: Request, res: Response): Promise<void>
     const hydrated = await Employee.findById(employee._id)
       .populate("teamId", "name defaultModules status")
       .lean();
+    if (hydrated) {
+      await ensureEmployeeDocuments({
+        organizationId: organization._id,
+        employee: hydrated,
+        generatedByUserId: authReq.user.id,
+      });
+    }
     res.status(201).json(serializeEmployee(hydrated));
   } catch (err: any) {
     console.error("Error creating employee:", err);
@@ -302,7 +314,8 @@ export async function getEmployee(req: Request, res: Response): Promise<void> {
 
 export async function updateEmployee(req: Request, res: Response): Promise<void> {
   try {
-    const organization = (req as OrganizationRequest).organization;
+    const authReq = req as OrganizationRequest;
+    const organization = authReq.organization;
     const id = String(req.params.id ?? "");
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid employee id" });
@@ -338,6 +351,12 @@ export async function updateEmployee(req: Request, res: Response): Promise<void>
       res.status(404).json({ error: "Employee not found" });
       return;
     }
+
+    await ensureEmployeeDocuments({
+      organizationId: organization._id,
+      employee,
+      generatedByUserId: authReq.user.id,
+    });
 
     res.json(serializeEmployee(employee));
   } catch (err: any) {
@@ -385,7 +404,8 @@ export async function archiveEmployee(req: Request, res: Response): Promise<void
 
 export async function restoreEmployee(req: Request, res: Response): Promise<void> {
   try {
-    const organization = (req as OrganizationRequest).organization;
+    const authReq = req as OrganizationRequest;
+    const organization = authReq.organization;
     const id = String(req.params.id ?? "");
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid employee id" });
@@ -404,6 +424,12 @@ export async function restoreEmployee(req: Request, res: Response): Promise<void
       res.status(404).json({ error: "Employee not found" });
       return;
     }
+
+    await ensureEmployeeDocuments({
+      organizationId: organization._id,
+      employee,
+      generatedByUserId: authReq.user.id,
+    });
 
     res.json(serializeEmployee(employee));
   } catch (err) {
@@ -594,7 +620,8 @@ export async function createEmployeeTeam(req: Request, res: Response): Promise<v
 
 export async function updateEmployeeTeam(req: Request, res: Response): Promise<void> {
   try {
-    const organization = (req as OrganizationRequest).organization;
+    const authReq = req as OrganizationRequest;
+    const organization = authReq.organization;
     const id = String(req.params.id ?? "");
     if (!mongoose.Types.ObjectId.isValid(id)) {
       res.status(400).json({ error: "Invalid team id" });
@@ -610,6 +637,15 @@ export async function updateEmployeeTeam(req: Request, res: Response): Promise<v
       return;
     }
 
+    const existingTeam = await EmployeeTeam.findOne({
+      _id: id,
+      organizationId: organization._id,
+    }).lean();
+    if (!existingTeam) {
+      res.status(404).json({ error: "Team not found" });
+      return;
+    }
+
     const team = await EmployeeTeam.findOneAndUpdate(
       { _id: id, organizationId: organization._id },
       input,
@@ -618,6 +654,26 @@ export async function updateEmployeeTeam(req: Request, res: Response): Promise<v
     if (!team) {
       res.status(404).json({ error: "Team not found" });
       return;
+    }
+
+    if ("name" in input && existingTeam.name !== team.name) {
+      const employees = await Employee.find({
+        organizationId: organization._id,
+        teamId: team._id,
+        status: { $ne: "archived" },
+      })
+        .populate("teamId", "name")
+        .lean();
+
+      await Promise.all(
+        employees.map((employee) =>
+          ensureEmployeeDocuments({
+            organizationId: organization._id,
+            employee,
+            generatedByUserId: authReq.user.id,
+          })
+        )
+      );
     }
 
     res.json(team);
@@ -673,7 +729,7 @@ export async function generateEmployeeDocument(req: Request, res: Response): Pro
     const organization = authReq.organization;
     const id = String(req.params.id ?? "");
     const type = stringValue(req.body?.type) as EmployeeDocumentType;
-    if (!mongoose.Types.ObjectId.isValid(id) || !DOCUMENT_TYPES.includes(type)) {
+    if (!mongoose.Types.ObjectId.isValid(id) || !EMPLOYEE_DOCUMENT_TYPES.includes(type)) {
       res.status(400).json({ error: "Invalid employee id or document type" });
       return;
     }
@@ -690,28 +746,15 @@ export async function generateEmployeeDocument(req: Request, res: Response): Pro
       return;
     }
 
-    const teamName = employee.teamId && typeof employee.teamId === "object"
-      ? String((employee.teamId as any).name ?? "")
-      : null;
-    const title = type === "id_card" ? "Employee ID Card" : "Proof of Employment";
-    const document = await EmployeeDocument.create({
+    const document = await upsertEmployeeDocument({
       organizationId: organization._id,
-      employeeId: employee._id,
+      employee,
       type,
-      title,
       generatedByUserId: authReq.user.id,
-      employeeSnapshot: {
-        fullName: employee.fullName,
-        email: employee.email,
-        phone: employee.phone,
-        title: employee.title,
-        employeeCode: employee.employeeCode,
-        teamName,
-        startDate: employee.startDate,
-      },
+      force: true,
     });
 
-    res.status(201).json({ document });
+    res.status(200).json({ document });
   } catch (err) {
     console.error("Error generating employee document:", err);
     res.status(500).json({ error: "Failed to generate employee document" });

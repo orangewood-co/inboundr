@@ -140,6 +140,8 @@ const documentLabels = {
   proof_of_employment: "Proof of employment",
 } as const
 
+const documentTypes = ["id_card", "proof_of_employment"] as const
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -154,6 +156,13 @@ function formatDate(value?: string | null) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "-"
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
+}
+
+function documentTimestamp(document: EmployeeDocument) {
+  const issuedAt = new Date(document.issuedAt ?? "").getTime()
+  if (Number.isFinite(issuedAt)) return issuedAt
+  const createdAt = new Date(document.createdAt ?? "").getTime()
+  return Number.isFinite(createdAt) ? createdAt : 0
 }
 
 function employeeToForm(employee: Employee): EmployeeFormState {
@@ -463,6 +472,20 @@ export default function EmployeeDetailPage() {
       .filter((module) => !(employee.platformAccess.restrictedModules ?? []).includes(module))
   }, [employee])
 
+  const currentDocuments = useMemo(() => {
+    const byType = new Map<EmployeeDocument["type"], EmployeeDocument>()
+    for (const document of documents) {
+      const current = byType.get(document.type)
+      if (!current || documentTimestamp(document) > documentTimestamp(current)) {
+        byType.set(document.type, document)
+      }
+    }
+    return documentTypes.flatMap((type) => {
+      const document = byType.get(type)
+      return document ? [document] : []
+    })
+  }, [documents])
+
   const fetchEmployee = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -581,6 +604,7 @@ export default function EmployeeDetailPage() {
       setEmployee(data)
       setForm(employeeToForm(data))
       setEditing(false)
+      await fetchDocuments()
       toast.success("Employee updated")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save employee")
@@ -663,7 +687,7 @@ export default function EmployeeDetailPage() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error ?? "Failed to generate document")
-      toast.success(`${documentLabels[type]} generated`)
+      toast.success(`${documentLabels[type]} refreshed`)
       await fetchDocuments()
       window.open(`${API_BASE}/${employee._id}/documents/${data.document._id}/pdf`, "_blank")
     } catch (err) {
@@ -859,24 +883,24 @@ export default function EmployeeDetailPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h2 className="font-semibold">Documents</h2>
-                          <p className="mt-1 text-sm text-muted-foreground">Generate branded employee documents.</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Open or refresh branded employee documents.</p>
                         </div>
                         <IdCardIcon className="size-5 text-muted-foreground" />
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <Button variant="outline" onClick={() => generateDocument("id_card")} disabled={saving}>
                           <FileBadgeIcon />
-                          ID card
+                          Refresh ID
                         </Button>
                         <Button variant="outline" onClick={() => generateDocument("proof_of_employment")} disabled={saving}>
                           <FileTextIcon />
-                          Proof
+                          Refresh proof
                         </Button>
                       </div>
                       <div className="mt-4 grid gap-2">
-                        {documents.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No generated documents yet.</p>
-                        ) : documents.map((document) => (
+                        {currentDocuments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No documents available yet.</p>
+                        ) : currentDocuments.map((document) => (
                           <button
                             key={document._id}
                             type="button"
@@ -885,7 +909,7 @@ export default function EmployeeDetailPage() {
                           >
                             <span>
                               <span className="block text-sm font-medium">{document.title}</span>
-                              <span className="block text-xs text-muted-foreground">{formatDate(document.createdAt)}</span>
+                              <span className="block text-xs text-muted-foreground">Issued {formatDate(document.issuedAt)}</span>
                             </span>
                             <LinkIcon className="size-4 text-muted-foreground" />
                           </button>

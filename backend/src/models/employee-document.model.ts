@@ -71,6 +71,10 @@ const employeeDocumentSchema = new Schema<IEmployeeDocument>(
 );
 
 employeeDocumentSchema.index({ organizationId: 1, employeeId: 1, createdAt: -1 });
+employeeDocumentSchema.index(
+  { organizationId: 1, employeeId: 1, type: 1 },
+  { unique: true }
+);
 
 export const EmployeeDocument = mongoose.model<IEmployeeDocument>(
   "EmployeeDocument",
