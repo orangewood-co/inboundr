@@ -212,7 +212,7 @@ function StageColorPicker({
           className="size-3 shrink-0 rounded-full ring-2 ring-transparent transition hover:ring-border"
           style={{ backgroundColor: color }}
           onPointerDown={(event) => event.stopPropagation()}
-          aria-label="Change list color"
+          aria-label="Change stage color"
         />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="start" onPointerDown={(event) => event.stopPropagation()}>
@@ -353,7 +353,7 @@ function BoardColumn({
           className="rounded-md p-1 text-muted-foreground transition hover:bg-background/70 hover:text-foreground"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => setAdding(true)}
-          aria-label="Add card"
+          aria-label="Add task"
         >
           <PlusIcon className="size-4" />
         </button>
@@ -363,7 +363,7 @@ function BoardColumn({
               type="button"
               className="rounded-md p-1 text-muted-foreground transition hover:bg-background/70 hover:text-foreground"
               onPointerDown={(event) => event.stopPropagation()}
-              aria-label="List actions"
+              aria-label="Stage actions"
             >
               <MoreHorizontalIcon className="size-4" />
             </button>
@@ -385,7 +385,7 @@ function BoardColumn({
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => onArchiveStage(stage._id)}>
               <ArchiveIcon />
-              Archive list
+              Archive stage
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -416,7 +416,7 @@ function BoardColumn({
               ref={addRef}
               value={draftTitle}
               onChange={(event) => setDraftTitle(event.target.value)}
-              placeholder="Card title..."
+              placeholder="Task title..."
               onKeyDown={(event) => {
                 if (event.key === "Enter") commitAdd()
                 if (event.key === "Escape") {
@@ -428,7 +428,7 @@ function BoardColumn({
             />
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" onClick={commitAdd}>
-                Add card
+                Add task
               </Button>
               <Button
                 size="icon-sm"
@@ -450,13 +450,13 @@ function BoardColumn({
             className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-sm font-medium text-muted-foreground transition hover:bg-background/70 hover:text-foreground"
           >
             <PlusIcon className="size-4" />
-            Add a card
+            Add a task
           </button>
         )}
 
         {taskIds.length === 0 && !adding && (
           <div className="rounded-xl border border-dashed bg-background/40 p-4 text-center text-xs text-muted-foreground">
-            Drop cards here
+            Drop tasks here
           </div>
         )}
       </div>
@@ -488,7 +488,7 @@ function AddListAffordance({ onAddStage }: { onAddStage: (name: string) => void 
         className="flex h-fit w-72 shrink-0 items-center gap-2 rounded-2xl border border-dashed bg-muted/20 px-3 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
       >
         <PlusIcon className="size-4" />
-        Add another list
+        Add another stage
       </button>
     )
   }
@@ -499,7 +499,7 @@ function AddListAffordance({ onAddStage }: { onAddStage: (name: string) => void 
         ref={inputRef}
         value={name}
         onChange={(event) => setName(event.target.value)}
-        placeholder="List name..."
+        placeholder="Stage name..."
         onKeyDown={(event) => {
           if (event.key === "Enter") commit()
           if (event.key === "Escape") {
@@ -511,7 +511,7 @@ function AddListAffordance({ onAddStage }: { onAddStage: (name: string) => void 
       />
       <div className="mt-2 flex items-center gap-2">
         <Button size="sm" onClick={commit}>
-          Add list
+          Add stage
         </Button>
         <Button
           size="icon-sm"

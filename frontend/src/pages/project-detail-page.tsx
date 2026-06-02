@@ -465,7 +465,7 @@ export default function ProjectDetailPage() {
     event.preventDefault()
     if (!project || !taskForm.title.trim()) return
     if (!taskForm.stageId) {
-      toast.error("Add a list before creating tasks")
+      toast.error("Add a stage before creating tasks")
       return
     }
     try {
@@ -517,7 +517,7 @@ export default function ProjectDetailPage() {
       try {
         await reorderProjectStages(project._id, stageIds)
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to reorder lists")
+        toast.error(err instanceof Error ? err.message : "Failed to reorder stages")
         void refresh()
       }
     },
@@ -534,7 +534,7 @@ export default function ProjectDetailPage() {
       try {
         await updateProjectStage(project._id, stageId, { name })
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to rename list")
+        toast.error(err instanceof Error ? err.message : "Failed to rename stage")
         void refresh()
       }
     },
@@ -551,7 +551,7 @@ export default function ProjectDetailPage() {
       try {
         await updateProjectStage(project._id, stageId, { color })
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to update list color")
+        toast.error(err instanceof Error ? err.message : "Failed to update stage color")
         void refresh()
       }
     },
@@ -563,10 +563,10 @@ export default function ProjectDetailPage() {
       if (!project) return
       try {
         await archiveProjectStage(project._id, stageId)
-        toast.success("List archived")
+        toast.success("Stage archived")
         await refresh()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to archive list")
+        toast.error(err instanceof Error ? err.message : "Failed to archive stage")
       }
     },
     [project, refresh]
@@ -579,7 +579,7 @@ export default function ProjectDetailPage() {
         await createProjectTask(project._id, { title, stageId })
         await refresh()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to add card")
+        toast.error(err instanceof Error ? err.message : "Failed to add task")
       }
     },
     [project, refresh]
@@ -590,10 +590,10 @@ export default function ProjectDetailPage() {
       if (!project) return
       try {
         await createProjectStage(project._id, { name })
-        toast.success("List added")
+        toast.success("Stage added")
         await refresh()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to add list")
+        toast.error(err instanceof Error ? err.message : "Failed to add stage")
       }
     },
     [project, refresh]
