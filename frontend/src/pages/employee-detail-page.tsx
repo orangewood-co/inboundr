@@ -7,8 +7,6 @@ import {
   BadgeCheckIcon,
   BriefcaseBusinessIcon,
   CameraIcon,
-  FileBadgeIcon,
-  FileTextIcon,
   IdCardIcon,
   LinkIcon,
   MailIcon,
@@ -134,11 +132,6 @@ const statusLabels: Record<EmployeeStatus, string> = {
   terminated: "Terminated",
   archived: "Archived",
 }
-
-const documentLabels = {
-  id_card: "Employee ID card",
-  proof_of_employment: "Proof of employment",
-} as const
 
 const documentTypes = ["id_card", "proof_of_employment"] as const
 
@@ -675,28 +668,6 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  async function generateDocument(type: EmployeeDocument["type"]) {
-    if (!employee) return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${employee._id}/documents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ type }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to generate document")
-      toast.success(`${documentLabels[type]} refreshed`)
-      await fetchDocuments()
-      window.open(`${API_BASE}/${employee._id}/documents/${data.document._id}/pdf`, "_blank")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate document")
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
     <AppLayout>
       <SiteHeader
@@ -883,19 +854,9 @@ export default function EmployeeDetailPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h2 className="font-semibold">Documents</h2>
-                          <p className="mt-1 text-sm text-muted-foreground">Open or refresh branded employee documents.</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Open current branded employee documents.</p>
                         </div>
                         <IdCardIcon className="size-5 text-muted-foreground" />
-                      </div>
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <Button variant="outline" onClick={() => generateDocument("id_card")} disabled={saving}>
-                          <FileBadgeIcon />
-                          Refresh ID
-                        </Button>
-                        <Button variant="outline" onClick={() => generateDocument("proof_of_employment")} disabled={saving}>
-                          <FileTextIcon />
-                          Refresh proof
-                        </Button>
                       </div>
                       <div className="mt-4 grid gap-2">
                         {currentDocuments.length === 0 ? (
