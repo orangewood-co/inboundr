@@ -36,12 +36,6 @@ const STATUS_TONE: Record<Project["status"], string> = {
   archived: "bg-muted text-muted-foreground",
 }
 
-const STATUS_ACCENT: Record<Project["status"], string> = {
-  active: "#16a34a",
-  completed: "#2563eb",
-  archived: "#64748b",
-}
-
 const VISIBILITY_LABELS: Record<Project["visibility"], string> = {
   internal: "All internal users",
   private: "Invited users",
@@ -63,7 +57,6 @@ function ProjectCard({ project, onOpen }: { project: Project; onOpen: (project: 
       onClick={() => onOpen(project)}
       className="group flex min-h-60 flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg"
     >
-      <span className="h-1.5 w-full" style={{ backgroundColor: STATUS_ACCENT[project.status] }} />
       <div className="flex flex-1 flex-col p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
@@ -182,14 +175,7 @@ export default function ProjectsPage() {
         }
       />
       <main className="flex min-h-0 flex-1 flex-col overflow-auto p-6">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">Projects</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Plan, assign, and track work</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Build project boards with private, team, or internal visibility and switch from Kanban to schedule planning.
-            </p>
-          </div>
+        <div className="mb-6 flex justify-end">
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative">
               <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
