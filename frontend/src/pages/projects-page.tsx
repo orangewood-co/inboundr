@@ -3,6 +3,8 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   CalendarDaysIcon,
   FolderKanbanIcon,
+  GlobeIcon,
+  LockIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -12,7 +14,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { Badge } from "@/components/ui/badge"
+import { DueDatePill, formatDate } from "@/components/projects/board-ui"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,50 +30,76 @@ import { cn } from "@/lib/utils"
 
 const PAGE_LIMIT = 24
 
-const visibilityLabels: Record<Project["visibility"], string> = {
-  internal: "All internal users",
-  private: "Invited users",
-  teams: "Teams",
+const STATUS_TONE: Record<Project["status"], string> = {
+  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  completed: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  archived: "bg-muted text-muted-foreground",
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "No date"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "No date"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
+const STATUS_ACCENT: Record<Project["status"], string> = {
+  active: "#16a34a",
+  completed: "#2563eb",
+  archived: "#64748b",
+}
+
+const VISIBILITY_LABELS: Record<Project["visibility"], string> = {
+  internal: "All internal users",
+  private: "Invited users",
+  teams: "Respective teams",
 }
 
 function ProjectCard({ project, onOpen }: { project: Project; onOpen: (project: Project) => void }) {
+  const VisibilityIcon =
+    project.visibility === "internal" ? GlobeIcon : project.visibility === "private" ? LockIcon : UsersIcon
+  const memberCount = new Set([
+    ...project.memberIds,
+    ...project.managerIds,
+    ...project.followerIds,
+  ]).size
+
   return (
     <button
       type="button"
       onClick={() => onOpen(project)}
-      className="group flex min-h-64 flex-col rounded-2xl border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg"
+      className="group flex min-h-60 flex-col overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="rounded-2xl bg-primary/10 p-3 text-primary">
-          <FolderKanbanIcon className="size-5" />
-        </div>
-        <Badge variant={project.status === "completed" ? "default" : "secondary"}>
-          {project.status}
-        </Badge>
-      </div>
-      <div className="mt-5 flex-1 space-y-2">
-        <h3 className="line-clamp-2 text-xl font-semibold tracking-tight">{project.title}</h3>
-        <p className="line-clamp-3 text-sm text-muted-foreground">
-          {project.description || "No description yet."}
-        </p>
-      </div>
-      <div className="mt-6 space-y-3 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <CalendarDaysIcon className="size-4" />
-          <span>
-            {formatDate(project.startDate)} - {formatDate(project.dueDate)}
+      <span className="h-1.5 w-full" style={{ backgroundColor: STATUS_ACCENT[project.status] }} />
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
+            <FolderKanbanIcon className="size-5" />
+          </div>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+              STATUS_TONE[project.status]
+            )}
+          >
+            {project.status}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <UsersIcon className="size-4" />
-          <span>{visibilityLabels[project.visibility]}</span>
+        <div className="mt-4 flex-1 space-y-1.5">
+          <h3 className="line-clamp-2 text-lg font-semibold tracking-tight">{project.title}</h3>
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            {project.description || "No description yet."}
+          </p>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium">
+            <VisibilityIcon className="size-3" />
+            {VISIBILITY_LABELS[project.visibility]}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium">
+            <UsersIcon className="size-3" />
+            {memberCount}
+          </span>
+          {project.startDate && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarDaysIcon className="size-3.5" />
+              {formatDate(project.startDate)}
+            </span>
+          )}
+          <DueDatePill due={project.dueDate} />
         </div>
       </div>
     </button>

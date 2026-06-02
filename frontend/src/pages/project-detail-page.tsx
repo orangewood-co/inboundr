@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams } from "@tanstack/react-router"
-import { DndContext, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core"
-import { CSS } from "@dnd-kit/utilities"
 import {
   ActivityIcon,
   ArchiveIcon,
@@ -10,19 +8,30 @@ import {
   ClockIcon,
   FolderKanbanIcon,
   GanttChartSquareIcon,
-  GripVerticalIcon,
+  GlobeIcon,
   KanbanSquareIcon,
+  LockIcon,
   PlusIcon,
   SaveIcon,
   Settings2Icon,
-  Trash2Icon,
   UsersIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ProjectBoard } from "@/components/projects/project-board"
+import {
+  DueDatePill,
+  EmployeeStack,
+  dateInputValue,
+  employeeName,
+  formatDate,
+  formatMinutes,
+  stageColor,
+  todayInputValue,
+  toggleValue,
+} from "@/components/projects/board-ui"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -66,10 +75,9 @@ import {
   type ProjectStage,
   type ProjectTask,
   type ProjectTeam,
-  type ProjectTimeEntry,
   type ProjectVisibility,
 } from "@/lib/projects"
-import { cn, getAvatarColor } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 type TaskForm = {
   title: string
@@ -104,78 +112,19 @@ const emptyTaskForm: TaskForm = {
   estimatedMinutes: "",
 }
 
-function dateInputValue(value?: string | null) {
-  if (!value) return ""
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toISOString().slice(0, 10)
+const STATUS_TONE: Record<Project["status"], string> = {
+  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  completed: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  archived: "bg-muted text-muted-foreground",
 }
 
-function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function formatDate(value?: string | null) {
-  const input = dateInputValue(value)
-  if (!input) return "No date"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(input))
-}
-
-function formatMinutes(minutes?: number | null) {
-  if (!minutes) return "0h"
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (!hours) return `${mins}m`
-  if (!mins) return `${hours}h`
-  return `${hours}h ${mins}m`
-}
-
-function initials(name: string) {
-  return (
-    name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "IN"
-  )
-}
-
-function toggleValue(values: string[], value: string, checked: boolean) {
-  if (checked) return [...new Set([...values, value])]
-  return values.filter((item) => item !== value)
-}
-
-function employeeName(employees: ProjectEmployee[], id: string) {
-  return employees.find((employee) => employee._id === id)?.fullName ?? "Unknown"
-}
-
-function EmployeeAvatar({ employee }: { employee: ProjectEmployee }) {
-  const palette = getAvatarColor(employee.fullName)
-  return (
-    <Avatar className="size-7">
-      <AvatarFallback className={cn("text-[11px] font-semibold", palette.bg, palette.text)}>
-        {initials(employee.fullName)}
-      </AvatarFallback>
-    </Avatar>
-  )
-}
-
-function EmployeeChips({ employees, ids, limit = 4 }: { employees: ProjectEmployee[]; ids: string[]; limit?: number }) {
-  const selected = ids.map((id) => employees.find((employee) => employee._id === id)).filter(Boolean) as ProjectEmployee[]
-  if (selected.length === 0) return <span className="text-xs text-muted-foreground">Unassigned</span>
-  return (
-    <div className="flex items-center -space-x-2">
-      {selected.slice(0, limit).map((employee) => (
-        <div key={employee._id} className="rounded-full border-2 border-card bg-card">
-          <EmployeeAvatar employee={employee} />
-        </div>
-      ))}
-      {selected.length > limit && (
-        <span className="ml-3 rounded-full bg-muted px-2 py-1 text-xs font-medium">+{selected.length - limit}</span>
-      )}
-    </div>
-  )
+const VISIBILITY_META: Record<
+  ProjectVisibility,
+  { icon: typeof GlobeIcon; label: string }
+> = {
+  internal: { icon: GlobeIcon, label: "All internal users" },
+  private: { icon: LockIcon, label: "Invited users" },
+  teams: { icon: UsersIcon, label: "Respective teams" },
 }
 
 function MultiEmployeePicker({
@@ -227,134 +176,6 @@ function MultiTeamPicker({
       ))}
       {teams.length === 0 && <p className="text-sm text-muted-foreground">No active teams found.</p>}
     </div>
-  )
-}
-
-function DraggableTaskCard({
-  task,
-  employees,
-  trackedMinutes,
-  onOpen,
-}: {
-  task: ProjectTask
-  employees: ProjectEmployee[]
-  trackedMinutes: number
-  onOpen: (task: ProjectTask) => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task._id,
-    data: { type: "task" },
-  })
-  const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-2xl border bg-card p-4 shadow-sm transition hover:border-foreground/20",
-        isDragging && "z-50 opacity-70 shadow-xl"
-      )}
-    >
-      <div className="mb-3 flex items-start gap-2">
-        <button
-          type="button"
-          className="mt-0.5 cursor-grab rounded-md p-1 text-muted-foreground hover:bg-muted"
-          {...listeners}
-          {...attributes}
-        >
-          <GripVerticalIcon className="size-4" />
-        </button>
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(task)}>
-          <h3 className="line-clamp-2 text-sm font-semibold">{task.title}</h3>
-          {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
-        </button>
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <EmployeeChips employees={employees} ids={task.assigneeIds} />
-        <Badge variant="secondary" className="gap-1">
-          <ClockIcon className="size-3" />
-          {formatMinutes(trackedMinutes)}
-        </Badge>
-      </div>
-      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <CalendarRangeIcon className="size-3.5" />
-        <span>
-          {formatDate(task.startDate)} - {formatDate(task.dueDate)}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function KanbanColumn({
-  stage,
-  tasks,
-  employees,
-  timeEntries,
-  stageName,
-  onStageNameChange,
-  onSaveStage,
-  onArchiveStage,
-  onCreateTask,
-  onOpenTask,
-}: {
-  stage: ProjectStage
-  tasks: ProjectTask[]
-  employees: ProjectEmployee[]
-  timeEntries: ProjectTimeEntry[]
-  stageName: string
-  onStageNameChange: (value: string) => void
-  onSaveStage: () => void
-  onArchiveStage: () => void
-  onCreateTask: () => void
-  onOpenTask: (task: ProjectTask) => void
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: stage._id })
-  return (
-    <section
-      ref={setNodeRef}
-      className={cn(
-        "flex h-full min-w-80 flex-col rounded-3xl border bg-muted/20 p-3 transition",
-        isOver && "border-primary bg-primary/5"
-      )}
-    >
-      <div className="mb-3 rounded-2xl bg-card p-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="size-3 rounded-full" style={{ backgroundColor: stage.color ?? "#64748b" }} />
-          <Input value={stageName} onChange={(event) => onStageNameChange(event.target.value)} className="h-8" />
-          <Button size="icon-sm" variant="ghost" onClick={onSaveStage}>
-            <SaveIcon className="size-4" />
-          </Button>
-          <Button size="icon-sm" variant="ghost" onClick={onArchiveStage}>
-            <Trash2Icon className="size-4" />
-          </Button>
-        </div>
-        <div className="mt-3 flex items-center justify-between">
-          <Badge variant="secondary">{tasks.length} tasks</Badge>
-          <Button size="sm" variant="outline" onClick={onCreateTask}>
-            <PlusIcon />
-            Task
-          </Button>
-        </div>
-      </div>
-      <div className="flex flex-1 flex-col gap-3 overflow-auto">
-        {tasks.map((task) => (
-          <DraggableTaskCard
-            key={task._id}
-            task={task}
-            employees={employees}
-            trackedMinutes={timeEntries.filter((entry) => entry.taskId === task._id).reduce((sum, entry) => sum + entry.minutes, 0)}
-            onOpen={onOpenTask}
-          />
-        ))}
-        {tasks.length === 0 && (
-          <div className="rounded-2xl border border-dashed bg-background/60 p-6 text-center text-sm text-muted-foreground">
-            Drop tasks here or create a new one.
-          </div>
-        )}
-      </div>
-    </section>
   )
 }
 
@@ -489,8 +310,12 @@ function GanttView({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{task.title}</div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{stage?.name ?? "Stage"}</span>
-                    <EmployeeChips employees={employees} ids={task.assigneeIds} limit={2} />
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: stageColor(stage?.color) }}
+                    />
+                    <span className="truncate">{stage?.name ?? "Stage"}</span>
+                    <EmployeeStack employees={employees} ids={task.assigneeIds} limit={2} emptyLabel={null} />
                   </div>
                 </div>
               </button>
@@ -501,8 +326,8 @@ function GanttView({
                   ))}
                 </div>
                 <div
-                  className="absolute top-1/2 flex h-8 -translate-y-1/2 items-center rounded-full bg-primary text-primary-foreground shadow-md"
-                  style={{ left, width }}
+                  className="absolute top-1/2 flex h-8 -translate-y-1/2 items-center rounded-full text-white shadow-md"
+                  style={{ left, width, backgroundColor: stageColor(stage?.color) }}
                 >
                   <button
                     type="button"
@@ -547,8 +372,6 @@ export default function ProjectDetailPage() {
   const [employees, setEmployees] = useState<ProjectEmployee[]>([])
   const [teams, setTeams] = useState<ProjectTeam[]>([])
   const [loading, setLoading] = useState(true)
-  const [newStageName, setNewStageName] = useState("")
-  const [stageNames, setStageNames] = useState<Record<string, string>>({})
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [taskForm, setTaskForm] = useState<TaskForm>(emptyTaskForm)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -562,7 +385,6 @@ export default function ProjectDetailPage() {
     setDetail(projectDetail)
     setEmployees(referenceData.employees)
     setTeams(referenceData.teams)
-    setStageNames(Object.fromEntries(projectDetail.stages.map((stage) => [stage._id, stage.name])))
     setSettingsForm({
       title: projectDetail.project.title,
       description: projectDetail.project.description ?? "",
@@ -614,73 +436,38 @@ export default function ProjectDetailPage() {
     })
   }, [employees, selectedTask])
 
-  const taskMinutes = useMemo(() => {
-    const totals = new Map<string, number>()
+  const trackedByTask = useMemo(() => {
+    const totals: Record<string, number> = {}
     for (const entry of timeEntries) {
-      totals.set(entry.taskId, (totals.get(entry.taskId) ?? 0) + entry.minutes)
+      totals[entry.taskId] = (totals[entry.taskId] ?? 0) + entry.minutes
     }
     return totals
   }, [timeEntries])
 
-  async function handleCreateStage() {
-    if (!project || !newStageName.trim()) return
-    try {
-      await createProjectStage(project._id, { name: newStageName.trim() })
-      setNewStageName("")
-      toast.success("Stage created")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create stage")
+  const subtaskCountByTask = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const task of tasks) {
+      if (task.parentTaskId) counts[task.parentTaskId] = (counts[task.parentTaskId] ?? 0) + 1
     }
-  }
+    return counts
+  }, [tasks])
 
-  async function handleSaveStage(stage: ProjectStage) {
-    if (!project) return
-    try {
-      await updateProjectStage(project._id, stage._id, { name: stageNames[stage._id] ?? stage.name, color: stage.color })
-      toast.success("Stage updated")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update stage")
-    }
-  }
+  const patchDetail = useCallback((updater: (current: ProjectDetail) => ProjectDetail) => {
+    setDetail((current) => (current ? updater(current) : current))
+  }, [])
 
-  async function handleArchiveStage(stage: ProjectStage) {
-    if (!project) return
-    try {
-      await archiveProjectStage(project._id, stage._id)
-      toast.success("Stage archived")
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to archive stage")
-    }
-  }
-
-  async function handleReorderStages(direction: "left" | "right", stage: ProjectStage) {
-    if (!project) return
-    const index = stages.findIndex((item) => item._id === stage._id)
-    const target = direction === "left" ? index - 1 : index + 1
-    if (target < 0 || target >= stages.length) return
-    const next = [...stages]
-    const [moved] = next.splice(index, 1)
-    if (!moved) return
-    next.splice(target, 0, moved)
-    try {
-      await reorderProjectStages(project._id, next.map((item) => item._id))
-      await refresh()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to reorder stages")
-    }
-  }
-
-  function openCreateTask(stageId: string) {
-    setTaskForm({ ...emptyTaskForm, stageId })
+  function openCreateTask(stageId?: string) {
+    setTaskForm({ ...emptyTaskForm, stageId: stageId ?? stages[0]?._id ?? "" })
     setTaskDialogOpen(true)
   }
 
   async function handleCreateTask(event: React.FormEvent) {
     event.preventDefault()
     if (!project || !taskForm.title.trim()) return
+    if (!taskForm.stageId) {
+      toast.error("Add a list before creating tasks")
+      return
+    }
     try {
       await createProjectTask(project._id, {
         title: taskForm.title.trim(),
@@ -699,28 +486,151 @@ export default function ProjectDetailPage() {
     }
   }
 
-  const handleMoveTask = useCallback(
-    async (task: ProjectTask, stageId: string, order: number, startDate?: string | null, dueDate?: string | null) => {
+  const handlePersistTaskMove = useCallback(
+    async (taskId: string, stageId: string, order: number) => {
       if (!project) return
-      await moveProjectTask(project._id, task._id, { stageId, order, startDate, dueDate })
-      await refresh()
+      patchDetail((current) => ({
+        ...current,
+        tasks: current.tasks.map((task) =>
+          task._id === taskId ? { ...task, stageId, order } : task
+        ),
+      }))
+      try {
+        await moveProjectTask(project._id, taskId, { stageId, order })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to move task")
+        void refresh()
+      }
+    },
+    [patchDetail, project, refresh]
+  )
+
+  const handleReorderStages = useCallback(
+    async (stageIds: string[]) => {
+      if (!project) return
+      patchDetail((current) => ({
+        ...current,
+        stages: [...current.stages]
+          .sort((a, b) => stageIds.indexOf(a._id) - stageIds.indexOf(b._id))
+          .map((stage, index) => ({ ...stage, order: index })),
+      }))
+      try {
+        await reorderProjectStages(project._id, stageIds)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to reorder lists")
+        void refresh()
+      }
+    },
+    [patchDetail, project, refresh]
+  )
+
+  const handleRenameStage = useCallback(
+    async (stageId: string, name: string) => {
+      if (!project) return
+      patchDetail((current) => ({
+        ...current,
+        stages: current.stages.map((stage) => (stage._id === stageId ? { ...stage, name } : stage)),
+      }))
+      try {
+        await updateProjectStage(project._id, stageId, { name })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to rename list")
+        void refresh()
+      }
+    },
+    [patchDetail, project, refresh]
+  )
+
+  const handleRecolorStage = useCallback(
+    async (stageId: string, color: string) => {
+      if (!project) return
+      patchDetail((current) => ({
+        ...current,
+        stages: current.stages.map((stage) => (stage._id === stageId ? { ...stage, color } : stage)),
+      }))
+      try {
+        await updateProjectStage(project._id, stageId, { color })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to update list color")
+        void refresh()
+      }
+    },
+    [patchDetail, project, refresh]
+  )
+
+  const handleArchiveStage = useCallback(
+    async (stageId: string) => {
+      if (!project) return
+      try {
+        await archiveProjectStage(project._id, stageId)
+        toast.success("List archived")
+        await refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to archive list")
+      }
     },
     [project, refresh]
   )
 
-  async function handleDragEnd(event: DragEndEvent) {
-    if (!project || !event.over) return
-    const task = tasks.find((item) => item._id === event.active.id)
-    const targetStageId = String(event.over.id)
-    if (!task || task.stageId === targetStageId || task.parentTaskId) return
-    try {
-      const order = topTasks.filter((item) => item.stageId === targetStageId).length
-      await handleMoveTask(task, targetStageId, order)
-      toast.success("Task moved")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to move task")
-    }
-  }
+  const handleQuickAddTask = useCallback(
+    async (stageId: string, title: string) => {
+      if (!project) return
+      try {
+        await createProjectTask(project._id, { title, stageId })
+        await refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to add card")
+      }
+    },
+    [project, refresh]
+  )
+
+  const handleAddStage = useCallback(
+    async (name: string) => {
+      if (!project) return
+      try {
+        await createProjectStage(project._id, { name })
+        toast.success("List added")
+        await refresh()
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to add list")
+      }
+    },
+    [project, refresh]
+  )
+
+  const handleGanttMove = useCallback(
+    async (
+      task: ProjectTask,
+      stageId: string,
+      order: number,
+      startDate?: string | null,
+      dueDate?: string | null
+    ) => {
+      if (!project) return
+      patchDetail((current) => ({
+        ...current,
+        tasks: current.tasks.map((item) =>
+          item._id === task._id
+            ? {
+                ...item,
+                stageId,
+                order,
+                startDate: startDate ?? item.startDate,
+                dueDate: dueDate ?? item.dueDate,
+              }
+            : item
+        ),
+      }))
+      try {
+        await moveProjectTask(project._id, task._id, { stageId, order, startDate, dueDate })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to update task dates")
+        void refresh()
+      }
+    },
+    [patchDetail, project, refresh]
+  )
 
   async function handleSaveSelectedTask() {
     if (!project || !selectedTask) return
@@ -868,28 +778,53 @@ export default function ProjectDetailPage() {
         }
       />
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
-        <section className="mb-5 rounded-3xl border bg-card p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+        <section className="mb-5 overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div
+            className="h-1.5 w-full"
+            style={{
+              backgroundImage: stages.length
+                ? `linear-gradient(to right, ${stages.map((stage) => stageColor(stage.color)).join(", ")})`
+                : undefined,
+              backgroundColor: stages.length ? undefined : "var(--primary)",
+            }}
+          />
+          <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{project.visibility}</Badge>
-                <Badge>{project.status}</Badge>
-                <Badge variant="outline" className="gap-1">
-                  <UsersIcon className="size-3" />
-                  {new Set([...project.memberIds, ...project.managerIds, ...project.followerIds]).size} people
-                </Badge>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                    STATUS_TONE[project.status]
+                  )}
+                >
+                  {project.status}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  {project.visibility === "internal" ? (
+                    <GlobeIcon className="size-3" />
+                  ) : project.visibility === "private" ? (
+                    <LockIcon className="size-3" />
+                  ) : (
+                    <UsersIcon className="size-3" />
+                  )}
+                  {VISIBILITY_META[project.visibility].label}
+                </span>
               </div>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight">{project.title}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{project.description || "No description yet."}</p>
-            </div>
-            <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 lg:min-w-80">
-              <div className="rounded-2xl bg-muted/40 p-3">
-                <span className="block text-xs">Start</span>
-                <span className="font-medium text-foreground">{formatDate(project.startDate)}</span>
-              </div>
-              <div className="rounded-2xl bg-muted/40 p-3">
-                <span className="block text-xs">Due</span>
-                <span className="font-medium text-foreground">{formatDate(project.dueDate)}</span>
+              <h1 className="mt-3 text-2xl font-semibold tracking-tight">{project.title}</h1>
+              <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
+                {project.description || "No description yet."}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <EmployeeStack
+                  employees={employees}
+                  ids={[...new Set([...project.managerIds, ...project.memberIds])]}
+                  limit={6}
+                  emptyLabel="No members yet"
+                />
+                <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <CalendarRangeIcon className="size-4" />
+                  {formatDate(project.startDate)} - {formatDate(project.dueDate)}
+                </span>
               </div>
             </div>
           </div>
@@ -911,49 +846,31 @@ export default function ProjectDetailPage() {
                 Activity
               </TabsTrigger>
             </TabsList>
-            <div className="flex gap-2">
-              <Input
-                value={newStageName}
-                onChange={(event) => setNewStageName(event.target.value)}
-                placeholder="New stage name"
-                className="w-48"
-              />
-              <Button onClick={handleCreateStage}>
-                <PlusIcon />
-                Stage
-              </Button>
-            </div>
+            <Button size="sm" onClick={() => openCreateTask()} disabled={stages.length === 0}>
+              <PlusIcon />
+              New task
+            </Button>
           </div>
 
-          <TabsContent value="kanban" className="min-h-0 overflow-hidden">
-            <DndContext onDragEnd={handleDragEnd}>
-              <div className="flex h-[calc(100svh-20rem)] gap-4 overflow-auto pb-4">
-                {stages.map((stage) => (
-                  <div key={stage._id} className="flex flex-col gap-2">
-                    <KanbanColumn
-                      stage={stage}
-                      tasks={topTasks.filter((task) => task.stageId === stage._id).sort((a, b) => a.order - b.order)}
-                      employees={employees}
-                      timeEntries={timeEntries}
-                      stageName={stageNames[stage._id] ?? stage.name}
-                      onStageNameChange={(value) => setStageNames((current) => ({ ...current, [stage._id]: value }))}
-                      onSaveStage={() => void handleSaveStage(stage)}
-                      onArchiveStage={() => void handleArchiveStage(stage)}
-                      onCreateTask={() => openCreateTask(stage._id)}
-                      onOpenTask={(task) => setSelectedTaskId(task._id)}
-                    />
-                    <div className="flex justify-center gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => void handleReorderStages("left", stage)}>
-                        Move left
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => void handleReorderStages("right", stage)}>
-                        Move right
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </DndContext>
+          <TabsContent value="kanban" className="mt-0 min-h-0 flex-1 overflow-hidden">
+            <div className="h-[calc(100svh-21rem)]">
+              <ProjectBoard
+                stages={stages}
+                tasks={topTasks}
+                employees={employees}
+                trackedByTask={trackedByTask}
+                subtaskCountByTask={subtaskCountByTask}
+                onOpenTask={(taskId) => setSelectedTaskId(taskId)}
+                onMoveTask={(taskId, stageId, order) => void handlePersistTaskMove(taskId, stageId, order)}
+                onReorderStages={(ids) => void handleReorderStages(ids)}
+                onRenameStage={(stageId, name) => void handleRenameStage(stageId, name)}
+                onRecolorStage={(stageId, color) => void handleRecolorStage(stageId, color)}
+                onArchiveStage={(stageId) => void handleArchiveStage(stageId)}
+                onQuickAddTask={(stageId, title) => void handleQuickAddTask(stageId, title)}
+                onAddStage={(name) => void handleAddStage(name)}
+                onAddTaskAdvanced={(stageId) => openCreateTask(stageId)}
+              />
+            </div>
           </TabsContent>
 
           <TabsContent value="gantt" className="min-h-0 overflow-auto">
@@ -963,7 +880,7 @@ export default function ProjectDetailPage() {
               tasks={tasks}
               employees={employees}
               onOpenTask={(task) => setSelectedTaskId(task._id)}
-              onMoveTask={handleMoveTask}
+              onMoveTask={handleGanttMove}
             />
           </TabsContent>
 
@@ -1045,8 +962,20 @@ export default function ProjectDetailPage() {
         <SheetContent className="w-full overflow-auto sm:max-w-2xl">
           {selectedTask && (
             <>
-              <SheetHeader>
-                <SheetTitle>Task details</SheetTitle>
+              <SheetHeader className="border-b">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{
+                      backgroundColor: stageColor(
+                        stages.find((stage) => stage._id === selectedTask.stageId)?.color
+                      ),
+                    }}
+                  />
+                  <SheetTitle className="flex-1 truncate">{selectedTask.title}</SheetTitle>
+                  {selectedTask.parentTaskId && <Badge variant="secondary">Subtask</Badge>}
+                  <DueDatePill due={selectedTask.dueDate} />
+                </div>
               </SheetHeader>
               <div className="grid gap-5 px-4 pb-8">
                 <Field>
