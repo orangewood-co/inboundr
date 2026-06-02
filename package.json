@@ -35,6 +35,11 @@
     "@langchain/openrouter": "^0.3.0",
     "@types/archiver": "^7.0.0",
     "archiver": "^8.0.0",
-    "react-easy-crop": "^5.5.7"
+    "qrcode": "^1.5.4",
+    "react-easy-crop": "^5.5.7",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6"
   }
 }

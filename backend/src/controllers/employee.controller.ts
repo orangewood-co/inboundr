@@ -25,6 +25,7 @@ import {
   upsertEmployeeDocument,
 } from "../services/employee-document.service";
 import { streamEmployeeDocumentPdf } from "../services/employee-document-pdf.service";
+import { generateVCardQrPng, loadPngBuffer } from "../services/pdf-image.service";
 
 const SEARCH_FIELDS = ["fullName", "email", "phone", "title", "employeeCode"] as const;
 const EMPLOYEE_STATUSES: EmployeeStatus[] = ["active", "inactive", "terminated", "archived"];
@@ -846,6 +847,12 @@ export async function downloadEmployeeDocumentPdf(req: Request, res: Response): 
       return;
     }
 
+    const [logoBuffer, photoBuffer, qrBuffer] = await Promise.all([
+      loadPngBuffer(organization.logoUrl),
+      loadPngBuffer(document.employeeSnapshot?.profileImageUrl),
+      generateVCardQrPng(document.employeeSnapshot),
+    ]);
+
     streamEmployeeDocumentPdf({
       document,
       organization: {
@@ -855,7 +862,9 @@ export async function downloadEmployeeDocumentPdf(req: Request, res: Response): 
         address: organization.address,
         website: organization.website,
         primaryColor: organization.preferences?.primaryColor,
+        logoBuffer,
       },
+      assets: { photoBuffer, qrBuffer },
       res,
       disposition: stringValue(req.query.inline) === "1" ? "inline" : "attachment",
     });

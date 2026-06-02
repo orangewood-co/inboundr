@@ -33,6 +33,7 @@ export function createEmployeeDocumentSnapshot(employee: any): IEmployeeDocument
     employeeCode: normalizeNullableString(employee.employeeCode),
     teamName: teamName(employee),
     startDate: employee.startDate ?? null,
+    profileImageUrl: normalizeNullableString(employee.profileImageUrl),
   };
 }
 
@@ -48,6 +49,7 @@ export function employeeDocumentSnapshotEquals(
     (current.title ?? null) === (next.title ?? null) &&
     (current.employeeCode ?? null) === (next.employeeCode ?? null) &&
     (current.teamName ?? null) === (next.teamName ?? null) &&
+    (current.profileImageUrl ?? null) === (next.profileImageUrl ?? null) &&
     dateTime(current.startDate) === dateTime(next.startDate)
   );
 }
