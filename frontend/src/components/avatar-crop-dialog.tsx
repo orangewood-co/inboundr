@@ -22,12 +22,20 @@ export interface AvatarCropResult {
 export function AvatarCropDialog({
   open,
   imageSrc,
+  title = "Crop profile picture",
+  description = "Drag to reposition and zoom to frame your photo.",
+  saveLabel = "Save photo",
+  upload = uploadAvatar,
   onOpenChange,
   onUploaded,
   onError,
 }: {
   open: boolean
   imageSrc: string | null
+  title?: string
+  description?: string
+  saveLabel?: string
+  upload?: (blob: Blob) => Promise<AvatarCropResult>
   onOpenChange: (open: boolean) => void
   onUploaded: (result: AvatarCropResult) => void
   onError?: (message: string) => void
@@ -55,7 +63,7 @@ export function AvatarCropDialog({
     setSaving(true)
     try {
       const blob = await getCroppedWebpBlob(imageSrc, croppedAreaPixels)
-      const result = await uploadAvatar(blob)
+      const result = await upload(blob)
       onUploaded(result)
       onOpenChange(false)
     } catch (err: any) {
@@ -69,8 +77,8 @@ export function AvatarCropDialog({
     <Dialog open={open} onOpenChange={(next) => (!saving ? onOpenChange(next) : undefined)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Crop profile picture</DialogTitle>
-          <DialogDescription>Drag to reposition and zoom to frame your photo.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="relative h-72 w-full overflow-hidden rounded-xl bg-muted">
@@ -110,7 +118,7 @@ export function AvatarCropDialog({
           </Button>
           <Button onClick={handleSave} disabled={saving || !croppedAreaPixels}>
             {saving && <Spinner data-icon="inline-start" />}
-            Save photo
+            {saveLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

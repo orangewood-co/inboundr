@@ -18,8 +18,8 @@ const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "i
 const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const AVATAR_ALLOWED_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"];
 const AVATAR_MAX_FILE_SIZE = 2 * 1024 * 1024;
-const IMAGE_UPLOAD_SCOPES = ["branding", "letterhead"] as const;
-const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding", "letterhead"] as const;
+const IMAGE_UPLOAD_SCOPES = ["branding", "letterhead", "employee"] as const;
+const AUTHENTICATED_UPLOAD_SCOPES = ["form", "customer", "quote", "product", "support", "branding", "letterhead", "employee"] as const;
 
 function normalizeUploadRequest(body: Record<string, unknown>) {
   return {
@@ -39,6 +39,11 @@ function validateUploadBasics(input: ReturnType<typeof normalizeUploadRequest>, 
   if (input.size > maxFileSize) return `File must be ${Math.round(maxFileSize / 1024 / 1024)}MB or smaller`;
   if (!allowedMimeTypes.includes(input.contentType)) return "This file type is not allowed";
   return null;
+}
+
+function allowedMimeTypesForScope(scope: string): string[] {
+  if (scope === "employee") return AVATAR_ALLOWED_MIME_TYPES;
+  return IMAGE_UPLOAD_SCOPES.includes(scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES;
 }
 
 function fieldMaxBytes(maxFileSizeMb?: number): number {
@@ -77,7 +82,7 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
 
     const validationError = validateUploadBasics(
       input,
-      IMAGE_UPLOAD_SCOPES.includes(input.scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES,
+      allowedMimeTypesForScope(input.scope),
       IMAGE_UPLOAD_SCOPES.includes(input.scope as any) ? BRANDING_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE
     );
     if (validationError) {
@@ -90,6 +95,8 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
         ? [input.formId]
         : input.scope === "branding"
           ? ["logo"]
+          : input.scope === "employee"
+            ? ["photos"]
           : [];
     const presigned = await createPresignedUpload({
       scope: input.scope,

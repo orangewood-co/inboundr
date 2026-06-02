@@ -38,6 +38,21 @@ function nullableString(value: unknown): string | null {
   return normalized || null;
 }
 
+function socialUrl(value: unknown): string | null {
+  const normalized = stringValue(value);
+  if (!normalized) return null;
+  return /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
   const parsed = parseInt(String(value ?? ""), 10);
   const normalized = Number.isFinite(parsed) ? Math.max(1, parsed) : fallback;
@@ -115,6 +130,8 @@ async function ensureTeamBelongsToOrganization(
 function normalizeEmployeeInput(body: Record<string, unknown>, partial = false) {
   const platformAccess = body.platformAccess as Record<string, unknown> | undefined;
   const emergencyContact = body.emergencyContact as Record<string, unknown> | undefined;
+  const socials = body.socials as Record<string, unknown> | undefined;
+  const address = body.address as Record<string, unknown> | undefined;
   const input: Record<string, unknown> = {};
 
   if (!partial || "fullName" in body) input.fullName = stringValue(body.fullName);
@@ -125,6 +142,24 @@ function normalizeEmployeeInput(body: Record<string, unknown>, partial = false) 
   if (!partial || "profileImageUrl" in body) input.profileImageUrl = nullableString(body.profileImageUrl);
   if (!partial || "startDate" in body) input.startDate = parseDate(body.startDate);
   if ("status" in body) input.status = normalizeStatus(body.status);
+
+  if (!partial || socials) {
+    input.socials = {
+      linkedinUrl: socialUrl(socials?.linkedinUrl),
+      instagramUrl: socialUrl(socials?.instagramUrl),
+    };
+  }
+
+  if (!partial || address) {
+    input.address = {
+      line1: stringValue(address?.line1),
+      line2: stringValue(address?.line2),
+      city: stringValue(address?.city),
+      state: stringValue(address?.state),
+      postalCode: stringValue(address?.postalCode),
+      country: stringValue(address?.country),
+    };
+  }
 
   if (emergencyContact) {
     input.emergencyContact = {
@@ -150,6 +185,13 @@ function validateEmployeeInput(input: Record<string, unknown>): string | null {
   if ("fullName" in input && !input.fullName) return "Employee name is required";
   if ("email" in input && (!input.email || !String(input.email).includes("@"))) {
     return "A valid email is required";
+  }
+  const socials = input.socials as Record<string, unknown> | undefined;
+  if (socials?.linkedinUrl && !isHttpUrl(String(socials.linkedinUrl))) {
+    return "LinkedIn URL must be a valid website URL";
+  }
+  if (socials?.instagramUrl && !isHttpUrl(String(socials.instagramUrl))) {
+    return "Instagram URL must be a valid website URL";
   }
   return null;
 }
@@ -815,6 +857,7 @@ export async function downloadEmployeeDocumentPdf(req: Request, res: Response): 
         primaryColor: organization.preferences?.primaryColor,
       },
       res,
+      disposition: stringValue(req.query.inline) === "1" ? "inline" : "attachment",
     });
   } catch (err) {
     console.error("Error downloading employee document PDF:", err);

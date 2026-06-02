@@ -207,9 +207,10 @@ export function streamEmployeeDocumentPdf(options: {
   document: EmployeeDocumentLike;
   organization: PdfOrganizationBranding;
   res: Response;
+  disposition?: "attachment" | "inline";
 }): void {
-  const { document, organization, res } = options;
+  const { document, organization, res, disposition = "attachment" } = options;
   const doc = createEmployeeDocumentPdf({ document, organization });
   const prefix = document.type === "id_card" ? "employee-id-card" : "proof-of-employment";
-  streamPdfDocument(doc, `${prefix}-${document.employeeSnapshot.fullName}`, res);
+  streamPdfDocument(doc, `${prefix}-${document.employeeSnapshot.fullName}`, res, { disposition });
 }

@@ -341,9 +341,15 @@ export function drawPdfSectionTitle(doc: PDFKit.PDFDocument, title: string, y: n
   return nextY + 20;
 }
 
-export function streamPdfDocument(doc: PDFKit.PDFDocument, filename: string, res: import("express").Response): void {
+export function streamPdfDocument(
+  doc: PDFKit.PDFDocument,
+  filename: string,
+  res: import("express").Response,
+  options: { disposition?: "attachment" | "inline" } = {}
+): void {
+  const disposition = options.disposition ?? "attachment";
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${safePdfFilename(filename)}.pdf"`);
+  res.setHeader("Content-Disposition", `${disposition}; filename="${safePdfFilename(filename)}.pdf"`);
   doc.pipe(res);
   doc.end();
 }

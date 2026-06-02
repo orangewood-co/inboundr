@@ -21,6 +21,20 @@ export interface IEmployeePlatformAccess {
   lastInvitedAt: Date | null;
 }
 
+export interface IEmployeeSocials {
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
+}
+
+export interface IEmployeeAddress {
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
 export interface IEmployee extends Document {
   organizationId: Types.ObjectId;
   organizationMemberId: Types.ObjectId | null;
@@ -33,6 +47,8 @@ export interface IEmployee extends Document {
   profileImageUrl: string | null;
   status: EmployeeStatus;
   startDate: Date | null;
+  socials: IEmployeeSocials;
+  address: IEmployeeAddress;
   emergencyContact: IEmployeeEmergencyContact;
   platformAccess: IEmployeePlatformAccess;
   archivedAt: Date | null;
@@ -65,6 +81,26 @@ const platformAccessSchema = new Schema<IEmployeePlatformAccess>(
     },
     invitedEmail: { type: String, default: null, lowercase: true, trim: true },
     lastInvitedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const employeeSocialsSchema = new Schema<IEmployeeSocials>(
+  {
+    linkedinUrl: { type: String, default: null, trim: true },
+    instagramUrl: { type: String, default: null, trim: true },
+  },
+  { _id: false }
+);
+
+const employeeAddressSchema = new Schema<IEmployeeAddress>(
+  {
+    line1: { type: String, default: "", trim: true },
+    line2: { type: String, default: "", trim: true },
+    city: { type: String, default: "", trim: true },
+    state: { type: String, default: "", trim: true },
+    postalCode: { type: String, default: "", trim: true },
+    country: { type: String, default: "", trim: true },
   },
   { _id: false }
 );
@@ -102,6 +138,8 @@ const employeeSchema = new Schema<IEmployee>(
       index: true,
     },
     startDate: { type: Date, default: null },
+    socials: { type: employeeSocialsSchema, default: () => ({}) },
+    address: { type: employeeAddressSchema, default: () => ({}) },
     emergencyContact: { type: emergencyContactSchema, default: () => ({}) },
     platformAccess: { type: platformAccessSchema, default: () => ({}) },
     archivedAt: { type: Date, default: null },
