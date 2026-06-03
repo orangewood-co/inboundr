@@ -27,6 +27,7 @@ import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as DriveRouteImport } from './routes/drive'
 import { Route as CustomersRouteImport } from './routes/customers'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
@@ -139,6 +140,11 @@ const CustomersRoute = CustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -248,6 +254,7 @@ const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRouteWithChildren
   '/emails': typeof EmailsRoute
@@ -289,6 +296,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRouteWithChildren
   '/emails': typeof EmailsRoute
@@ -328,6 +336,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRouteWithChildren
   '/emails': typeof EmailsRoute
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/chat'
     | '/customers'
     | '/drive'
     | '/emails'
@@ -412,6 +422,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/chat'
     | '/customers'
     | '/drive'
     | '/emails'
@@ -450,6 +461,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/chat'
     | '/customers'
     | '/drive'
     | '/emails'
@@ -492,6 +504,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  ChatRoute: typeof ChatRoute
   CustomersRoute: typeof CustomersRoute
   DriveRoute: typeof DriveRouteWithChildren
   EmailsRoute: typeof EmailsRoute
@@ -648,6 +661,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers'
       preLoaderRoute: typeof CustomersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -855,6 +875,7 @@ const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  ChatRoute: ChatRoute,
   CustomersRoute: CustomersRoute,
   DriveRoute: DriveRouteWithChildren,
   EmailsRoute: EmailsRoute,

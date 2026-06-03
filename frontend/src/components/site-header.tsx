@@ -21,6 +21,7 @@ export type BreadcrumbSegment = {
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
+  "/chat": "AI Chat",
   "/rfq": "RFQ",
   "/emails": "Inbox",
   "/employees": "Employees",
