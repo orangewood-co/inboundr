@@ -4,7 +4,7 @@ import { ChatOpenRouter } from "@langchain/openrouter";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 const model = new ChatOpenRouter({
-  model: "openai/gpt-oss-120b:free",
+  model: "openai/gpt-oss-120b",
   temperature: 0,
 });
 
