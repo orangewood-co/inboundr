@@ -278,6 +278,14 @@ function AssistantMessage() {
             return null
           }}
         </MessagePrimitive.Parts>
+        <AuiIf
+          condition={(s) =>
+            s.message.status?.type === "running" &&
+            s.message.parts.length === 0
+          }
+        >
+          <LoadingIndicator />
+        </AuiIf>
       </div>
       <div className="flex items-center gap-0.5 text-[#5d5d5d] dark:text-[#a8a8a8]">
         <ActionBarPrimitive.Root hideWhenRunning>
@@ -363,6 +371,20 @@ function DecorativeButton({
     <ActionButton label={label} className="hidden sm:flex">
       {children}
     </ActionButton>
+  )
+}
+
+function LoadingIndicator() {
+  return (
+    <div
+      className="flex items-center gap-1 py-1 text-[#5d5d5d] dark:text-[#a8a8a8]"
+      role="status"
+      aria-label="Generating response"
+    >
+      <span className="size-2 animate-bounce rounded-full bg-current/60 [animation-delay:-0.3s]" />
+      <span className="size-2 animate-bounce rounded-full bg-current/60 [animation-delay:-0.15s]" />
+      <span className="size-2 animate-bounce rounded-full bg-current/60" />
+    </div>
   )
 }
 
