@@ -184,7 +184,7 @@ export default function ProjectNewPage() {
       <SiteHeader
         breadcrumbs={[
           { label: "Projects", href: "/projects" },
-          { label: "New project" },
+          { label: "New Project" },
         ]}
         actions={
           <Button variant="outline" size="sm" onClick={() => history.back()}>
@@ -201,8 +201,8 @@ export default function ProjectNewPage() {
                 <FolderKanbanIcon className="size-6" />
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Create project</p>
-                <h1 className="text-3xl font-semibold tracking-tight">Set up the workspace</h1>
+                <p className="text-sm font-medium text-muted-foreground">Create Project</p>
+                <h1 className="text-3xl font-semibold tracking-tight">Set Up the Workspace</h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                   Add project details, choose who can see it, and seed the people who should manage or follow it.
                 </p>
@@ -262,9 +262,9 @@ export default function ProjectNewPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="internal">All internal users</SelectItem>
-                    <SelectItem value="private">Invited or added users</SelectItem>
-                    <SelectItem value="teams">Respective teams</SelectItem>
+                    <SelectItem value="internal">All Internal Users</SelectItem>
+                    <SelectItem value="private">Invited or Added Users</SelectItem>
+                    <SelectItem value="teams">Respective Teams</SelectItem>
                   </SelectContent>
                 </Select>
                 <FieldDescription>
@@ -305,7 +305,7 @@ export default function ProjectNewPage() {
           </section>
 
           <aside className="h-fit rounded-3xl border bg-muted/20 p-5">
-            <h2 className="font-semibold">Project summary</h2>
+            <h2 className="font-semibold">Project Summary</h2>
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Visibility</span>
@@ -322,7 +322,7 @@ export default function ProjectNewPage() {
             </div>
             <Button className="mt-6 w-full" type="submit" disabled={saving}>
               <SaveIcon />
-              {saving ? "Creating..." : "Create project"}
+              {saving ? "Creating..." : "Create Project"}
             </Button>
           </aside>
         </form>

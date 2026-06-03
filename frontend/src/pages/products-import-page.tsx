@@ -94,8 +94,8 @@ const importFields: Array<{
 ]
 
 const steps: Array<{ id: ImportStep; label: string; description: string }> = [
-  { id: "upload", label: "Upload file", description: "Choose CSV or Excel" },
-  { id: "mapping", label: "Match columns", description: "Map spreadsheet headers" },
+  { id: "upload", label: "Upload File", description: "Choose CSV or Excel" },
+  { id: "mapping", label: "Match Columns", description: "Map spreadsheet headers" },
   { id: "review", label: "Review", description: "Validate and choose duplicates" },
   { id: "complete", label: "Import", description: "Create catalog rows" },
 ]
@@ -315,16 +315,16 @@ export default function ProductsImportPage() {
               <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3">
                 <Link to="/products">
                   <ArrowLeftIcon className="size-4" />
-                  Back to products
+                  Back to Products
                 </Link>
               </Button>
-              <h1 className="text-2xl font-bold tracking-tight">Import products</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Import Products</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Upload a product spreadsheet, match columns, review validation, and import into the catalog.
               </p>
             </div>
             <Button variant="outline" onClick={resetFile} disabled={!parsedFile || importing}>
-              Start over
+              Start Over
             </Button>
           </div>
 
@@ -346,7 +346,7 @@ export default function ProductsImportPage() {
                   <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
                     <FileSpreadsheetIcon className="size-6 text-primary" />
                   </div>
-                  <h2 className="mt-5 text-xl font-semibold">Upload your product spreadsheet</h2>
+                  <h2 className="mt-5 text-xl font-semibold">Upload Your Product Spreadsheet</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                     Use CSV, XLS, or XLSX files. The first populated row is treated as the header row, and you will match those headers to product fields in the next step.
                   </p>
@@ -371,7 +371,7 @@ export default function ProductsImportPage() {
             <section className="space-y-5 rounded-2xl border bg-card p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Match spreadsheet columns</h2>
+                  <h2 className="text-xl font-semibold">Match Spreadsheet Columns</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Imported file: <span className="font-medium text-foreground">{parsedFile.fileName}</span> · {parsedFile.rows.length.toLocaleString("en-IN")} rows · {parsedFile.headers.length} columns.
                   </p>
@@ -391,7 +391,7 @@ export default function ProductsImportPage() {
                         <SelectValue placeholder="Select a column" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={UNMAPPED_COLUMN}>Do not import</SelectItem>
+                        <SelectItem value={UNMAPPED_COLUMN}>Do Not Import</SelectItem>
                         {parsedFile.headers.map((header) => (
                           <SelectItem key={header} value={header}>
                             {header}
@@ -407,7 +407,7 @@ export default function ProductsImportPage() {
                 <Button variant="outline" onClick={() => setStep("upload")}>
                   Back
                 </Button>
-                <Button onClick={() => setStep("review")}>Review import</Button>
+                <Button onClick={() => setStep("review")}>Review Import</Button>
               </div>
             </section>
           )}
@@ -415,7 +415,7 @@ export default function ProductsImportPage() {
           {parsedFile && step === "review" && (
             <section className="space-y-5 rounded-2xl border bg-card p-6">
               <div>
-                <h2 className="text-xl font-semibold">Review before import</h2>
+                <h2 className="text-xl font-semibold">Review Before Import</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Confirm duplicate handling and check validation results before importing.
                 </p>
@@ -430,7 +430,7 @@ export default function ProductsImportPage() {
                     mode === "skip" && "border-primary bg-primary/5"
                   )}
                 >
-                  <span className="font-semibold">Skip duplicates</span>
+                  <span className="font-semibold">Skip Duplicates</span>
                   <span className="mt-1 block text-sm text-muted-foreground">Existing product codes stay unchanged.</span>
                 </button>
                 <button
@@ -441,7 +441,7 @@ export default function ProductsImportPage() {
                     mode === "update" && "border-primary bg-primary/5"
                   )}
                 >
-                  <span className="font-semibold">Update existing</span>
+                  <span className="font-semibold">Update Existing</span>
                   <span className="mt-1 block text-sm text-muted-foreground">Mapped fields overwrite matching product codes.</span>
                 </button>
               </div>
@@ -504,7 +504,7 @@ export default function ProductsImportPage() {
                 </Button>
                 <Button onClick={() => void submitImport()} disabled={validationErrors.length > 0 || importing}>
                   {importing && <Spinner data-icon="inline-start" />}
-                  Import products
+                  Import Products
                 </Button>
               </div>
             </section>
@@ -517,7 +517,7 @@ export default function ProductsImportPage() {
                   <CheckCircle2Icon className="size-6 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">Import complete</h2>
+                  <h2 className="text-xl font-semibold">Import Complete</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Processed {result.summary.total.toLocaleString("en-IN")} rows from the uploaded file.
                   </p>
@@ -547,7 +547,7 @@ export default function ProductsImportPage() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   {result.errors.length > 0 && (
                     <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-                      <h3 className="font-semibold">Failed rows</h3>
+                      <h3 className="font-semibold">Failed Rows</h3>
                       <ul className="mt-2 list-disc space-y-1 pl-5">
                         {result.errors.slice(0, 10).map((item) => (
                           <li key={`${item.row}-${item.error}`}>Row {item.row}: {item.error}</li>
@@ -557,7 +557,7 @@ export default function ProductsImportPage() {
                   )}
                   {result.skipped.length > 0 && (
                     <div className="rounded-xl border bg-muted/20 p-4 text-sm">
-                      <h3 className="font-semibold">Skipped duplicates</h3>
+                      <h3 className="font-semibold">Skipped Duplicates</h3>
                       <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
                         {result.skipped.slice(0, 10).map((item) => (
                           <li key={`${item.row}-${item.productcode}`}>Row {item.row}: {item.productcode}</li>
@@ -570,10 +570,10 @@ export default function ProductsImportPage() {
 
               <div className="flex flex-col gap-2 border-t pt-5 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={resetFile}>
-                  Import another file
+                  Import Another File
                 </Button>
                 <Button onClick={() => void navigate({ to: "/products" })}>
-                  Back to products
+                  Back to Products
                 </Button>
               </div>
             </section>

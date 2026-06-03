@@ -30,7 +30,7 @@ export function ChatHeaderActions() {
       <ThreadListPrimitive.New asChild>
         <Button type="button" size="sm" className="gap-2">
           <MessageSquarePlusIcon className="size-4" />
-          <span className="hidden sm:inline">New chat</span>
+          <span className="hidden sm:inline">New Chat</span>
         </Button>
       </ThreadListPrimitive.New>
     </div>
@@ -43,7 +43,7 @@ export function ThreadList({ className }: { className?: string }) {
       <ThreadListPrimitive.New asChild>
         <Button type="button" variant="ghost" className="justify-start gap-2">
           <MessageSquarePlusIcon className="size-4" />
-          New chat
+          New Chat
         </Button>
       </ThreadListPrimitive.New>
 
@@ -64,7 +64,7 @@ function ThreadListItem() {
           type="button"
           className="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
         >
-          <ThreadListItemPrimitive.Title fallback="New chat" />
+          <ThreadListItemPrimitive.Title fallback="New Chat" />
         </button>
       </ThreadListItemPrimitive.Trigger>
       <ThreadListItemPrimitive.Delete asChild>

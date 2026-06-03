@@ -103,7 +103,7 @@ export function LoginForm({
               to="/forgot-password"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
-              Forgot your password?
+              Forgot Your Password?
             </Link>
           </div>
           <Input
@@ -147,7 +147,7 @@ export function LoginForm({
               search={getInviteSearch()}
               className="underline underline-offset-4"
             >
-              Sign up
+              Sign Up
             </Link>
           </FieldDescription>
         </Field>

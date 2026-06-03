@@ -147,7 +147,7 @@ export function SignupForm({
             </svg>
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">Check your mail</h1>
+            <h1 className="text-2xl font-bold">Check Your Mail</h1>
             <p className="text-sm text-balance text-muted-foreground">
               We sent a verification link to {email}. Open it to activate your
               account before signing in.
@@ -159,7 +159,7 @@ export function SignupForm({
             to="/login"
             search={getInviteSearch()}
           >
-            Back to sign in
+            Back to Sign In
           </Link>
         </Button>
       </div>
@@ -174,7 +174,7 @@ export function SignupForm({
     >
       <FieldGroup>
         <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-2xl font-bold">Create your account</h1>
+          <h1 className="text-2xl font-bold">Create Your Account</h1>
           <p className="text-sm text-balance text-muted-foreground">
             Fill in the form below to create your account
           </p>
@@ -265,7 +265,7 @@ export function SignupForm({
               search={getInviteSearch()}
               className="underline underline-offset-4"
             >
-              Sign in
+              Sign In
             </Link>
           </FieldDescription>
         </Field>

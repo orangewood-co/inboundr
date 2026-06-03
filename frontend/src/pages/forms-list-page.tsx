@@ -170,7 +170,7 @@ export default function FormsListPage() {
                 ) : (
                   <PlusIcon className="size-4" />
                 )}
-                Create form
+                Create Form
               </Button>
             </div>
 
@@ -185,7 +185,7 @@ export default function FormsListPage() {
                   <ClipboardListIcon className="size-7 text-primary" />
                 </div>
                 <div>
-                  <p className="font-semibold">No forms yet</p>
+                  <p className="font-semibold">No Forms Yet</p>
                   <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                     Create your first form to start collecting responses from
                     customers.
@@ -193,7 +193,7 @@ export default function FormsListPage() {
                 </div>
                 <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
                   <PlusIcon className="size-4" />
-                  Create your first form
+                  Create Your First Form
                 </Button>
               </div>
             ) : (

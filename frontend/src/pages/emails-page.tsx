@@ -451,7 +451,7 @@ function EmptyState() {
         <InboxIcon className="size-10 text-muted-foreground/40" />
       </div>
       <div className="space-y-1.5">
-        <p className="font-heading text-[13px] font-semibold text-muted-foreground">No emails yet</p>
+        <p className="font-heading text-[13px] font-semibold text-muted-foreground">No Emails Yet</p>
         <p className="text-[11px] text-muted-foreground/60">
           Incoming emails will appear here once the Gmail watcher picks them up.
         </p>
@@ -1061,7 +1061,7 @@ export function EmailsPage() {
                     <Button asChild>
                       <a href={buildAttachmentUrl(detail._id, selectedAttachment.attachmentId, true)}>
                         <DownloadIcon className="mr-2 size-4" />
-                        Download attachment
+                        Download Attachment
                       </a>
                     </Button>
                   </div>

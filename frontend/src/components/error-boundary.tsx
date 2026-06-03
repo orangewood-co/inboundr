@@ -36,7 +36,7 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
 
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">
-            Something went wrong
+            Something Went Wrong
           </h1>
           <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
             The page ran into an error it couldn't recover from. You can try
@@ -51,7 +51,7 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
         <div className="flex items-center justify-center gap-3">
           <Button onClick={reset}>
             <RefreshCwIcon data-icon="inline-start" />
-            Try again
+            Try Again
           </Button>
           <Button asChild variant="outline">
             <Link to="/">
@@ -71,7 +71,7 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
               <ChevronDownIcon
                 className={`size-3.5 transition-transform ${showDetails ? "rotate-180" : ""}`}
               />
-              Technical details
+              Technical Details
             </button>
 
             {showDetails ? (
@@ -96,7 +96,7 @@ export function NotFoundPage() {
 
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">
-            Page not found
+            Page Not Found
           </h1>
           <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
             The page you're looking for doesn't exist or may have been moved.
@@ -108,7 +108,7 @@ export function NotFoundPage() {
           <Button asChild>
             <Link to="/">
               <LayoutDashboardIcon data-icon="inline-start" />
-              Go to dashboard
+              Go to Dashboard
             </Link>
           </Button>
         </div>

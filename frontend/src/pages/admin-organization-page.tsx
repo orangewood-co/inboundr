@@ -340,17 +340,17 @@ export default function AdminOrganizationPage() {
               <div className="rounded-xl border p-4">
                 <MailPlusIcon className="mb-3 size-4 text-muted-foreground" />
                 <div className="text-2xl font-semibold">{summary.pendingInvites}</div>
-                <div className="text-xs text-muted-foreground">Pending invites</div>
+                <div className="text-xs text-muted-foreground">Pending Invites</div>
               </div>
               <div className="rounded-xl border p-4">
                 <ShieldAlertIcon className="mb-3 size-4 text-muted-foreground" />
                 <div className="text-2xl font-semibold capitalize">{organization.status}</div>
-                <div className="text-xs text-muted-foreground">Organization status</div>
+                <div className="text-xs text-muted-foreground">Organization Status</div>
               </div>
             </div>
           </section>
 
-          <SectionCard title="Organization settings" description="Update identity, status, and the assigned plan.">
+          <SectionCard title="Organization Settings" description="Update identity, status, and the assigned plan.">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>Name</Label>
@@ -379,12 +379,12 @@ export default function AdminOrganizationPage() {
             <div className="mt-5 flex justify-end">
               <Button onClick={() => void save()} disabled={saving}>
                 {saving ? <Spinner className="mr-2 size-4" /> : <SaveIcon className="mr-2 size-4" />}
-                Save changes
+                Save Changes
               </Button>
             </div>
           </SectionCard>
 
-          <SectionCard title="Feature access" description={`Plan defaults from ${selectedPlan?.name ?? "the selected plan"} can be overridden per organization.`}>
+          <SectionCard title="Feature Access" description={`Plan defaults from ${selectedPlan?.name ?? "the selected plan"} can be overridden per organization.`}>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {features.map((feature) => {
                 const planFeatures = selectedPlan?.features ?? []
@@ -451,7 +451,7 @@ export default function AdminOrganizationPage() {
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" disabled={member.role === "owner" || busyAction === member._id} onClick={() => void transferOwner(member)}>
                           <CrownIcon className="mr-2 size-3.5" />
-                          Make owner
+                          Make Owner
                         </Button>
                         <Button variant="outline" size="sm" disabled={member.role === "owner" || busyAction === member._id} onClick={() => void removeMember(member)}>
                           <UserMinusIcon className="mr-2 size-3.5" />

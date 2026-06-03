@@ -47,11 +47,11 @@ export function ResetPasswordPage() {
       <div className="w-full max-w-md space-y-6 rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
         <div className="space-y-3">
           <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-xs font-medium text-primary">
-            New password
+            New Password
           </span>
           <div className="space-y-2">
             <h2 className="text-3xl font-semibold tracking-tight">
-              Reset your password
+              Reset Your Password
             </h2>
             <p className="text-sm leading-6 text-muted-foreground">
               Enter a new password for your BTSA account.
@@ -88,12 +88,12 @@ export function ResetPasswordPage() {
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting && <Spinner data-icon="inline-start" />}
-            Reset password
+            Reset Password
           </Button>
         </form>
 
         <Button asChild variant="ghost" className="w-full">
-          <Link to="/login">Back to sign in</Link>
+          <Link to="/login">Back to Sign In</Link>
         </Button>
       </div>
     </div>

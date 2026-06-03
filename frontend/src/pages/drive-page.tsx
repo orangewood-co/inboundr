@@ -631,7 +631,7 @@ export default function DrivePage() {
             onClick={() => (view === "trash" ? setDeleteTarget(node) : void moveToTrash(node))}
           >
             <Trash2Icon className="size-4" />
-            {view === "trash" ? "Delete forever" : "Move to Trash"}
+            {view === "trash" ? "Delete Forever" : "Move to Trash"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -659,7 +659,7 @@ export default function DrivePage() {
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setFolderDialog({ mode: "create" })}>
                 <FolderPlusIcon className="size-4" />
-                New folder
+                New Folder
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -672,11 +672,11 @@ export default function DrivePage() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => filesInputRef.current?.click()}>
                     <FileUpIcon className="size-4" />
-                    Upload files
+                    Upload Files
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => folderInputRef.current?.click()}>
                     <FolderUpIcon className="size-4" />
-                    Upload folder
+                    Upload Folder
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -715,7 +715,7 @@ export default function DrivePage() {
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
                         <Trash2Icon className="size-4" />
-                        Delete forever
+                        Delete Forever
                       </Button>
                     </>
                   ) : (
@@ -740,8 +740,8 @@ export default function DrivePage() {
               <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
                 <Tabs value={view} onValueChange={(value) => changeView(value as DriveView)}>
                   <TabsList>
-                    <TabsTrigger value="my">My files</TabsTrigger>
-                    <TabsTrigger value="shared">Shared with me</TabsTrigger>
+                    <TabsTrigger value="my">My Files</TabsTrigger>
+                    <TabsTrigger value="shared">Shared with Me</TabsTrigger>
                     <TabsTrigger value="trash">Trash</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -1337,24 +1337,24 @@ function DriveEmptyState({
   hasParent: boolean
 }) {
   let Icon = FolderIcon
-  let title = "This folder is empty"
+  let title = "This Folder Is Empty"
   let description = "Upload a file or create a folder to get started."
 
   if (search) {
     Icon = SearchIcon
-    title = "No matches found"
+    title = "No Matches Found"
     description = "Try a different file or folder name."
   } else if (view === "shared") {
     Icon = Users2Icon
-    title = "Nothing shared with you"
+    title = "Nothing Shared with You"
     description = "Files and folders shared by your team will appear here."
   } else if (view === "trash") {
     Icon = Trash2Icon
-    title = "Trash is empty"
+    title = "Trash Is Empty"
     description = "Items you delete will rest here before being removed permanently."
   } else if (!hasParent) {
     Icon = HardDriveIcon
-    title = "Your Drive is empty"
+    title = "Your Drive Is Empty"
     description = "Drag files here, or use the Upload button to get started."
   }
 
@@ -1436,7 +1436,7 @@ function FolderNameDialog({
     <Dialog open={Boolean(state)} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{isRename ? "Rename" : "New folder"}</DialogTitle>
+          <DialogTitle>{isRename ? "Rename" : "New Folder"}</DialogTitle>
           <DialogDescription>
             {isRename ? "Enter a new name for this item." : "Give your folder a name."}
           </DialogDescription>
@@ -1585,7 +1585,7 @@ function DeleteDialog({
     <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Delete forever</DialogTitle>
+          <DialogTitle>Delete Forever</DialogTitle>
           <DialogDescription>
             Permanently delete <span className="font-medium text-foreground">{node?.name}</span>? This cannot be undone.
           </DialogDescription>
@@ -1596,7 +1596,7 @@ function DeleteDialog({
           </Button>
           <Button variant="destructive" onClick={() => void submit()} disabled={deleting}>
             {deleting && <Spinner data-icon="inline-start" />}
-            Delete forever
+            Delete Forever
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1630,7 +1630,7 @@ function BulkDeleteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Delete forever</DialogTitle>
+          <DialogTitle>Delete Forever</DialogTitle>
           <DialogDescription>
             Permanently delete <span className="font-medium text-foreground">{count}</span>{" "}
             {count === 1 ? "item" : "items"}? This cannot be undone.
@@ -1642,7 +1642,7 @@ function BulkDeleteDialog({
           </Button>
           <Button variant="destructive" onClick={() => void submit()} disabled={deleting}>
             {deleting && <Spinner data-icon="inline-start" />}
-            Delete forever
+            Delete Forever
           </Button>
         </DialogFooter>
       </DialogContent>

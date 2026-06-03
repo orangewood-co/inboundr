@@ -1407,7 +1407,7 @@ export function DashboardPage() {
           className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
         >
           <PlusIcon className="size-3" />
-          Add product
+          Add Product
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[420px] space-y-3 p-3">
@@ -1574,7 +1574,7 @@ export function DashboardPage() {
             }}
           >
             <PlusIcon className="size-3.5" />
-            Add custom line
+            Add Custom Line
           </Button>
           <Button
             type="button"
@@ -1589,7 +1589,7 @@ export function DashboardPage() {
             ) : (
               <PackageIcon className="size-3.5" />
             )}
-            Add to catalogue
+            Add to Catalogue
           </Button>
         </div>
       </div>
@@ -1645,7 +1645,7 @@ export function DashboardPage() {
                           <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All statuses</SelectItem>
+                          <SelectItem value="all">All Statuses</SelectItem>
                           <SelectItem value="analyzing">Analyzing</SelectItem>
                           <SelectItem value="ready">Ready</SelectItem>
                           <SelectItem value="draft">Draft</SelectItem>
@@ -1658,10 +1658,10 @@ export function DashboardPage() {
                           <SelectValue placeholder="Sort" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="created_desc">Newest created</SelectItem>
-                          <SelectItem value="created_asc">Oldest created</SelectItem>
-                          <SelectItem value="updated_desc">Recently updated</SelectItem>
-                          <SelectItem value="updated_asc">Oldest updated</SelectItem>
+                          <SelectItem value="created_desc">Newest Created</SelectItem>
+                          <SelectItem value="created_asc">Oldest Created</SelectItem>
+                          <SelectItem value="updated_desc">Recently Updated</SelectItem>
+                          <SelectItem value="updated_asc">Oldest Updated</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1699,7 +1699,7 @@ export function DashboardPage() {
                         className="h-8 w-full text-xs text-muted-foreground"
                         onClick={clearFilters}
                       >
-                        Clear filters
+                        Clear Filters
                       </Button>
                     )}
                   </PopoverContent>
@@ -2329,7 +2329,7 @@ export function DashboardPage() {
                     <div className="mt-5 rounded-xl border bg-muted/15 p-4">
                       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <h3 className="text-sm font-semibold">Payment terms</h3>
+                          <h3 className="text-sm font-semibold">Payment Terms</h3>
                           <p className="mt-1 text-xs text-muted-foreground">
                             Pick an organization template, then edit the final wording for this RFQ.
                           </p>

@@ -384,11 +384,11 @@ export default function LinksDetailPage() {
           <SiteHeader breadcrumbs={[{ label: "Links", href: "/links" }, { label: "Details" }]} />
           <main className="flex flex-1 flex-col items-center justify-center gap-3">
             <LinkIcon className="size-10 text-muted-foreground" />
-            <p className="font-semibold">Link not found</p>
+            <p className="font-semibold">Link Not Found</p>
             <Button variant="outline" asChild>
               <Link to="/links">
                 <ArrowLeftIcon className="size-4" />
-                Back to links
+                Back to Links
               </Link>
             </Button>
           </main>
@@ -414,7 +414,7 @@ export default function LinksDetailPage() {
               className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
             >
               <ArrowLeftIcon className="size-3.5" />
-              Back to list
+              Back to List
             </Link>
 
             {/* Link header card */}
@@ -625,7 +625,7 @@ export default function LinksDetailPage() {
             {/* Engagements over time chart */}
             <div className="mt-4 rounded-xl border bg-card p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Engagements over time</h2>
+                <h2 className="text-lg font-semibold">Engagements Over Time</h2>
                 <span className="text-xs text-muted-foreground">Last 30 days</span>
               </div>
               {chartData.length > 0 ? (
@@ -746,7 +746,7 @@ export default function LinksDetailPage() {
                                   className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                                 >
                                   <MapPinIcon className="size-3" />
-                                  View on map
+                                  View on Map
                                 </a>
                               )}
                               {!location && !hasPrecise && (
@@ -788,7 +788,7 @@ export default function LinksDetailPage() {
             <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Email link</DialogTitle>
+                  <DialogTitle>Email Link</DialogTitle>
                   <DialogDescription>
                     Send this tracked short link to one recipient.
                   </DialogDescription>
@@ -816,7 +816,7 @@ export default function LinksDetailPage() {
                     </Button>
                     <Button type="submit" disabled={emailSending}>
                       {emailSending && <Spinner data-icon="inline-start" />}
-                      Send email
+                      Send Email
                     </Button>
                   </div>
                 </form>

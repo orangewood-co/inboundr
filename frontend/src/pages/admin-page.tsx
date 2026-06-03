@@ -197,12 +197,12 @@ export default function AdminPage() {
                     <DialogTrigger asChild>
                       <Button>
                         <PlusIcon className="mr-2 size-4" />
-                        New organization
+                        New Organization
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Create organization</DialogTitle>
+                        <DialogTitle>Create Organization</DialogTitle>
                         <DialogDescription>
                           Create a tenant and optionally send an owner invitation.
                         </DialogDescription>
@@ -233,7 +233,7 @@ export default function AdminPage() {
                         </div>
                         <Button className="w-full" type="submit" disabled={creating}>
                           {creating ? <Spinner className="mr-2 size-4" /> : <SendIcon className="mr-2 size-4" />}
-                          Create and invite
+                          Create and Invite
                         </Button>
                       </form>
                     </DialogContent>
@@ -247,8 +247,8 @@ export default function AdminPage() {
             <StatCard title="Organizations" value={summary.total} icon={Building2Icon} />
             <StatCard title="Active" value={summary.active} icon={UsersIcon} />
             <StatCard title="Suspended" value={summary.suspended} icon={ShieldAlertIcon} />
-            <StatCard title="Pending owners" value={summary.pendingOwner} icon={CrownIcon} />
-            <StatCard title="Pending invites" value={summary.pendingInvites} icon={MailIcon} />
+            <StatCard title="Pending Owners" value={summary.pendingOwner} icon={CrownIcon} />
+            <StatCard title="Pending Invites" value={summary.pendingInvites} icon={MailIcon} />
           </section>
 
           <section className="rounded-2xl border bg-background">
@@ -265,7 +265,7 @@ export default function AdminPage() {
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
@@ -273,7 +273,7 @@ export default function AdminPage() {
                 <Select value={planFilter} onValueChange={setPlanFilter}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All plans</SelectItem>
+                    <SelectItem value="all">All Plans</SelectItem>
                     {plans.map((plan) => (
                       <SelectItem key={plan.slug} value={plan.slug}>{plan.name}</SelectItem>
                     ))}

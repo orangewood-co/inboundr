@@ -386,7 +386,7 @@ function EmployeeForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No team</SelectItem>
+              <SelectItem value="none">No Team</SelectItem>
               {teams.map((team) => (
                 <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
               ))}
@@ -425,7 +425,7 @@ function EmployeeForm({
               <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
                 <label className="cursor-pointer">
                   <UploadIcon className="size-4" />
-                  Upload photo
+                  Upload Photo
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -462,7 +462,7 @@ function EmployeeForm({
 
       <div className="grid gap-4">
         <div>
-          <h3 className="text-sm font-semibold">Emergency contact</h3>
+          <h3 className="text-sm font-semibold">Emergency Contact</h3>
           <p className="text-sm text-muted-foreground">Stored for HR reference and generated documents.</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -789,7 +789,7 @@ export default function EmployeeDetailPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-6">
             <Link to="/employees">
               <ArrowLeftIcon className="size-4" />
-              Back to employees
+              Back to Employees
             </Link>
           </Button>
 
@@ -802,7 +802,7 @@ export default function EmployeeDetailPage() {
                 <h2 className="text-lg font-semibold">{error}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">The employee profile could not be loaded.</p>
               </div>
-              <Button onClick={() => void fetchEmployee()}>Try again</Button>
+              <Button onClick={() => void fetchEmployee()}>Try Again</Button>
             </div>
           ) : employee ? (
             <div className="space-y-6">
@@ -839,7 +839,7 @@ export default function EmployeeDetailPage() {
                         </Button>
                         <Button onClick={saveEmployee} disabled={saving || !form}>
                           {saving ? <Spinner data-icon="inline-start" /> : <SaveIcon />}
-                          Save changes
+                          Save Changes
                         </Button>
                       </>
                     ) : (
@@ -848,7 +848,7 @@ export default function EmployeeDetailPage() {
                           <ArchiveIcon />
                           Archive
                         </Button>
-                        <Button onClick={() => setEditing(true)}>Edit profile</Button>
+                        <Button onClick={() => setEditing(true)}>Edit Profile</Button>
                       </>
                     )}
                   </div>
@@ -933,7 +933,7 @@ export default function EmployeeDetailPage() {
                       <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4">
                         <div className="flex items-center gap-2 font-semibold">
                           <UserRoundIcon className="size-4" />
-                          Emergency contact
+                          Emergency Contact
                         </div>
                         <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                           <span>Name: <span className="text-foreground">{employee.emergencyContact?.name || "-"}</span></span>
@@ -947,7 +947,7 @@ export default function EmployeeDetailPage() {
 
                   <aside className="space-y-6">
                     <section className="rounded-3xl border bg-card p-5">
-                      <h2 className="font-semibold">Module access</h2>
+                      <h2 className="font-semibold">Module Access</h2>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Effective modules from team defaults and employee overrides.
                       </p>
@@ -967,7 +967,7 @@ export default function EmployeeDetailPage() {
                     <section className="rounded-3xl border bg-card p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <h2 className="font-semibold">Login linking</h2>
+                          <h2 className="font-semibold">Login Linking</h2>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {employee.organizationMemberId
                               ? "Linked to an organization member."
@@ -981,10 +981,10 @@ export default function EmployeeDetailPage() {
                       </div>
                       <Select value="none" onValueChange={linkMember}>
                         <SelectTrigger className="mt-4 w-full">
-                          <SelectValue placeholder="Link existing member" />
+                          <SelectValue placeholder="Link Existing Member" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Link existing member</SelectItem>
+                          <SelectItem value="none">Link Existing Member</SelectItem>
                           {members.map((member) => (
                             <SelectItem key={member._id} value={member._id}>
                               {(member.userName || member.userEmail || member._id)} · {member.role}
@@ -1032,7 +1032,7 @@ export default function EmployeeDetailPage() {
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Archive employee</DialogTitle>
+            <DialogTitle>Archive Employee</DialogTitle>
             <DialogDescription>
               Archive {employee?.fullName}? This disables platform access and removes the employee from the active directory.
             </DialogDescription>
@@ -1050,7 +1050,7 @@ export default function EmployeeDetailPage() {
       <Dialog open={Boolean(previewDocument)} onOpenChange={(open) => !open && setPreviewDocument(null)}>
         <DialogContent className="max-h-[90svh] max-w-5xl overflow-hidden">
           <DialogHeader>
-            <DialogTitle>{previewDocument?.title ?? "Employee document"}</DialogTitle>
+            <DialogTitle>{previewDocument?.title ?? "Employee Document"}</DialogTitle>
             <DialogDescription>
               Preview the current document or download a PDF copy.
             </DialogDescription>
@@ -1083,9 +1083,9 @@ export default function EmployeeDetailPage() {
       <AvatarCropDialog
         open={cropOpen}
         imageSrc={cropImageSrc}
-        title="Crop employee photo"
+        title="Crop Employee Photo"
         description="Drag to reposition and zoom to frame this employee photo."
-        saveLabel="Save employee photo"
+        saveLabel="Save Employee Photo"
         upload={uploadCroppedEmployeeImage}
         onOpenChange={setCropOpen}
         onUploaded={handleProfilePictureUploaded}

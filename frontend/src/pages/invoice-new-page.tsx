@@ -375,7 +375,7 @@ export default function InvoiceNewPage() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void saveInvoice(false)} disabled={saving}>
               {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
-              Save draft
+              Save Draft
             </Button>
             <Button size="sm" onClick={() => void saveInvoice(true)} disabled={saving}>
               {saving ? (
@@ -402,7 +402,7 @@ export default function InvoiceNewPage() {
                 >
                   <SelectTrigger className="w-full"><SelectValue placeholder="Select customer" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="manual">Manual entry</SelectItem>
+                    <SelectItem value="manual">Manual Entry</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer._id} value={customer._id}>
                         {customer.company || customer.name}
@@ -454,7 +454,7 @@ export default function InvoiceNewPage() {
                 onClick={() => setForm((c) => ({ ...c, lineItems: [...c.lineItems, emptyLine()] }))}
               >
                 <PlusIcon className="size-3.5" />
-                Add item
+                Add Item
               </Button>
             </div>
             <div className="divide-y">
@@ -468,7 +468,7 @@ export default function InvoiceNewPage() {
                     >
                       <SelectTrigger className="w-full"><SelectValue placeholder="Select product" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">Manual item</SelectItem>
+                        <SelectItem value="manual">Manual Item</SelectItem>
                         {products.map((product) => (
                           <SelectItem key={product.id} value={String(product.id)}>
                             {product.productdescription}
@@ -565,7 +565,7 @@ export default function InvoiceNewPage() {
             </Button>
             <Button variant="outline" onClick={() => void saveInvoice(false)} disabled={saving}>
               {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
-              Save draft
+              Save Draft
             </Button>
             <Button onClick={() => void saveInvoice(true)} disabled={saving}>
               {saving ? (

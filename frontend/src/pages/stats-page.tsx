@@ -108,9 +108,9 @@ interface StatsOverview {
 }
 
 const rangeOptions: Array<{ value: StatsRange; label: string }> = [
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
-  { value: "90d", label: "90 days" },
+  { value: "7d", label: "7 Days" },
+  { value: "30d", label: "30 Days" },
+  { value: "90d", label: "90 Days" },
 ]
 
 const mailChartConfig = {
@@ -214,7 +214,7 @@ function EmptyState() {
         <BarChart3Icon className="size-6 text-muted-foreground" />
       </div>
       <div className="space-y-1">
-        <h2 className="text-base font-semibold">No stats yet</h2>
+        <h2 className="text-base font-semibold">No Stats Yet</h2>
         <p className="max-w-md text-sm text-muted-foreground">
           Stats will appear after Gmail sync receives emails and RFQ classification has processed them.
         </p>
@@ -323,7 +323,7 @@ export function StatsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All members</SelectItem>
+                  <SelectItem value="all">All Members</SelectItem>
                   {filterMembers.map((item) => (
                     <SelectItem key={item.userId} value={item.userId}>
                       {item.email || item.name || item.userId}
@@ -339,7 +339,7 @@ export function StatsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All mailboxes</SelectItem>
+                  <SelectItem value="all">All Mailboxes</SelectItem>
                   {filterAccounts.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.emailAddress}

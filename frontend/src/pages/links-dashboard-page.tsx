@@ -174,7 +174,7 @@ export default function LinksDashboardPage() {
               <Button asChild>
                 <Link to="/links/create">
                   <PlusIcon className="size-4" />
-                  Create link
+                  Create Link
                 </Link>
               </Button>
             </div>
@@ -192,11 +192,11 @@ export default function LinksDashboardPage() {
               </div>
               <Button variant="outline" size="sm" disabled>
                 <CalendarIcon className="size-4" />
-                Filter by created date
+                Filter by Created Date
               </Button>
               <Button variant="outline" size="sm" disabled>
                 <FilterIcon className="size-4" />
-                Add filters
+                Add Filters
               </Button>
 
               <div className="ml-auto flex items-center gap-2">
@@ -255,7 +255,7 @@ export default function LinksDashboardPage() {
               <div className="mt-12 rounded-2xl border border-dashed p-14 text-center">
                 <LinkIcon className="mx-auto size-10 text-muted-foreground" />
                 <p className="mt-4 text-lg font-semibold">
-                  {links.length === 0 ? "No links yet" : "No matching links"}
+                  {links.length === 0 ? "No Links Yet" : "No Matching Links"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {links.length === 0
@@ -266,7 +266,7 @@ export default function LinksDashboardPage() {
                   <Button className="mt-5" asChild>
                     <Link to="/links/create">
                       <PlusIcon className="size-4" />
-                      Create a link
+                      Create a Link
                     </Link>
                   </Button>
                 )}

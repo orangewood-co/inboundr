@@ -37,9 +37,9 @@ const STATUS_TONE: Record<Project["status"], string> = {
 }
 
 const VISIBILITY_LABELS: Record<Project["visibility"], string> = {
-  internal: "All internal users",
-  private: "Invited users",
-  teams: "Respective teams",
+  internal: "All Internal Users",
+  private: "Invited Users",
+  teams: "Respective Teams",
 }
 
 function ProjectCard({ project, onOpen }: { project: Project; onOpen: (project: Project) => void }) {
@@ -169,7 +169,7 @@ export default function ProjectsPage() {
             </Button>
             <Button size="sm" onClick={() => void navigate({ to: "/projects/new" })}>
               <PlusIcon />
-              New project
+              New Project
             </Button>
           </>
         }
@@ -191,7 +191,7 @@ export default function ProjectsPage() {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
@@ -204,11 +204,11 @@ export default function ProjectsPage() {
         ) : projects.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center rounded-3xl border border-dashed bg-muted/20 p-12 text-center">
             <FolderKanbanIcon className="size-12 text-muted-foreground/50" />
-            <h2 className="mt-4 text-lg font-semibold">No projects found</h2>
+            <h2 className="mt-4 text-lg font-semibold">No Projects Found</h2>
             <p className="mt-2 text-sm text-muted-foreground">{emptyMessage}</p>
             <Button className="mt-5" onClick={() => void navigate({ to: "/projects/new" })}>
               <PlusIcon />
-              Create project
+              Create Project
             </Button>
           </div>
         ) : (

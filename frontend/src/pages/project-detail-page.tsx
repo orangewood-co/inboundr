@@ -601,9 +601,9 @@ export default function ProjectDetailPage() {
         <main className="flex flex-1 items-center justify-center p-6">
           <div className="text-center">
             <FolderKanbanIcon className="mx-auto size-12 text-muted-foreground/50" />
-            <h1 className="mt-4 text-xl font-semibold">Project not found</h1>
+            <h1 className="mt-4 text-xl font-semibold">Project Not Found</h1>
             <Button className="mt-4" asChild>
-              <Link to="/projects">Back to projects</Link>
+              <Link to="/projects">Back to Projects</Link>
             </Button>
           </div>
         </main>
@@ -652,7 +652,7 @@ export default function ProjectDetailPage() {
             </TabsList>
             <Button size="sm" onClick={() => openCreateTask()} disabled={stages.length === 0}>
               <PlusIcon />
-              New task
+              New Task
             </Button>
           </div>
 
@@ -709,7 +709,7 @@ export default function ProjectDetailPage() {
         <DialogContent className="max-w-2xl">
           <form onSubmit={handleCreateTask}>
             <DialogHeader>
-              <DialogTitle>Create task</DialogTitle>
+              <DialogTitle>Create Task</DialogTitle>
               <DialogDescription>Add a new top-level task to this project board.</DialogDescription>
             </DialogHeader>
             <div className="mt-5 grid gap-4">
@@ -756,7 +756,7 @@ export default function ProjectDetailPage() {
               </Field>
             </div>
             <DialogFooter className="mt-6">
-              <Button type="submit">Create task</Button>
+              <Button type="submit">Create Task</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -767,7 +767,7 @@ export default function ProjectDetailPage() {
           {settingsForm && (
             <>
               <DialogHeader>
-                <DialogTitle>Project settings</DialogTitle>
+                <DialogTitle>Project Settings</DialogTitle>
                 <DialogDescription>Update metadata, visibility, managers, members, and followers.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
@@ -812,9 +812,9 @@ export default function ProjectDetailPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="internal">All internal users</SelectItem>
-                      <SelectItem value="private">Invited or added users</SelectItem>
-                      <SelectItem value="teams">Respective teams</SelectItem>
+                      <SelectItem value="internal">All Internal Users</SelectItem>
+                      <SelectItem value="private">Invited or Added Users</SelectItem>
+                      <SelectItem value="teams">Respective Teams</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -846,7 +846,7 @@ export default function ProjectDetailPage() {
               <DialogFooter className="mt-6">
                 <Button onClick={() => void handleSaveSettings()}>
                   <SaveIcon />
-                  Save settings
+                  Save Settings
                 </Button>
               </DialogFooter>
             </>

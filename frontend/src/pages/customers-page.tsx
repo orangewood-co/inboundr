@@ -195,7 +195,7 @@ function EmptyState({ search }: { search: string }) {
       </div>
       <div className="space-y-1">
         <h3 className="text-sm font-semibold">
-          {search ? "No customers match that search" : "No customers identified yet"}
+          {search ? "No Customers Match That Search" : "No Customers Identified Yet"}
         </h3>
         <p className="max-w-sm text-sm text-muted-foreground">
           {search
@@ -586,7 +586,7 @@ export default function CustomersPage() {
               <AlertCircleIcon className="size-5 text-destructive" />
               <p className="text-sm text-destructive">{error}</p>
               <Button variant="outline" size="sm" onClick={() => void fetchCustomers()}>
-                Try again
+                Try Again
               </Button>
             </div>
           ) : loading ? (
@@ -723,7 +723,7 @@ export default function CustomersPage() {
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
           <SheetHeader className="px-5 pt-5">
             <SheetTitle className="text-xl">
-              {sheetMode === "view" ? "Customer details" : "Edit customer"}
+              {sheetMode === "view" ? "Customer Details" : "Edit Customer"}
             </SheetTitle>
             {sheetMode === "view" && editingCustomer && (
               <CustomerMetadata customer={editingCustomer} />
@@ -741,7 +741,7 @@ export default function CustomersPage() {
               <SheetFooter className="border-t bg-muted/30">
                 <Button onClick={() => openEditSheet(editingCustomer)}>
                   <Edit3Icon className="size-4" />
-                  Edit customer
+                  Edit Customer
                 </Button>
                 <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)}>
                   <ArchiveIcon className="size-4" />
@@ -766,7 +766,7 @@ export default function CustomersPage() {
               <SheetFooter className="border-t bg-muted/30">
                 <Button onClick={saveCustomer} disabled={saving}>
                   {saving && <Spinner data-icon="inline-start" />}
-                  Save changes
+                  Save Changes
                 </Button>
                 <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)} disabled={saving}>
                   <ArchiveIcon className="size-4" />
@@ -784,7 +784,7 @@ export default function CustomersPage() {
       <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Archive customer</DialogTitle>
+            <DialogTitle>Archive Customer</DialogTitle>
             <DialogDescription>
               Are you sure you want to archive <span className="font-medium text-foreground">{editingCustomer?.name}</span>? They will no longer appear in your customer list or search results.
             </DialogDescription>

@@ -380,12 +380,12 @@ function BoardColumn({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onAddTaskAdvanced(stage._id)}>
               <PlusIcon />
-              Add task with details
+              Add Task with Details
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => onArchiveStage(stage._id)}>
               <ArchiveIcon />
-              Archive stage
+              Archive Stage
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -428,7 +428,7 @@ function BoardColumn({
             />
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" onClick={commitAdd}>
-                Add task
+                Add Task
               </Button>
               <Button
                 size="icon-sm"
@@ -450,7 +450,7 @@ function BoardColumn({
             className="flex items-center gap-1.5 rounded-xl px-2 py-2 text-sm font-medium text-muted-foreground transition hover:bg-background/70 hover:text-foreground"
           >
             <PlusIcon className="size-4" />
-            Add a task
+            Add a Task
           </button>
         )}
       </div>
@@ -482,7 +482,7 @@ function AddListAffordance({ onAddStage }: { onAddStage: (name: string) => void 
         className="flex h-fit w-72 shrink-0 items-center gap-2 rounded-2xl border border-dashed bg-muted/20 px-3 py-3 text-sm font-medium text-muted-foreground transition hover:bg-muted/40 hover:text-foreground"
       >
         <PlusIcon className="size-4" />
-        Add another stage
+        Add Another Stage
       </button>
     )
   }
@@ -505,7 +505,7 @@ function AddListAffordance({ onAddStage }: { onAddStage: (name: string) => void 
       />
       <div className="mt-2 flex items-center gap-2">
         <Button size="sm" onClick={commit}>
-          Add stage
+          Add Stage
         </Button>
         <Button
           size="icon-sm"

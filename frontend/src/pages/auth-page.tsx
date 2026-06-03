@@ -80,7 +80,7 @@ export function AuthPage({
 
         <div className="relative z-10 max-w-md space-y-4">
           <span className="inline-flex rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-medium text-primary backdrop-blur">
-            BTSA workspace
+            BTSA Workspace
           </span>
           <h1 className="max-w-sm text-4xl font-semibold tracking-tight">
             Built for calm operations and clear decisions.
@@ -163,7 +163,7 @@ export function AuthPage({
                     to="/forgot-password"
                     className="text-xs font-medium text-primary transition-opacity hover:opacity-80"
                   >
-                    Forgot password?
+                    Forgot Password?
                   </Link>
                 ) : null}
               </div>
@@ -218,7 +218,7 @@ export function AuthPage({
             </p>
 
             <Button asChild variant="ghost" className="w-full">
-              <Link to="/">Go to dashboard</Link>
+              <Link to="/">Go to Dashboard</Link>
             </Button>
           </div>
         </div>

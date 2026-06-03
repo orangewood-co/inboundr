@@ -210,7 +210,7 @@ function EmptyState({ search }: { search: string }) {
       </div>
       <div className="space-y-1">
         <h3 className="text-sm font-semibold">
-          {search ? "No products match that search" : "No products in the catalog yet"}
+          {search ? "No Products Match That Search" : "No Products in the Catalog Yet"}
         </h3>
         <p className="max-w-sm text-sm text-muted-foreground">
           {search
@@ -772,7 +772,7 @@ export default function ProductsPage() {
                     <TooltipTrigger asChild>
                       <Button variant="outline" size="sm" onClick={openImportPage}>
                         <UploadIcon className="size-4" />
-                        Bulk upload
+                        Bulk Upload
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Import products from CSV or Excel</TooltipContent>
@@ -810,7 +810,7 @@ export default function ProductsPage() {
                   <AlertCircleIcon className="size-5 text-destructive" />
                   <p className="text-sm text-destructive">{error}</p>
                   <Button variant="outline" size="sm" onClick={() => void fetchProducts()}>
-                    Try again
+                    Try Again
                   </Button>
                 </div>
               ) : loading ? (
@@ -920,7 +920,7 @@ export default function ProductsPage() {
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
           <SheetHeader className="px-5 pt-5">
             <SheetTitle className="text-xl">
-              {editingProduct ? "Edit product" : "Add product"}
+              {editingProduct ? "Edit Product" : "Add Product"}
             </SheetTitle>
             <SheetDescription>
               {editingProduct
@@ -941,7 +941,7 @@ export default function ProductsPage() {
           <SheetFooter className="border-t bg-muted/30">
             <Button onClick={saveProduct} disabled={saving}>
               {saving && <Spinner data-icon="inline-start" />}
-              {editingProduct ? "Save changes" : "Create product"}
+              {editingProduct ? "Save Changes" : "Create Product"}
             </Button>
             <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
               Cancel

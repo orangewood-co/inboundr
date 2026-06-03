@@ -334,7 +334,7 @@ export default function EmployeeNewPage() {
       <SiteHeader
         breadcrumbs={[
           { label: "Employees", href: "/employees" },
-          { label: "New employee" },
+          { label: "New Employee" },
         ]}
       />
       <main className="flex-1 overflow-auto bg-muted/20">
@@ -342,7 +342,7 @@ export default function EmployeeNewPage() {
           <Button asChild variant="ghost" size="sm" className="-ml-2 mb-6">
             <Link to="/employees">
               <ArrowLeftIcon className="size-4" />
-              Back to employees
+              Back to Employees
             </Link>
           </Button>
 
@@ -350,7 +350,7 @@ export default function EmployeeNewPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <Badge variant="outline" className="mb-3">Employee setup</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight">Add employee</h1>
+                <h1 className="text-3xl font-semibold tracking-tight">Add Employee</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Create the HR record first. Login access can be enabled during setup or adjusted later.
                 </p>
@@ -425,7 +425,7 @@ export default function EmployeeNewPage() {
                           <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
                             <label className="cursor-pointer">
                               <UploadIcon className="size-4" />
-                              Upload photo
+                              Upload Photo
                               <input
                                 type="file"
                                 accept="image/png,image/jpeg,image/webp"
@@ -498,7 +498,7 @@ export default function EmployeeNewPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No team</SelectItem>
+                        <SelectItem value="none">No Team</SelectItem>
                         {teams.map((team) => (
                           <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
                         ))}
@@ -514,7 +514,7 @@ export default function EmployeeNewPage() {
                 <div className="flex items-center gap-3">
                   <ShieldCheckIcon className="size-5 text-muted-foreground" />
                   <div>
-                    <h2 className="font-semibold">Platform access</h2>
+                    <h2 className="font-semibold">Platform Access</h2>
                     <p className="text-sm text-muted-foreground">Choose module access if this employee needs Inboundr login access.</p>
                   </div>
                 </div>
@@ -548,7 +548,7 @@ export default function EmployeeNewPage() {
             {step === "review" ? (
               <section className="grid gap-5">
                 <div>
-                  <h2 className="font-semibold">Review employee</h2>
+                  <h2 className="font-semibold">Review Employee</h2>
                   <p className="text-sm text-muted-foreground">Confirm the details before creating the record.</p>
                 </div>
                 {validationErrors.length > 0 ? (
@@ -610,7 +610,7 @@ export default function EmployeeNewPage() {
               {step === "review" ? (
                 <Button onClick={createEmployee} disabled={saving || validationErrors.length > 0}>
                   {saving && <Spinner data-icon="inline-start" />}
-                  Create employee
+                  Create Employee
                 </Button>
               ) : (
                 <Button onClick={goNext}>Continue</Button>
@@ -623,9 +623,9 @@ export default function EmployeeNewPage() {
       <AvatarCropDialog
         open={cropOpen}
         imageSrc={cropImageSrc}
-        title="Crop employee photo"
+        title="Crop Employee Photo"
         description="Drag to reposition and zoom to frame this employee photo."
-        saveLabel="Save employee photo"
+        saveLabel="Save Employee Photo"
         upload={uploadCroppedEmployeeImage}
         onOpenChange={setCropOpen}
         onUploaded={handleProfilePictureUploaded}

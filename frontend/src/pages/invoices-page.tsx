@@ -252,7 +252,7 @@ export default function InvoicesPage() {
               <Button size="sm" asChild>
                 <Link to="/invoices/new" search={{ edit: undefined }}>
                   <PlusIcon className="size-4" />
-                  New invoice
+                  New Invoice
                 </Link>
               </Button>
             </div>
@@ -283,8 +283,8 @@ export default function InvoicesPage() {
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option === "all" ? "All invoices" : labelStatus(option)}
+                  <SelectItem key={option} value={option} className="capitalize">
+                    {option === "all" ? "All Invoices" : labelStatus(option)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -302,7 +302,7 @@ export default function InvoicesPage() {
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-xs text-muted-foreground">{selected.size} selected</span>
                 <Button variant="outline" size="sm" onClick={() => void bulkSend()} disabled={bulkLoading}>
-                  Send drafts
+                  Send Drafts
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => void bulkCancel()} disabled={bulkLoading}>
                   Cancel
@@ -319,7 +319,7 @@ export default function InvoicesPage() {
             <div className="flex flex-col items-center gap-2 p-8 text-center">
               <AlertCircleIcon className="size-5 text-destructive" />
               <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void fetchInvoices()}>Try again</Button>
+              <Button variant="outline" size="sm" onClick={() => void fetchInvoices()}>Try Again</Button>
             </div>
           ) : loading ? (
             <div className="divide-y">
@@ -337,14 +337,14 @@ export default function InvoicesPage() {
               <div className="flex size-10 items-center justify-center rounded-full bg-muted">
                 <ReceiptTextIcon className="size-5 text-muted-foreground" />
               </div>
-              <h3 className="text-sm font-semibold">No invoices yet</h3>
+              <h3 className="text-sm font-semibold">No Invoices Yet</h3>
               <p className="max-w-md text-sm text-muted-foreground">
                 Create your first invoice to start tracking payments and revenue.
               </p>
               <Button size="sm" asChild>
                 <Link to="/invoices/new" search={{ edit: undefined }}>
                   <PlusIcon className="size-4" />
-                  Create invoice
+                  Create Invoice
                 </Link>
               </Button>
             </div>

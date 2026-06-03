@@ -534,7 +534,7 @@ export default function FormEditorPage() {
 
               {selected === "welcome" && (
                 <div className="space-y-6">
-                  <SectionHeader title="Welcome screen" description="The first thing respondents see when they open your form." />
+                  <SectionHeader title="Welcome Screen" description="The first thing respondents see when they open your form." />
 
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-5">
@@ -577,7 +577,7 @@ export default function FormEditorPage() {
 
               {selected === "ending" && (
                 <div className="space-y-6">
-                  <SectionHeader title="Thank you screen" description="What respondents see after submitting." />
+                  <SectionHeader title="Thank You Screen" description="What respondents see after submitting." />
 
                   <div className="rounded-xl border bg-card p-6 shadow-sm">
                     <div className="space-y-5">
@@ -601,7 +601,7 @@ export default function FormEditorPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
-                      <p className="font-semibold">Response submitted</p>
+                      <p className="font-semibold">Response Submitted</p>
                       <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">{draft.settings?.successMessage || "Thanks! Your response has been recorded."}</p>
                     </div>
                   </div>
@@ -871,7 +871,7 @@ export default function FormEditorPage() {
 
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-                    <LinkIcon className="size-4 text-muted-foreground" /> Public link
+                    <LinkIcon className="size-4 text-muted-foreground" /> Public Link
                   </div>
                   <div className="flex gap-2">
                     <Input readOnly value={draft.slug ? publicUrl(draft.slug) : "Save the form first"} className="font-mono text-xs" />
@@ -886,12 +886,12 @@ export default function FormEditorPage() {
 
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <div className="mb-4 flex items-center gap-2 text-sm font-medium">
-                    <CodeXmlIcon className="size-4 text-muted-foreground" /> Embed code
+                    <CodeXmlIcon className="size-4 text-muted-foreground" /> Embed Code
                   </div>
                   <textarea readOnly rows={4} value={draft.slug ? embedSnippet(draft.slug) : ""}
                     className="w-full rounded-md border bg-muted/30 p-3 font-mono text-xs leading-relaxed text-muted-foreground outline-none" />
                   <Button variant="outline" size="sm" className="mt-3" onClick={() => draft.slug && navigator.clipboard.writeText(embedSnippet(draft.slug))}>
-                    <CopyIcon className="size-3.5" /> Copy embed code
+                    <CopyIcon className="size-3.5" /> Copy Embed Code
                   </Button>
                 </div>
               </div>
@@ -922,7 +922,7 @@ export default function FormEditorPage() {
               {submissions.length === 0 ? (
                 <div className="rounded-xl border border-dashed px-6 py-20 text-center">
                   <InboxIcon className="mx-auto mb-3 size-10 text-muted-foreground/40" />
-                  <p className="font-medium text-muted-foreground">No responses yet</p>
+                  <p className="font-medium text-muted-foreground">No Responses Yet</p>
                   <p className="mt-1 text-sm text-muted-foreground/70">Share your form to start collecting data.</p>
                 </div>
               ) : (
@@ -973,7 +973,7 @@ export default function FormEditorPage() {
             <Sheet open={detailId !== null} onOpenChange={(open) => { if (!open) setDetailId(null) }}>
               <SheetContent className="overflow-y-auto sm:max-w-md">
                 <SheetHeader>
-                  <SheetTitle>Submission details</SheetTitle>
+                  <SheetTitle>Submission Details</SheetTitle>
                 </SheetHeader>
                 {detailSubmission && (
                   <div className="space-y-5 px-4 pb-8">
@@ -1031,7 +1031,7 @@ export default function FormEditorPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2 border-t pt-4">
-                      <Button size="sm" variant="outline" onClick={() => void createCustomerFromSubmission(detailSubmission)}>Create customer</Button>
+                      <Button size="sm" variant="outline" onClick={() => void createCustomerFromSubmission(detailSubmission)}>Create Customer</Button>
                       <Button size="sm" variant={detailSubmission.status === "reviewed" ? "default" : "outline"}
                         onClick={() => void updateSubmissionStatus(detailSubmission._id, "reviewed")}>
                         Reviewed
@@ -1110,7 +1110,7 @@ function QuestionSidebar({ fields, selected, setSelected, sensors, handleDragEnd
           <button onClick={addField}
             className="mt-1.5 flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground">
             <PlusIcon className="size-4" />
-            Add question
+            Add Question
           </button>
 
           <div className="my-2 border-t" />

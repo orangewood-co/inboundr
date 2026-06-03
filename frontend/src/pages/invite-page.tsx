@@ -110,14 +110,14 @@ export function InvitePage() {
         ) : error && !invitation ? (
           <div className="space-y-5">
             <span className="inline-flex rounded-full border border-destructive/20 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
-              Invite unavailable
+              Invite Unavailable
             </span>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight">This invitation can’t be opened</h1>
+              <h1 className="text-3xl font-semibold tracking-tight">This Invitation Can’t Be Opened</h1>
               <p className="text-sm leading-6 text-muted-foreground">{error}</p>
             </div>
             <Button asChild variant="outline">
-              <Link to="/login">Go to login</Link>
+              <Link to="/login">Go to Login</Link>
             </Button>
           </div>
         ) : invitation ? (
@@ -125,7 +125,7 @@ export function InvitePage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  Workspace invitation
+                  Workspace Invitation
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground">
                   {roleLabel(invitation.role)}
@@ -178,13 +178,13 @@ export function InvitePage() {
                 {sessionEmail && !signedInWithWrongEmail ? (
                   <Button size="lg" onClick={acceptInvitation} disabled={accepting}>
                     {accepting && <Spinner data-icon="inline-start" />}
-                    Accept invitation
+                    Accept Invitation
                   </Button>
                 ) : (
                   <>
                     <Button asChild size="lg">
                       <Link to="/register" search={authSearch}>
-                        Create account
+                        Create Account
                       </Link>
                     </Button>
                     <p className="text-center text-sm text-muted-foreground">
@@ -194,7 +194,7 @@ export function InvitePage() {
                         search={authSearch}
                         className="font-medium text-primary underline-offset-4 hover:underline"
                       >
-                        Sign in
+                        Sign In
                       </Link>
                     </p>
                   </>

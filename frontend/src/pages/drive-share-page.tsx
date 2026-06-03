@@ -94,7 +94,7 @@ export default function DriveSharePage() {
       <main className="flex min-h-svh items-center justify-center bg-background p-6">
         <div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-sm">
           <LockIcon className="mb-4 size-8 text-primary" />
-          <h1 className="font-heading text-xl font-semibold">Password required</h1>
+          <h1 className="font-heading text-xl font-semibold">Password Required</h1>
           <p className="mt-2 text-sm text-muted-foreground">Enter the password shared with this Drive link.</p>
           <Input className="mt-4" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
           <Button className="mt-4 w-full" onClick={() => void unlock()}>Unlock</Button>
@@ -109,7 +109,7 @@ export default function DriveSharePage() {
         <div className="rounded-xl border bg-card p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="font-heading text-2xl font-semibold">{root?.name ?? "Shared Drive item"}</h1>
+              <h1 className="font-heading text-2xl font-semibold">{root?.name ?? "Shared Drive Item"}</h1>
               <p className="text-sm text-muted-foreground">Public view-only Drive share</p>
             </div>
             {root?.type === "folder" && (
@@ -122,7 +122,7 @@ export default function DriveSharePage() {
 
           {root?.type === "folder" && (
             <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <button onClick={() => { setParent(root); setBreadcrumbs([]); void listPublicDriveChildren(token, root._id, unlockedPassword).then((res) => setNodes(res.nodes)) }}>Shared folder</button>
+              <button onClick={() => { setParent(root); setBreadcrumbs([]); void listPublicDriveChildren(token, root._id, unlockedPassword).then((res) => setNodes(res.nodes)) }}>Shared Folder</button>
               {breadcrumbs.map((crumb, index) => (
                 <React.Fragment key={crumb._id}>
                   <span>/</span>

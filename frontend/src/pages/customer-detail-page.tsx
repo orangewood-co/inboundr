@@ -282,7 +282,7 @@ export default function CustomerDetailPage() {
             <Button asChild variant="ghost" size="sm" className="-ml-2 mb-6">
               <Link to="/customers">
                 <ArrowLeftIcon className="size-4" />
-                Back to customers
+                Back to Customers
               </Link>
             </Button>
 
@@ -299,10 +299,10 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => void fetchCustomer()}>
-                    Try again
+                    Try Again
                   </Button>
                   <Button onClick={() => void navigate({ to: "/customers" })}>
-                    Back to customers
+                    Back to Customers
                   </Button>
                 </div>
               </div>
@@ -413,7 +413,7 @@ export default function CustomerDetailPage() {
             ) : customer && editing ? (
               <div className="space-y-6 animate-in fade-in-0 duration-200">
                 <div className="flex items-center justify-between">
-                  <h1 className="text-2xl font-bold">Edit customer</h1>
+                  <h1 className="text-2xl font-bold">Edit Customer</h1>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" onClick={cancelEditing} disabled={saving}>
                       <XIcon className="size-4" />
@@ -421,7 +421,7 @@ export default function CustomerDetailPage() {
                     </Button>
                     <Button onClick={() => void saveCustomer()} disabled={saving}>
                       {saving ? <Spinner data-icon="inline-start" /> : <SaveIcon className="size-4" />}
-                      Save changes
+                      Save Changes
                     </Button>
                   </div>
                 </div>
@@ -504,7 +504,7 @@ export default function CustomerDetailPage() {
       <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Archive customer</DialogTitle>
+            <DialogTitle>Archive Customer</DialogTitle>
             <DialogDescription>
               Are you sure you want to archive <span className="font-medium text-foreground">{customer?.name}</span>? They will no longer appear in your customer list or search results.
             </DialogDescription>

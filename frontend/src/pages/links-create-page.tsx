@@ -124,12 +124,12 @@ export default function LinksCreatePage() {
           <form onSubmit={handleSubmit} className="mx-auto max-w-2xl p-6 lg:p-8">
             {/* Page header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold tracking-tight">Create a new link</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Create a New Link</h1>
             </div>
 
             {/* Link details card */}
             <div className="mt-6 rounded-xl border bg-card p-6">
-              <h2 className="text-lg font-semibold">Link details</h2>
+              <h2 className="text-lg font-semibold">Link Details</h2>
 
               {/* Destination URL */}
               <div className="mt-5 grid gap-2">
@@ -198,7 +198,7 @@ export default function LinksCreatePage() {
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen} className="mt-4">
               <div className="rounded-xl border bg-card">
                 <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-4">
-                  <h2 className="text-lg font-semibold">Advanced options</h2>
+                  <h2 className="text-lg font-semibold">Advanced Options</h2>
                   <ChevronDownIcon
                     className={`size-5 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`}
                   />
@@ -278,7 +278,7 @@ export default function LinksCreatePage() {
             {/* Sharing options */}
             <div className="mt-4 rounded-xl border bg-card">
               <div className="px-6 py-4">
-                <h2 className="text-lg font-semibold">Sharing options</h2>
+                <h2 className="text-lg font-semibold">Sharing Options</h2>
               </div>
               <Separator />
               <div className="grid gap-0 divide-y">
@@ -322,7 +322,7 @@ export default function LinksCreatePage() {
               </Button>
               <Button type="submit" disabled={saving}>
                 {saving && <Spinner data-icon="inline-start" />}
-                Create link
+                Create Link
               </Button>
             </div>
           </form>

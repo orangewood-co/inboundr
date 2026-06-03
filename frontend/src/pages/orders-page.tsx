@@ -113,7 +113,7 @@ function EmptyState() {
         <CheckCircle2Icon className="size-10 text-muted-foreground/50" />
       </div>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-muted-foreground">No draft RFQs</p>
+        <p className="text-sm font-medium text-muted-foreground">No Draft RFQs</p>
         <p className="text-xs text-muted-foreground/60">
           Saved RFQ selections will appear here for quote number processing.
         </p>

@@ -361,7 +361,7 @@ export default function InvoiceDetailPage() {
           <XCircleIcon className="size-8 text-destructive" />
           <p className="text-sm text-muted-foreground">{error ?? "Invoice not found"}</p>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/invoices">Back to invoices</Link>
+            <Link to="/invoices">Back to Invoices</Link>
           </Button>
         </div>
       </AppLayout>
@@ -423,7 +423,7 @@ export default function InvoiceDetailPage() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => void copyShareLink()}>
                   <CopyIcon className="size-3.5" />
-                  Copy share link
+                  Copy Share Link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => void handleDuplicate()} disabled={actionLoading !== null}>
                   <RefreshCwIcon className="size-3.5" />
@@ -436,7 +436,7 @@ export default function InvoiceDetailPage() {
                   className="text-destructive"
                 >
                   <BanIcon className="size-3.5" />
-                  Write off
+                  Write Off
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => void runAction("cancel")}
@@ -444,7 +444,7 @@ export default function InvoiceDetailPage() {
                   className="text-destructive"
                 >
                   <XCircleIcon className="size-3.5" />
-                  Cancel invoice
+                  Cancel Invoice
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -652,7 +652,7 @@ export default function InvoiceDetailPage() {
                   ) : (
                     <CheckCircle2Icon className="size-3.5" />
                   )}
-                  Record payment
+                  Record Payment
                 </Button>
               </div>
             </div>

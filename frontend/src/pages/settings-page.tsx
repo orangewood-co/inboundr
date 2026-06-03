@@ -747,7 +747,7 @@ function OrganizationTab() {
                     <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB. Save organization settings after upload.</p>
                     {form.logoUrl && (
                       <Button type="button" variant="outline" size="sm" onClick={() => updateForm("logoUrl", "")}>
-                        Remove logo
+                        Remove Logo
                       </Button>
                     )}
                   </div>
@@ -975,7 +975,7 @@ function OrganizationTab() {
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={addPaymentTerm} className="gap-2">
                     <PlusIcon className="size-3.5" />
-                    Add term
+                    Add Term
                   </Button>
                 </div>
 
@@ -1226,7 +1226,7 @@ function AccountTab() {
                   className="text-xs font-medium text-primary hover:underline"
                   onClick={() => avatarInputRef.current?.click()}
                 >
-                  Change photo
+                  Change Photo
                 </button>
                 {sessionImage && (
                   <button
@@ -1235,7 +1235,7 @@ function AccountTab() {
                     onClick={handleRemoveAvatar}
                     disabled={removingAvatar}
                   >
-                    Remove photo
+                    Remove Photo
                   </button>
                 )}
               </div>
@@ -1887,7 +1887,7 @@ function NotificationsTab() {
           <div className="rounded-xl border bg-muted/20 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold">Delivery window</p>
+                <p className="text-sm font-semibold">Delivery Window</p>
                 <p className="text-xs text-muted-foreground">
                   Sent daily at {prefs.sendTimeLocal} in {prefs.timezone}. The backend queues it during hour {prefs.sendHourUtc.toString().padStart(2, "0")}:00 UTC.
                 </p>
@@ -1964,7 +1964,7 @@ function NotificationsTab() {
                 disabled={!prefs.enabled}
                 onClick={() => setPrefs((prev) => ({ ...prev, recipientMode: "all_members" }))}
               >
-                <p className="text-sm font-semibold">All members</p>
+                <p className="text-sm font-semibold">All Members</p>
                 <p className="mt-1 text-xs text-muted-foreground">{members.length} current workspace members</p>
               </button>
               <button
@@ -1977,7 +1977,7 @@ function NotificationsTab() {
                   memberRecipientUserIds: prev.memberRecipientUserIds.length > 0 ? prev.memberRecipientUserIds : members.map((member) => member.userId),
                 }))}
               >
-                <p className="text-sm font-semibold">Custom recipients</p>
+                <p className="text-sm font-semibold">Custom Recipients</p>
                 <p className="mt-1 text-xs text-muted-foreground">{totalRecipientCount} selected recipients</p>
               </button>
             </div>
@@ -2056,7 +2056,7 @@ function NotificationsTab() {
 
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-semibold">Included sections</p>
+              <p className="text-sm font-semibold">Included Sections</p>
               <p className="text-xs text-muted-foreground">Choose which stats should appear in the daily email.</p>
             </div>
             {DIGEST_SECTIONS.map((section) => (
@@ -2081,11 +2081,11 @@ function NotificationsTab() {
           <div className="flex items-center gap-3 pt-2">
             <Button onClick={handleSave} disabled={disableSave}>
               {saving && <Spinner data-icon="inline-start" />}
-              Save preferences
+              Save Preferences
             </Button>
             <Button variant="outline" onClick={handleSendTest} disabled={sendingTest}>
               {sendingTest && <Spinner data-icon="inline-start" />}
-              Send test email
+              Send Test Email
             </Button>
           </div>
         </div>

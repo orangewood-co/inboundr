@@ -301,7 +301,7 @@ export default function EmployeesPage() {
             </Button>
             <Button onClick={openCreate}>
               <PlusIcon />
-              Add employee
+              Add Employee
             </Button>
           </>
         }
@@ -326,7 +326,7 @@ export default function EmployeesPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 {Object.entries(statusLabels).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
@@ -337,7 +337,7 @@ export default function EmployeesPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All teams</SelectItem>
+                <SelectItem value="all">All Teams</SelectItem>
                 {teams.map((team) => (
                   <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
                 ))}
@@ -354,7 +354,7 @@ export default function EmployeesPage() {
         ) : employees.length === 0 ? (
           <div className="mx-auto max-w-7xl rounded-sm border bg-card p-12 text-center">
             <IdCardIcon className="mx-auto mb-3 size-10 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">No employees found</h2>
+            <h2 className="text-lg font-semibold">No Employees Found</h2>
             <p className="mt-1 text-sm text-muted-foreground">Add the first profile or adjust your filters.</p>
           </div>
         ) : (
@@ -402,7 +402,7 @@ export default function EmployeesPage() {
               </div>
               <Button className="mt-4" onClick={createTeam} disabled={saving}>
                 <PlusIcon />
-                Create team
+                Create Team
               </Button>
             </div>
             <div className="grid gap-3">

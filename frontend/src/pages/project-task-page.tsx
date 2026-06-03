@@ -207,10 +207,10 @@ export default function ProjectTaskPage() {
         <main className="flex flex-1 items-center justify-center p-6">
           <div className="text-center">
             <FolderKanbanIcon className="mx-auto size-12 text-muted-foreground/50" />
-            <h1 className="mt-4 text-xl font-semibold">Task not found</h1>
+            <h1 className="mt-4 text-xl font-semibold">Task Not Found</h1>
             <Button className="mt-4" asChild>
               <Link to="/projects/$id" params={{ id }}>
-                Back to board
+                Back to Board
               </Link>
             </Button>
           </div>
@@ -301,7 +301,7 @@ export default function ProjectTaskPage() {
           <div className="flex gap-2">
             <Button onClick={() => void handleSave()}>
               <SaveIcon />
-              Save task
+              Save Task
             </Button>
             <Button variant="outline" onClick={() => void handleArchive()}>
               <ArchiveIcon />
@@ -336,7 +336,7 @@ export default function ProjectTaskPage() {
         </section>
 
         <section className="rounded-2xl border bg-card p-5 shadow-sm">
-          <h2 className="font-semibold">Manual time tracking</h2>
+          <h2 className="font-semibold">Manual Time Tracking</h2>
           <form onSubmit={handleCreateTimeEntry} className="mt-3 grid gap-3">
             <div className="grid gap-3 sm:grid-cols-3">
               <Select value={timeEntryForm.employeeId} onValueChange={(employeeId) => setTimeEntryForm((current) => ({ ...current, employeeId }))}>
@@ -371,7 +371,7 @@ export default function ProjectTaskPage() {
             />
             <Button type="submit" variant="outline">
               <ClockIcon />
-              Log time
+              Log Time
             </Button>
           </form>
           <div className="mt-4 space-y-2">

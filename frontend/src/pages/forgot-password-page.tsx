@@ -36,8 +36,8 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthShell
-      eyebrow="Password reset"
-      title="Recover your account"
+      eyebrow="Password Reset"
+      title="Recover Your Account"
       description="Enter your email and Better Auth will create a reset link. Emails are mocked, so the link appears in the backend console."
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -68,12 +68,12 @@ export function ForgotPasswordPage() {
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
           {isSubmitting && <Spinner data-icon="inline-start" />}
-          Send reset link
+          Send Reset Link
         </Button>
       </form>
 
       <Button asChild variant="ghost" className="w-full">
-        <Link to="/login">Back to sign in</Link>
+        <Link to="/login">Back to Sign In</Link>
       </Button>
     </AuthShell>
   )

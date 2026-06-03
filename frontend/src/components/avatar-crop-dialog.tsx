@@ -22,9 +22,9 @@ export interface AvatarCropResult {
 export function AvatarCropDialog({
   open,
   imageSrc,
-  title = "Crop profile picture",
+  title = "Crop Profile Picture",
   description = "Drag to reposition and zoom to frame your photo.",
-  saveLabel = "Save photo",
+  saveLabel = "Save Photo",
   upload = uploadAvatar,
   onOpenChange,
   onUploaded,

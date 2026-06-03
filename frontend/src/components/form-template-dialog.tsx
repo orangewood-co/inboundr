@@ -43,7 +43,7 @@ type FormTemplate = {
 const TEMPLATES: FormTemplate[] = [
   {
     id: "blank",
-    title: "Blank form",
+    title: "Blank Form",
     description: "Start from scratch with an empty form",
     icon: <ClipboardListIcon className="size-5" />,
     formTitle: "Untitled form",
@@ -155,7 +155,7 @@ export function FormTemplateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create a new form</DialogTitle>
+          <DialogTitle>Create a New Form</DialogTitle>
           <DialogDescription>Choose a template to get started quickly, or start from scratch.</DialogDescription>
         </DialogHeader>
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
