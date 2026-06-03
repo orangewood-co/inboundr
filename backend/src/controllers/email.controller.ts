@@ -5,6 +5,8 @@ import { GmailAccount } from "../models/gmail-account.model";
 import { RFQ } from "../models/rfq.model";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { streamEmailPdf } from "../services/email-pdf.service";
+import { buildRFQProcessingInput, hasRFQProcessableContent } from "../services/rfq-input.service";
+import { processEmailForRFQ } from "../services/rfq.service";
 
 const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -183,6 +185,79 @@ export const getEmail = async (
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });
+  }
+};
+
+export const reprocessEmail = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const email = await Email.findOne({
+      _id: req.params.id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+
+    if (!email) {
+      res.status(404).json({ error: "Email not found" });
+      return;
+    }
+
+    const rfq = await RFQ.findOne({
+      emailId: email._id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+    const hasFailedRFQ = Boolean(rfq?.errorMessage);
+
+    if (email.status !== "failed" && !hasFailedRFQ) {
+      res.status(400).json({ error: "Only failed emails can be reprocessed" });
+      return;
+    }
+
+    if (!hasRFQProcessableContent(email)) {
+      res.status(400).json({ error: "Email has no processable RFQ content" });
+      return;
+    }
+
+    const account = await GmailAccount.findOne({
+      _id: email.gmailAccountId,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+    if (!account) {
+      res.status(404).json({ error: "Gmail account not found" });
+      return;
+    }
+
+    const body = await buildRFQProcessingInput(account, email);
+    await RFQ.deleteMany({
+      emailId: email._id,
+      userId: authReq.user.id,
+      organizationId: organization._id,
+    });
+    email.status = "processing";
+    email.errorMessage = null;
+    await email.save();
+
+    processEmailForRFQ(
+      email._id.toString(),
+      body,
+      email.messageId,
+      authReq.user.id,
+      account._id.toString(),
+      organization._id.toString()
+    ).catch((err) =>
+      console.error(`RFQ reprocessing failed for ${email.messageId}:`, err)
+    );
+
+    res.status(202).json({ message: "RFQ reprocessing started" });
+  } catch (err) {
+    console.error("Error reprocessing email:", err);
+    res.status(500).json({ error: "Failed to reprocess email" });
   }
 };
 

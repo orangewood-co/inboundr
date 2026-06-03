@@ -5,6 +5,7 @@ import {
   getEmail,
   getEmailAttachment,
   listEmails,
+  reprocessEmail,
 } from "../controllers/email.controller";
 import { requireAuth, requireEmployeeModule, requireOrganization } from "../middleware/auth.middleware";
 
@@ -27,6 +28,7 @@ router.get(
   getEmailAttachment
 );
 router.get("/:id/pdf", requireAuth, requireOrganization, requireEmployeeModule("inbox"), downloadEmailPdf);
+router.post("/:id/reprocess", requireAuth, requireOrganization, requireEmployeeModule("inbox"), reprocessEmail);
 router.get("/:id", requireAuth, requireOrganization, requireEmployeeModule("inbox"), getEmail);
 
 export default router;

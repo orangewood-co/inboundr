@@ -3,14 +3,27 @@ import { updateEmailStatus } from "./email.service";
 import { classifyEmail } from "../agents/check_rfq";
 import { generateRFQ } from "../agents/generate_rfq";
 
+interface ProcessEmailForRFQOptions {
+  resetExisting?: boolean;
+}
+
 export async function processEmailForRFQ(
   emailId: string,
   emailBody: string,
   messageId: string,
   userId: string,
   gmailAccountId: string,
-  organizationId?: string
+  organizationId?: string,
+  options: ProcessEmailForRFQOptions = {}
 ): Promise<void> {
+  if (options.resetExisting) {
+    await RFQ.deleteMany({
+      emailId,
+      userId,
+      ...(organizationId ? { organizationId } : {}),
+    });
+  }
+
   await updateEmailStatus(messageId, "processing", undefined, gmailAccountId);
 
   try {

@@ -305,6 +305,7 @@ export async function updateEmailStatus(
 ): Promise<void> {
   const update: Record<string, any> = { status };
   if (status === "processed") update.processedAt = new Date();
+  if (status === "processing" || status === "processed") update.errorMessage = null;
   if (errorMessage) update.errorMessage = errorMessage;
 
   await Email.updateOne(

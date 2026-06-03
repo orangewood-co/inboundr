@@ -11,6 +11,7 @@ import { CopyableText, CopyButton } from "@/components/copy-button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { openDownload } from "@/lib/downloads"
 import { getAvatarColor } from "@/lib/utils"
+import { toast } from "sonner"
 import {
   InboxIcon,
   MailOpenIcon,
@@ -533,6 +534,7 @@ export function EmailsPage() {
   const [selectedAttachment, setSelectedAttachment] = useState<EmailDetail["attachments"][number] | null>(null)
 
   const [refreshing, setRefreshing] = useState(false)
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const emailDocument = useMemo(
     () => (detail?.bodyHtml ? buildEmailDocument(detail.bodyHtml) : null),
@@ -589,6 +591,44 @@ export function EmailsPage() {
     setRefreshing(false)
   }
 
+  const markEmailProcessing = (id: string) => {
+    const nextState = {
+      status: "processing" as const,
+      rfqErrorMessage: null,
+      classificationReason: null,
+      isRFQ: null,
+    }
+
+    setEmails((current) =>
+      current.map((email) => (email._id === id ? { ...email, ...nextState } : email))
+    )
+    setDetail((current) =>
+      current?._id === id ? { ...current, ...nextState } : current
+    )
+  }
+
+  const handleReprocessEmail = async (id: string) => {
+    setReprocessingId(id)
+    try {
+      const res = await fetch(`${API_BASE}/${id}/reprocess`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`)
+      }
+
+      markEmailProcessing(id)
+      toast.success("RFQ reprocessing started")
+      await Promise.all([fetchList(page), fetchDetail(id)])
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reprocess RFQ")
+    } finally {
+      setReprocessingId(null)
+    }
+  }
+
   // Keyboard navigation
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -626,6 +666,9 @@ export function EmailsPage() {
     const { name } = parseSender(from)
     return name.charAt(0).toUpperCase()
   }
+  const canReprocessDetail = Boolean(
+    detail && (detail.status === "failed" || detail.rfqErrorMessage)
+  )
 
   return (
     <AppLayout>
@@ -787,6 +830,22 @@ export function EmailsPage() {
                       {detail.subject || "(no subject)"}
                     </h1>
                     <div className="flex shrink-0 items-center gap-1">
+                      {canReprocessDetail && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground/50 hover:text-foreground"
+                              onClick={() => handleReprocessEmail(detail._id)}
+                              disabled={reprocessingId === detail._id}
+                            >
+                              <RefreshCwIcon className={`size-4 ${reprocessingId === detail._id ? "animate-spin" : ""}`} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Reprocess RFQ</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
