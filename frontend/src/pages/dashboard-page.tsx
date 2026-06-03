@@ -239,6 +239,7 @@ interface ManualProduct {
   description: string
   code: string
   price: string
+  discountPercent: string
   hsnCode: string
   gstRate: string
   calibrationCharges: string
@@ -268,7 +269,7 @@ interface RegrettedLine {
 
 type ManualProductField = keyof Pick<
   ManualProduct,
-  "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "hsnCode" | "gstRate" | "calibrationCharges" | "deliveryTimeline"
+  "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "discountPercent" | "hsnCode" | "gstRate" | "calibrationCharges" | "deliveryTimeline"
 >
 
 function parseSender(from: string): { name: string; email: string } {
@@ -317,6 +318,7 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
     description: product.productdescription ?? "",
     code: product.productcode ?? "",
     price: numberInputValue(product.unitprice),
+    discountPercent: "",
     hsnCode: product.hsncode ?? "",
     gstRate: numberInputValue(product.gstrate),
     calibrationCharges: numberInputValue(product.calibrationcharges),
@@ -515,6 +517,7 @@ export function DashboardPage() {
     description: "",
     code: "",
     price: "",
+    discountPercent: "",
     hsnCode: "",
     gstRate: "",
     calibrationCharges: "",
@@ -713,6 +716,7 @@ export function DashboardPage() {
           description: product.description ?? "",
           code: product.code ?? "",
           price: product.price != null ? String(product.price) : "",
+          discountPercent: product.discountPercent ? String(product.discountPercent) : "",
           hsnCode: product.hsnCode ?? "",
           gstRate: product.gstRate != null ? String(product.gstRate) : "",
           calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
@@ -993,6 +997,7 @@ export function DashboardPage() {
       description: "",
       code: "",
       price: "",
+      discountPercent: "",
       hsnCode: "",
       gstRate: "",
       calibrationCharges: "",
@@ -1017,6 +1022,7 @@ export function DashboardPage() {
       description: "",
       code: "",
       price: "",
+      discountPercent: "",
       hsnCode: "",
       gstRate: "",
       calibrationCharges: "",
@@ -1121,6 +1127,7 @@ export function DashboardPage() {
       description: product.description.trim() || null,
       code: product.code.trim() || null,
       price: product.price.trim() === "" ? null : Number(product.price),
+      discountPercent: product.discountPercent.trim() === "" ? null : Number(product.discountPercent),
       hsnCode: product.hsnCode.trim() || null,
       gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
       calibrationCharges: product.calibrationCharges?.trim() ? Number(product.calibrationCharges) : null,
@@ -1237,6 +1244,149 @@ export function DashboardPage() {
     manualProducts.length > 0 ||
     Object.keys(regrettedLines).length > 0
   const hasPaymentTerms = paymentTermsText.trim().length > 0
+
+  const renderManualProductEditor = (product: ManualProduct) => {
+    const effectivePrice = product.price.trim() !== "" ? Number(product.price) : null
+    const discountPct = product.discountPercent.trim() !== "" ? Number(product.discountPercent) : 0
+    const finalPrice = effectivePrice != null && Number.isFinite(effectivePrice)
+      ? effectivePrice * (1 - discountPct / 100)
+      : null
+
+    return (
+      <div key={product.id} className="rounded-lg border bg-card p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {product.source === "catalog" ? "Catalog" : "Custom"}
+            </span>
+            <p className="truncate text-sm font-semibold">
+              {product.description || product.queryName || "Added product"}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 text-muted-foreground"
+            onClick={() => handleRemoveManualProduct(product.id)}
+          >
+            <Trash2Icon className="size-3.5" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Line</label>
+            <Input
+              value={product.queryName}
+              onChange={(event) => handleManualProductChange(product.id, "queryName", event.target.value)}
+              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Desc</label>
+            <Input
+              value={product.description}
+              onChange={(event) => handleManualProductChange(product.id, "description", event.target.value)}
+              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Brand</label>
+            <Input
+              value={product.brand}
+              onChange={(event) => handleManualProductChange(product.id, "brand", event.target.value)}
+              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+            />
+            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">Code</label>
+            <Input
+              value={product.code}
+              onChange={(event) => handleManualProductChange(product.id, "code", event.target.value)}
+              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">HSN</label>
+            <Input
+              value={product.hsnCode}
+              onChange={(event) => handleManualProductChange(product.id, "hsnCode", event.target.value)}
+              className="h-7 w-28 border-muted-foreground/15 bg-transparent text-xs"
+            />
+            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">GST%</label>
+            <Input
+              value={product.gstRate}
+              onChange={(event) => handleManualProductChange(product.id, "gstRate", event.target.value)}
+              type="number"
+              min="0"
+              className="h-7 w-16 border-muted-foreground/15 bg-transparent text-xs"
+            />
+            <label className="ml-1 w-7 shrink-0 text-[10px] text-muted-foreground">Qty</label>
+            <Input
+              value={product.quantity}
+              onChange={(event) => handleManualProductChange(product.id, "quantity", event.target.value)}
+              type="number"
+              min="1"
+              className="h-7 w-16 border-muted-foreground/15 bg-transparent text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Price</label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">₹</span>
+              <Input
+                value={product.price}
+                onChange={(event) => handleManualProductChange(product.id, "price", event.target.value)}
+                type="number"
+                min="0"
+                className="h-7 w-28 border-muted-foreground/15 bg-transparent pl-5 text-xs"
+              />
+            </div>
+            <label className="ml-1 w-9 shrink-0 text-[10px] text-muted-foreground">Disc.</label>
+            <div className="relative">
+              <Input
+                value={product.discountPercent}
+                onChange={(event) => handleManualProductChange(product.id, "discountPercent", event.target.value)}
+                placeholder="0"
+                type="number"
+                min="0"
+                max="100"
+                className="h-7 w-16 border-muted-foreground/15 bg-transparent pr-5 text-xs"
+              />
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
+            </div>
+            {finalPrice != null && discountPct > 0 && (
+              <span className="ml-auto text-xs font-semibold tabular-nums text-emerald-500 dark:text-emerald-400">
+                ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                  ({discountPct}% off)
+                </span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <label className="w-11 shrink-0 text-[10px] text-muted-foreground">Calib.</label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">₹</span>
+              <Input
+                value={product.calibrationCharges}
+                onChange={(event) => handleManualProductChange(product.id, "calibrationCharges", event.target.value)}
+                placeholder="0"
+                type="number"
+                min="0"
+                className="h-7 w-28 border-muted-foreground/15 bg-transparent pl-5 text-xs"
+              />
+            </div>
+            <label className="ml-1 w-14 shrink-0 text-[10px] text-muted-foreground">Delivery</label>
+            <Input
+              value={product.deliveryTimeline}
+              onChange={(event) => handleManualProductChange(product.id, "deliveryTimeline", event.target.value)}
+              placeholder="e.g. 2 weeks"
+              className="h-7 border-muted-foreground/15 bg-transparent text-xs"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const renderManualProductPopover = (searchResultIndex: number, query: RFQSearchResult["query"]) => (
     <Popover
@@ -1381,6 +1531,15 @@ export function DashboardPage() {
             placeholder="Price"
             type="number"
             min="0"
+            className="h-8 text-xs"
+          />
+          <Input
+            value={customProduct.discountPercent}
+            onChange={(event) => handleCustomProductChange("discountPercent", event.target.value)}
+            placeholder="Discount %"
+            type="number"
+            min="0"
+            max="100"
             className="h-8 text-xs"
           />
           <Input
@@ -2135,37 +2294,7 @@ export function DashboardPage() {
                               </p>
                               {manualProducts
                                 .filter((product) => product.searchResultIndex === i)
-                                .map((product) => (
-                                  <div key={product.id} className="flex items-start justify-between gap-3 rounded-lg border bg-card p-3">
-                                    <div className="min-w-0">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                          {product.source === "catalog" ? "Catalog" : "Custom"}
-                                        </span>
-                                        <p className="truncate text-sm font-semibold">
-                                          {product.description || product.queryName}
-                                        </p>
-                                      </div>
-                                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                                        <span>Qty: {product.quantity}</span>
-                                        {product.brand && <span>· {product.brand}</span>}
-                                        {product.code && <span>· <span className="font-mono">{product.code}</span></span>}
-                                        {product.price && <span>· ₹{Number(product.price).toLocaleString("en-IN")}</span>}
-                                        {product.calibrationCharges && <span>· Calibration: ₹{Number(product.calibrationCharges).toLocaleString("en-IN")}</span>}
-                                        {product.deliveryTimeline && <span>· Delivery: {product.deliveryTimeline}</span>}
-                                      </div>
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-7 shrink-0 text-muted-foreground"
-                                      onClick={() => handleRemoveManualProduct(product.id)}
-                                    >
-                                      <Trash2Icon className="size-3.5" />
-                                    </Button>
-                                  </div>
-                                ))}
+                                .map((product) => renderManualProductEditor(product))}
                             </div>
                           )}
                         </div>
@@ -2189,109 +2318,9 @@ export function DashboardPage() {
                           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                             Unassigned products
                           </p>
-                          {manualProducts.filter((product) => product.searchResultIndex == null).map((product) => (
-                            <div key={product.id} className="rounded-lg border p-3">
-                              <div className="mb-2 flex items-center justify-between gap-3">
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                  {product.source === "catalog" ? "Catalog" : "Custom"}
-                                </span>
-                                {product.searchResultIndex != null && (
-                                  <span className="mr-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                                    For item {product.searchResultIndex + 1}
-                                  </span>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-7 text-muted-foreground"
-                                  onClick={() => handleRemoveManualProduct(product.id)}
-                                >
-                                  <Trash2Icon className="size-3.5" />
-                                </Button>
-                              </div>
-                              <div className="grid gap-2 md:grid-cols-2">
-                                <Input
-                                  value={product.queryName}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "queryName", event.target.value)
-                                  }
-                                  placeholder="Line name"
-                                />
-                                <Input
-                                  value={product.quantity}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "quantity", event.target.value)
-                                  }
-                                  placeholder="Quantity"
-                                  type="number"
-                                  min="1"
-                                />
-                                <Input
-                                  value={product.description}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "description", event.target.value)
-                                  }
-                                  placeholder="Description"
-                                />
-                                <Input
-                                  value={product.code}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "code", event.target.value)
-                                  }
-                                  placeholder="Code"
-                                />
-                                <Input
-                                  value={product.brand}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "brand", event.target.value)
-                                  }
-                                  placeholder="Brand"
-                                />
-                                <Input
-                                  value={product.price}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "price", event.target.value)
-                                  }
-                                  placeholder="Price"
-                                  type="number"
-                                  min="0"
-                                />
-                                <Input
-                                  value={product.hsnCode}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "hsnCode", event.target.value)
-                                  }
-                                  placeholder="HSN"
-                                />
-                                <Input
-                                  value={product.gstRate}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "gstRate", event.target.value)
-                                  }
-                                  placeholder="GST %"
-                                  type="number"
-                                  min="0"
-                                />
-                                <Input
-                                  value={product.calibrationCharges ?? ""}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "calibrationCharges", event.target.value)
-                                  }
-                                  placeholder="Calibration charges"
-                                  type="number"
-                                  min="0"
-                                />
-                                <Input
-                                  value={product.deliveryTimeline ?? ""}
-                                  onChange={(event) =>
-                                    handleManualProductChange(product.id, "deliveryTimeline", event.target.value)
-                                  }
-                                  placeholder="Delivery timeline"
-                                />
-                              </div>
-                            </div>
-                          ))}
+                          {manualProducts
+                            .filter((product) => product.searchResultIndex == null)
+                            .map((product) => renderManualProductEditor(product))}
                         </div>
                       )}
                     </div>

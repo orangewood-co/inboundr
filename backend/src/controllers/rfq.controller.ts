@@ -77,6 +77,7 @@ type ManualQuoteProduct = {
   description?: unknown;
   code?: unknown;
   price?: unknown;
+  discountPercent?: unknown;
   hsnCode?: unknown;
   gstRate?: unknown;
   calibrationCharges?: unknown;
@@ -175,6 +176,9 @@ function resolveManualProduct(product: ManualQuoteProduct) {
   const quantity = positiveNumber(product.quantity);
   const description = nullableString(product.description);
   const code = nullableString(product.code);
+  const discountPercent = nullableNumber(product.discountPercent) ?? 0;
+  const basePrice = nullableNumber(product.price);
+  const finalPrice = basePrice != null ? basePrice * (1 - discountPercent / 100) : null;
 
   if (!queryName || !quantity || (!description && !code)) {
     throw new Error("Manual products require a name, quantity, and description or code");
@@ -188,10 +192,10 @@ function resolveManualProduct(product: ManualQuoteProduct) {
     brand: nullableString(product.brand),
     description,
     code,
-    price: nullableNumber(product.price),
+    price: finalPrice,
     hsnCode: nullableString(product.hsnCode),
     gstRate: nullableNumber(product.gstRate),
-    discountPercent: 0,
+    discountPercent,
     calibrationCharges: nullableNumber(product.calibrationCharges),
     deliveryTimeline: nullableString(product.deliveryTimeline),
     lineStatus: "quoted" as const,
