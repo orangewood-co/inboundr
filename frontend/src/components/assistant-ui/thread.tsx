@@ -70,7 +70,7 @@ export function Thread({ className }: { className?: string }) {
             <div className="mx-auto w-full max-w-3xl px-4 pb-3">
               <Composer />
               <p className="pt-2 text-center text-xs text-[#5d5d5d] dark:text-[#a8a8a8]">
-                ChatGPT can make mistakes. Check important info.
+                Inboundr can make mistakes. Check important info.
               </p>
             </div>
           </ThreadPrimitive.ViewportFooter>
