@@ -2,6 +2,7 @@ import { useMemo, type PropsWithChildren } from "react"
 import {
   RuntimeAdapterProvider,
   useAui,
+  type MessageFormatAdapter,
   type RemoteThreadListAdapter,
   type ThreadHistoryAdapter,
 } from "@assistant-ui/react"
@@ -24,6 +25,18 @@ type ChatMessageRow = {
   parent_id: string | null
   format: string
   content: Record<string, unknown>
+}
+
+function decodeStoredMessage<TMessage, TStorageFormat extends Record<string, unknown>>(
+  format: MessageFormatAdapter<TMessage, TStorageFormat>,
+  row: ChatMessageRow
+) {
+  return format.decode({
+    id: row.id,
+    parent_id: row.parent_id,
+    format: row.format,
+    content: row.content as TStorageFormat,
+  })
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -60,11 +73,11 @@ export const chatThreadListAdapter: RemoteThreadListAdapter = {
       })),
     }
   },
-  async initialize() {
+  async initialize(threadId) {
     const { id } = (await apiFetch("/threads", { method: "POST" }).then((response) => response.json())) as {
       id: string
     }
-    return { remoteId: id }
+    return { remoteId: id, externalId: threadId }
   },
   async rename(remoteId, title) {
     await apiFetch(`/threads/${remoteId}`, {
@@ -126,14 +139,7 @@ export const chatThreadListAdapter: RemoteThreadListAdapter = {
             )) as ChatMessageRow[]
 
             return {
-              messages: rows.map((row) =>
-                format.decode({
-                  id: row.id,
-                  parent_id: row.parent_id,
-                  format: row.format,
-                  content: row.content,
-                })
-              ),
+              messages: rows.map((row) => decodeStoredMessage(format, row)),
             }
           },
           async append(item) {
