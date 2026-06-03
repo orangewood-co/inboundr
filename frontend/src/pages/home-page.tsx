@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useSession } from "@/lib/auth-client"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 interface StatsOverview {
   totals: {

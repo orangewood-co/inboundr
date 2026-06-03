@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 const INVOICE_API = `${API_ORIGIN}/api/v1/invoices`
 const CUSTOMER_API = `${API_ORIGIN}/api/v1/customers`
 const PRODUCT_API = `${API_ORIGIN}/api/v1/products`

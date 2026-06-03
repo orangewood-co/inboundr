@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 export type FeatureKey = "rfq" | "invoices" | "links" | "forms" | "drive"
 export type EmployeeAccessModule =

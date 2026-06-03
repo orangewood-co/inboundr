@@ -39,7 +39,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 const createPaymentTermId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

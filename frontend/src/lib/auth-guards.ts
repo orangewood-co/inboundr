@@ -2,9 +2,8 @@ import { redirect } from "@tanstack/react-router"
 
 import { getSession } from "@/lib/auth-client"
 import { getAdminMe } from "@/lib/admin"
+import { API_ORIGIN } from "@/lib/env"
 import type { EmployeeAccessModule, FeatureKey } from "@/lib/entitlements"
-
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 
 export async function requireSession() {
   const { data: session } = await getSession()

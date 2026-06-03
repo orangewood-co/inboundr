@@ -39,7 +39,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 

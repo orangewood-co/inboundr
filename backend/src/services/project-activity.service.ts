@@ -8,9 +8,8 @@ import {
   type ProjectActivityType,
 } from "../models/project.model";
 import { ProjectUpdateEmail } from "../emails/project-update";
+import { frontendOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
-
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 const EMAIL_ACTIVITY_TYPES = new Set<ProjectActivityType>([
   "project_updated",
   "project_archived",

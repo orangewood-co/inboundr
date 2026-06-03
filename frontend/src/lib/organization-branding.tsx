@@ -1,8 +1,8 @@
 import * as React from "react"
 
 import { useTheme } from "@/components/theme-provider"
+import { API_ORIGIN } from "@/lib/env"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const DEFAULT_PRIMARY_COLOR = "#f5b400"
 const BRANDING_CHANGED_EVENT = "btsa:organization-branding-changed"
 const BRANDING_CACHE_KEY = "organization-branding"

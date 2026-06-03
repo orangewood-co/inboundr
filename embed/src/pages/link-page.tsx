@@ -4,8 +4,7 @@ import { AlertCircleIcon, LoaderIcon, LockIcon, MapPinIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 type LinkCheck = {
   code: string

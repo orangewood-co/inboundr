@@ -58,7 +58,7 @@ import { CopyableText } from "@/components/copy-button"
 import { openDownload } from "@/lib/downloads"
 import { getAvatarColor } from "@/lib/utils"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
 const PRODUCTS_API_BASE = `${API_ORIGIN}/api/v1/products`
 

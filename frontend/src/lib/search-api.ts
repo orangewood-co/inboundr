@@ -1,4 +1,5 @@
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
+
 const SEARCH_API = `${API_ORIGIN}/api/v1/search`
 
 export type SearchResultType = "customer" | "product" | "rfq"

@@ -1,6 +1,6 @@
+import { API_ORIGIN } from "@/lib/env"
 import { resolveUploadedImageUrl } from "./uploaded-image"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 export const MAX_LETTERHEADS = 10
 export const MAX_LETTERHEAD_SIZE = 2 * 1024 * 1024
 export const ACCEPTED_LETTERHEAD_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"]

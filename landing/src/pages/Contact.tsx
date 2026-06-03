@@ -2,8 +2,7 @@ import { motion } from "motion/react"
 import { type FormEvent, useState } from "react"
 import { FadeIn } from "@/components/FadeIn"
 import { PageHeader } from "@/components/PageHeader"
-
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 export default function Contact() {
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")

@@ -36,7 +36,7 @@ import type { EmployeeAccessModule } from "@/lib/entitlements"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { cn } from "@/lib/utils"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
 const PAGE_LIMIT = 24
 

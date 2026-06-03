@@ -1,4 +1,5 @@
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
+
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"]
 const CROPPED_EMPLOYEE_IMAGE_TYPE = "image/webp"

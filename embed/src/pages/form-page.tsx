@@ -8,8 +8,7 @@ import { SuccessStep } from "@/components/form/success-step"
 import { ProgressBar } from "@/components/form/progress-bar"
 import { NavigationControls } from "@/components/form/navigation-controls"
 import type { PublicField, PublicForm, UploadedFile } from "@/components/form/types"
-
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 type Step = "welcome" | "question" | "success"
 

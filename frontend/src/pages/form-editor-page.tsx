@@ -62,9 +62,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { cn } from "@/lib/utils"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
 const CUSTOMERS_API_BASE = `${API_ORIGIN}/api/v1/customers`
 const UPLOADS_API_BASE = `${API_ORIGIN}/api/v1/uploads`
@@ -198,10 +198,8 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
 }
 
-const EMBED_ORIGIN = import.meta.env.VITE_EMBED_URL ?? "http://localhost:5175"
-
 function publicUrl(slug: string) {
-  return `${EMBED_ORIGIN}/form/${slug}`
+  return `${getEmbedOrigin()}/form/${slug}`
 }
 
 function embedSnippet(slug: string) {

@@ -1,4 +1,4 @@
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
+import { API_ORIGIN } from "@/lib/env"
 
 export type DriveNodeType = "file" | "folder"
 export type DriveNodeStatus = "active" | "trashed" | "deleted"

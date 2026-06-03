@@ -1,6 +1,6 @@
+import { API_ORIGIN } from "@/lib/env"
 import { resolveUploadedImageUrl } from "./uploaded-image"
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const OUTPUT_SIZE = 512
 const OUTPUT_TYPE = "image/webp"
 const OUTPUT_QUALITY = 0.9
