@@ -68,6 +68,7 @@ export interface ProductSearchMatch {
   price: number | null;
   hsnCode: string | null;
   gstRate: number | null;
+  calibrationCharges: number | null;
   link: string | null;
   isTopSeller: boolean;
   score: number;
@@ -94,6 +95,7 @@ interface RankedProductRow {
   unitprice: string | number | null;
   hsncode: string | null;
   gstrate: string | number | null;
+  calibrationcharges: string | number | null;
   productlink: string | null;
   is_top_seller: boolean | null;
   rank_score: string | number;
@@ -123,6 +125,7 @@ const TEXT_SEARCH_SQL = `
       p.unitprice,
       p.hsncode,
       p.gstrate,
+      p.calibrationcharges,
       p.productlink,
       COALESCE(p.is_top_seller, false) AS is_top_seller,
       CASE
@@ -287,6 +290,7 @@ const TEXT_SEARCH_SQL = `
     unitprice,
     hsncode,
     gstrate,
+    calibrationcharges,
     productlink,
     is_top_seller,
     rank_score,
@@ -349,6 +353,7 @@ export class TextProductSearcher {
         price: toNumberOrNull(row.unitprice),
         hsnCode: row.hsncode,
         gstRate: toNumberOrNull(row.gstrate),
+        calibrationCharges: toNumberOrNull(row.calibrationcharges),
         link: row.productlink,
         isTopSeller: Boolean(row.is_top_seller),
         score: Number(row.rank_score),

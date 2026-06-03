@@ -21,6 +21,7 @@ export interface IRFQSearchMatch {
   price: number | null;
   hsnCode: string | null;
   gstRate: number | null;
+  calibrationCharges: number | null;
   link: string | null;
   isTopSeller: boolean;
   score: number;
@@ -89,6 +90,7 @@ const rfqSearchMatchSchema = new Schema<IRFQSearchMatch>(
     price: { type: Number, default: null },
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },
+    calibrationCharges: { type: Number, default: null },
     link: { type: String, default: null },
     isTopSeller: { type: Boolean, default: false },
     score: { type: Number, required: true },

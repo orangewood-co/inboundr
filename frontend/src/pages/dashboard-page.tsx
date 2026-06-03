@@ -125,6 +125,7 @@ interface RFQSearchMatch {
   price: number | null
   hsnCode: string | null
   gstRate: number | null
+  calibrationCharges?: number | null
   isTopSeller?: boolean
   score: number
   matchReasons: string[]
@@ -220,6 +221,7 @@ interface CatalogProduct {
   unitprice: number | string | null
   hsncode: string | null
   gstrate: number | string | null
+  calibrationcharges: number | string | null
   is_top_seller?: boolean | null
 }
 
@@ -317,7 +319,7 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
     price: numberInputValue(product.unitprice),
     hsnCode: product.hsncode ?? "",
     gstRate: numberInputValue(product.gstrate),
-    calibrationCharges: "",
+    calibrationCharges: numberInputValue(product.calibrationcharges),
     deliveryTimeline: "",
     source: "catalog",
   }
@@ -2093,7 +2095,7 @@ export function DashboardPage() {
                                             <div className="relative">
                                               <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">₹</span>
                                               <Input
-                                                value={override?.calibrationCharges ?? ""}
+                                                value={override?.calibrationCharges ?? (m.calibrationCharges != null ? String(m.calibrationCharges) : "")}
                                                 onChange={(e) => handleOverrideChange(overrideKey, "calibrationCharges", e.target.value)}
                                                 placeholder="0"
                                                 type="number"

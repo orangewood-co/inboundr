@@ -246,7 +246,7 @@ function resolveSelectedProducts(
       hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
       gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
       discountPercent: overrideDiscount,
-      calibrationCharges: nullableNumber(overrides.calibrationCharges),
+      calibrationCharges: nullableNumber(overrides.calibrationCharges) ?? match.calibrationCharges,
       deliveryTimeline: nullableString(overrides.deliveryTimeline),
       lineStatus: "quoted" as const,
       regretReason: null,
