@@ -2,6 +2,7 @@ import { google, type gmail_v1 } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
 import { GmailAccount, type IGmailAccount } from "../models/gmail-account.model";
 import { decryptSecret, encryptSecret } from "../lib/crypto";
+import { gmailOAuthRedirectUri } from "./origins.config";
 
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -11,15 +12,12 @@ export const GMAIL_SCOPES = [
 export function getGoogleOAuthClient(): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri =
-    process.env.GMAIL_OAUTH_REDIRECT_URI ||
-    `${process.env.API_ORIGIN ?? "http://localhost:3000"}/api/v1/gmail/callback`;
 
   if (!clientId || !clientSecret) {
     throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
   }
 
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  return new google.auth.OAuth2(clientId, clientSecret, gmailOAuthRedirectUri);
 }
 
 export function getGmailAuthUrl(state: string): string {

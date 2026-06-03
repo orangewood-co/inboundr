@@ -5,6 +5,7 @@ import { MongoClient } from "mongodb";
 import { createElement } from "react";
 import { ResetPasswordEmail } from "../emails/reset-password";
 import { VerifyEmail } from "../emails/verify-email";
+import { frontendOrigin } from "../config/origins.config";
 import { sendEmail } from "./email";
 
 const mongoUri = process.env.MONGODB_URI;
@@ -16,8 +17,6 @@ if (!mongoUri) {
 const mongoClient = new MongoClient(mongoUri);
 const databaseName = new URL(mongoUri).pathname.replace("/", "") || undefined;
 const db = mongoClient.db(databaseName);
-
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
 export const auth = betterAuth({
   database: mongodbAdapter(db, {

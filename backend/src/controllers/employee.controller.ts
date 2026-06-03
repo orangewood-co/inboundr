@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { createElement } from "react";
 import mongoose from "mongoose";
 import { OrganizationInvitationEmail } from "../emails/organization-invitation";
+import { frontendOrigin } from "../config/origins.config";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { Employee, type EmployeeStatus } from "../models/employee.model";
 import {
@@ -530,7 +531,6 @@ export async function inviteEmployee(req: Request, res: Response): Promise<void>
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     });
 
-    const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
     const inviteUrl = `${frontendOrigin}/invite/${encodeURIComponent(rawToken)}`;
     await sendEmail({
       to: email,

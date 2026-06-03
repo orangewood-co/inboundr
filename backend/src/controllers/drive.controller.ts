@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import type { Request, Response } from "express";
 import mongoose, { type Types } from "mongoose";
+import { frontendOrigin } from "../config/origins.config";
 import { DriveExportJob } from "../models/drive-export-job.model";
 import { DriveNode, type IDriveNode } from "../models/drive-node.model";
 import { DrivePermission, type DrivePermissionRole } from "../models/drive-permission.model";
@@ -60,8 +61,7 @@ function paramValue(req: Request, name: string): string {
 }
 
 function publicShareUrl(token: string): string {
-  const origin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
-  return `${origin}/drive/share/${encodeURIComponent(token)}`;
+  return `${frontendOrigin}/drive/share/${encodeURIComponent(token)}`;
 }
 
 function defaultPublicLinkExpiry(): Date {

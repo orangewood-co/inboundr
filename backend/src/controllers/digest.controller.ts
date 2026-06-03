@@ -6,6 +6,7 @@ import { Email } from "../models/email.model";
 import { OrganizationMember } from "../models/organization-member.model";
 import { RFQ } from "../models/rfq.model";
 import { DailyDigest } from "../emails/daily-digest";
+import { frontendOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 
@@ -318,8 +319,6 @@ export async function sendTestDigest(
     const dateLabel = from.toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
     });
-
-    const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
     await sendEmail({
       to: userEmail,

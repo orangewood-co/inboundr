@@ -17,12 +17,7 @@ import {
   recordLinkEvent,
   verifyPassword,
 } from "../services/short-link.service";
-
-const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
-
-function apiOrigin(): string {
-  return process.env.API_ORIGIN ?? process.env.PUBLIC_API_ORIGIN ?? process.env.BACKEND_ORIGIN ?? "http://localhost:3000";
-}
+import { apiOrigin, embedOrigin } from "../config/origins.config";
 
 function embedLinkUrl(code: string, sourceValue: unknown): string {
   const url = new URL(`/l/${encodeURIComponent(code)}`, embedOrigin);
@@ -32,7 +27,7 @@ function embedLinkUrl(code: string, sourceValue: unknown): string {
 }
 
 function trackedShortUrl(code: string, source: string): string {
-  const url = new URL(`/l/${encodeURIComponent(code)}`, apiOrigin());
+  const url = new URL(`/l/${encodeURIComponent(code)}`, apiOrigin);
   url.searchParams.set("source", source);
   return url.toString();
 }

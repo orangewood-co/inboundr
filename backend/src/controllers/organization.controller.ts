@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { createElement } from "react";
 import mongoose from "mongoose";
 import { OrganizationInvitationEmail } from "../emails/organization-invitation";
+import { frontendOrigin } from "../config/origins.config";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { OrganizationInvitation } from "../models/organization-invitation.model";
 import {
@@ -429,7 +430,6 @@ export async function inviteOrganizationMember(
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     });
 
-    const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
     const inviteUrl = `${frontendOrigin}/invite/${encodeURIComponent(rawToken)}`;
     await sendEmail({
       to: email,

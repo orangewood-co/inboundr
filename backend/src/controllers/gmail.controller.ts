@@ -6,8 +6,7 @@ import { createGmailOAuthState, verifyGmailOAuthState } from "../lib/oauth-state
 import { startWatch } from "../services/gmail-watcher.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { decryptSecret } from "../lib/crypto";
-
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+import { frontendOrigin } from "../config/origins.config";
 
 export async function connectGmail(req: Request, res: Response): Promise<void> {
   try {

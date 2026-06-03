@@ -27,6 +27,7 @@ import contactRouter from "./routes/contact.route";
 import employeeRouter from "./routes/employee.route";
 import projectRouter from "./routes/project.route";
 import { connectDB, disconnectDB } from "./config/database.config";
+import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
 import { auth } from "./lib/auth";
 import {
   startWatchesForConnectedAccounts,
@@ -36,9 +37,6 @@ import {
 import { startDigestCron } from "./jobs/digest-cron";
 
 const app: Application = express();
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
-const embedOrigin = process.env.EMBED_ORIGIN ?? "http://localhost:5175";
-const landingOrigin = process.env.LANDING_ORIGIN ?? "http://localhost:5174";
 
 app.use(
   cors({

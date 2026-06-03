@@ -6,9 +6,8 @@ import { RFQ } from "../models/rfq.model";
 import { Organization } from "../models/organization.model";
 import { OrganizationMember } from "../models/organization-member.model";
 import { DailyDigest, type DailyDigestProps } from "../emails/daily-digest";
+import { frontendOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
-
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
 
 interface BetterAuthUser {
   _id: string;
