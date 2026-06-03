@@ -11,6 +11,7 @@ export const EMPLOYEE_ACCESS_MODULES = [
   "drive",
   "stats",
   "employees",
+  "projects",
 ] as const;
 
 export type EmployeeAccessModule = (typeof EMPLOYEE_ACCESS_MODULES)[number];

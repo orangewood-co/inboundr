@@ -15,6 +15,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,7 +32,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
-import { uploadEmployeeImage } from "@/lib/uploaded-image"
+import { uploadCroppedEmployeeImage } from "@/lib/uploaded-image"
 import { cn } from "@/lib/utils"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
@@ -53,6 +54,14 @@ type EmployeeFormState = {
   phone: string
   title: string
   profileImageUrl: string
+  linkedinUrl: string
+  instagramUrl: string
+  addressLine1: string
+  addressLine2: string
+  addressCity: string
+  addressState: string
+  addressPostalCode: string
+  addressCountry: string
   employeeCode: string
   startDate: string
   status: EmployeeStatus
@@ -75,12 +84,23 @@ const statusLabels: Record<EmployeeStatus, string> = {
   archived: "Archived",
 }
 
+const employeePhotoTypes = ["image/png", "image/jpeg", "image/webp"]
+const maxEmployeePhotoSourceSize = 10 * 1024 * 1024
+
 const emptyForm: EmployeeFormState = {
   fullName: "",
   email: "",
   phone: "",
   title: "",
   profileImageUrl: "",
+  linkedinUrl: "",
+  instagramUrl: "",
+  addressLine1: "",
+  addressLine2: "",
+  addressCity: "",
+  addressState: "",
+  addressPostalCode: "",
+  addressCountry: "",
   employeeCode: "",
   startDate: "",
   status: "active",
@@ -142,6 +162,15 @@ function initials(name: string) {
     .join("") || "IN"
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ""))
+    reader.onerror = () => reject(new Error("Failed to read image"))
+    reader.readAsDataURL(file)
+  })
+}
+
 function toggleModule(
   modules: EmployeeAccessModule[],
   module: EmployeeAccessModule,
@@ -162,6 +191,18 @@ function formToPayload(form: EmployeeFormState) {
     startDate: form.startDate || null,
     status: form.status,
     teamId: form.teamId === "none" ? null : form.teamId,
+    socials: {
+      linkedinUrl: form.linkedinUrl.trim() || null,
+      instagramUrl: form.instagramUrl.trim() || null,
+    },
+    address: {
+      line1: form.addressLine1.trim(),
+      line2: form.addressLine2.trim(),
+      city: form.addressCity.trim(),
+      state: form.addressState.trim(),
+      postalCode: form.addressPostalCode.trim(),
+      country: form.addressCountry.trim(),
+    },
     emergencyContact: {
       name: "",
       relationship: "",
@@ -185,6 +226,8 @@ export default function EmployeeNewPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
 
   const currentIndex = steps.findIndex((item) => item.id === step)
   const validationErrors = useMemo(() => {
@@ -215,17 +258,30 @@ export default function EmployeeNewPage() {
   }
 
   async function uploadProfilePicture(file: File) {
+    if (!employeePhotoTypes.includes(file.type)) {
+      toast.error("Please choose a PNG, JPG, or WebP image.")
+      return
+    }
+    if (file.size > maxEmployeePhotoSourceSize) {
+      toast.error("Profile picture source must be 10MB or smaller.")
+      return
+    }
+
     setUploadingPhoto(true)
     try {
-      const uploaded = await uploadEmployeeImage(file)
-      updateForm("profileImageUrl", uploaded.key)
-      setPhotoPreviewUrl(uploaded.displayUrl)
-      toast.success("Profile picture uploaded")
+      setCropImageSrc(await readFileAsDataUrl(file))
+      setCropOpen(true)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to upload profile picture")
+      toast.error(err instanceof Error ? err.message : "Failed to load profile picture")
     } finally {
       setUploadingPhoto(false)
     }
+  }
+
+  function handleProfilePictureUploaded(result: AvatarCropResult) {
+    updateForm("profileImageUrl", result.key)
+    setPhotoPreviewUrl(result.displayUrl)
+    toast.success("Profile picture uploaded")
   }
 
   function removeProfilePicture() {
@@ -332,6 +388,28 @@ export default function EmployeeNewPage() {
                     <Label>Title</Label>
                     <Input value={form.title} onChange={(event) => updateForm("title", event.target.value)} />
                   </div>
+                  <div className="grid gap-2">
+                    <Label>LinkedIn</Label>
+                    <Input placeholder="linkedin.com/in/name" value={form.linkedinUrl} onChange={(event) => updateForm("linkedinUrl", event.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Instagram</Label>
+                    <Input placeholder="instagram.com/name" value={form.instagramUrl} onChange={(event) => updateForm("instagramUrl", event.target.value)} />
+                  </div>
+                  <div className="grid gap-4 sm:col-span-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">Address</h3>
+                      <p className="text-sm text-muted-foreground">Optional employee address for HR reference.</p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Input placeholder="Address line 1" value={form.addressLine1} onChange={(event) => updateForm("addressLine1", event.target.value)} />
+                      <Input placeholder="Address line 2" value={form.addressLine2} onChange={(event) => updateForm("addressLine2", event.target.value)} />
+                      <Input placeholder="City" value={form.addressCity} onChange={(event) => updateForm("addressCity", event.target.value)} />
+                      <Input placeholder="State" value={form.addressState} onChange={(event) => updateForm("addressState", event.target.value)} />
+                      <Input placeholder="Postal code" value={form.addressPostalCode} onChange={(event) => updateForm("addressPostalCode", event.target.value)} />
+                      <Input placeholder="Country" value={form.addressCountry} onChange={(event) => updateForm("addressCountry", event.target.value)} />
+                    </div>
+                  </div>
                   <div className="grid gap-2 sm:col-span-2">
                     <Label>Profile picture</Label>
                     <div className="flex flex-col gap-4 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
@@ -342,7 +420,7 @@ export default function EmployeeNewPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-2">
-                        <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB.</p>
+                        <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Crop to a square before upload.</p>
                         <div className="flex flex-wrap gap-2">
                           <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
                             <label className="cursor-pointer">
@@ -350,7 +428,7 @@ export default function EmployeeNewPage() {
                               Upload photo
                               <input
                                 type="file"
-                                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                accept="image/png,image/jpeg,image/webp"
                                 className="sr-only"
                                 disabled={uploadingPhoto}
                                 onChange={(event) => {
@@ -485,6 +563,12 @@ export default function EmployeeNewPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{form.title || "No title"}</p>
                     <p className="mt-3 text-sm">{form.email || "No email"}</p>
                     <p className="text-sm text-muted-foreground">{form.phone || "No phone"}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      LinkedIn: <span className="text-foreground">{form.linkedinUrl || "-"}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Instagram: <span className="text-foreground">{form.instagramUrl || "-"}</span>
+                    </p>
                   </div>
                   <div className="rounded-2xl border p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Employment</p>
@@ -494,6 +578,15 @@ export default function EmployeeNewPage() {
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Status</dt><dd>{statusLabels[form.status]}</dd></div>
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Team</dt><dd>{selectedTeam?.name ?? "No team"}</dd></div>
                     </dl>
+                  </div>
+                  <div className="rounded-2xl border p-4 md:col-span-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</p>
+                    <div className="mt-3 grid gap-1 text-sm text-muted-foreground">
+                      <span>{form.addressLine1 || "-"}</span>
+                      {form.addressLine2 ? <span>{form.addressLine2}</span> : null}
+                      <span>{[form.addressCity, form.addressState, form.addressPostalCode].filter(Boolean).join(", ") || "-"}</span>
+                      <span>{form.addressCountry || "-"}</span>
+                    </div>
                   </div>
                   <div className="rounded-2xl border p-4 md:col-span-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Access</p>
@@ -526,6 +619,18 @@ export default function EmployeeNewPage() {
           </div>
         </div>
       </main>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        title="Crop employee photo"
+        description="Drag to reposition and zoom to frame this employee photo."
+        saveLabel="Save employee photo"
+        upload={uploadCroppedEmployeeImage}
+        onOpenChange={setCropOpen}
+        onUploaded={handleProfilePictureUploaded}
+        onError={(message) => toast.error(message)}
+      />
     </AppLayout>
   )
 }

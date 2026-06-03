@@ -10,6 +10,7 @@ export interface IEmployeeDocumentSnapshot {
   employeeCode: string | null;
   teamName: string | null;
   startDate: Date | null;
+  profileImageUrl: string | null;
 }
 
 export interface IEmployeeDocument extends Document {
@@ -34,6 +35,7 @@ const employeeDocumentSnapshotSchema = new Schema<IEmployeeDocumentSnapshot>(
     employeeCode: { type: String, default: null },
     teamName: { type: String, default: null },
     startDate: { type: Date, default: null },
+    profileImageUrl: { type: String, default: null },
   },
   { _id: false }
 );
@@ -71,6 +73,10 @@ const employeeDocumentSchema = new Schema<IEmployeeDocument>(
 );
 
 employeeDocumentSchema.index({ organizationId: 1, employeeId: 1, createdAt: -1 });
+employeeDocumentSchema.index(
+  { organizationId: 1, employeeId: 1, type: 1 },
+  { unique: true }
+);
 
 export const EmployeeDocument = mongoose.model<IEmployeeDocument>(
   "EmployeeDocument",

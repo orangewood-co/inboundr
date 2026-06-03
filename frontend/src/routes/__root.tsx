@@ -27,6 +27,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/links/$id": "Link Details",
   "/login": "Login",
   "/products": "Products",
+  "/projects": "Projects",
+  "/projects/new": "New Project",
   "/register": "Register",
   "/reset-password": "Reset Password",
   "/settings": "Settings",
@@ -68,6 +70,16 @@ function RootRouteComponent() {
 
     if (pathname.startsWith("/employees/") && pathname !== "/employees/new") {
       document.title = `Employee Details - ${APP_TITLE}`
+      return
+    }
+
+    if (pathname.includes("/tasks/")) {
+      document.title = `Task Details - ${APP_TITLE}`
+      return
+    }
+
+    if (pathname.startsWith("/projects/") && pathname !== "/projects/new") {
+      document.title = `Project Details - ${APP_TITLE}`
       return
     }
 

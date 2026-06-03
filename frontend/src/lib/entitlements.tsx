@@ -14,6 +14,7 @@ export type EmployeeAccessModule =
   | "drive"
   | "stats"
   | "employees"
+  | "projects"
 
 interface EntitlementState {
   effectiveFeatures: FeatureKey[]

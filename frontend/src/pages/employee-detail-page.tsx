@@ -7,9 +7,10 @@ import {
   BadgeCheckIcon,
   BriefcaseBusinessIcon,
   CameraIcon,
-  FileBadgeIcon,
-  FileTextIcon,
+  DownloadIcon,
+  ExternalLinkIcon,
   IdCardIcon,
+  MapPinIcon,
   LinkIcon,
   MailIcon,
   PhoneIcon,
@@ -24,6 +25,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -49,7 +51,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import type { EmployeeAccessModule } from "@/lib/entitlements"
-import { resolveUploadedImageUrl, uploadEmployeeImage } from "@/lib/uploaded-image"
+import { resolveUploadedImageUrl, uploadCroppedEmployeeImage } from "@/lib/uploaded-image"
 
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
@@ -78,6 +80,18 @@ interface Employee {
   profileImageUrl: string | null
   status: EmployeeStatus
   startDate: string | null
+  socials: {
+    linkedinUrl: string | null
+    instagramUrl: string | null
+  }
+  address: {
+    line1: string
+    line2: string
+    city: string
+    state: string
+    postalCode: string
+    country: string
+  }
   emergencyContact: {
     name: string
     relationship: string
@@ -120,6 +134,14 @@ type EmployeeFormState = {
   teamId: string
   status: EmployeeStatus
   startDate: string
+  linkedinUrl: string
+  instagramUrl: string
+  addressLine1: string
+  addressLine2: string
+  addressCity: string
+  addressState: string
+  addressPostalCode: string
+  addressCountry: string
   emergencyName: string
   emergencyRelationship: string
   emergencyPhone: string
@@ -135,10 +157,9 @@ const statusLabels: Record<EmployeeStatus, string> = {
   archived: "Archived",
 }
 
-const documentLabels = {
-  id_card: "Employee ID card",
-  proof_of_employment: "Proof of employment",
-} as const
+const documentTypes = ["id_card", "proof_of_employment"] as const
+const employeePhotoTypes = ["image/png", "image/jpeg", "image/webp"]
+const maxEmployeePhotoSourceSize = 10 * 1024 * 1024
 
 function initials(name: string) {
   return name
@@ -156,6 +177,28 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
 }
 
+function documentTimestamp(document: EmployeeDocument) {
+  const issuedAt = new Date(document.issuedAt ?? "").getTime()
+  if (Number.isFinite(issuedAt)) return issuedAt
+  const createdAt = new Date(document.createdAt ?? "").getTime()
+  return Number.isFinite(createdAt) ? createdAt : 0
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ""))
+    reader.onerror = () => reject(new Error("Failed to read image"))
+    reader.readAsDataURL(file)
+  })
+}
+
+function employeeAddressLines(address?: Employee["address"] | null) {
+  if (!address) return []
+  const cityLine = [address.city, address.state, address.postalCode].filter(Boolean).join(", ")
+  return [address.line1, address.line2, cityLine, address.country].filter(Boolean)
+}
+
 function employeeToForm(employee: Employee): EmployeeFormState {
   return {
     fullName: employee.fullName ?? "",
@@ -167,6 +210,14 @@ function employeeToForm(employee: Employee): EmployeeFormState {
     teamId: employee.teamId ?? "none",
     status: employee.status ?? "active",
     startDate: employee.startDate ? employee.startDate.slice(0, 10) : "",
+    linkedinUrl: employee.socials?.linkedinUrl ?? "",
+    instagramUrl: employee.socials?.instagramUrl ?? "",
+    addressLine1: employee.address?.line1 ?? "",
+    addressLine2: employee.address?.line2 ?? "",
+    addressCity: employee.address?.city ?? "",
+    addressState: employee.address?.state ?? "",
+    addressPostalCode: employee.address?.postalCode ?? "",
+    addressCountry: employee.address?.country ?? "",
     emergencyName: employee.emergencyContact?.name ?? "",
     emergencyRelationship: employee.emergencyContact?.relationship ?? "",
     emergencyPhone: employee.emergencyContact?.phone ?? "",
@@ -187,6 +238,18 @@ function formToPayload(form: EmployeeFormState) {
     teamId: form.teamId === "none" ? null : form.teamId,
     status: form.status,
     startDate: form.startDate || null,
+    socials: {
+      linkedinUrl: form.linkedinUrl.trim() || null,
+      instagramUrl: form.instagramUrl.trim() || null,
+    },
+    address: {
+      line1: form.addressLine1.trim(),
+      line2: form.addressLine2.trim(),
+      city: form.addressCity.trim(),
+      state: form.addressState.trim(),
+      postalCode: form.addressPostalCode.trim(),
+      country: form.addressCountry.trim(),
+    },
     emergencyContact: {
       name: form.emergencyName.trim(),
       relationship: form.emergencyRelationship.trim(),
@@ -280,6 +343,17 @@ function EmployeeForm({
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <Label>LinkedIn</Label>
+          <Input placeholder="linkedin.com/in/name" value={form.linkedinUrl} onChange={(event) => onChange("linkedinUrl", event.target.value)} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Instagram</Label>
+          <Input placeholder="instagram.com/name" value={form.instagramUrl} onChange={(event) => onChange("instagramUrl", event.target.value)} />
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="grid gap-2">
           <Label>Employee ID</Label>
@@ -321,6 +395,21 @@ function EmployeeForm({
         </div>
       </div>
 
+      <div className="grid gap-4">
+        <div>
+          <h3 className="text-sm font-semibold">Address</h3>
+          <p className="text-sm text-muted-foreground">Optional employee address for HR reference.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input placeholder="Address line 1" value={form.addressLine1} onChange={(event) => onChange("addressLine1", event.target.value)} />
+          <Input placeholder="Address line 2" value={form.addressLine2} onChange={(event) => onChange("addressLine2", event.target.value)} />
+          <Input placeholder="City" value={form.addressCity} onChange={(event) => onChange("addressCity", event.target.value)} />
+          <Input placeholder="State" value={form.addressState} onChange={(event) => onChange("addressState", event.target.value)} />
+          <Input placeholder="Postal code" value={form.addressPostalCode} onChange={(event) => onChange("addressPostalCode", event.target.value)} />
+          <Input placeholder="Country" value={form.addressCountry} onChange={(event) => onChange("addressCountry", event.target.value)} />
+        </div>
+      </div>
+
       <div className="grid gap-2">
         <Label>Profile picture</Label>
         <div className="flex flex-col gap-4 rounded-2xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
@@ -331,7 +420,7 @@ function EmployeeForm({
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 space-y-2">
-            <p className="text-xs text-muted-foreground">PNG, JPG, WebP or SVG. Max 2MB.</p>
+            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Crop to a square before upload.</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" disabled={uploadingPhoto} asChild>
                 <label className="cursor-pointer">
@@ -339,7 +428,7 @@ function EmployeeForm({
                   Upload photo
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    accept="image/png,image/jpeg,image/webp"
                     className="sr-only"
                     disabled={uploadingPhoto}
                     onChange={(event) => {
@@ -454,6 +543,9 @@ export default function EmployeeDetailPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("")
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
+  const [cropOpen, setCropOpen] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState<EmployeeDocument | null>(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [form, setForm] = useState<EmployeeFormState | null>(null)
 
@@ -462,6 +554,20 @@ export default function EmployeeDetailPage() {
     return [...new Set([...(employee.team?.defaultModules ?? []), ...(employee.platformAccess.allowedModules ?? [])])]
       .filter((module) => !(employee.platformAccess.restrictedModules ?? []).includes(module))
   }, [employee])
+
+  const currentDocuments = useMemo(() => {
+    const byType = new Map<EmployeeDocument["type"], EmployeeDocument>()
+    for (const document of documents) {
+      const current = byType.get(document.type)
+      if (!current || documentTimestamp(document) > documentTimestamp(current)) {
+        byType.set(document.type, document)
+      }
+    }
+    return documentTypes.flatMap((type) => {
+      const document = byType.get(type)
+      return document ? [document] : []
+    })
+  }, [documents])
 
   const fetchEmployee = useCallback(async () => {
     setLoading(true)
@@ -529,17 +635,35 @@ export default function EmployeeDetailPage() {
   }
 
   async function uploadProfilePicture(file: File) {
+    if (!employeePhotoTypes.includes(file.type)) {
+      toast.error("Please choose a PNG, JPG, or WebP image.")
+      return
+    }
+    if (file.size > maxEmployeePhotoSourceSize) {
+      toast.error("Profile picture source must be 10MB or smaller.")
+      return
+    }
+
     setUploadingPhoto(true)
     try {
-      const uploaded = await uploadEmployeeImage(file)
-      updateForm("profileImageUrl", uploaded.key)
-      setPhotoPreviewUrl(uploaded.displayUrl)
-      toast.success("Profile picture uploaded")
+      setCropImageSrc(await readFileAsDataUrl(file))
+      setCropOpen(true)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to upload profile picture")
+      toast.error(err instanceof Error ? err.message : "Failed to load profile picture")
     } finally {
       setUploadingPhoto(false)
     }
+  }
+
+  function handleProfilePictureUploaded(result: AvatarCropResult) {
+    updateForm("profileImageUrl", result.key)
+    setPhotoPreviewUrl(result.displayUrl)
+    toast.success("Profile picture uploaded")
+  }
+
+  function documentPdfUrl(document: EmployeeDocument, inline = false) {
+    const url = `${API_BASE}/${employee?._id}/documents/${document._id}/pdf`
+    return inline ? `${url}?inline=1` : url
   }
 
   function removeProfilePicture() {
@@ -581,6 +705,7 @@ export default function EmployeeDetailPage() {
       setEmployee(data)
       setForm(employeeToForm(data))
       setEditing(false)
+      await fetchDocuments()
       toast.success("Employee updated")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save employee")
@@ -646,28 +771,6 @@ export default function EmployeeDetailPage() {
       toast.success("Employee linked")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to link member")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function generateDocument(type: EmployeeDocument["type"]) {
-    if (!employee) return
-    setSaving(true)
-    try {
-      const response = await fetch(`${API_BASE}/${employee._id}/documents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ type }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error ?? "Failed to generate document")
-      toast.success(`${documentLabels[type]} generated`)
-      await fetchDocuments()
-      window.open(`${API_BASE}/${employee._id}/documents/${data.document._id}/pdf`, "_blank")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to generate document")
     } finally {
       setSaving(false)
     }
@@ -791,6 +894,42 @@ export default function EmployeeDetailPage() {
                         <InfoCard icon={<PhoneIcon className="size-5" />} label="Phone" value={employee.phone || "Not set"} />
                       </div>
                       <Separator className="my-5" />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <InfoCard
+                          icon={<LinkIcon className="size-5" />}
+                          label="Socials"
+                          value={
+                            employee.socials?.linkedinUrl || employee.socials?.instagramUrl ? (
+                              <span className="flex flex-col gap-1">
+                                {employee.socials?.linkedinUrl ? (
+                                  <a className="inline-flex items-center gap-1 text-primary" href={employee.socials.linkedinUrl} target="_blank" rel="noreferrer">
+                                    LinkedIn <ExternalLinkIcon className="size-3" />
+                                  </a>
+                                ) : null}
+                                {employee.socials?.instagramUrl ? (
+                                  <a className="inline-flex items-center gap-1 text-primary" href={employee.socials.instagramUrl} target="_blank" rel="noreferrer">
+                                    Instagram <ExternalLinkIcon className="size-3" />
+                                  </a>
+                                ) : null}
+                              </span>
+                            ) : "Not set"
+                          }
+                        />
+                        <InfoCard
+                          icon={<MapPinIcon className="size-5" />}
+                          label="Address"
+                          value={
+                            employeeAddressLines(employee.address).length > 0 ? (
+                              <span className="flex flex-col gap-1">
+                                {employeeAddressLines(employee.address).map((line) => (
+                                  <span key={line}>{line}</span>
+                                ))}
+                              </span>
+                            ) : "Not set"
+                          }
+                        />
+                      </div>
+                      <Separator className="my-5" />
                       <div className="grid gap-3 rounded-2xl border bg-muted/20 p-4">
                         <div className="flex items-center gap-2 font-semibold">
                           <UserRoundIcon className="size-4" />
@@ -859,33 +998,23 @@ export default function EmployeeDetailPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h2 className="font-semibold">Documents</h2>
-                          <p className="mt-1 text-sm text-muted-foreground">Generate branded employee documents.</p>
+                          <p className="mt-1 text-sm text-muted-foreground">Open current branded employee documents.</p>
                         </div>
                         <IdCardIcon className="size-5 text-muted-foreground" />
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <Button variant="outline" onClick={() => generateDocument("id_card")} disabled={saving}>
-                          <FileBadgeIcon />
-                          ID card
-                        </Button>
-                        <Button variant="outline" onClick={() => generateDocument("proof_of_employment")} disabled={saving}>
-                          <FileTextIcon />
-                          Proof
-                        </Button>
-                      </div>
                       <div className="mt-4 grid gap-2">
-                        {documents.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No generated documents yet.</p>
-                        ) : documents.map((document) => (
+                        {currentDocuments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No documents available yet.</p>
+                        ) : currentDocuments.map((document) => (
                           <button
                             key={document._id}
                             type="button"
-                            onClick={() => window.open(`${API_BASE}/${employee._id}/documents/${document._id}/pdf`, "_blank")}
+                            onClick={() => setPreviewDocument(document)}
                             className="flex items-center justify-between rounded-2xl border px-3 py-2 text-left"
                           >
                             <span>
                               <span className="block text-sm font-medium">{document.title}</span>
-                              <span className="block text-xs text-muted-foreground">{formatDate(document.createdAt)}</span>
+                              <span className="block text-xs text-muted-foreground">Issued {formatDate(document.issuedAt)}</span>
                             </span>
                             <LinkIcon className="size-4 text-muted-foreground" />
                           </button>
@@ -917,6 +1046,51 @@ export default function EmployeeDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(previewDocument)} onOpenChange={(open) => !open && setPreviewDocument(null)}>
+        <DialogContent className="max-h-[90svh] max-w-5xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>{previewDocument?.title ?? "Employee document"}</DialogTitle>
+            <DialogDescription>
+              Preview the current document or download a PDF copy.
+            </DialogDescription>
+          </DialogHeader>
+          {previewDocument ? (
+            <div className="overflow-hidden rounded-xl border bg-background">
+              <iframe
+                title={previewDocument.title}
+                src={documentPdfUrl(previewDocument, true)}
+                className="h-[70svh] w-full border-0 bg-white"
+              />
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDocument(null)}>
+              Close
+            </Button>
+            {previewDocument ? (
+              <Button asChild>
+                <a href={documentPdfUrl(previewDocument)} target="_blank" rel="noreferrer">
+                  <DownloadIcon className="size-4" />
+                  Download
+                </a>
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AvatarCropDialog
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        title="Crop employee photo"
+        description="Drag to reposition and zoom to frame this employee photo."
+        saveLabel="Save employee photo"
+        upload={uploadCroppedEmployeeImage}
+        onOpenChange={setCropOpen}
+        onUploaded={handleProfilePictureUploaded}
+        onError={(message) => toast.error(message)}
+      />
     </AppLayout>
   )
 }

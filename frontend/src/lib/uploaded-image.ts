@@ -1,6 +1,7 @@
 const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:3000"
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"]
+const CROPPED_EMPLOYEE_IMAGE_TYPE = "image/webp"
 
 interface PresignedUpload {
   uploadUrl: string
@@ -57,6 +58,43 @@ export async function uploadEmployeeImage(file: File): Promise<{ key: string; di
     method: "PUT",
     headers: presign.headers,
     body: file,
+  })
+  if (!uploadResponse.ok) {
+    throw new Error("Failed to upload image")
+  }
+
+  return {
+    key: presign.file.key,
+    displayUrl: await resolveUploadedImageUrl(presign.file.key),
+  }
+}
+
+export async function uploadCroppedEmployeeImage(blob: Blob): Promise<{ key: string; displayUrl: string }> {
+  if (blob.size > MAX_IMAGE_SIZE) {
+    throw new Error("Profile picture must be 2MB or smaller.")
+  }
+
+  const presignResponse = await fetch(`${API_ORIGIN}/api/v1/uploads/presign`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scope: "employee",
+      fileName: "employee-photo.webp",
+      contentType: CROPPED_EMPLOYEE_IMAGE_TYPE,
+      size: blob.size,
+    }),
+  })
+  const presign: PresignedUpload | { error?: string } = await presignResponse.json()
+
+  if (!presignResponse.ok || !("uploadUrl" in presign)) {
+    throw new Error((presign as { error?: string }).error || "Failed to prepare image upload")
+  }
+
+  const uploadResponse = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: presign.headers,
+    body: blob,
   })
   if (!uploadResponse.ok) {
     throw new Error("Failed to upload image")
