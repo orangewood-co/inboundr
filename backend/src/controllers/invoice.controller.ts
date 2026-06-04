@@ -531,12 +531,64 @@ export const downloadInvoicePdf = async (req: Request, res: Response): Promise<v
   }
 };
 
+const AGING_EXCLUDED_STATUSES = new Set<InvoiceStatus>(["draft", "cancelled", "written_off", "paid"]);
+const DAY_MS = 86_400_000;
+
+type AgingBucket = "current" | "d1_15" | "d16_30" | "d31_45" | "d45plus";
+
+function agingBucketOf(dueDate: Date | null | undefined, now: Date): AgingBucket {
+  if (!dueDate) return "current";
+  const days = Math.floor((now.getTime() - new Date(dueDate).getTime()) / DAY_MS);
+  if (days <= 0) return "current";
+  if (days <= 15) return "d1_15";
+  if (days <= 30) return "d16_30";
+  if (days <= 45) return "d31_45";
+  return "d45plus";
+}
+
 export const getInvoiceStats = async (req: Request, res: Response): Promise<void> => {
   try {
     const orgReq = req as OrganizationRequest;
     const invoices = await Invoice.find({ organizationId: orgReq.organization._id }).lean();
     const now = new Date();
     const outstanding = invoices.filter((invoice) => invoice.totals.balanceDue > 0);
+
+    const aging = { current: 0, d1_15: 0, d16_30: 0, d31_45: 0, d45plus: 0 };
+    for (const invoice of outstanding) {
+      if (AGING_EXCLUDED_STATUSES.has(invoice.status)) continue;
+      const bucket = agingBucketOf(invoice.dueDate, now);
+      aging[bucket] = roundMoney(aging[bucket] + invoice.totals.balanceDue);
+    }
+
+    const monthly: Array<{ key: string; label: string; invoiced: number; collected: number }> = [];
+    const monthIndex = new Map<string, number>();
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const label = new Intl.DateTimeFormat("en-IN", { month: "short", year: "2-digit" }).format(date);
+      monthIndex.set(key, monthly.length);
+      monthly.push({ key, label, invoiced: 0, collected: 0 });
+    }
+
+    const monthKey = (value: Date | string) => {
+      const date = new Date(value);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    };
+
+    for (const invoice of invoices) {
+      if (invoice.status !== "cancelled" && invoice.status !== "written_off") {
+        const index = monthIndex.get(monthKey(invoice.issueDate));
+        if (index !== undefined) {
+          monthly[index].invoiced = roundMoney(monthly[index].invoiced + invoice.totals.grandTotal);
+        }
+      }
+      for (const payment of invoice.payments) {
+        const index = monthIndex.get(monthKey(payment.date));
+        if (index !== undefined) {
+          monthly[index].collected = roundMoney(monthly[index].collected + Math.max(0, payment.amount));
+        }
+      }
+    }
 
     res.json({
       totalInvoiced: roundMoney(invoices.reduce((sum, invoice) => sum + invoice.totals.grandTotal, 0)),
@@ -559,6 +611,8 @@ export const getInvoiceStats = async (req: Request, res: Response): Promise<void
           0
         )
       ),
+      aging,
+      monthly,
       countByStatus: invoices.reduce<Record<string, number>>((acc, invoice) => {
         acc[invoice.status] = (acc[invoice.status] ?? 0) + 1;
         return acc;

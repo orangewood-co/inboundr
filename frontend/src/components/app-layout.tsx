@@ -16,7 +16,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }
     >
       <AppSidebar collapsible="icon" variant="inset" />
-      <SidebarInset className="overflow-hidden">
+      <SidebarInset className="min-h-0 overflow-hidden">
         {children}
       </SidebarInset>
     </SidebarProvider>

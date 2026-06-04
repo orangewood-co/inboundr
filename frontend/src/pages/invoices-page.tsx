@@ -10,10 +10,20 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -61,11 +71,28 @@ interface InvoicesResponse {
   totalPages: number
 }
 
+interface InvoiceAging {
+  current: number
+  d1_15: number
+  d16_30: number
+  d31_45: number
+  d45plus: number
+}
+
+interface InvoiceMonthlyPoint {
+  key: string
+  label: string
+  invoiced: number
+  collected: number
+}
+
 interface InvoiceStats {
   totalInvoiced: number
   outstanding: number
   overdue: number
   paidThisMonth: number
+  aging: InvoiceAging
+  monthly: InvoiceMonthlyPoint[]
   countByStatus: Record<string, number>
 }
 
@@ -232,7 +259,7 @@ export default function InvoicesPage() {
     <TooltipProvider>
       <AppLayout>
         <SiteHeader />
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Top bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
             <div className="flex items-center gap-2">
@@ -259,11 +286,10 @@ export default function InvoicesPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid gap-3 border-b p-4 md:grid-cols-4">
-            <StatCard label="Total invoiced" value={formatMoney(stats?.totalInvoiced ?? 0)} />
-            <StatCard label="Outstanding" value={formatMoney(stats?.outstanding ?? 0)} />
-            <StatCard label="Overdue" value={formatMoney(stats?.overdue ?? 0)} tone="danger" />
-            <StatCard label="Paid this month" value={formatMoney(stats?.paidThisMonth ?? 0)} />
+          <div className="grid gap-4 border-b p-4 lg:grid-cols-3">
+            <ReceivablesCard stats={stats} className="lg:col-span-2" />
+            <StatusSummaryCard stats={stats} />
+            <MonthlyChartCard stats={stats} className="lg:col-span-3" />
           </div>
 
           {/* Filters + bulk actions */}
@@ -349,7 +375,7 @@ export default function InvoicesPage() {
               </Button>
             </div>
           ) : (
-            <div className="flex-1 overflow-auto">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -402,7 +428,7 @@ export default function InvoicesPage() {
           )}
 
           {/* Pagination */}
-          <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
+          <div className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
               Page <span className="font-semibold text-foreground">{page}</span> of <span className="font-semibold text-foreground">{totalPages}</span>
             </p>
@@ -421,11 +447,162 @@ export default function InvoicesPage() {
   )
 }
 
-function StatCard({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
+const AGING_BUCKETS: Array<{ key: keyof InvoiceAging; label: string; bar: string; dot: string }> = [
+  { key: "current", label: "Current", bar: "bg-emerald-500", dot: "bg-emerald-500" },
+  { key: "d1_15", label: "1-15 Days", bar: "bg-amber-400", dot: "bg-amber-400" },
+  { key: "d16_30", label: "16-30 Days", bar: "bg-orange-500", dot: "bg-orange-500" },
+  { key: "d31_45", label: "31-45 Days", bar: "bg-rose-500", dot: "bg-rose-500" },
+  { key: "d45plus", label: "45+ Days", bar: "bg-red-700", dot: "bg-red-700" },
+]
+
+function ReceivablesCard({ stats, className }: { stats: InvoiceStats | null; className?: string }) {
+  const aging = stats?.aging
+  const total = stats?.outstanding ?? 0
+  const segmentsTotal = aging
+    ? aging.current + aging.d1_15 + aging.d16_30 + aging.d31_45 + aging.d45plus
+    : 0
+
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 text-xl font-semibold", tone === "danger" && "text-destructive")}>{value}</p>
+    <div className={cn("rounded-xl border bg-card p-5", className)}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Receivables</p>
+        {stats ? (
+          <p className="text-lg font-semibold tabular-nums">{formatMoney(total)}</p>
+        ) : (
+          <Skeleton className="h-5 w-28" />
+        )}
+      </div>
+
+      {stats ? (
+        <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+          {segmentsTotal > 0 && aging ? (
+            AGING_BUCKETS.map((bucket) => {
+              const value = aging[bucket.key]
+              if (value <= 0) return null
+              return (
+                <div
+                  key={bucket.key}
+                  className={bucket.bar}
+                  style={{ width: `${(value / segmentsTotal) * 100}%` }}
+                />
+              )
+            })
+          ) : null}
+        </div>
+      ) : (
+        <Skeleton className="mt-4 h-2.5 w-full rounded-full" />
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-5">
+        {AGING_BUCKETS.map((bucket) => (
+          <div key={bucket.key} className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className={cn("size-2 shrink-0 rounded-full", bucket.dot)} />
+              <span className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {bucket.label}
+              </span>
+            </div>
+            {stats && aging ? (
+              <p
+                className={cn(
+                  "mt-1 text-sm font-semibold tabular-nums",
+                  bucket.key !== "current" && aging[bucket.key] > 0 && "text-destructive"
+                )}
+              >
+                {formatMoney(aging[bucket.key])}
+              </p>
+            ) : (
+              <Skeleton className="mt-1 h-4 w-16" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const STATUS_SUMMARY: Array<{ key: InvoiceStatus; label: string }> = [
+  { key: "draft", label: "Draft" },
+  { key: "sent", label: "Sent" },
+  { key: "overdue", label: "Overdue" },
+  { key: "partially_paid", label: "Partially paid" },
+  { key: "paid", label: "Paid" },
+]
+
+function StatusSummaryCard({ stats, className }: { stats: InvoiceStats | null; className?: string }) {
+  return (
+    <div className={cn("rounded-xl border bg-card p-5", className)}>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">By Status</p>
+      <div className="mt-4 flex flex-col gap-2.5">
+        {STATUS_SUMMARY.map((item) => (
+          <div key={item.key} className="flex items-center justify-between gap-3">
+            <Badge variant={statusVariant(item.key)} className="capitalize">
+              {item.label}
+            </Badge>
+            {stats ? (
+              <span className="text-sm font-semibold tabular-nums">{stats.countByStatus[item.key] ?? 0}</span>
+            ) : (
+              <Skeleton className="h-4 w-6" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const chartConfig = {
+  invoiced: { label: "Invoiced", color: "var(--chart-1)" },
+  collected: { label: "Collected", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+function MonthlyChartCard({ stats, className }: { stats: InvoiceStats | null; className?: string }) {
+  const monthly = stats?.monthly ?? []
+  const totalInvoiced = monthly.reduce((sum, point) => sum + point.invoiced, 0)
+  const totalCollected = monthly.reduce((sum, point) => sum + point.collected, 0)
+
+  return (
+    <div className={cn("rounded-xl border bg-card p-5", className)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Invoiced vs Collected</p>
+        <div className="flex gap-6">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Invoiced</p>
+            {stats ? (
+              <p className="text-base font-semibold tabular-nums" style={{ color: "var(--chart-1)" }}>
+                {formatMoney(totalInvoiced)}
+              </p>
+            ) : (
+              <Skeleton className="mt-1 h-5 w-24" />
+            )}
+          </div>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Collected</p>
+            {stats ? (
+              <p className="text-base font-semibold tabular-nums" style={{ color: "var(--chart-2)" }}>
+                {formatMoney(totalCollected)}
+              </p>
+            ) : (
+              <Skeleton className="mt-1 h-5 w-24" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {stats ? (
+        <ChartContainer config={chartConfig} className="mt-4 h-56 w-full">
+          <BarChart data={monthly} barGap={4}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="invoiced" fill="var(--color-invoiced)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="collected" fill="var(--color-collected)" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      ) : (
+        <Skeleton className="mt-4 h-56 w-full" />
+      )}
     </div>
   )
 }
