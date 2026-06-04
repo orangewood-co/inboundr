@@ -5,7 +5,6 @@ import {
   duplicateInvoice,
   downloadInvoicePdf,
   getInvoice,
-  getInvoicePreview,
   getInvoiceStats,
   listInvoices,
   markInvoiceViewed,
@@ -34,7 +33,6 @@ router.post("/:id/payments", recordInvoicePayment);
 router.post("/:id/cancel", cancelInvoice);
 router.post("/:id/write-off", writeOffInvoice);
 router.post("/:id/duplicate", duplicateInvoice);
-router.get("/:id/preview", getInvoicePreview);
 router.get("/:id/pdf", downloadInvoicePdf);
 
 export default router;

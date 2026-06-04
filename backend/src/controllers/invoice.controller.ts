@@ -12,6 +12,7 @@ import { GmailAccount } from "../models/gmail-account.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { sendStandaloneEmail } from "../services/gmail-send.service";
 import { renderInvoicePdfBuffer, streamInvoicePdf } from "../services/invoice-pdf.service";
+import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 
 const ACTIVE_STATUSES = new Set<InvoiceStatus>(["sent", "viewed", "partially_paid", "overdue"]);
 const LOCKED_STATUSES = new Set<InvoiceStatus>(["cancelled", "written_off", "paid"]);
@@ -194,77 +195,6 @@ function normalizeTemplate(value: unknown): "professional" | "compact" | "modern
     : "professional";
 }
 
-function renderInvoiceHtml(invoice: any): string {
-  const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
-  const rows = invoice.lineItems
-    .map(
-      (item: IInvoiceLineItem) => `<tr>
-        <td>${item.description}</td>
-        <td>${item.hsnCode || "-"}</td>
-        <td>${item.quantity}</td>
-        <td>${money.format(item.unitPrice)}</td>
-        <td>${item.discountPercentage}%</td>
-        <td>${item.gstRate}%</td>
-        <td>${money.format(item.totalAmount)}</td>
-      </tr>`
-    )
-    .join("");
-
-  return `<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>${invoice.invoiceNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; color: #111827; margin: 40px; }
-        header { display: flex; justify-content: space-between; gap: 32px; border-bottom: 2px solid #111827; padding-bottom: 24px; }
-        h1 { margin: 0; font-size: 32px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 32px; }
-        th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 13px; }
-        th { background: #f9fafb; text-transform: uppercase; letter-spacing: .04em; }
-        .totals { margin-left: auto; margin-top: 24px; width: 320px; }
-        .totals div { display: flex; justify-content: space-between; padding: 6px 0; }
-        .grand { border-top: 2px solid #111827; font-weight: 700; font-size: 18px; }
-      </style>
-    </head>
-    <body>
-      <header>
-        <div>
-          <h1>Invoice</h1>
-          <p><strong>${invoice.invoiceNumber}</strong></p>
-          <p>Status: ${invoice.status}</p>
-        </div>
-        <div>
-          <h2>${invoice.organizationSnapshot.name}</h2>
-          <p>${invoice.organizationSnapshot.address || ""}</p>
-          <p>${invoice.organizationSnapshot.email || ""}</p>
-        </div>
-      </header>
-      <section>
-        <h3>Bill To</h3>
-        <p><strong>${invoice.customerSnapshot.company || invoice.customerSnapshot.name}</strong></p>
-        <p>${invoice.customerSnapshot.name}</p>
-        <p>${invoice.customerSnapshot.billingAddress || ""}</p>
-        <p>${invoice.customerSnapshot.email || ""}</p>
-      </section>
-      <table>
-        <thead><tr><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Disc.</th><th>GST</th><th>Total</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <section class="totals">
-        <div><span>Subtotal</span><span>${money.format(invoice.totals.subtotal)}</span></div>
-        <div><span>Discount</span><span>${money.format(invoice.totals.discountTotal)}</span></div>
-        <div><span>Taxable</span><span>${money.format(invoice.totals.taxableTotal)}</span></div>
-        <div><span>GST</span><span>${money.format(invoice.totals.taxTotal)}</span></div>
-        <div class="grand"><span>Total</span><span>${money.format(invoice.totals.grandTotal)}</span></div>
-        <div><span>Paid</span><span>${money.format(invoice.totals.paidTotal)}</span></div>
-        <div><span>Balance</span><span>${money.format(invoice.totals.balanceDue)}</span></div>
-      </section>
-      <section><h3>Notes</h3><p>${invoice.notes || ""}</p><h3>Terms</h3><p>${invoice.termsAndConditions || ""}</p></section>
-    </body>
-  </html>`;
-}
-
 function renderInvoiceEmail(invoice: any): string {
   const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
   return [
@@ -274,7 +204,7 @@ function renderInvoiceEmail(invoice: any): string {
     `Amount due: ${money.format(invoice.totals.balanceDue)}`,
     invoice.dueDate ? `Due date: ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(invoice.dueDate))}` : "",
     "",
-    "You can preview or download the invoice from the app.",
+    "The invoice PDF is attached to this email.",
     "",
     invoice.notes || "",
   ]
@@ -452,7 +382,8 @@ export const sendInvoice = async (req: Request, res: Response): Promise<void> =>
       }).sort({ updatedAt: -1 });
 
       if (account) {
-        const pdf = await renderInvoicePdfBuffer(invoice);
+        const branding = await resolveOrganizationPdfBranding(orgReq.organization);
+        const pdf = await renderInvoicePdfBuffer(invoice, branding);
         gmailMessageId = await sendStandaloneEmail({
           account,
           to: invoice.customerSnapshot.email,
@@ -583,31 +514,17 @@ export const duplicateInvoice = async (req: Request, res: Response): Promise<voi
   }
 };
 
-export const getInvoicePreview = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const invoice = await findInvoice(req, true);
-    if (!invoice) {
-      res.status(404).json({ error: "Invoice not found" });
-      return;
-    }
-
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderInvoiceHtml(invoice));
-  } catch (err) {
-    console.error("Error rendering invoice preview:", err);
-    res.status(500).json({ error: "Failed to render invoice preview" });
-  }
-};
-
 export const downloadInvoicePdf = async (req: Request, res: Response): Promise<void> => {
   try {
+    const orgReq = req as OrganizationRequest;
     const invoice = await findInvoice(req, true);
     if (!invoice) {
       res.status(404).json({ error: "Invoice not found" });
       return;
     }
 
-    streamInvoicePdf(invoice, res);
+    const branding = await resolveOrganizationPdfBranding(orgReq.organization);
+    streamInvoicePdf(invoice, branding, res, { inline: req.query.inline === "1" });
   } catch (err) {
     console.error("Error rendering invoice PDF:", err);
     res.status(500).json({ error: "Failed to render invoice PDF" });

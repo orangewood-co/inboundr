@@ -318,7 +318,7 @@ export default function InvoiceDetailPage() {
 
   function openPreview() {
     if (!invoice) return
-    window.open(`${INVOICE_API}/${invoice._id}/preview`, "_blank", "noopener,noreferrer")
+    window.open(`${INVOICE_API}/${invoice._id}/pdf?inline=1`, "_blank", "noopener,noreferrer")
   }
 
   function downloadPdf() {
@@ -328,9 +328,9 @@ export default function InvoiceDetailPage() {
 
   async function copyShareLink() {
     if (!invoice) return
-    const url = `${INVOICE_API}/${invoice._id}/preview`
+    const url = `${INVOICE_API}/${invoice._id}/pdf?inline=1`
     await navigator.clipboard.writeText(url)
-    toast.success("Invoice preview link copied")
+    toast.success("Invoice PDF link copied")
   }
 
   if (loading) {

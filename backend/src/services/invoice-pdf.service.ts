@@ -2,12 +2,18 @@ import type { Response } from "express";
 import type { IInvoice, IInvoiceLineItem } from "../models/invoice.model";
 import {
   createBrandedPdfDocument,
+  drawPdfBrandHeader,
   drawPdfFooter,
+  drawPdfKeyValueGrid,
+  drawPdfSectionTitle,
   ensurePdfRoom,
   formatPdfDate as date,
+  normalizePdfColor,
   PDF_COLORS as COLORS,
   PDF_PAGE as PAGE,
   safePdfFilename,
+  streamPdfDocument,
+  type PdfOrganizationBranding,
 } from "./pdf-branding.service";
 
 type PdfInvoice = Pick<
@@ -38,75 +44,98 @@ function statusLabel(status: string): string {
   return status.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function fitText(doc: PDFKit.PDFDocument, value: string, x: number, y: number, options: PDFKit.Mixins.TextOptions) {
-  doc.text(value || "-", x, y, { ellipsis: true, ...options });
+function mergeBranding(invoice: PdfInvoice, branding: PdfOrganizationBranding): PdfOrganizationBranding {
+  const org = invoice.organizationSnapshot;
+  return {
+    name: branding.name ?? org.name,
+    email: branding.email ?? org.email,
+    phoneNumber: branding.phoneNumber ?? org.phoneNumber,
+    address: branding.address ?? org.address,
+    website: branding.website ?? org.website,
+    primaryColor: branding.primaryColor ?? org.primaryColor,
+    logoBuffer: branding.logoBuffer,
+    letterheadBuffer: branding.letterheadBuffer,
+  };
 }
 
-function drawHeader(doc: PDFKit.PDFDocument, invoice: PdfInvoice): number {
-  const org = invoice.organizationSnapshot;
+function fitText(doc: PDFKit.PDFDocument, value: string | number, x: number, y: number, options: PDFKit.Mixins.TextOptions) {
+  doc.text(String(value || "-"), x, y, { ellipsis: true, ...options });
+}
 
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(28)
-    .fillColor(COLORS.text)
-    .text("Invoice", PAGE.margin, PAGE.margin);
-
-  doc
-    .font("Helvetica-Bold")
-    .fontSize(12)
-    .text(org.name || "Organization", PAGE.width - PAGE.margin - 220, PAGE.margin, {
-      width: 220,
-      align: "right",
-    });
-
-  doc
-    .font("Helvetica")
-    .fontSize(9)
-    .fillColor(COLORS.muted)
-    .text([org.address, org.email, org.phoneNumber, org.website].filter(Boolean).join("\n"), PAGE.width - PAGE.margin - 220, PAGE.margin + 18, {
-      width: 220,
-      align: "right",
-      lineGap: 2,
-    });
-
-  const metaY = PAGE.margin + 72;
-  doc
-    .roundedRect(PAGE.margin, metaY, PAGE.width - PAGE.margin * 2, 76, 8)
-    .fillAndStroke(COLORS.soft, COLORS.border);
-
-  const fields: Array<[string, string]> = [
-    ["Invoice #", invoice.invoiceNumber],
-    ["Status", statusLabel(invoice.status)],
-    ["Issue Date", date(invoice.issueDate)],
-    ["Due Date", date(invoice.dueDate)],
-    ["Payment Terms", invoice.paymentTerms || "-"],
-    ["PO / Reference", invoice.poNumber || "-"],
+function drawSummary(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number, primary: string): number {
+  const y = ensurePdfRoom(doc, startY, 102);
+  const cardGap = 10;
+  const cardWidth = (PAGE.width - PAGE.margin * 2 - cardGap * 2) / 3;
+  const cards = [
+    {
+      label: "Balance Due",
+      value: money(invoice.totals.balanceDue),
+      sublabel: invoice.dueDate ? `Due ${date(invoice.dueDate)}` : "No due date",
+      highlight: true,
+    },
+    {
+      label: "Invoice",
+      value: invoice.invoiceNumber,
+      sublabel: statusLabel(invoice.status),
+    },
+    {
+      label: "Issued",
+      value: date(invoice.issueDate),
+      sublabel: invoice.paymentTerms || "Payment terms not set",
+    },
   ];
-  const columnWidth = (PAGE.width - PAGE.margin * 2 - 32) / 3;
-  fields.forEach(([label, value], index) => {
-    const row = Math.floor(index / 3);
-    const col = index % 3;
-    const x = PAGE.margin + 16 + col * columnWidth;
-    const y = metaY + 14 + row * 34;
-    doc.font("Helvetica").fontSize(8).fillColor(COLORS.muted).text(label, x, y);
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text(value, x, y + 12, {
-      width: columnWidth - 10,
-      ellipsis: true,
-    });
+
+  cards.forEach((card, index) => {
+    const x = PAGE.margin + index * (cardWidth + cardGap);
+    doc
+      .roundedRect(x, y, cardWidth, 78, 10)
+      .fillAndStroke(card.highlight ? primary : COLORS.soft, card.highlight ? primary : COLORS.border);
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor(card.highlight ? COLORS.white : COLORS.muted)
+      .text(card.label.toUpperCase(), x + 14, y + 14, { width: cardWidth - 28 });
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(card.highlight ? 16 : 12)
+      .fillColor(card.highlight ? COLORS.white : COLORS.text)
+      .text(card.value, x + 14, y + 31, { width: cardWidth - 28, height: 18, ellipsis: true });
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor(card.highlight ? COLORS.white : COLORS.muted)
+      .text(card.sublabel, x + 14, y + 54, { width: cardWidth - 28, height: 12, ellipsis: true });
   });
 
-  return metaY + 104;
+  return y + 98;
+}
+
+function drawInvoiceMeta(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): number {
+  return drawPdfKeyValueGrid(
+    doc,
+    startY,
+    [
+      ["Invoice #", invoice.invoiceNumber],
+      ["Status", statusLabel(invoice.status)],
+      ["Issue Date", date(invoice.issueDate)],
+      ["Due Date", date(invoice.dueDate)],
+      ["Payment Terms", invoice.paymentTerms || "-"],
+      ["PO / Reference", invoice.poNumber || "-"],
+    ],
+    3
+  );
 }
 
 function drawPartyBlocks(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): number {
+  const y = ensurePdfRoom(doc, startY, 128);
   const blockWidth = (PAGE.width - PAGE.margin * 2 - 16) / 2;
   const customer = invoice.customerSnapshot;
   const blocks = [
     {
       title: "Bill To",
+      name: customer.company || customer.name || "-",
       lines: [
-        customer.company || customer.name,
-        customer.name,
+        customer.company && customer.name && customer.company !== customer.name ? customer.name : null,
         customer.billingAddress,
         customer.email,
         customer.contactNumber,
@@ -114,91 +143,115 @@ function drawPartyBlocks(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: n
     },
     {
       title: "Ship To",
-      lines: [customer.company || customer.name, customer.shippingAddress || customer.billingAddress],
+      name: customer.company || customer.name || "-",
+      lines: [customer.shippingAddress || customer.billingAddress],
     },
   ];
 
   blocks.forEach((block, index) => {
     const x = PAGE.margin + index * (blockWidth + 16);
-    doc.roundedRect(x, startY, blockWidth, 104, 8).stroke(COLORS.border);
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(COLORS.muted).text(block.title, x + 12, startY + 12);
+    doc.roundedRect(x, y, blockWidth, 112, 10).fillAndStroke("#ffffff", COLORS.border);
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(COLORS.muted).text(block.title.toUpperCase(), x + 14, y + 14, {
+      width: blockWidth - 28,
+    });
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(COLORS.text).text(block.name, x + 14, y + 32, {
+      width: blockWidth - 28,
+      height: 16,
+      ellipsis: true,
+    });
     doc
       .font("Helvetica")
-      .fontSize(10)
-      .fillColor(COLORS.text)
-      .text(block.lines.filter(Boolean).join("\n") || "-", x + 12, startY + 30, {
-        width: blockWidth - 24,
+      .fontSize(9)
+      .fillColor(COLORS.muted)
+      .text(block.lines.filter(Boolean).join("\n") || "-", x + 14, y + 54, {
+        width: blockWidth - 28,
+        height: 46,
         lineGap: 2,
+        ellipsis: true,
       });
   });
 
-  return startY + 128;
+  return y + 132;
 }
 
-function drawTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+function drawTableHeader(doc: PDFKit.PDFDocument, y: number, primary: string): number {
   const columns = [
-    ["Item", 48, 150],
-    ["HSN/SAC", 198, 52],
-    ["Qty", 250, 34],
-    ["Rate", 284, 58],
-    ["Disc", 342, 42],
-    ["GST", 384, 40],
-    ["Taxable", 424, 58],
-    ["Total", 482, 65],
+    ["Item", PAGE.margin + 12, 158, "left"],
+    ["HSN", PAGE.margin + 178, 42, "left"],
+    ["Qty", PAGE.margin + 224, 28, "right"],
+    ["Rate", PAGE.margin + 258, 54, "right"],
+    ["Disc", PAGE.margin + 318, 34, "right"],
+    ["GST", PAGE.margin + 358, 34, "right"],
+    ["Total", PAGE.margin + 398, 88, "right"],
   ] as const;
 
-  doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, 24).fill(COLORS.primary);
-  columns.forEach(([label, x, width]) => {
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(7.5)
-      .fillColor("#ffffff")
-      .text(label, x, y + 8, { width, align: x >= 250 ? "right" : "left" });
+  doc
+    .roundedRect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, 26, 8)
+    .fill(primary);
+
+  columns.forEach(([label, x, width, align]) => {
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(COLORS.white).text(label, x, y + 9, {
+      width,
+      align,
+    });
   });
-  return y + 24;
+
+  return y + 26;
 }
 
-function drawLineItem(doc: PDFKit.PDFDocument, item: IInvoiceLineItem, y: number): number {
+function drawLineItem(doc: PDFKit.PDFDocument, item: IInvoiceLineItem, y: number, index: number): number {
   const descriptionHeight = doc.heightOfString(item.description || "-", {
-    width: 146,
+    width: 158,
     lineGap: 1,
   });
-  const rowHeight = Math.max(32, descriptionHeight + 16);
+  const meta = [item.productCode, item.hsnCode ? `HSN ${item.hsnCode}` : null, item.unit].filter(Boolean).join(" · ");
+  const rowHeight = Math.max(38, descriptionHeight + (meta ? 24 : 18));
 
-  doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, rowHeight).stroke(COLORS.border);
+  doc.rect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, rowHeight).fillAndStroke(index % 2 === 0 ? "#ffffff" : COLORS.soft, COLORS.border);
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor(COLORS.text);
+  fitText(doc, item.description, PAGE.margin + 12, y + 8, { width: 158, height: rowHeight - 16, lineGap: 1 });
+
+  if (meta) {
+    doc.font("Helvetica").fontSize(7.5).fillColor(COLORS.muted).text(meta, PAGE.margin + 12, y + rowHeight - 15, {
+      width: 158,
+      height: 10,
+      ellipsis: true,
+    });
+  }
+
   doc.font("Helvetica").fontSize(8).fillColor(COLORS.text);
-  fitText(doc, item.description, 52, y + 8, { width: 142, height: rowHeight - 12, lineGap: 1 });
-  fitText(doc, item.hsnCode, 198, y + 8, { width: 50 });
-  fitText(doc, String(item.quantity), 250, y + 8, { width: 34, align: "right" });
-  fitText(doc, money(item.unitPrice), 284, y + 8, { width: 58, align: "right" });
-  fitText(doc, `${item.discountPercentage}%`, 342, y + 8, { width: 42, align: "right" });
-  fitText(doc, `${item.gstRate}%`, 384, y + 8, { width: 40, align: "right" });
-  fitText(doc, money(item.taxableAmount), 424, y + 8, { width: 58, align: "right" });
-  fitText(doc, money(item.totalAmount), 482, y + 8, { width: 65, align: "right" });
+  fitText(doc, item.hsnCode, PAGE.margin + 178, y + 9, { width: 42 });
+  fitText(doc, item.quantity, PAGE.margin + 224, y + 9, { width: 28, align: "right" });
+  fitText(doc, money(item.unitPrice), PAGE.margin + 258, y + 9, { width: 54, align: "right" });
+  fitText(doc, `${item.discountPercentage}%`, PAGE.margin + 318, y + 9, { width: 34, align: "right" });
+  fitText(doc, `${item.gstRate}%`, PAGE.margin + 358, y + 9, { width: 34, align: "right" });
+  fitText(doc, money(item.totalAmount), PAGE.margin + 398, y + 9, { width: 88, align: "right" });
 
   return y + rowHeight;
 }
 
-function drawLineItems(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): number {
-  let y = drawTableHeader(doc, startY);
+function drawLineItems(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number, primary: string): number {
+  let y = drawPdfSectionTitle(doc, "Line Items", startY);
+  y = drawTableHeader(doc, y, primary);
 
-  for (const item of invoice.lineItems) {
+  invoice.lineItems.forEach((item, index) => {
     const descriptionHeight = doc.heightOfString(item.description || "-", {
-      width: 146,
+      width: 158,
       lineGap: 1,
     });
-    const rowHeight = Math.max(32, descriptionHeight + 16);
+    const rowHeight = Math.max(38, descriptionHeight + 24);
     y = ensurePdfRoom(doc, y, rowHeight + 110);
-    if (y === PAGE.margin) y = drawTableHeader(doc, y);
-    y = drawLineItem(doc, item, y);
-  }
+    if (y === PAGE.margin) y = drawTableHeader(doc, y, primary);
+    y = drawLineItem(doc, item, y, index);
+  });
 
   return y + 16;
 }
 
-function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): number {
-  let y = ensurePdfRoom(doc, startY, 160);
+function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number, primary: string): number {
+  let y = ensurePdfRoom(doc, startY, 178);
   const x = PAGE.width - PAGE.margin - 220;
+  const boxHeight = 154;
   const rows = [
     ["Subtotal", invoice.totals.subtotal],
     ["Discount", invoice.totals.discountTotal],
@@ -209,22 +262,26 @@ function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number
     ["Balance Due", invoice.totals.balanceDue],
   ];
 
-  rows.forEach(([label, value], index) => {
-    const isGrand = label === "Grand Total" || label === "Balance Due";
-    if (isGrand) {
-      doc.moveTo(x, y).lineTo(x + 220, y).stroke(COLORS.border);
-      y += 4;
+  doc.roundedRect(x, y, 220, boxHeight, 10).fillAndStroke("#ffffff", COLORS.border);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text("Totals", x + 14, y + 14, { width: 192 });
+
+  let rowY = y + 34;
+  rows.forEach(([label, value]) => {
+    const isBalance = label === "Balance Due";
+    const isEmphasis = label === "Grand Total" || isBalance;
+    if (isEmphasis) {
+      doc.moveTo(x + 14, rowY - 5).lineTo(x + 206, rowY - 5).stroke(COLORS.border);
     }
     doc
-      .font(isGrand ? "Helvetica-Bold" : "Helvetica")
-      .fontSize(isGrand ? 11 : 9)
-      .fillColor(label === "Balance Due" ? COLORS.danger : COLORS.text)
-      .text(String(label), x, y, { width: 100 })
-      .text(money(Number(value)), x + 110, y, { width: 110, align: "right" });
-    y += isGrand ? 20 : 16;
+      .font(isEmphasis ? "Helvetica-Bold" : "Helvetica")
+      .fontSize(isBalance ? 11 : 9)
+      .fillColor(isBalance ? primary : COLORS.text)
+      .text(String(label), x + 14, rowY, { width: 92 })
+      .text(money(Number(value)), x + 106, rowY, { width: 100, align: "right" });
+    rowY += isBalance ? 20 : 15;
   });
 
-  return y + 12;
+  return y + boxHeight + 18;
 }
 
 function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number): void {
@@ -236,49 +293,60 @@ function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number)
 
   sections.forEach(([title, content]) => {
     if (!content) return;
-    const height = doc.heightOfString(content, { width: PAGE.width - PAGE.margin * 2, lineGap: 2 }) + 32;
+    const height = doc.heightOfString(content, { width: PAGE.width - PAGE.margin * 2 - 28, lineGap: 2 }) + 42;
     y = ensurePdfRoom(doc, y, height);
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text(title, PAGE.margin, y);
+    doc.roundedRect(PAGE.margin, y, PAGE.width - PAGE.margin * 2, height, 10).fillAndStroke("#ffffff", COLORS.border);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text(title, PAGE.margin + 14, y + 12);
     doc
       .font("Helvetica")
       .fontSize(9)
       .fillColor(COLORS.muted)
-      .text(content, PAGE.margin, y + 16, { width: PAGE.width - PAGE.margin * 2, lineGap: 2 });
-    y += height;
+      .text(content, PAGE.margin + 14, y + 29, { width: PAGE.width - PAGE.margin * 2 - 28, lineGap: 2 });
+    y += height + 10;
   });
 }
 
-export function createInvoicePdfDocument(invoice: PdfInvoice): PDFKit.PDFDocument {
+export function createInvoicePdfDocument(invoice: PdfInvoice, branding: PdfOrganizationBranding): PDFKit.PDFDocument {
+  const organization = mergeBranding(invoice, branding);
+  const primary = normalizePdfColor(organization.primaryColor);
   const doc = createBrandedPdfDocument({
     title: `Invoice ${invoice.invoiceNumber}`,
-    author: invoice.organizationSnapshot.name,
+    author: organization.name,
     subject: "Invoice",
     keywords: "invoice, pdf",
   });
 
-  let y = drawHeader(doc, invoice);
+  let y = drawPdfBrandHeader(doc, {
+    title: "Invoice",
+    subtitle: `Invoice ${invoice.invoiceNumber}`,
+    organization,
+  });
+  y = drawSummary(doc, invoice, y, primary);
+  y = drawInvoiceMeta(doc, invoice, y);
   y = drawPartyBlocks(doc, invoice, y);
-  y = drawLineItems(doc, invoice, y);
-  y = drawTotals(doc, invoice, y);
+  y = drawLineItems(doc, invoice, y, primary);
+  y = drawTotals(doc, invoice, y, primary);
   drawNotes(doc, invoice, y);
   drawPdfFooter(doc, invoice.invoiceNumber);
 
   return doc;
 }
 
-export function streamInvoicePdf(invoice: PdfInvoice, res: Response): void {
-  const filename = `${safePdfFilename(invoice.invoiceNumber)}.pdf`;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-  const doc = createInvoicePdfDocument(invoice);
-  doc.pipe(res);
-  doc.end();
+export function streamInvoicePdf(
+  invoice: PdfInvoice,
+  branding: PdfOrganizationBranding,
+  res: Response,
+  options: { inline?: boolean } = {}
+): void {
+  const doc = createInvoicePdfDocument(invoice, branding);
+  streamPdfDocument(doc, safePdfFilename(invoice.invoiceNumber), res, {
+    disposition: options.inline ? "inline" : "attachment",
+  });
 }
 
-export function renderInvoicePdfBuffer(invoice: PdfInvoice): Promise<Buffer> {
+export function renderInvoicePdfBuffer(invoice: PdfInvoice, branding: PdfOrganizationBranding): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = createInvoicePdfDocument(invoice);
+    const doc = createInvoicePdfDocument(invoice, branding);
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
