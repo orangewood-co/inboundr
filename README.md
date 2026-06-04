@@ -151,7 +151,7 @@ Create local `.env` files from the production examples, then replace placeholder
 |---|---|---|
 | `backend` | `backend/.env` from `backend/.env.production.example` | Requires database, auth, origin, Google OAuth/Gmail, Pub/Sub, and AWS SES values. Keep production secrets only on the production host or in GitHub secrets. |
 | `frontend` | `frontend/.env` from `frontend/.env.production.example` | Requires `VITE_API_URL` so the dashboard can reach the API and `VITE_EMBED_URL` for public form links. |
-| `embed` | Optional `embed/.env` | Add only public `VITE_*` variables if the embed app needs environment-specific URLs. |
+| `embed` | `embed/.env` from `embed/.env.production.example` | Requires `VITE_API_URL` so public forms can reach the API. |
 | `landing` | Optional `landing/.env` | Add only public `VITE_*` variables for marketing-site configuration. |
 
 Never commit real `.env` files or private keys. Use GitHub repository secrets and environment variables for CI/CD values.

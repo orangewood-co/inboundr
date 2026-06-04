@@ -41,6 +41,8 @@ jobs:
         run: bun run typecheck:embed
 
       - name: Build embed
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: bun run build:embed
 
       - name: Upload dist artifact
