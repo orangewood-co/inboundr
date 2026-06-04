@@ -420,28 +420,37 @@ export default function InvoiceDetailPage() {
                   <MoreHorizontalIcon className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => void copyShareLink()}>
+              <DropdownMenuContent align="end" className="w-52 rounded-xl p-1.5">
+                <DropdownMenuItem
+                  onClick={() => void copyShareLink()}
+                  className="h-9 cursor-pointer gap-2.5 rounded-lg px-2.5 whitespace-nowrap"
+                >
                   <CopyIcon className="size-3.5" />
                   Copy Share Link
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void handleDuplicate()} disabled={actionLoading !== null}>
+                <DropdownMenuItem
+                  onClick={() => void handleDuplicate()}
+                  disabled={actionLoading !== null}
+                  className="h-9 cursor-pointer gap-2.5 rounded-lg px-2.5 whitespace-nowrap"
+                >
                   <RefreshCwIcon className="size-3.5" />
                   Duplicate
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
+                  variant="destructive"
                   onClick={() => void runAction("write-off")}
                   disabled={actionLoading !== null || !isCancellable}
-                  className="text-destructive"
+                  className="h-9 cursor-pointer gap-2.5 rounded-lg px-2.5 whitespace-nowrap"
                 >
                   <BanIcon className="size-3.5" />
                   Write Off
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  variant="destructive"
                   onClick={() => void runAction("cancel")}
                   disabled={actionLoading !== null || !isCancellable}
-                  className="text-destructive"
+                  className="h-9 cursor-pointer gap-2.5 rounded-lg px-2.5 whitespace-nowrap"
                 >
                   <XCircleIcon className="size-3.5" />
                   Cancel Invoice
