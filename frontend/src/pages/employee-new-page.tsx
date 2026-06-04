@@ -63,6 +63,7 @@ type EmployeeFormState = {
   addressPostalCode: string
   addressCountry: string
   employeeCode: string
+  attendancePin: string
   startDate: string
   status: EmployeeStatus
   teamId: string
@@ -102,6 +103,7 @@ const emptyForm: EmployeeFormState = {
   addressPostalCode: "",
   addressCountry: "",
   employeeCode: "",
+  attendancePin: "",
   startDate: "",
   status: "active",
   teamId: "none",
@@ -188,6 +190,7 @@ function formToPayload(form: EmployeeFormState) {
     title: form.title.trim() || null,
     profileImageUrl: form.profileImageUrl.trim() || null,
     employeeCode: form.employeeCode.trim() || null,
+    attendancePin: form.attendancePin.trim() || undefined,
     startDate: form.startDate || null,
     status: form.status,
     teamId: form.teamId === "none" ? null : form.teamId,
@@ -234,8 +237,11 @@ export default function EmployeeNewPage() {
     const errors: string[] = []
     if (!form.fullName.trim()) errors.push("Employee name is required.")
     if (!form.email.trim() || !form.email.includes("@")) errors.push("A valid email is required.")
+    if (form.attendancePin.trim() && !/^\d{4,8}$/.test(form.attendancePin.trim())) {
+      errors.push("Attendance PIN must be 4 to 8 digits.")
+    }
     return errors
-  }, [form.email, form.fullName])
+  }, [form.attendancePin, form.email, form.fullName])
 
   const selectedTeam = teams.find((team) => team._id === form.teamId)
   const selectedModules = modules.filter((module) => form.allowedModules.includes(module.key))
@@ -479,6 +485,17 @@ export default function EmployeeNewPage() {
                     <Input type="date" value={form.startDate} onChange={(event) => updateForm("startDate", event.target.value)} />
                   </div>
                   <div className="grid gap-2">
+                    <Label>Attendance PIN</Label>
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      placeholder="4 to 8 digits"
+                      value={form.attendancePin}
+                      onChange={(event) => updateForm("attendancePin", event.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Required for the embed POS attendance kiosk.</p>
+                  </div>
+                  <div className="grid gap-2">
                     <Label>Status</Label>
                     <Select value={form.status} onValueChange={(value) => updateForm("status", value as EmployeeStatus)}>
                       <SelectTrigger className="w-full">
@@ -574,6 +591,7 @@ export default function EmployeeNewPage() {
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Employment</p>
                     <dl className="mt-3 grid gap-2 text-sm">
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Employee ID</dt><dd>{form.employeeCode || "-"}</dd></div>
+                      <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Attendance PIN</dt><dd>{form.attendancePin ? "Set" : "Not set"}</dd></div>
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Start date</dt><dd>{form.startDate || "-"}</dd></div>
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Status</dt><dd>{statusLabels[form.status]}</dd></div>
                       <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Team</dt><dd>{selectedTeam?.name ?? "No team"}</dd></div>

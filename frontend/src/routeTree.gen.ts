@@ -43,6 +43,7 @@ import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 import { Route as EmployeesNewRouteImport } from './routes/employees_.new'
+import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.attendance'
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
@@ -220,6 +221,11 @@ const EmployeesNewRoute = EmployeesNewRouteImport.update({
   path: '/employees/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmployeesAttendanceRoute = EmployeesAttendanceRouteImport.update({
+  id: '/employees_/attendance',
+  path: '/employees/attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmployeesIdRoute = EmployeesIdRouteImport.update({
   id: '/employees_/$id',
   path: '/employees/$id',
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
+  '/employees/attendance': typeof EmployeesAttendanceRoute
   '/employees/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
+  '/employees/attendance': typeof EmployeesAttendanceRoute
   '/employees/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -358,6 +366,7 @@ export interface FileRoutesById {
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
+  '/employees_/attendance': typeof EmployeesAttendanceRoute
   '/employees_/new': typeof EmployeesNewRoute
   '/forms/$slug': typeof FormsSlugRoute
   '/invite/$token': typeof InviteTokenRoute
@@ -402,6 +411,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
+    | '/employees/attendance'
     | '/employees/new'
     | '/forms/$slug'
     | '/invite/$token'
@@ -441,6 +451,7 @@ export interface FileRouteTypes {
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
+    | '/employees/attendance'
     | '/employees/new'
     | '/forms/$slug'
     | '/invite/$token'
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
+    | '/employees_/attendance'
     | '/employees_/new'
     | '/forms/$slug'
     | '/invite/$token'
@@ -526,6 +538,7 @@ export interface RootRouteChildren {
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
+  EmployeesAttendanceRoute: typeof EmployeesAttendanceRoute
   EmployeesNewRoute: typeof EmployeesNewRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
@@ -775,6 +788,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/employees_/attendance': {
+      id: '/employees_/attendance'
+      path: '/employees/attendance'
+      fullPath: '/employees/attendance'
+      preLoaderRoute: typeof EmployeesAttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/employees_/$id': {
       id: '/employees_/$id'
       path: '/employees/$id'
@@ -897,6 +917,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,
+  EmployeesAttendanceRoute: EmployeesAttendanceRoute,
   EmployeesNewRoute: EmployeesNewRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,

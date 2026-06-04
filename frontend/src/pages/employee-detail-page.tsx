@@ -73,6 +73,7 @@ interface Employee {
   teamId: string | null
   team: EmployeeTeam | null
   employeeCode: string | null
+  attendancePinSet: boolean
   fullName: string
   email: string
   phone: string | null
@@ -130,6 +131,7 @@ type EmployeeFormState = {
   phone: string
   title: string
   employeeCode: string
+  attendancePin: string
   profileImageUrl: string
   teamId: string
   status: EmployeeStatus
@@ -206,6 +208,7 @@ function employeeToForm(employee: Employee): EmployeeFormState {
     phone: employee.phone ?? "",
     title: employee.title ?? "",
     employeeCode: employee.employeeCode ?? "",
+    attendancePin: "",
     profileImageUrl: employee.profileImageUrl ?? "",
     teamId: employee.teamId ?? "none",
     status: employee.status ?? "active",
@@ -234,6 +237,7 @@ function formToPayload(form: EmployeeFormState) {
     phone: form.phone.trim() || null,
     title: form.title.trim() || null,
     employeeCode: form.employeeCode.trim() || null,
+    attendancePin: form.attendancePin.trim() || undefined,
     profileImageUrl: form.profileImageUrl.trim() || null,
     teamId: form.teamId === "none" ? null : form.teamId,
     status: form.status,
@@ -304,6 +308,7 @@ function EmployeeForm({
   form,
   teams,
   modules,
+  attendancePinSet,
   photoPreviewUrl,
   uploadingPhoto,
   onChange,
@@ -313,6 +318,7 @@ function EmployeeForm({
   form: EmployeeFormState
   teams: EmployeeTeam[]
   modules: { key: EmployeeAccessModule; label: string }[]
+  attendancePinSet: boolean
   photoPreviewUrl: string
   uploadingPhoto: boolean
   onChange: <K extends keyof EmployeeFormState>(field: K, value: EmployeeFormState[K]) => void
@@ -358,6 +364,16 @@ function EmployeeForm({
         <div className="grid gap-2">
           <Label>Employee ID</Label>
           <Input value={form.employeeCode} onChange={(event) => onChange("employeeCode", event.target.value)} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Attendance PIN</Label>
+          <Input
+            type="password"
+            inputMode="numeric"
+            placeholder={attendancePinSet ? "Leave blank to keep current PIN" : "4 to 8 digits"}
+            value={form.attendancePin}
+            onChange={(event) => onChange("attendancePin", event.target.value)}
+          />
         </div>
         <div className="grid gap-2">
           <Label>Start date</Label>
@@ -691,6 +707,10 @@ export default function EmployeeDetailPage() {
       toast.error("Name and email are required")
       return
     }
+    if (form.attendancePin.trim() && !/^\d{4,8}$/.test(form.attendancePin.trim())) {
+      toast.error("Attendance PIN must be 4 to 8 digits")
+      return
+    }
 
     setSaving(true)
     try {
@@ -860,6 +880,7 @@ export default function EmployeeDetailPage() {
                   form={form}
                   teams={teams}
                   modules={modules}
+                  attendancePinSet={employee.attendancePinSet}
                   photoPreviewUrl={photoPreviewUrl}
                   uploadingPhoto={uploadingPhoto}
                   onChange={updateForm}
@@ -884,6 +905,11 @@ export default function EmployeeDetailPage() {
                         icon={<ShieldCheckIcon className="size-5" />}
                         label="Platform access"
                         value={employee.platformAccess.enabled ? "Enabled" : "Disabled"}
+                      />
+                      <InfoCard
+                        icon={<IdCardIcon className="size-5" />}
+                        label="Attendance PIN"
+                        value={employee.attendancePinSet ? "Set" : "Not set"}
                       />
                     </div>
 

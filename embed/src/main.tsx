@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
 import "./index.css"
+import AttendancePage from "./pages/attendance-page"
 import FormPage from "./pages/form-page"
 import LinkPage from "./pages/link-page"
 import NotFound from "./pages/not-found"
@@ -11,9 +12,12 @@ const params = new URLSearchParams(window.location.search)
 
 const formMatch = path.match(/^\/form\/(.+)$/)
 const linkMatch = path.match(/^\/l\/(.+)$/)
+const attendanceMatch = path.match(/^\/attendance\/(.+)$/)
 
 let page: React.ReactNode
-if (formMatch) {
+if (attendanceMatch) {
+  page = <AttendancePage organizationId={attendanceMatch[1]} />
+} else if (formMatch) {
   const slug = formMatch[1]
   const embed = params.get("embed") === "1"
   page = <FormPage slug={slug} embed={embed} />

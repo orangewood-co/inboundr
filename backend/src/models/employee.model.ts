@@ -40,6 +40,8 @@ export interface IEmployee extends Document {
   organizationMemberId: Types.ObjectId | null;
   teamId: Types.ObjectId | null;
   employeeCode: string | null;
+  attendancePinHash: string | null;
+  attendancePinSetAt: Date | null;
   fullName: string;
   email: string;
   phone: string | null;
@@ -126,6 +128,8 @@ const employeeSchema = new Schema<IEmployee>(
       index: true,
     },
     employeeCode: { type: String, default: null, trim: true },
+    attendancePinHash: { type: String, default: null, select: false },
+    attendancePinSetAt: { type: Date, default: null },
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, default: null, trim: true },

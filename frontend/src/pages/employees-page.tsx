@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
+  CalendarCheckIcon,
   IdCardIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -295,6 +296,10 @@ export default function EmployeesPage() {
         breadcrumbs={[{ label: "Employees" }]}
         actions={
           <>
+            <Button variant="outline" onClick={() => void navigate({ to: "/employees/attendance" })}>
+              <CalendarCheckIcon />
+              Attendance
+            </Button>
             <Button variant="outline" onClick={() => setTeamsOpen(true)}>
               <UsersIcon />
               Teams

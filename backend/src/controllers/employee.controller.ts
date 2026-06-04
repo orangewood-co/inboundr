@@ -89,6 +89,12 @@ function tokenHash(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function attendancePinHash(pin: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(pin, salt, 32).toString("hex");
+  return `${salt}:${hash}`;
+}
+
 function normalizeRole(value: unknown): OrganizationRole {
   return value === "owner" || value === "admin" ? value : "member";
 }
@@ -141,6 +147,17 @@ function normalizeEmployeeInput(body: Record<string, unknown>, partial = false) 
   if (!partial || "phone" in body) input.phone = nullableString(body.phone);
   if (!partial || "title" in body) input.title = nullableString(body.title);
   if (!partial || "employeeCode" in body) input.employeeCode = nullableString(body.employeeCode);
+  if ("attendancePin" in body) {
+    const attendancePin = stringValue(body.attendancePin);
+    if (attendancePin) {
+      if (/^\d{4,8}$/.test(attendancePin)) {
+        input.attendancePinHash = attendancePinHash(attendancePin);
+        input.attendancePinSetAt = new Date();
+      } else {
+        input.attendancePinHash = "";
+      }
+    }
+  }
   if (!partial || "profileImageUrl" in body) input.profileImageUrl = nullableString(body.profileImageUrl);
   if (!partial || "startDate" in body) input.startDate = parseDate(body.startDate);
   if ("status" in body) input.status = normalizeStatus(body.status);
@@ -188,6 +205,7 @@ function validateEmployeeInput(input: Record<string, unknown>): string | null {
   if ("email" in input && (!input.email || !String(input.email).includes("@"))) {
     return "A valid email is required";
   }
+  if ("attendancePinHash" in input && !input.attendancePinHash) return "Attendance PIN must be 4 to 8 digits";
   const socials = input.socials as Record<string, unknown> | undefined;
   if (socials?.linkedinUrl && !isHttpUrl(String(socials.linkedinUrl))) {
     return "LinkedIn URL must be a valid website URL";
@@ -199,6 +217,7 @@ function validateEmployeeInput(input: Record<string, unknown>): string | null {
 }
 
 function serializeEmployee(employee: any) {
+  const { attendancePinHash: _attendancePinHash, ...safeEmployee } = employee ?? {};
   const team = employee.teamId && typeof employee.teamId === "object"
     ? {
         _id: employee.teamId._id,
@@ -209,7 +228,8 @@ function serializeEmployee(employee: any) {
     : null;
 
   return {
-    ...employee,
+    ...safeEmployee,
+    attendancePinSet: Boolean(employee.attendancePinSetAt),
     teamId: team?._id ?? employee.teamId ?? null,
     team,
   };
