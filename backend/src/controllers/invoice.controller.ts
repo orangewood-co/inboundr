@@ -578,14 +578,16 @@ export const getInvoiceStats = async (req: Request, res: Response): Promise<void
     for (const invoice of invoices) {
       if (invoice.status !== "cancelled" && invoice.status !== "written_off") {
         const index = monthIndex.get(monthKey(invoice.issueDate));
-        if (index !== undefined) {
-          monthly[index].invoiced = roundMoney(monthly[index].invoiced + invoice.totals.grandTotal);
+        const month = index === undefined ? undefined : monthly[index];
+        if (month) {
+          month.invoiced = roundMoney(month.invoiced + invoice.totals.grandTotal);
         }
       }
       for (const payment of invoice.payments) {
         const index = monthIndex.get(monthKey(payment.date));
-        if (index !== undefined) {
-          monthly[index].collected = roundMoney(monthly[index].collected + Math.max(0, payment.amount));
+        const month = index === undefined ? undefined : monthly[index];
+        if (month) {
+          month.collected = roundMoney(month.collected + Math.max(0, payment.amount));
         }
       }
     }
