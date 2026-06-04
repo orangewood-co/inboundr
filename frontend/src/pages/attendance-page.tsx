@@ -4,6 +4,7 @@ import {
   CameraIcon,
   CheckCircle2Icon,
   Clock3Icon,
+  CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
   MapPinIcon,
@@ -269,92 +270,93 @@ export default function AttendancePage() {
   }
 
   const summary = data?.summary
-  const summaryCards: { label: string; value: number; icon: LucideIcon }[] = [
-    { label: "Present", value: summary?.present ?? 0, icon: CheckCircle2Icon },
-    { label: "Absent", value: summary?.absent ?? 0, icon: UsersIcon },
-    { label: "Missing Checkout", value: summary?.missingCheckout ?? 0, icon: Clock3Icon },
-    { label: "Flagged", value: summary?.flagged ?? 0, icon: ShieldAlertIcon },
-    { label: "Total Employees", value: summary?.totalEmployees ?? 0, icon: CalendarDaysIcon },
+  const summaryCards: { label: string; value: number; helper: string; icon: LucideIcon }[] = [
+    { label: "Present", value: summary?.present ?? 0, helper: "Checked in and out", icon: CheckCircle2Icon },
+    { label: "Absent", value: summary?.absent ?? 0, helper: "No record today", icon: UsersIcon },
+    { label: "Missing Checkout", value: summary?.missingCheckout ?? 0, helper: "Checked in only", icon: Clock3Icon },
+    { label: "Flagged", value: summary?.flagged ?? 0, helper: "Needs review", icon: ShieldAlertIcon },
+    { label: "Total Employees", value: summary?.totalEmployees ?? 0, helper: "Active employees", icon: CalendarDaysIcon },
   ]
 
   return (
     <AppLayout>
-      <SiteHeader breadcrumbs={[{ label: "Attendance" }]} />
-      <main className="flex-1 overflow-auto bg-muted/20">
-        <div className="mx-auto grid max-w-7xl gap-6 p-5 md:p-8">
-          <section className="overflow-hidden rounded-[2rem] border bg-card">
-            <div className="grid gap-6 p-6 lg:grid-cols-[1fr_24rem] lg:p-8">
-              <div>
-                <Badge variant="outline" className="mb-4">Attendance MVP</Badge>
-                <h1 className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">Daily Site Attendance</h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  Review check-ins, location evidence, selfies, missing checkouts, and manual corrections from one daily desk.
-                </p>
-              </div>
-              <div className="rounded-3xl border bg-background p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Clock3Icon className="size-4" />
-                  Embed POS Link
-                </div>
-                <p className="mt-2 break-all text-xs text-muted-foreground">{posUrl || "Loading workspace link..."}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => void copyPosUrl()} disabled={!posUrl}>Copy Link</Button>
-                  <Button variant="outline" size="sm" asChild disabled={!posUrl}>
-                    <a href={posUrl} target="_blank" rel="noreferrer">
-                      <ExternalLinkIcon />
-                      Open POS
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
+      <SiteHeader
+        breadcrumbs={[{ label: "Employees", href: "/employees" }, { label: "Attendance" }]}
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => void fetchAttendance()} disabled={loading}>
+              <RefreshCwIcon className={loading ? "animate-spin" : ""} />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <DownloadIcon />
+              Export CSV
+            </Button>
+            <Button size="sm" onClick={() => setManualOpen(true)}>
+              <PlusIcon />
+              Add Attendance
+            </Button>
+          </>
+        }
+      />
+      <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Daily check-ins, location and selfie evidence, and corrections.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              type="date"
+              aria-label="Attendance date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              className="h-8 w-full sm:w-44"
+            />
+            <Button variant="outline" size="sm" onClick={() => void copyPosUrl()} disabled={!posUrl}>
+              <CopyIcon />
+              Copy POS Link
+            </Button>
+            {posUrl ? (
+              <Button variant="outline" size="sm" asChild>
+                <a href={posUrl} target="_blank" rel="noreferrer">
+                  <ExternalLinkIcon />
+                  Open POS
+                </a>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled>
+                <ExternalLinkIcon />
+                Open POS
+              </Button>
+            )}
+          </div>
+        </div>
 
-          <section className="grid gap-4 md:grid-cols-[16rem_1fr]">
-            <div className="rounded-3xl border bg-card p-4">
-              <Label htmlFor="attendance-date">Attendance date</Label>
-              <Input id="attendance-date" type="date" className="mt-2" value={date} onChange={(event) => setDate(event.target.value)} />
-              <div className="mt-4 flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => void fetchAttendance()}>
-                  <RefreshCwIcon />
-                  Refresh
-                </Button>
-                <Button variant="outline" size="sm" onClick={exportCsv}>
-                  <DownloadIcon />
-                  CSV
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              {summaryCards.map(({ label, value, icon: Icon }) => (
-                <div key={label} className="rounded-3xl border bg-card p-5">
-                  <Icon className="size-5 text-muted-foreground" />
-                  <p className="mt-4 text-3xl font-semibold">{value}</p>
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                </div>
+        {loading ? (
+          <div className="grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-[130px] rounded-xl" />
               ))}
             </div>
-          </section>
-
-          <section className="rounded-3xl border bg-card">
-            <div className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Attendance Records</h2>
-                <p className="text-sm text-muted-foreground">Selfies and map links are shown when the POS captured them.</p>
-              </div>
-              <Button onClick={() => setManualOpen(true)}>
-                <PlusIcon />
-                Add Manual Attendance
-              </Button>
+            <Skeleton className="h-80 rounded-xl" />
+          </div>
+        ) : (
+          <div className="grid gap-6 animate-in fade-in-0 duration-500">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              {summaryCards.map(({ label, value, helper, icon: Icon }) => (
+                <StatCard key={label} title={label} value={value} helper={helper} icon={Icon} />
+              ))}
             </div>
-            {loading ? (
-              <div className="grid gap-3 p-5">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton key={index} className="h-14 rounded-xl" />
-                ))}
+
+            <section className="rounded-xl border bg-card p-5">
+              <div className="mb-5">
+                <h2 className="text-base font-semibold">Attendance Records</h2>
+                <p className="text-sm text-muted-foreground">Selfies and map links appear when the POS captured them.</p>
               </div>
-            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -376,8 +378,8 @@ export default function AttendancePage() {
                       <TableCell>
                         <Badge variant={statusVariant(record.status)}>{statusLabels[record.status]}</Badge>
                       </TableCell>
-                      <TableCell>{formatTime(record.checkInAt)}</TableCell>
-                      <TableCell>{formatTime(record.checkOutAt)}</TableCell>
+                      <TableCell className="tabular-nums">{formatTime(record.checkInAt)}</TableCell>
+                      <TableCell className="tabular-nums">{formatTime(record.checkOutAt)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
                           {record.selfiePreview && (
@@ -415,22 +417,22 @@ export default function AttendancePage() {
                   )}
                 </TableBody>
               </Table>
-            )}
-          </section>
+            </section>
 
-          <section className="rounded-3xl border bg-card p-5">
-            <h2 className="text-xl font-semibold">Absent Employees</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Active employees without a record for the selected date.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(data?.absentEmployees ?? []).map((employee) => (
-                <Badge key={employee._id} variant="outline" className="rounded-full px-3 py-1">
-                  {employee.fullName}{employee.employeeCode ? ` · ${employee.employeeCode}` : ""}
-                </Badge>
-              ))}
-              {data?.absentEmployees.length === 0 && <p className="text-sm text-muted-foreground">No absent employees.</p>}
-            </div>
-          </section>
-        </div>
+            <section className="rounded-xl border bg-card p-5">
+              <h2 className="text-base font-semibold">Absent Employees</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">Active employees without a record for the selected date.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(data?.absentEmployees ?? []).map((employee) => (
+                  <Badge key={employee._id} variant="secondary">
+                    {employee.fullName}{employee.employeeCode ? ` · ${employee.employeeCode}` : ""}
+                  </Badge>
+                ))}
+                {data?.absentEmployees.length === 0 && <p className="text-sm text-muted-foreground">No absent employees.</p>}
+              </div>
+            </section>
+          </div>
+        )}
       </main>
 
       <Dialog open={manualOpen} onOpenChange={setManualOpen}>
@@ -477,6 +479,33 @@ export default function AttendancePage() {
         </DialogContent>
       </Dialog>
     </AppLayout>
+  )
+}
+
+function StatCard({
+  title,
+  value,
+  helper,
+  icon: Icon,
+}: {
+  title: string
+  value: number
+  helper: string
+  icon: LucideIcon
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-5 transition-colors hover:bg-card/80">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+        </div>
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+          <Icon className="size-5 text-muted-foreground" />
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{helper}</p>
+    </div>
   )
 }
 
