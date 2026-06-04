@@ -1,22 +1,90 @@
 import { useState } from "react"
 import { Link, type ErrorComponentProps } from "@tanstack/react-router"
-import { ChevronDownIcon, RefreshCwIcon, LayoutDashboardIcon, SearchXIcon } from "lucide-react"
+import { ChevronDownIcon, RefreshCwIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 function ErrorLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_30%_20%,oklch(from_var(--primary)_l_c_h/0.08),transparent_50%),radial-gradient(circle_at_70%_80%,oklch(from_var(--sidebar-primary)_l_c_h/0.06),transparent_50%),var(--background)]">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        <div className="absolute top-[15%] left-[10%] h-36 w-36 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute right-[12%] bottom-[18%] h-48 w-48 rounded-full bg-sidebar-primary/10 blur-3xl" />
-        <div className="absolute top-[60%] left-[55%] h-24 w-24 rounded-full bg-destructive/5 blur-3xl" />
-      </div>
-
-      <div className="relative z-10 w-full max-w-lg px-6 py-16">
+    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-6 py-20">
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 size-[40rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl"
+        aria-hidden
+      />
+      <div className="relative z-10 flex w-full max-w-xl flex-col items-center">
         {children}
       </div>
     </div>
+  )
+}
+
+function CableIllustration({ variant }: { variant: "error" | "missing" }) {
+  const sparkColor =
+    variant === "error" ? "text-destructive" : "text-primary"
+
+  return (
+    <svg
+      viewBox="0 0 720 200"
+      fill="none"
+      className="w-full max-w-md text-foreground"
+      role="img"
+      aria-hidden
+    >
+      {/* Cable coming in from the left, sagging into the critter's mouth */}
+      <path
+        d="M0 96 C 120 96, 170 70, 250 118 C 300 148, 330 150, 360 138"
+        className="text-border"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      {/* Cable continuing out to the right, with a severed gap */}
+      <path
+        d="M438 128 C 520 150, 560 116, 660 110 C 690 108, 710 106, 720 104"
+        className="text-border"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      {/* Frayed cable tip near the spark */}
+      <path
+        d="M438 128 l 14 -6 M438 128 l 12 6 M438 128 l 16 1"
+        className={sparkColor}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+
+      {/* Little spark/zap where the cable was nibbled through */}
+      <path
+        d="M404 96 l 10 -22 l -3 16 l 12 -4 l -14 22 l 4 -14 z"
+        className={sparkColor}
+        fill="currentColor"
+      />
+
+      {/* Rabbit silhouette perched on the cable, nibbling the cut */}
+      <path
+        fill="currentColor"
+        d="M362 146
+           c -6 0 -12 -2 -16 -7
+           c -5 -6 -7 -14 -6 -22
+           c 1 -8 5 -15 11 -20
+           c -4 -10 -6 -22 -4 -33
+           c 1 -6 8 -7 11 -2
+           c 4 7 7 15 8 23
+           c 4 -2 9 -3 13 -3
+           c -1 -9 -1 -20 3 -29
+           c 2 -6 9 -5 11 1
+           c 3 9 3 20 1 30
+           c 7 4 12 11 14 19
+           c 2 9 0 19 -5 26
+           c -6 8 -16 12 -26 13
+           c -7 1 -14 4 -20 4 z"
+      />
+      {/* Eye notch (background-colored) to read as a face */}
+      <circle cx="376" cy="116" r="2.4" className="text-background" fill="currentColor" />
+    </svg>
   )
 }
 
@@ -29,40 +97,33 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
 
   return (
     <ErrorLayout>
-      <div className="space-y-6 text-center">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10">
-          <span className="text-2xl font-semibold text-destructive">!</span>
-        </div>
+      <CableIllustration variant="error" />
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Something Went Wrong
-          </h1>
-          <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
-            The page ran into an error it couldn't recover from. You can try
-            reloading, or head back to a safe page.
-          </p>
-        </div>
+      <div className="mt-10 flex flex-col items-center text-center">
+        <h1 className="text-4xl font-light tracking-tight sm:text-5xl">
+          Something Went Wrong
+        </h1>
+        <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">
+          The wires got crossed and this page couldn't load. You can try again,
+          or head back to the{" "}
+          <Link
+            to="/"
+            className="text-foreground underline underline-offset-4 transition-colors hover:text-primary"
+          >
+            Dashboard
+          </Link>
+          .
+        </p>
 
-        <div className="mx-auto max-w-md rounded-2xl border border-destructive/15 bg-destructive/5 px-4 py-3 text-left text-sm text-destructive">
-          {message}
-        </div>
-
-        <div className="flex items-center justify-center gap-3">
+        <div className="mt-8">
           <Button onClick={reset}>
             <RefreshCwIcon data-icon="inline-start" />
             Try Again
           </Button>
-          <Button asChild variant="outline">
-            <Link to="/">
-              <LayoutDashboardIcon data-icon="inline-start" />
-              Dashboard
-            </Link>
-          </Button>
         </div>
 
         {stack ? (
-          <div className="mx-auto max-w-md text-left">
+          <div className="mt-10 w-full max-w-md text-left">
             <button
               type="button"
               onClick={() => setShowDetails((v) => !v)}
@@ -75,7 +136,9 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
             </button>
 
             {showDetails ? (
-              <pre className="mt-2 max-h-48 overflow-auto rounded-xl border bg-muted/50 p-3 text-[11px] leading-5 text-muted-foreground">
+              <pre className="mt-3 max-h-48 overflow-auto rounded-xl border bg-muted/40 p-3 text-[11px] leading-5 text-muted-foreground">
+                {message}
+                {"\n\n"}
                 {stack}
               </pre>
             ) : null}
@@ -89,29 +152,23 @@ export function ErrorPage({ error, reset }: ErrorComponentProps) {
 export function NotFoundPage() {
   return (
     <ErrorLayout>
-      <div className="space-y-6 text-center">
-        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
-          <SearchXIcon className="size-7 text-primary" />
-        </div>
+      <CableIllustration variant="missing" />
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Page Not Found
-          </h1>
-          <p className="mx-auto max-w-sm text-sm leading-6 text-muted-foreground">
-            The page you're looking for doesn't exist or may have been moved.
-            Let's get you back on track.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-center gap-3">
-          <Button asChild>
-            <Link to="/">
-              <LayoutDashboardIcon data-icon="inline-start" />
-              Go to Dashboard
-            </Link>
-          </Button>
-        </div>
+      <div className="mt-10 flex flex-col items-center text-center">
+        <h1 className="text-4xl font-light tracking-tight sm:text-5xl">
+          Page Not Found
+        </h1>
+        <p className="mt-4 max-w-md text-sm leading-6 text-muted-foreground">
+          Something nibbled through the cables again and this page wandered off.
+          Let's get you back to the{" "}
+          <Link
+            to="/"
+            className="text-foreground underline underline-offset-4 transition-colors hover:text-primary"
+          >
+            Dashboard
+          </Link>
+          .
+        </p>
       </div>
     </ErrorLayout>
   )
