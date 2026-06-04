@@ -42,12 +42,13 @@ Recommended CloudFront settings:
 
 ## Frontend Environment
 
-The frontend reads the backend API origin from `VITE_API_URL`.
+The frontend reads the backend API origin from `VITE_API_URL` and the public forms/embed origin from `VITE_EMBED_URL`.
 
 For production:
 
 ```env
 VITE_API_URL=https://api.example.com
+VITE_EMBED_URL=https://forms.example.com
 ```
 
 The example file is `frontend/.env.production.example`.
@@ -66,6 +67,7 @@ Add repository variables:
 FRONTEND_S3_BUCKET=inboundr-frontend-prod
 CLOUDFRONT_DISTRIBUTION_ID=E1234567890ABC
 VITE_API_URL=https://api.example.com
+VITE_EMBED_URL=https://forms.example.com
 ```
 
 Add repository secrets:
@@ -116,7 +118,7 @@ Scope the deploy identity to one S3 bucket and one CloudFront distribution:
 The frontend workflow:
 
 1. Runs typecheck on pull requests and pushes that touch frontend/deployment files.
-2. Builds the Vite app with `VITE_API_URL`.
+2. Builds the Vite app with `VITE_API_URL` and `VITE_EMBED_URL`.
 3. Uploads static assets from `frontend/dist` to S3.
 4. Uses long-lived cache headers for hashed assets.
 5. Uses no-cache headers for `index.html`.
