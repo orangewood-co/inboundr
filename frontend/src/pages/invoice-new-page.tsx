@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { DatePicker } from "@/components/date-picker"
 import { SearchablePickerDialog } from "@/components/searchable-picker-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
@@ -429,8 +430,8 @@ export default function InvoiceNewPage() {
           <div className="rounded-xl border p-5">
             <h2 className="text-sm font-semibold">Invoice Details</h2>
             <div className="mt-4 grid gap-4 lg:grid-cols-4">
-              <FormField label="Issue date" type="date" value={form.issueDate} onChange={(v) => setForm((c) => ({ ...c, issueDate: v }))} />
-              <FormField label="Due date" type="date" value={form.dueDate} onChange={(v) => setForm((c) => ({ ...c, dueDate: v }))} />
+              <DatePicker label="Issue date" value={form.issueDate} onChange={(v) => setForm((c) => ({ ...c, issueDate: v }))} />
+              <DatePicker label="Due date" value={form.dueDate} onChange={(v) => setForm((c) => ({ ...c, dueDate: v }))} />
               <FormField label="Payment terms" value={form.paymentTerms} onChange={(v) => setForm((c) => ({ ...c, paymentTerms: v }))} />
               <div className="grid gap-2">
                 <Label className="text-xs">Template</Label>
@@ -540,8 +541,8 @@ export default function InvoiceNewPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <FormField label="Start date" type="date" value={form.recurringStartDate} onChange={(v) => setForm((c) => ({ ...c, recurringStartDate: v }))} />
-                <FormField label="End date (optional)" type="date" value={form.recurringEndDate} onChange={(v) => setForm((c) => ({ ...c, recurringEndDate: v }))} />
+                <DatePicker label="Start date" value={form.recurringStartDate} onChange={(v) => setForm((c) => ({ ...c, recurringStartDate: v }))} />
+                <DatePicker label="End date (optional)" value={form.recurringEndDate} onChange={(v) => setForm((c) => ({ ...c, recurringEndDate: v }))} />
                 <div className="flex items-end pb-2">
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
