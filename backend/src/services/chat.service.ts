@@ -127,13 +127,34 @@ export async function generateChatThreadTitle(
   const thread = await findOwnedThread(threadId, userId);
   if (!thread) return null;
 
+  // Source: https://github.com/open-webui/open-webui/blob/b5f4c85bb196c16a775802907aedd87366f58b0f/backend/open_webui/config.py#L1358
+  const TITLE_GENERATION_PROMPT = `
+    ### Task:
+    Generate a concise, 3-5 word title with an emoji summarizing the chat history.
+    ### Guidelines:
+    - The title should clearly represent the main theme or subject of the conversation.
+    - Use emojis that enhance understanding of the topic, but avoid quotation marks or special formatting.
+    - Write the title in the chat's primary language; default to English if multilingual.
+    - Prioritize accuracy over excessive creativity; keep it clear and simple.
+    - Your entire response must consist solely of the title, without any introductory or concluding text.
+    - Ensure no conversational text, affirmations, or explanations precede or follow the title, as this will cause direct parsing failure.
+    ### Output:
+    Reply with only the title, no other text or formatting.
+    ### Examples:
+    - "📉 Stock Market Trends"
+    - "🍪 Perfect Chocolate Chip Recipe"
+    - "Evolution of Music Streaming"
+    - "Remote Work Productivity Tips"
+    - "Artificial Intelligence in Healthcare"
+    - "🎮 Video Game Development Insights"
+  `
   const result = await generateText({
     model: openrouter(process.env.CHAT_TITLE_MODEL ?? DEFAULT_TITLE_MODEL),
-    system: "Generate a concise title for this chat. Reply with only the title.",
+    system: TITLE_GENERATION_PROMPT,
     prompt: JSON.stringify(messages ?? []).slice(0, 6000),
   });
   const title = result.text.trim().replace(/^["'`]+|["'`.]+$/g, "").slice(0, 80);
-  thread.title = title || "New chat";
+  thread.title = title || "New Chat";
   await thread.save();
 
   return thread.title;
