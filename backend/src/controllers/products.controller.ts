@@ -5,7 +5,13 @@ import type { OrganizationRequest } from "../middleware/auth.middleware";
 
 type ProductInput = Omit<
   Product,
-  "id" | "organization_id" | "addedtime" | "embedding" | "embedding_model" | "embedding_updated_at" | "embedding_task"
+  | "id"
+  | "organization_id"
+  | "addedtime"
+  | "embedding"
+  | "embedding_model"
+  | "embedding_updated_at"
+  | "embedding_task"
 > & {
   addedtime?: string | Date | null;
 };

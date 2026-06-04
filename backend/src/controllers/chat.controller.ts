@@ -1,7 +1,7 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { Readable } from "node:stream";
 
-import type { AuthenticatedRequest } from "../middleware/auth.middleware";
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import {
   createChatStreamResponse,
   createChatThread as createChatThreadRecord,
@@ -52,7 +52,12 @@ async function pipeWebResponse(
 
 export async function streamChat(req: Request, res: ExpressResponse): Promise<void> {
   try {
-    const webResponse = await createChatStreamResponse(req.body as ChatStreamInput);
+    const orgReq = req as OrganizationRequest;
+    const webResponse = await createChatStreamResponse(req.body as ChatStreamInput, {
+      user: orgReq.user,
+      organization: orgReq.organization,
+      organizationMembership: orgReq.organizationMembership,
+    });
     await pipeWebResponse(webResponse, res);
   } catch (err) {
     console.error("Chat stream failed:", err);

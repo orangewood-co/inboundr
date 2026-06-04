@@ -3,26 +3,39 @@ import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import {
   convertToModelMessages,
   generateText,
+  stepCountIs,
   streamText,
   type UIMessage,
 } from "ai";
 import mongoose from "mongoose";
 
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { ChatMessage } from "../models/chat-message.model";
 import { ChatThread, type ChatThreadStatus } from "../models/chat-thread.model";
+import { createProductTools } from "../tools/product.tool";
 
 const openrouter = createOpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
 });
 
-const DEFAULT_CHAT_MODEL = "openai/gpt-5.5";
+const DEFAULT_CHAT_MODEL = "moonshotai/kimi-k2.6";
 const DEFAULT_TITLE_MODEL = "openai/gpt-5.4-nano";
+const DEFAULT_CHAT_SYSTEM_PROMPT = `You are a helpful assistant for Inboundr users.
+
+You can help users search and add products to their catalog when tools are available. You cannot remove products.
+After using a tool, summarize the result clearly for the user.`;
 
 export type ChatStreamInput = {
   messages?: UIMessage[];
   system?: string;
   tools?: Record<string, unknown>;
+};
+
+export type ChatStreamContext = {
+  user: AuthenticatedRequest["user"];
+  organization: OrganizationRequest["organization"];
+  organizationMembership: OrganizationRequest["organizationMembership"];
 };
 
 export type ChatMessageInput = {
@@ -62,13 +75,20 @@ function serializeThread(thread: {
   };
 }
 
-export async function createChatStreamResponse(input: ChatStreamInput): Promise<globalThis.Response> {
-  const aiTools = frontendTools((input.tools ?? {}) as Parameters<typeof frontendTools>[0]);
+export async function createChatStreamResponse(
+  input: ChatStreamInput,
+  context: ChatStreamContext
+): Promise<globalThis.Response> {
+  const aiTools = {
+    ...createProductTools(context),
+    ...frontendTools((input.tools ?? {}) as Parameters<typeof frontendTools>[0]),
+  };
   const result = streamText({
     model: openrouter(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
-    system: input.system ?? "You are a helpful assistant for Inboundr users.",
+    system: input.system ? `${DEFAULT_CHAT_SYSTEM_PROMPT}\n\n${input.system}` : DEFAULT_CHAT_SYSTEM_PROMPT,
     messages: await convertToModelMessages(input.messages ?? [], { tools: aiTools }),
     tools: aiTools,
+    stopWhen: stepCountIs(5),
   });
 
   return result.toUIMessageStreamResponse();
