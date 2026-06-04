@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, Link, useSearch } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
+  ChevronsUpDownIcon,
   PlusIcon,
   SendIcon,
   TrashIcon,
@@ -9,6 +10,7 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { SearchablePickerDialog } from "@/components/searchable-picker-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -175,25 +177,28 @@ export default function InvoiceNewPage() {
   const searchParams = useSearch({ from: "/invoices/new" })
   const editId = searchParams.edit
 
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [products, setProducts] = useState<Product[]>([])
   const [form, setForm] = useState<InvoiceFormState>(emptyForm())
   const [saving, setSaving] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(!!editId)
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
+  const [productPickerLine, setProductPickerLine] = useState<number | null>(null)
 
-  const fetchLookups = useCallback(async () => {
-    const [customerResponse, productResponse] = await Promise.all([
-      fetch(`${CUSTOMER_API}?limit=50`, { credentials: "include" }),
-      fetch(`${PRODUCT_API}?limit=50`, { credentials: "include" }),
-    ])
-    if (customerResponse.ok) {
-      const data = await customerResponse.json()
-      setCustomers(data.customers ?? [])
-    }
-    if (productResponse.ok) {
-      const data = await productResponse.json()
-      setProducts(data.products ?? [])
-    }
+  const fetchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
+    const params = new URLSearchParams({ limit: "20" })
+    if (query) params.set("search", query)
+    const response = await fetch(`${CUSTOMER_API}?${params}`, { credentials: "include", signal })
+    if (!response.ok) throw new Error("Unable to load customers")
+    const data = await response.json()
+    return (data.customers ?? []) as Customer[]
+  }, [])
+
+  const fetchProducts = useCallback(async (query: string, signal: AbortSignal) => {
+    const params = new URLSearchParams({ limit: "20" })
+    if (query) params.set("search", query)
+    const response = await fetch(`${PRODUCT_API}?${params}`, { credentials: "include", signal })
+    if (!response.ok) throw new Error("Unable to load products")
+    const data = await response.json()
+    return (data.products ?? []) as Product[]
   }, [])
 
   const fetchInvoiceForEdit = useCallback(async () => {
@@ -245,33 +250,33 @@ export default function InvoiceNewPage() {
   }, [editId])
 
   useEffect(() => {
-    void fetchLookups()
     void fetchInvoiceForEdit()
-  }, [fetchLookups, fetchInvoiceForEdit])
+  }, [fetchInvoiceForEdit])
 
   const previewTotals = useMemo(() => calculatePreviewTotals(form.lineItems), [form.lineItems])
 
-  function selectCustomer(customerId: string) {
-    const customer = customers.find((item) => item._id === customerId)
+  function selectCustomer(customer: Customer) {
     setForm((current) => ({
       ...current,
-      customerId,
-      customerName: customer?.name ?? "",
-      customerCompany: customer?.company ?? "",
-      customerEmail: customer?.email ?? "",
-      customerPhone: customer?.contactNumber ?? "",
-      billingAddress: customer?.address ?? "",
-      shippingAddress: customer?.address ?? "",
+      customerId: customer._id,
+      customerName: customer.name ?? "",
+      customerCompany: customer.company ?? "",
+      customerEmail: customer.email ?? "",
+      customerPhone: customer.contactNumber ?? "",
+      billingAddress: customer.address ?? "",
+      shippingAddress: customer.address ?? "",
       lineItems: current.lineItems.map((line) => ({
         ...line,
-        discountPercentage: customer?.specialDiscountPercentage ?? line.discountPercentage,
+        discountPercentage: customer.specialDiscountPercentage ?? line.discountPercentage,
       })),
     }))
   }
 
-  function selectProduct(lineIndex: number, productId: string) {
-    const product = products.find((item) => String(item.id) === productId)
-    if (!product) return
+  function clearCustomer() {
+    setForm((current) => ({ ...current, customerId: "" }))
+  }
+
+  function selectProduct(lineIndex: number, product: Product) {
     updateLine(lineIndex, {
       productId: product.id,
       description: product.productdescription ?? "",
@@ -396,20 +401,17 @@ export default function InvoiceNewPage() {
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <div className="grid gap-2">
                 <Label className="text-xs">Select customer</Label>
-                <Select
-                  value={form.customerId || "manual"}
-                  onValueChange={(value) => value === "manual" ? setForm((c) => ({ ...c, customerId: "" })) : selectCustomer(value)}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                  onClick={() => setCustomerPickerOpen(true)}
                 >
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual Entry</SelectItem>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer._id} value={customer._id}>
-                        {customer.company || customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <span className={cn("truncate", !form.customerId && "text-muted-foreground")}>
+                    {form.customerCompany || form.customerName || "Select customer"}
+                  </span>
+                  <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-50" />
+                </Button>
               </div>
               <FormField label="Name" value={form.customerName} onChange={(v) => setForm((c) => ({ ...c, customerName: v }))} />
               <FormField label="Company" value={form.customerCompany} onChange={(v) => setForm((c) => ({ ...c, customerCompany: v }))} />
@@ -462,20 +464,17 @@ export default function InvoiceNewPage() {
                 <div key={index} className="grid gap-3 p-4 lg:grid-cols-[1.4fr_1fr_.5fr_.7fr_.5fr_.5fr_auto]">
                   <div className="grid gap-2">
                     <Label className="text-xs">Product</Label>
-                    <Select
-                      value={line.productId ? String(line.productId) : "manual"}
-                      onValueChange={(v) => v !== "manual" && selectProduct(index, v)}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      onClick={() => setProductPickerLine(index)}
                     >
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select product" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manual">Manual Item</SelectItem>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={String(product.id)}>
-                            {product.productdescription}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <span className={cn("truncate", !line.description && "text-muted-foreground")}>
+                        {line.description || "Select product"}
+                      </span>
+                      <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-50" />
+                    </Button>
                   </div>
                   <FormField label="Description" value={line.description} onChange={(v) => updateLine(index, { description: v })} />
                   <FormField label="Qty" type="number" value={String(line.quantity)} onChange={(v) => updateLine(index, { quantity: Number(v) })} />
@@ -578,6 +577,42 @@ export default function InvoiceNewPage() {
           </div>
         </div>
       </div>
+
+      <SearchablePickerDialog<Customer>
+        open={customerPickerOpen}
+        onOpenChange={setCustomerPickerOpen}
+        title="Select customer"
+        placeholder="Search customers by name, company, email…"
+        fetchItems={fetchCustomers}
+        getKey={(customer) => customer._id}
+        renderItem={(customer) => ({
+          title: customer.company || customer.name,
+          subtitle: [customer.name, customer.email, customer.contactNumber].filter(Boolean).join(" · "),
+        })}
+        onSelect={selectCustomer}
+        manualEntryLabel="Enter customer manually"
+        onManualEntry={clearCustomer}
+      />
+
+      <SearchablePickerDialog<Product>
+        open={productPickerLine !== null}
+        onOpenChange={(open) => {
+          if (!open) setProductPickerLine(null)
+        }}
+        title="Select product"
+        placeholder="Search products by description, code, HSN…"
+        fetchItems={fetchProducts}
+        getKey={(product) => String(product.id)}
+        renderItem={(product) => ({
+          title: product.productdescription,
+          subtitle: [product.productcode, product.unitprice != null ? `₹${product.unitprice}` : null]
+            .filter(Boolean)
+            .join(" · "),
+        })}
+        onSelect={(product) => {
+          if (productPickerLine !== null) selectProduct(productPickerLine, product)
+        }}
+      />
     </AppLayout>
   )
 }
