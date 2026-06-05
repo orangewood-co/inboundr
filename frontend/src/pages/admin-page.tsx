@@ -5,12 +5,14 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,6 +29,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { API_ORIGIN } from "@/lib/env"
 
 interface Plan {
@@ -58,6 +61,45 @@ interface AdminSummary {
   pendingInvites: number
 }
 
+interface AdminUserMembership {
+  _id: string
+  organizationId: string
+  userId: string
+  role: "owner" | "admin" | "member"
+  createdAt: string
+  organization: {
+    _id: string
+    name: string
+    status: "active" | "suspended"
+    ownerUserId: string
+  } | null
+}
+
+interface AdminUser {
+  id: string
+  name: string
+  email: string
+  image: string | null
+  emailVerified: boolean | null
+  lastSignInAt: string | null
+  createdAt: string
+  memberships: AdminUserMembership[]
+}
+
+interface AdminUsersPagination {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+interface AdminUsersSummary {
+  total: number
+  matching: number
+  withMemberships: number
+  withoutMemberships: number
+}
+
 const emptySummary: AdminSummary = {
   total: 0,
   active: 0,
@@ -66,8 +108,43 @@ const emptySummary: AdminSummary = {
   pendingInvites: 0,
 }
 
+const emptyUsersSummary: AdminUsersSummary = {
+  total: 0,
+  matching: 0,
+  withMemberships: 0,
+  withoutMemberships: 0,
+}
+
+const emptyUsersPagination: AdminUsersPagination = {
+  page: 1,
+  limit: 10,
+  total: 0,
+  totalPages: 1,
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Never recorded"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Never recorded"
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
+}
+
+function getInitials(value?: string | null) {
+  const fallback = value?.trim() || "User"
+  return fallback
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "U"
+}
+
+function directImageUrl(value?: string | null) {
+  const source = value?.trim() ?? ""
+  return /^https?:\/\//i.test(source) || source.startsWith("data:") || source.startsWith("blob:") ? source : undefined
 }
 
 function planLabel(plans: Plan[], slug: string) {
@@ -95,19 +172,40 @@ function StatCard({ title, value, icon: Icon }: { title: string; value: number; 
 
 export default function AdminPage() {
   const [organizations, setOrganizations] = useState<AdminOrganization[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [plans, setPlans] = useState<Plan[]>([])
   const [summary, setSummary] = useState<AdminSummary>(emptySummary)
+  const [usersSummary, setUsersSummary] = useState<AdminUsersSummary>(emptyUsersSummary)
+  const [usersPagination, setUsersPagination] = useState<AdminUsersPagination>(emptyUsersPagination)
   const [loading, setLoading] = useState(true)
+  const [usersLoading, setUsersLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [search, setSearch] = useState("")
+  const [userSearch, setUserSearch] = useState("")
+  const [userPage, setUserPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState("all")
   const [planFilter, setPlanFilter] = useState("all")
   const [name, setName] = useState("")
   const [ownerEmail, setOwnerEmail] = useState("")
   const [planSlug, setPlanSlug] = useState("all_features")
+  const [membershipOrganizationId, setMembershipOrganizationId] = useState("")
+  const [membershipRole, setMembershipRole] = useState<"admin" | "member">("member")
+  const [membershipBusy, setMembershipBusy] = useState<string | null>(null)
+  const [moveMembership, setMoveMembership] = useState<AdminUserMembership | null>(null)
+  const [moveOrganizationId, setMoveOrganizationId] = useState("")
+  const [moveRole, setMoveRole] = useState<"admin" | "member">("member")
 
   const visiblePlans = useMemo(() => plans.filter((plan) => plan.slug !== "all_features"), [plans])
+  const membershipOrganizationOptions = useMemo(
+    () => organizations.filter((organization) => !selectedUser?.memberships.some((membership) => membership.organizationId === organization._id)),
+    [organizations, selectedUser?.memberships]
+  )
+  const moveOrganizationOptions = useMemo(
+    () => organizations.filter((organization) => organization._id !== moveMembership?.organizationId),
+    [moveMembership?.organizationId, organizations]
+  )
   const filteredOrganizations = useMemo(() => {
     const query = search.trim().toLowerCase()
     return organizations.filter((organization) => {
@@ -119,6 +217,47 @@ export default function AdminPage() {
       return matchesSearch && matchesStatus && matchesPlan
     })
   }, [organizations, planFilter, search, statusFilter])
+
+  function syncSelectedUser(nextUsers: AdminUser[]) {
+    if (!selectedUser) return
+    const nextSelectedUser = nextUsers.find((user) => user.id === selectedUser.id)
+    if (nextSelectedUser) setSelectedUser(nextSelectedUser)
+  }
+
+  function updateUserMemberships(userId: string, updater: (memberships: AdminUserMembership[]) => AdminUserMembership[]) {
+    setUsers((current) => {
+      const next = current.map((user) =>
+        user.id === userId ? { ...user, memberships: updater(user.memberships) } : user
+      )
+      return next
+    })
+    setSelectedUser((current) =>
+      current && current.id === userId ? { ...current, memberships: updater(current.memberships) } : current
+    )
+  }
+
+  async function loadUsers(page = userPage, query = userSearch) {
+    setUsersLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(usersPagination.limit),
+      })
+      if (query.trim()) params.set("q", query.trim())
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/users?${params.toString()}`, { credentials: "include" })
+      if (!response.ok) throw new Error("Failed to load users")
+      const data = await response.json()
+      const nextUsers = data.users ?? []
+      setUsers(nextUsers)
+      setUsersPagination(data.pagination ?? emptyUsersPagination)
+      setUsersSummary(data.summary ?? emptyUsersSummary)
+      syncSelectedUser(nextUsers)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load users")
+    } finally {
+      setUsersLoading(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -166,9 +305,123 @@ export default function AdminPage() {
     }
   }
 
+  async function addMembership() {
+    if (!selectedUser || !membershipOrganizationId) return
+    setMembershipBusy("add")
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/users/${encodeURIComponent(selectedUser.id)}/memberships`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: membershipOrganizationId, role: membershipRole }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to add membership")
+      }
+      const data = await response.json()
+      updateUserMemberships(selectedUser.id, (memberships) => [...memberships, data.member])
+      setMembershipOrganizationId("")
+      setMembershipRole("member")
+      toast.success("Membership added")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add membership")
+    } finally {
+      setMembershipBusy(null)
+    }
+  }
+
+  async function updateMembershipRole(membership: AdminUserMembership, role: "admin" | "member") {
+    if (!selectedUser) return
+    setMembershipBusy(membership._id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${membership.organizationId}/members/${membership._id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to update membership")
+      }
+      updateUserMemberships(selectedUser.id, (memberships) =>
+        memberships.map((item) => item._id === membership._id ? { ...item, role } : item)
+      )
+      toast.success("Membership updated")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update membership")
+    } finally {
+      setMembershipBusy(null)
+    }
+  }
+
+  async function removeMembership(membership: AdminUserMembership) {
+    if (!selectedUser) return
+    setMembershipBusy(membership._id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${membership.organizationId}/members/${membership._id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to remove membership")
+      }
+      updateUserMemberships(selectedUser.id, (memberships) => memberships.filter((item) => item._id !== membership._id))
+      toast.success("Membership removed")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove membership")
+    } finally {
+      setMembershipBusy(null)
+    }
+  }
+
+  function openMoveMembership(membership: AdminUserMembership) {
+    setMoveMembership(membership)
+    setMoveRole(membership.role === "admin" ? "admin" : "member")
+    setMoveOrganizationId(organizations.find((organization) => organization._id !== membership.organizationId)?._id ?? "")
+  }
+
+  async function moveSelectedMembership() {
+    if (!selectedUser || !moveMembership || !moveOrganizationId) return
+    setMembershipBusy(moveMembership._id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${moveMembership.organizationId}/members/${moveMembership._id}/move`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetOrganizationId: moveOrganizationId, role: moveRole }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to move membership")
+      }
+      const data = await response.json()
+      updateUserMemberships(selectedUser.id, (memberships) =>
+        memberships.map((item) => item._id === moveMembership._id ? data.member : item)
+      )
+      setMoveMembership(null)
+      setMoveOrganizationId("")
+      setMoveRole("member")
+      toast.success("Membership moved")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to move membership")
+    } finally {
+      setMembershipBusy(null)
+    }
+  }
+
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadUsers(userPage, userSearch)
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [userPage, userSearch])
 
   return (
     <AppLayout>
@@ -183,7 +436,7 @@ export default function AdminPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => void load()}>
+              <Button variant="outline" onClick={() => { void load(); void loadUsers() }}>
                 <RefreshCwIcon className="mr-2 size-4" />
                 Refresh
               </Button>
@@ -243,86 +496,375 @@ export default function AdminPage() {
             <StatCard title="Pending Invites" value={summary.pendingInvites} icon={MailIcon} />
           </section>
 
-          <section className="rounded-2xl border bg-background">
-            <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="font-semibold">Organizations</h2>
-                <p className="text-sm text-muted-foreground">Filter tenants by owner, status, and plan.</p>
-              </div>
-              <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_150px_170px]">
-                <div className="relative">
-                  <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or owner" />
+          <Tabs defaultValue="organizations" className="gap-4">
+            <TabsList>
+              <TabsTrigger value="organizations">Organizations</TabsTrigger>
+              <TabsTrigger value="users">Users</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="organizations" className="mt-0">
+              <section className="rounded-2xl border bg-background">
+                <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="font-semibold">Organizations</h2>
+                    <p className="text-sm text-muted-foreground">Filter tenants by owner, status, and plan.</p>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_150px_170px]">
+                    <div className="relative">
+                      <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or owner" />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="suspended">Suspended</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={planFilter} onValueChange={setPlanFilter}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Plans</SelectItem>
+                        {plans.map((plan) => (
+                          <SelectItem key={plan.slug} value={plan.slug}>{plan.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={planFilter} onValueChange={setPlanFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Plans</SelectItem>
-                    {plans.map((plan) => (
-                      <SelectItem key={plan.slug} value={plan.slug}>{plan.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Separator />
-            {loading ? (
-              <div className="flex h-64 items-center justify-center">
-                <Spinner />
-              </div>
-            ) : (
+                <Separator />
+                {loading ? (
+                  <div className="flex h-64 items-center justify-center">
+                    <Spinner />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-5">Organization</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Features</TableHead>
+                        <TableHead>People</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOrganizations.map((organization) => (
+                        <TableRow key={organization._id}>
+                          <TableCell className="pl-5">
+                            <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
+                              {organization.name}
+                            </Link>
+                            <div className="text-xs text-muted-foreground">{organization.owner?.email ?? "Owner pending"}</div>
+                          </TableCell>
+                          <TableCell className="capitalize">{planLabel(plans, organization.entitlements.planSlug)}</TableCell>
+                          <TableCell>
+                            <div className="flex max-w-72 flex-wrap gap-1">
+                              {organization.entitlements.effectiveFeatures.map((feature) => (
+                                <Badge key={feature} variant="secondary">{featureLabel(feature)}</Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{organization.memberCount} members</div>
+                            <div className="text-xs text-muted-foreground">{organization.pendingInviteCount} invites</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={organization.status === "active" ? "default" : "destructive"} className="capitalize">{organization.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{formatDate(organization.createdAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </section>
+            </TabsContent>
+
+            <TabsContent value="users" className="mt-0">
+              <section className="rounded-2xl border bg-background">
+                <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="font-semibold">Users</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {usersSummary.matching} matching users · {usersSummary.withMemberships} with memberships
+                    </p>
+                  </div>
+                  <div className="relative w-full max-w-sm">
+                    <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      value={userSearch}
+                      onChange={(event) => {
+                        setUserPage(1)
+                        setUserSearch(event.target.value)
+                      }}
+                      placeholder="Search name, email, or ID"
+                    />
+                  </div>
+                </div>
+                <Separator />
+                {usersLoading ? (
+                  <div className="flex h-64 items-center justify-center">
+                    <Spinner />
+                  </div>
+                ) : (
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="pl-5">User</TableHead>
+                          <TableHead>Memberships</TableHead>
+                          <TableHead>Last Signed In</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="pl-5">
+                              <div className="flex items-center gap-3">
+                                <Avatar>
+                                  <AvatarImage src={directImageUrl(user.image)} alt={user.name || user.email || "User"} />
+                                  <AvatarFallback>{getInitials(user.name || user.email)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{user.name || user.email || user.id}</div>
+                                  <div className="text-xs text-muted-foreground">{user.email || user.id}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex max-w-80 flex-wrap gap-1">
+                                {user.memberships.length === 0 ? (
+                                  <span className="text-xs text-muted-foreground">No memberships</span>
+                                ) : user.memberships.slice(0, 3).map((membership) => (
+                                  <Badge key={membership._id} variant="secondary">
+                                    {membership.organization?.name ?? "Unknown Organization"}
+                                  </Badge>
+                                ))}
+                                {user.memberships.length > 3 && (
+                                  <Badge variant="outline">+{user.memberships.length - 3}</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{formatDateTime(user.lastSignInAt)}</TableCell>
+                            <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
+                                Manage Memberships
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <div className="flex flex-col gap-3 border-t p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Page {usersPagination.page} of {usersPagination.totalPages} · {usersPagination.total} users
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUserPage((page) => Math.max(1, page - 1))}
+                          disabled={usersPagination.page <= 1 || usersLoading}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUserPage((page) => Math.min(usersPagination.totalPages, page + 1))}
+                          disabled={usersPagination.page >= usersPagination.totalPages || usersLoading}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+      <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedUser(null)
+          setMoveMembership(null)
+          setMembershipOrganizationId("")
+          setMembershipRole("member")
+        }
+      }}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Manage Memberships</DialogTitle>
+            <DialogDescription>
+              Manage organization access for {selectedUser?.email || selectedUser?.id || "this user"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-5">
+            <div className="rounded-xl border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-5">Organization</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Features</TableHead>
-                    <TableHead>People</TableHead>
+                    <TableHead>Organization</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrganizations.map((organization) => (
-                    <TableRow key={organization._id}>
-                      <TableCell className="pl-5">
-                        <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
-                          {organization.name}
-                        </Link>
-                        <div className="text-xs text-muted-foreground">{organization.owner?.email ?? "Owner pending"}</div>
+                  {selectedUser?.memberships.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                        No Memberships
                       </TableCell>
-                      <TableCell className="capitalize">{planLabel(plans, organization.entitlements.planSlug)}</TableCell>
+                    </TableRow>
+                  ) : selectedUser?.memberships.map((membership) => (
+                    <TableRow key={membership._id}>
                       <TableCell>
-                        <div className="flex max-w-72 flex-wrap gap-1">
-                          {organization.entitlements.effectiveFeatures.map((feature) => (
-                            <Badge key={feature} variant="secondary">{featureLabel(feature)}</Badge>
-                          ))}
+                        <div className="font-medium">{membership.organization?.name ?? "Unknown Organization"}</div>
+                        <div className="text-xs text-muted-foreground">{membership.organizationId}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={membership.organization?.status === "suspended" ? "destructive" : "default"} className="capitalize">
+                          {membership.organization?.status ?? "active"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {membership.role === "owner" ? (
+                          <Badge>Owner</Badge>
+                        ) : (
+                          <Select
+                            value={membership.role}
+                            onValueChange={(role) => void updateMembershipRole(membership, role as "admin" | "member")}
+                            disabled={membershipBusy === membership._id}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="member">Member</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMoveMembership(membership)}
+                            disabled={membership.role === "owner" || membershipBusy === membership._id}
+                          >
+                            Move User
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => void removeMembership(membership)}
+                            disabled={membership.role === "owner" || membershipBusy === membership._id}
+                          >
+                            Remove Member
+                          </Button>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{organization.memberCount} members</div>
-                        <div className="text-xs text-muted-foreground">{organization.pendingInviteCount} invites</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={organization.status === "active" ? "default" : "destructive"} className="capitalize">{organization.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(organization.createdAt)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </section>
-        </div>
-      </main>
+            </div>
+
+            <div className="rounded-xl border p-4">
+              <h3 className="font-semibold">Add to Organization</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Add this user to an existing organization with a selected role.</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_160px_auto]">
+                <Select value={membershipOrganizationId} onValueChange={setMembershipOrganizationId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {membershipOrganizationOptions.map((organization) => (
+                      <SelectItem key={organization._id} value={organization._id}>
+                        {organization.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={membershipRole} onValueChange={(role) => setMembershipRole(role as "admin" | "member")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="member">Member</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => void addMembership()} disabled={!membershipOrganizationId || membershipBusy === "add"}>
+                  {membershipBusy === "add" && <Spinner className="mr-2 size-4" />}
+                  Add Membership
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(moveMembership)} onOpenChange={(open) => !open && setMoveMembership(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move User</DialogTitle>
+            <DialogDescription>
+              Move this membership to another organization. Owner memberships cannot be moved.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label>Target organization</Label>
+              <Select value={moveOrganizationId} onValueChange={setMoveOrganizationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  {moveOrganizationOptions.map((organization) => (
+                    <SelectItem key={organization._id} value={organization._id}>
+                      {organization.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Target role</Label>
+              <Select value={moveRole} onValueChange={(role) => setMoveRole(role as "admin" | "member")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="member">Member</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveMembership(null)} disabled={Boolean(membershipBusy)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void moveSelectedMembership()} disabled={!moveOrganizationId || Boolean(membershipBusy)}>
+              {membershipBusy && <Spinner className="mr-2 size-4" />}
+              Move User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

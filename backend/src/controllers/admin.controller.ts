@@ -70,6 +70,39 @@ function serializeMember(member: any, user?: any) {
   };
 }
 
+function serializeUserMembership(member: any, organization?: any) {
+  return {
+    _id: member._id,
+    organizationId: member.organizationId,
+    userId: member.userId,
+    role: member.role,
+    createdAt: member.createdAt,
+    updatedAt: member.updatedAt,
+    organization: organization
+      ? {
+          _id: organization._id,
+          name: organization.name,
+          status: organization.status ?? "active",
+          ownerUserId: organization.ownerUserId,
+        }
+      : null,
+  };
+}
+
+function serializeAdminUser(user: any, memberships: any[]) {
+  return {
+    id: user.id,
+    name: user.name ?? "",
+    email: user.email ?? "",
+    image: user.image ?? null,
+    emailVerified: user.emailVerified ?? null,
+    lastSignInAt: user.lastSignInAt ?? null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    memberships,
+  };
+}
+
 async function getUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) return new Map<string, any>();
@@ -109,6 +142,22 @@ async function getUsersByEmails(emails: string[]) {
     .toArray();
 
   return new Map(users.map((user) => [String(user.email).toLowerCase(), user]));
+}
+
+async function getUserById(userId: string) {
+  const db = mongoose.connection.db;
+  if (!db) return null;
+
+  const objectIds = mongoose.Types.ObjectId.isValid(userId)
+    ? [new mongoose.Types.ObjectId(userId)]
+    : [];
+
+  return db.collection("user").findOne({
+    $or: [
+      { id: userId },
+      ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
+    ],
+  });
 }
 
 async function createInvitation({
@@ -232,6 +281,89 @@ export async function listAdminOrganizations(_req: Request, res: Response): Prom
   } catch (err) {
     console.error("Error listing admin organizations:", err);
     res.status(500).json({ error: "Failed to list organizations" });
+  }
+}
+
+export async function listAdminUsers(req: Request, res: Response): Promise<void> {
+  try {
+    const db = mongoose.connection.db;
+    if (!db) {
+      res.status(500).json({ error: "Database is not available" });
+      return;
+    }
+
+    const q = stringValue(req.query.q).toLowerCase();
+    const page = Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit ?? "10"), 10) || 10));
+    const skip = (page - 1) * limit;
+    const escapedQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const filter = q
+      ? {
+          $or: [
+            { name: { $regex: escapedQuery, $options: "i" } },
+            { email: { $regex: escapedQuery, $options: "i" } },
+            { id: { $regex: escapedQuery, $options: "i" } },
+          ],
+        }
+      : {};
+
+    const [users, total, totalUsers] = await Promise.all([
+      db
+        .collection("user")
+        .find(filter)
+        .project({
+          id: 1,
+          name: 1,
+          email: 1,
+          image: 1,
+          emailVerified: 1,
+          lastSignInAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .sort({ createdAt: -1, _id: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      db.collection("user").countDocuments(filter),
+      db.collection("user").countDocuments({}),
+    ]);
+
+    const userIds = users.map((user) => user.id).filter(Boolean);
+    const memberships = await OrganizationMember.find({ userId: { $in: userIds } })
+      .sort({ createdAt: 1 })
+      .lean();
+    const organizationIds = [...new Set(memberships.map((membership) => String(membership.organizationId)))];
+    const organizations = await Organization.find({ _id: { $in: organizationIds } }).lean();
+    const organizationById = new Map(organizations.map((organization) => [String(organization._id), organization]));
+    const membershipsByUserId = new Map<string, any[]>();
+
+    for (const membership of memberships) {
+      const list = membershipsByUserId.get(membership.userId) ?? [];
+      list.push(serializeUserMembership(membership, organizationById.get(String(membership.organizationId))));
+      membershipsByUserId.set(membership.userId, list);
+    }
+
+    const usersWithMemberships = await OrganizationMember.distinct("userId");
+
+    res.json({
+      users: users.map((user) => serializeAdminUser(user, membershipsByUserId.get(user.id) ?? [])),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+      summary: {
+        total: totalUsers,
+        matching: total,
+        withMemberships: usersWithMemberships.length,
+        withoutMemberships: Math.max(0, totalUsers - usersWithMemberships.length),
+      },
+    });
+  } catch (err) {
+    console.error("Error listing admin users:", err);
+    res.status(500).json({ error: "Failed to list users" });
   }
 }
 
@@ -404,6 +536,61 @@ export async function inviteAdminOrganizationMember(req: Request, res: Response)
   }
 }
 
+export async function addAdminUserMembership(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = stringValue(req.params.userId);
+    const organizationId = stringValue(req.body?.organizationId);
+    const role = normalizeMoveRole(req.body?.role);
+
+    if (!userId) {
+      res.status(400).json({ error: "User id is required" });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+      res.status(400).json({ error: "Invalid organization id" });
+      return;
+    }
+
+    const [user, organization] = await Promise.all([
+      getUserById(userId),
+      Organization.findById(organizationId).lean(),
+    ]);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    const existingMember = await OrganizationMember.findOne({
+      organizationId,
+      userId: user.id,
+    }).lean();
+    if (existingMember) {
+      res.status(409).json({ error: "User is already a member of this organization" });
+      return;
+    }
+
+    const member = await OrganizationMember.create({
+      organizationId,
+      userId: user.id,
+      role,
+    });
+
+    res.status(201).json({
+      member: serializeUserMembership(member.toObject(), organization),
+    });
+  } catch (err: any) {
+    console.error("Error adding admin user membership:", err);
+    res.status(err?.code === 11000 ? 409 : 500).json({
+      error: err?.code === 11000 ? "User is already a member of this organization" : "Failed to add user membership",
+    });
+  }
+}
+
 export async function updateAdminOrganizationMember(req: Request, res: Response): Promise<void> {
   try {
     const organizationId = stringValue(req.params.id);
@@ -488,6 +675,8 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
     }
 
     let movedUserId = "";
+    let movedMember: any = null;
+    let movedOrganization: any = null;
 
     await mongoSession.withTransaction(async () => {
       const [sourceOrganization, targetOrganization, member] = await Promise.all([
@@ -516,8 +705,9 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
       }
 
       movedUserId = member.userId;
+      movedOrganization = targetOrganization.toObject();
       await member.deleteOne({ session: mongoSession });
-      await OrganizationMember.create(
+      const createdMembers = await OrganizationMember.create(
         [
           {
             organizationId: targetOrganization._id,
@@ -527,9 +717,18 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
         ],
         { session: mongoSession }
       );
+      const createdMember = createdMembers[0];
+      if (!createdMember) throw httpError("Failed to create target membership", 500);
+      movedMember = createdMember.toObject();
     });
 
-    res.json({ ok: true, userId: movedUserId, targetOrganizationId, role });
+    res.json({
+      ok: true,
+      userId: movedUserId,
+      targetOrganizationId,
+      role,
+      member: movedMember ? serializeUserMembership(movedMember, movedOrganization) : null,
+    });
   } catch (err: any) {
     console.error("Error moving admin organization member:", err);
     const statusCode = err?.statusCode || (err?.code === 11000 ? 409 : 500);
