@@ -175,73 +175,65 @@ export default function AdminPage() {
       <SiteHeader breadcrumbs={[{ label: "Super Admin" }]} />
       <main className="h-full overflow-y-auto bg-muted/20 p-4 md:p-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-6">
-          <section className="overflow-hidden rounded-2xl border bg-background">
-            <div className="relative p-6">
-              <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.18),transparent_45%)]" />
-              <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <CrownIcon className="size-5" />
-                  </div>
-                  <h1 className="text-2xl font-semibold tracking-tight">Control every tenant from one place.</h1>
-                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                    Create production organizations, invite owners, and assign feature access through plans and overrides.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => void load()}>
-                    <RefreshCwIcon className="mr-2 size-4" />
-                    Refresh
-                  </Button>
-                  <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <PlusIcon className="mr-2 size-4" />
-                        New Organization
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Create Organization</DialogTitle>
-                        <DialogDescription>
-                          Create a tenant and optionally send an owner invitation.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={createOrganization} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="org-name">Organization name</Label>
-                          <Input id="org-name" value={name} onChange={(event) => setName(event.target.value)} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="owner-email">Owner email</Label>
-                          <Input id="owner-email" type="email" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} placeholder="founder@company.com" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Plan</Label>
-                          <Select value={planSlug} onValueChange={setPlanSlug}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select plan" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(visiblePlans.length ? visiblePlans : plans).map((plan) => (
-                                <SelectItem key={plan.slug} value={plan.slug}>
-                                  {plan.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button className="w-full" type="submit" disabled={creating}>
-                          {creating ? <Spinner className="mr-2 size-4" /> : <SendIcon className="mr-2 size-4" />}
-                          Create and Invite
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Super Admin</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Create production organizations, invite owners, and assign feature access through plans and overrides.
+              </p>
             </div>
-          </section>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => void load()}>
+                <RefreshCwIcon className="mr-2 size-4" />
+                Refresh
+              </Button>
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <PlusIcon className="mr-2 size-4" />
+                    New Organization
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Organization</DialogTitle>
+                    <DialogDescription>
+                      Create a tenant and optionally send an owner invitation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={createOrganization} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="org-name">Organization name</Label>
+                      <Input id="org-name" value={name} onChange={(event) => setName(event.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="owner-email">Owner email</Label>
+                      <Input id="owner-email" type="email" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} placeholder="founder@company.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Plan</Label>
+                      <Select value={planSlug} onValueChange={setPlanSlug}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select plan" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(visiblePlans.length ? visiblePlans : plans).map((plan) => (
+                            <SelectItem key={plan.slug} value={plan.slug}>
+                              {plan.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button className="w-full" type="submit" disabled={creating}>
+                      {creating ? <Spinner className="mr-2 size-4" /> : <SendIcon className="mr-2 size-4" />}
+                      Create and Invite
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
 
           <section className="grid gap-4 md:grid-cols-5">
             <StatCard title="Organizations" value={summary.total} icon={Building2Icon} />
@@ -320,7 +312,7 @@ export default function AdminPage() {
                         <div className="text-xs text-muted-foreground">{organization.pendingInviteCount} invites</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={organization.status === "active" ? "default" : "destructive"}>{organization.status}</Badge>
+                        <Badge variant={organization.status === "active" ? "default" : "destructive"} className="capitalize">{organization.status}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(organization.createdAt)}</TableCell>
                     </TableRow>
