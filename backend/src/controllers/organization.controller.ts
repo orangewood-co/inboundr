@@ -87,7 +87,7 @@ function normalizePaymentTerms(value: unknown, defaultTerms: string) {
 async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) {
-    return new Map<string, { name?: string; email?: string; lastSignInAt?: Date }>();
+    return new Map<string, { name?: string; email?: string; lastSignInAt?: Date; image?: string }>();
   }
 
   const objectIds = userIds
@@ -102,10 +102,10 @@ async function resolveUsersByIds(userIds: string[]) {
         ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
       ],
     })
-    .project({ id: 1, name: 1, email: 1, lastSignInAt: 1 })
+    .project({ id: 1, name: 1, email: 1, lastSignInAt: 1, image: 1 })
     .toArray();
 
-  const map = new Map<string, { name?: string; email?: string; lastSignInAt?: Date }>();
+  const map = new Map<string, { name?: string; email?: string; lastSignInAt?: Date; image?: string }>();
   for (const user of users) {
     map.set(user.id as string, user);
     map.set(String(user._id), user);
@@ -372,6 +372,7 @@ export async function listOrganizationMembers(
         ...member,
         userName: user?.name ?? null,
         userEmail: user?.email ?? null,
+        userImage: user?.image ?? null,
         lastSignInAt: user?.lastSignInAt ?? null,
       };
     });

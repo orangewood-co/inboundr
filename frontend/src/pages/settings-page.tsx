@@ -14,6 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -31,7 +38,7 @@ import { ThemePicker } from "@/components/theme-picker"
 import { useTheme } from "@/components/theme-provider"
 import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
-import { setActiveOrganizationId } from "@/lib/organization-context"
+import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organization-context"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -41,7 +48,9 @@ import {
   CrownIcon,
   ImageIcon,
   KeyIcon,
+  LogOutIcon,
   MailIcon,
+  MoreVerticalIcon,
   PlusIcon,
   Trash2Icon,
   UsersIcon,
@@ -149,6 +158,7 @@ interface OrganizationMember {
   userId: string
   userName: string | null
   userEmail: string | null
+  userImage: string | null
   role: OrganizationRole
   createdAt: string
   lastSignInAt: string | null
@@ -1384,6 +1394,7 @@ function MembersTab() {
   const [transferTarget, setTransferTarget] = useState<OrganizationMember | null>(null)
   const [transferConfirmation, setTransferConfirmation] = useState("")
   const [transferringId, setTransferringId] = useState<string | null>(null)
+  const [memberAvatars, setMemberAvatars] = useState<Record<string, string>>({})
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -1427,6 +1438,38 @@ function MembersTab() {
   useEffect(() => {
     void fetchMembers()
   }, [fetchMembers])
+
+  useEffect(() => {
+    let cancelled = false
+    const pending = members.filter(
+      (member) => member.userImage && !memberAvatars[member.userId],
+    )
+    if (pending.length === 0) return
+
+    void Promise.all(
+      pending.map(async (member) => {
+        try {
+          const url = await resolveUploadedImageUrl(member.userImage as string)
+          return [member.userId, url] as const
+        } catch {
+          return null
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return
+      const resolved = entries.filter((entry): entry is readonly [string, string] => entry !== null)
+      if (resolved.length === 0) return
+      setMemberAvatars((prev) => {
+        const next = { ...prev }
+        for (const [userId, url] of resolved) next[userId] = url
+        return next
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [members, memberAvatars])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -1522,6 +1565,26 @@ function MembersTab() {
     }
   }
 
+  const leaveOrganization = async (id: string) => {
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/members/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to leave organization")
+      }
+      window.localStorage.removeItem(ACTIVE_ORGANIZATION_ID_KEY)
+      toast.success("You left the organization")
+      window.location.href = "/"
+    } catch (err: any) {
+      setError(err.message || "Failed to leave organization")
+      toast.error(err.message || "Failed to leave organization")
+    }
+  }
+
   const openTransferDialog = (member: OrganizationMember) => {
     setTransferTarget(member)
     setTransferConfirmation("")
@@ -1610,11 +1673,24 @@ function MembersTab() {
           ) : members.map((member) => (
             <div key={member._id} className="flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-muted/30">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {(member.userName ?? member.userEmail ?? member.userId).slice(0, 1).toUpperCase()}
-                </div>
+                <Avatar size="lg">
+                  <AvatarImage
+                    src={memberAvatars[member.userId] || undefined}
+                    alt={member.userName ?? member.userEmail ?? "Member"}
+                  />
+                  <AvatarFallback className="bg-primary/10 font-bold text-primary">
+                    {(member.userName ?? member.userEmail ?? member.userId).slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <div>
-                  <p className="text-sm font-medium">{member.userName ?? member.userEmail ?? member.userId}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{member.userName ?? member.userEmail ?? member.userId}</p>
+                    {member.userId === currentUserId && (
+                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        You
+                      </span>
+                    )}
+                  </div>
                   {member.userEmail && (
                     <p className="text-xs text-muted-foreground">{member.userEmail}</p>
                   )}
@@ -1629,22 +1705,35 @@ function MembersTab() {
               <div className="flex items-center gap-3">
                 <RoleBadge role={toRoleLabel(member.role)} />
                 {member.role !== "owner" && (
-                  <>
-                    {isCurrentUserOwner && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => openTransferDialog(member)}
-                      >
-                        <CrownIcon className="size-3.5" />
-                        Transfer ownership
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" aria-label="Member actions">
+                        <MoreVerticalIcon className="size-4" />
                       </Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => removeMember(member._id)}>
-                      Remove
-                    </Button>
-                  </>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {isCurrentUserOwner && member.userId !== currentUserId && (
+                        <>
+                          <DropdownMenuItem onSelect={() => openTransferDialog(member)}>
+                            <CrownIcon />
+                            Transfer Ownership
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      {member.userId === currentUserId ? (
+                        <DropdownMenuItem variant="destructive" onSelect={() => void leaveOrganization(member._id)}>
+                          <LogOutIcon />
+                          Leave
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem variant="destructive" onSelect={() => void removeMember(member._id)}>
+                          <Trash2Icon />
+                          Remove Member
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </div>
@@ -1697,7 +1786,7 @@ function MembersTab() {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Transfer ownership</DialogTitle>
+          <DialogTitle>Transfer Ownership</DialogTitle>
           <DialogDescription>
             This immediately makes {transferTarget?.userName ?? transferTarget?.userEmail ?? "this member"} the organization owner.
             Your role will become Admin.
@@ -1740,7 +1829,7 @@ function MembersTab() {
             disabled={!transferConfirmationMatches || Boolean(transferringId)}
           >
             {transferringId && <Spinner data-icon="inline-start" />}
-            Transfer ownership
+            Transfer Ownership
           </Button>
         </DialogFooter>
       </DialogContent>
