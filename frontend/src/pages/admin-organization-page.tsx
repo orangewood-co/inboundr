@@ -195,11 +195,6 @@ export default function AdminOrganizationPage() {
     [moveOrganizationId, targetOrganizations]
   )
 
-  function setOrganizationStatus(status: "active" | "suspended") {
-    if (!organization) return
-    setOrganization({ ...organization, status })
-  }
-
   async function load() {
     setLoading(true)
     try {
