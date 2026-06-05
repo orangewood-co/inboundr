@@ -7,6 +7,7 @@ import {
   getAdminPlans,
   inviteAdminOrganizationMember,
   listAdminOrganizations,
+  moveAdminOrganizationMember,
   removeAdminOrganizationMember,
   transferAdminOrganizationOwner,
   updateAdminOrganizationMember,
@@ -28,6 +29,7 @@ router.post("/organizations/:id/invitations", inviteAdminOrganizationMember);
 router.delete("/organizations/:id/invitations/:invitationId", cancelAdminOrganizationInvitation);
 router.patch("/organizations/:id/members/:memberId", updateAdminOrganizationMember);
 router.delete("/organizations/:id/members/:memberId", removeAdminOrganizationMember);
+router.post("/organizations/:id/members/:memberId/move", moveAdminOrganizationMember);
 router.post("/organizations/:id/members/:memberId/transfer-owner", transferAdminOrganizationOwner);
 
 export default router;

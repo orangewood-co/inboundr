@@ -33,6 +33,16 @@ function normalizeRole(value: unknown): OrganizationRole {
   return value === "owner" || value === "admin" ? value : "member";
 }
 
+function normalizeMoveRole(value: unknown): Exclude<OrganizationRole, "owner"> {
+  return value === "admin" ? "admin" : "member";
+}
+
+function httpError(message: string, statusCode: number): Error {
+  const error = new Error(message);
+  (error as any).statusCode = statusCode;
+  return error;
+}
+
 function publicInvitation(invitation: any) {
   return {
     _id: invitation._id,
@@ -451,6 +461,83 @@ export async function removeAdminOrganizationMember(req: Request, res: Response)
   } catch (err) {
     console.error("Error removing admin organization member:", err);
     res.status(500).json({ error: "Failed to remove member" });
+  }
+}
+
+export async function moveAdminOrganizationMember(req: Request, res: Response): Promise<void> {
+  const mongoSession = await mongoose.startSession();
+
+  try {
+    const sourceOrganizationId = stringValue(req.params.id);
+    const memberId = stringValue(req.params.memberId);
+    const targetOrganizationId = stringValue(req.body?.targetOrganizationId);
+    const role = normalizeMoveRole(req.body?.role);
+
+    if (
+      !mongoose.Types.ObjectId.isValid(sourceOrganizationId) ||
+      !mongoose.Types.ObjectId.isValid(memberId) ||
+      !mongoose.Types.ObjectId.isValid(targetOrganizationId)
+    ) {
+      res.status(400).json({ error: "Invalid organization or member id" });
+      return;
+    }
+
+    if (sourceOrganizationId === targetOrganizationId) {
+      res.status(400).json({ error: "Choose a different target organization" });
+      return;
+    }
+
+    let movedUserId = "";
+
+    await mongoSession.withTransaction(async () => {
+      const [sourceOrganization, targetOrganization, member] = await Promise.all([
+        Organization.findById(sourceOrganizationId).session(mongoSession),
+        Organization.findById(targetOrganizationId).session(mongoSession),
+        OrganizationMember.findOne({ _id: memberId, organizationId: sourceOrganizationId }).session(mongoSession),
+      ]);
+
+      if (!sourceOrganization || !targetOrganization) {
+        throw httpError("Organization not found", 404);
+      }
+      if (!member) {
+        throw httpError("Member not found", 404);
+      }
+      if (member.role === "owner") {
+        throw httpError("Transfer ownership before moving this user", 400);
+      }
+
+      const existingTargetMember = await OrganizationMember.findOne({
+        organizationId: targetOrganization._id,
+        userId: member.userId,
+      }).session(mongoSession);
+
+      if (existingTargetMember) {
+        throw httpError("User is already a member of the target organization", 409);
+      }
+
+      movedUserId = member.userId;
+      await member.deleteOne({ session: mongoSession });
+      await OrganizationMember.create(
+        [
+          {
+            organizationId: targetOrganization._id,
+            userId: movedUserId,
+            role,
+          },
+        ],
+        { session: mongoSession }
+      );
+    });
+
+    res.json({ ok: true, userId: movedUserId, targetOrganizationId, role });
+  } catch (err: any) {
+    console.error("Error moving admin organization member:", err);
+    const statusCode = err?.statusCode || (err?.code === 11000 ? 409 : 500);
+    res.status(statusCode).json({
+      error: statusCode === 500 ? "Failed to move member" : err.message || "Failed to move member",
+    });
+  } finally {
+    await mongoSession.endSession();
   }
 }
 
