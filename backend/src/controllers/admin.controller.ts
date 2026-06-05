@@ -43,6 +43,10 @@ function httpError(message: string, statusCode: number): Error {
   return error;
 }
 
+function authUserId(user: any): string {
+  return String(user?.id ?? user?._id ?? "");
+}
+
 function publicInvitation(invitation: any) {
   return {
     _id: invitation._id,
@@ -90,8 +94,9 @@ function serializeUserMembership(member: any, organization?: any) {
 }
 
 function serializeAdminUser(user: any, memberships: any[]) {
+  const id = authUserId(user);
   return {
-    id: user.id,
+    id,
     name: user.name ?? "",
     email: user.email ?? "",
     image: user.image ?? null,
@@ -329,7 +334,7 @@ export async function listAdminUsers(req: Request, res: Response): Promise<void>
       db.collection("user").countDocuments({}),
     ]);
 
-    const userIds = users.map((user) => user.id).filter(Boolean);
+    const userIds = users.map(authUserId).filter(Boolean);
     const memberships = await OrganizationMember.find({ userId: { $in: userIds } })
       .sort({ createdAt: 1 })
       .lean();
@@ -347,7 +352,7 @@ export async function listAdminUsers(req: Request, res: Response): Promise<void>
     const usersWithMemberships = await OrganizationMember.distinct("userId");
 
     res.json({
-      users: users.map((user) => serializeAdminUser(user, membershipsByUserId.get(user.id) ?? [])),
+      users: users.map((user) => serializeAdminUser(user, membershipsByUserId.get(authUserId(user)) ?? [])),
       pagination: {
         page,
         limit,
@@ -567,7 +572,7 @@ export async function addAdminUserMembership(req: Request, res: Response): Promi
 
     const existingMember = await OrganizationMember.findOne({
       organizationId,
-      userId: user.id,
+      userId: authUserId(user),
     }).lean();
     if (existingMember) {
       res.status(409).json({ error: "User is already a member of this organization" });
@@ -576,7 +581,7 @@ export async function addAdminUserMembership(req: Request, res: Response): Promi
 
     const member = await OrganizationMember.create({
       organizationId,
-      userId: user.id,
+      userId: authUserId(user),
       role,
     });
 
@@ -638,8 +643,9 @@ export async function removeAdminOrganizationMember(req: Request, res: Response)
       return;
     }
 
-    if (member.role === "owner") {
-      res.status(400).json({ error: "Owner members cannot be removed" });
+    const organization = await Organization.findById(organizationId).lean();
+    if (organization?.ownerUserId === member.userId) {
+      res.status(400).json({ error: "Transfer ownership before removing the organization owner" });
       return;
     }
 
@@ -691,7 +697,7 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
       if (!member) {
         throw httpError("Member not found", 404);
       }
-      if (member.role === "owner") {
+      if (sourceOrganization.ownerUserId === member.userId) {
         throw httpError("Transfer ownership before moving this user", 400);
       }
 

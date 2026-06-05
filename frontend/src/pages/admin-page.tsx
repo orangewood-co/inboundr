@@ -147,6 +147,10 @@ function directImageUrl(value?: string | null) {
   return /^https?:\/\//i.test(source) || source.startsWith("data:") || source.startsWith("blob:") ? source : undefined
 }
 
+function isCanonicalOwnerMembership(membership: AdminUserMembership) {
+  return Boolean(membership.organization && membership.organization.ownerUserId === membership.userId)
+}
+
 function planLabel(plans: Plan[], slug: string) {
   return plans.find((plan) => plan.slug === slug)?.name ?? slug.replaceAll("_", " ")
 }
@@ -761,7 +765,7 @@ export default function AdminPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => openMoveMembership(membership)}
-                            disabled={membership.role === "owner" || membershipBusy === membership._id}
+                            disabled={isCanonicalOwnerMembership(membership) || membershipBusy === membership._id}
                           >
                             Move User
                           </Button>
@@ -769,7 +773,7 @@ export default function AdminPage() {
                             variant="destructive"
                             size="sm"
                             onClick={() => void removeMembership(membership)}
-                            disabled={membership.role === "owner" || membershipBusy === membership._id}
+                            disabled={isCanonicalOwnerMembership(membership) || membershipBusy === membership._id}
                           >
                             Remove Member
                           </Button>
