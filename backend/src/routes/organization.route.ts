@@ -11,6 +11,7 @@ import {
   previewOrganizationInvitation,
   removeOrganizationMember,
   setActiveOrganizationLetterhead,
+  transferOrganizationOwnership,
   updateMyOrganization,
   updateOrganizationMemberRole,
 } from "../controllers/organization.controller";
@@ -44,6 +45,11 @@ router.delete(
   deleteOrganizationLetterhead
 );
 router.get("/members", listOrganizationMembers);
+router.post(
+  "/members/:id/transfer-ownership",
+  requireOrganizationRole(["owner"]),
+  transferOrganizationOwnership
+);
 router.patch(
   "/members/:id",
   requireOrganizationRole(["owner", "admin"]),

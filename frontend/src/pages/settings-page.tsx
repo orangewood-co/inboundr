@@ -6,6 +6,14 @@ import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -30,6 +38,7 @@ import {
   Building2Icon,
   CameraIcon,
   CheckCircle2Icon,
+  CrownIcon,
   ImageIcon,
   KeyIcon,
   MailIcon,
@@ -142,6 +151,7 @@ interface OrganizationMember {
   userEmail: string | null
   role: OrganizationRole
   createdAt: string
+  lastSignInAt: string | null
 }
 
 interface OrganizationInvitation {
@@ -269,6 +279,16 @@ function formatShortDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "Unknown date"
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
+}
+
+function formatLastSignIn(value?: string | null) {
+  if (!value) return "Never recorded"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Never recorded"
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -1353,6 +1373,7 @@ function AccountTab() {
 }
 
 function MembersTab() {
+  const { data: session } = useSession()
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
   const [email, setEmail] = useState("")
@@ -1360,8 +1381,17 @@ function MembersTab() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [accepting, setAccepting] = useState(false)
+  const [transferTarget, setTransferTarget] = useState<OrganizationMember | null>(null)
+  const [transferConfirmation, setTransferConfirmation] = useState("")
+  const [transferringId, setTransferringId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const currentUserId = session?.user?.id
+  const isCurrentUserOwner = members.some((member) => member.userId === currentUserId && member.role === "owner")
+  const transferTargetEmail = transferTarget?.userEmail?.toLowerCase() ?? ""
+  const transferConfirmationMatches =
+    Boolean(transferTargetEmail) && transferConfirmation.trim().toLowerCase() === transferTargetEmail
 
   const fetchMembers = useCallback(async () => {
     setLoading(true)
@@ -1492,7 +1522,38 @@ function MembersTab() {
     }
   }
 
+  const openTransferDialog = (member: OrganizationMember) => {
+    setTransferTarget(member)
+    setTransferConfirmation("")
+    setError(null)
+  }
+
+  const transferOwnership = async () => {
+    if (!transferTarget || !transferConfirmationMatches) return
+    setError(null)
+    setTransferringId(transferTarget._id)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/members/${transferTarget._id}/transfer-ownership`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to transfer ownership")
+      const targetName = transferTarget.userName ?? transferTarget.userEmail ?? "member"
+      setTransferTarget(null)
+      setTransferConfirmation("")
+      await fetchMembers()
+      toast.success(`Ownership transferred to ${targetName}`)
+    } catch (err: any) {
+      setError(err.message || "Failed to transfer ownership")
+      toast.error(err.message || "Failed to transfer ownership")
+    } finally {
+      setTransferringId(null)
+    }
+  }
+
   return (
+    <>
     <div className="space-y-6">
       <SectionHeader
         title="Members"
@@ -1558,16 +1619,32 @@ function MembersTab() {
                     <p className="text-xs text-muted-foreground">{member.userEmail}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Joined {new Date(member.createdAt).toLocaleDateString()}
+                    Joined {formatShortDate(member.createdAt)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Last signed in {formatLastSignIn(member.lastSignInAt)}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <RoleBadge role={toRoleLabel(member.role)} />
                 {member.role !== "owner" && (
-                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => removeMember(member._id)}>
-                    Remove
-                  </Button>
+                  <>
+                    {isCurrentUserOwner && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => openTransferDialog(member)}
+                      >
+                        <CrownIcon className="size-3.5" />
+                        Transfer ownership
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => removeMember(member._id)}>
+                      Remove
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -1610,6 +1687,65 @@ function MembersTab() {
         )}
       </SettingsCard>
     </div>
+    <Dialog
+      open={Boolean(transferTarget)}
+      onOpenChange={(open) => {
+        if (open || transferringId) return
+        setTransferTarget(null)
+        setTransferConfirmation("")
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Transfer ownership</DialogTitle>
+          <DialogDescription>
+            This immediately makes {transferTarget?.userName ?? transferTarget?.userEmail ?? "this member"} the organization owner.
+            Your role will become Admin.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="rounded-xl border bg-muted/30 p-3 text-sm">
+            <p className="font-medium">{transferTarget?.userName ?? transferTarget?.userEmail ?? "Selected member"}</p>
+            {transferTarget?.userEmail && (
+              <p className="text-xs text-muted-foreground">{transferTarget.userEmail}</p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="transfer-confirmation">
+              Type {transferTarget?.userEmail ?? "the member email"} to confirm
+            </Label>
+            <Input
+              id="transfer-confirmation"
+              value={transferConfirmation}
+              onChange={(event) => setTransferConfirmation(event.target.value)}
+              placeholder={transferTarget?.userEmail ?? "member@example.com"}
+              disabled={Boolean(transferringId)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setTransferTarget(null)
+              setTransferConfirmation("")
+            }}
+            disabled={Boolean(transferringId)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => void transferOwnership()}
+            disabled={!transferConfirmationMatches || Boolean(transferringId)}
+          >
+            {transferringId && <Spinner data-icon="inline-start" />}
+            Transfer ownership
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 

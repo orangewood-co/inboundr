@@ -22,6 +22,27 @@ export const auth = betterAuth({
   database: mongodbAdapter(db, {
     client: mongoClient,
   }),
+  user: {
+    additionalFields: {
+      lastSignInAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (session) => {
+          await db.collection("user").updateOne(
+            { id: session.userId },
+            { $set: { lastSignInAt: session.createdAt ?? new Date() } }
+          );
+        },
+      },
+    },
+  },
   trustedOrigins: [frontendOrigin],
   emailAndPassword: {
     enabled: true,

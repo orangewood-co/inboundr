@@ -30,6 +30,12 @@ function validationError(message: string): Error {
   return error;
 }
 
+function httpError(message: string, statusCode: number): Error {
+  const error = new Error(message);
+  (error as any).statusCode = statusCode;
+  return error;
+}
+
 function normalizePaymentTerms(value: unknown, defaultTerms: string) {
   if (!Array.isArray(value)) {
     return defaultTerms
@@ -80,7 +86,9 @@ function normalizePaymentTerms(value: unknown, defaultTerms: string) {
 
 async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
-  if (!db || userIds.length === 0) return new Map<string, { name?: string; email?: string }>();
+  if (!db || userIds.length === 0) {
+    return new Map<string, { name?: string; email?: string; lastSignInAt?: Date }>();
+  }
 
   const objectIds = userIds
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
@@ -94,10 +102,10 @@ async function resolveUsersByIds(userIds: string[]) {
         ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
       ],
     })
-    .project({ id: 1, name: 1, email: 1 })
+    .project({ id: 1, name: 1, email: 1, lastSignInAt: 1 })
     .toArray();
 
-  const map = new Map<string, { name?: string; email?: string }>();
+  const map = new Map<string, { name?: string; email?: string; lastSignInAt?: Date }>();
   for (const user of users) {
     map.set(user.id as string, user);
     map.set(String(user._id), user);
@@ -155,6 +163,11 @@ function tokenHash(token: string): string {
 
 function normalizeRole(value: unknown): OrganizationRole {
   return value === "owner" || value === "admin" ? value : "member";
+}
+
+function normalizeManageableRole(value: unknown): Exclude<OrganizationRole, "owner"> | null {
+  if (value === "admin" || value === "member") return value;
+  return null;
 }
 
 function publicInvitation(invitation: any) {
@@ -359,6 +372,7 @@ export async function listOrganizationMembers(
         ...member,
         userName: user?.name ?? null,
         userEmail: user?.email ?? null,
+        lastSignInAt: user?.lastSignInAt ?? null,
       };
     });
 
@@ -598,22 +612,120 @@ export async function updateOrganizationMemberRole(
       return;
     }
 
-    const role = normalizeRole(req.body?.role);
+    const role = normalizeManageableRole(req.body?.role);
+    if (!role) {
+      res.status(400).json({ error: "Use ownership transfer to change organization owners" });
+      return;
+    }
+
+    const existing = await OrganizationMember.findOne({
+      _id: id,
+      organizationId: organization._id,
+    });
+    if (!existing) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+    if (existing.role === "owner") {
+      res.status(400).json({ error: "Use ownership transfer before changing the owner role" });
+      return;
+    }
+
     const member = await OrganizationMember.findOneAndUpdate(
       { _id: id, organizationId: organization._id },
       { $set: { role } },
       { new: true }
     );
 
-    if (!member) {
-      res.status(404).json({ error: "Member not found" });
-      return;
-    }
-
     res.json({ member });
   } catch (err) {
     console.error("Error updating organization member:", err);
     res.status(500).json({ error: "Failed to update organization member" });
+  }
+}
+
+export async function transferOrganizationOwnership(
+  req: Request,
+  res: Response
+): Promise<void> {
+  const mongoSession = await mongoose.startSession();
+
+  try {
+    const orgReq = req as OrganizationRequest;
+    const organization = orgReq.organization;
+    const currentOwnerUserId = orgReq.user.id;
+    const { id } = req.params;
+
+    if (organization.ownerUserId !== currentOwnerUserId) {
+      res.status(403).json({ error: "Only the current owner can transfer ownership" });
+      return;
+    }
+
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid member id" });
+      return;
+    }
+
+    let newOwnerUserId = "";
+
+    await mongoSession.withTransaction(async () => {
+      const targetMember = await OrganizationMember.findOne({
+        _id: id,
+        organizationId: organization._id,
+      }).session(mongoSession);
+
+      if (!targetMember) throw httpError("Member not found", 404);
+      if (targetMember.userId === currentOwnerUserId || targetMember.role === "owner") {
+        throw httpError("This member is already the owner", 400);
+      }
+
+      const ownedOrganization = await Organization.findOne({
+        _id: { $ne: organization._id },
+        ownerUserId: targetMember.userId,
+      }).session(mongoSession);
+      if (ownedOrganization) {
+        throw httpError("This member already owns another organization", 409);
+      }
+
+      const ownerUpdate = await Organization.updateOne(
+        { _id: organization._id, ownerUserId: currentOwnerUserId },
+        { $set: { ownerUserId: targetMember.userId } },
+        { session: mongoSession }
+      );
+      if (ownerUpdate.modifiedCount !== 1) {
+        throw httpError("Only the current owner can transfer ownership", 403);
+      }
+
+      await OrganizationMember.updateMany(
+        { organizationId: organization._id, role: "owner" },
+        { $set: { role: "admin" } },
+        { session: mongoSession }
+      );
+      targetMember.role = "owner";
+      await targetMember.save({ session: mongoSession });
+      newOwnerUserId = targetMember.userId;
+    });
+
+    const [updatedOrganization, updatedMember] = await Promise.all([
+      Organization.findById(organization._id),
+      OrganizationMember.findOne({ organizationId: organization._id, userId: newOwnerUserId }),
+    ]);
+
+    res.json({
+      organization: updatedOrganization ?? organization,
+      member: updatedMember,
+    });
+  } catch (err: any) {
+    console.error("Error transferring organization ownership:", err);
+    const statusCode = err?.statusCode || (err?.code === 11000 ? 409 : 500);
+    res.status(statusCode).json({
+      error:
+        statusCode === 500
+          ? "Failed to transfer organization ownership"
+          : err.message || "Failed to transfer organization ownership",
+    });
+  } finally {
+    await mongoSession.endSession();
   }
 }
 
