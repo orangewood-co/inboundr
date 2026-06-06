@@ -38,8 +38,9 @@ You write quotation email replies to customers who have asked for prices.
 Hard rules:
 - Output plain text only. No HTML, no markdown, no asterisks, no bullets using "*". Use "-" or numbered lines if a list is needed.
 - All amounts are in Indian Rupees and must be shown with the "Rs." prefix (e.g. "Rs. 1,250.00"). Do not use any other currency symbol.
-- Use ONLY the numbers provided in the "Pricing summary" block of the prompt. Never recompute, round differently, or invent prices, GST, discounts, or totals.
+- Use ONLY the numbers provided in the "Products to quote" and "Pricing summary" blocks of the prompt. Never recompute, round differently, or invent prices, GST, discounts, or totals.
 - For any line whose unit price is "Price on request", do NOT make up a number. Mark it clearly as "Price on request" in the line, and exclude it from the totals (the totals block already excludes it).
+- When a product line includes a line discount, show the original unit price, discount percentage, and net unit price separately. When no line discount is provided, do not mention discount for that line.
 - Address the customer by first name where possible. Keep tone professional, courteous, and concise.
 - Subject format: prefer "Quotation: <original subject>". If the original subject already starts with "Re:" or "Quotation:", keep it as-is or use "Re: <original subject>".
 - Body structure:
@@ -83,9 +84,11 @@ export interface QuoteInput {
     brand: string | null;
     description: string | null;
     code: string | null;
+    basePrice?: number | null;
     price: number | null;
     hsnCode: string | null;
     gstRate: number | null;
+    discountPercent?: number | null;
   }[];
 }
 
@@ -97,6 +100,8 @@ interface PricedLine {
   hsnCode: string;
   quantity: number;
   unitPriceText: string;
+  discountText: string | null;
+  netUnitPriceText: string | null;
   gstRateText: string;
   lineTotalText: string;
   hasPrice: boolean;
@@ -122,6 +127,19 @@ function formatINR(n: number): string {
   return `Rs. ${INR.format(n)}`;
 }
 
+function normalizeDiscount(value: number | null | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : 0;
+}
+
+function resolveBasePrice(price: number | null, basePrice: number | null | undefined, discount: number): number | null {
+  if (typeof basePrice === "number" && Number.isFinite(basePrice)) return basePrice;
+  if (typeof price !== "number" || !Number.isFinite(price)) return null;
+  if (discount > 0 && discount < 100) return price / (1 - discount / 100);
+  return price;
+}
+
 function computePricing(input: QuoteInput): PricingSummary {
   const discountPercentage =
     typeof input.specialDiscountPercentage === "number" && input.specialDiscountPercentage > 0
@@ -133,21 +151,27 @@ function computePricing(input: QuoteInput): PricingSummary {
   let hasAnyMissingPrice = false;
 
   const lines: PricedLine[] = input.products.map((p, i) => {
-    const hasPrice = typeof p.price === "number" && p.price > 0;
+    const discount = normalizeDiscount(p.discountPercent);
+    const basePrice = resolveBasePrice(p.price, p.basePrice, discount);
+    const hasLineDiscount =
+      discount > 0 &&
+      basePrice != null &&
+      typeof p.price === "number" &&
+      Number.isFinite(p.price);
+    const hasPrice = typeof p.price === "number" && Number.isFinite(p.price) && (p.price > 0 || hasLineDiscount);
     const quantity = p.quantity > 0 ? p.quantity : 1;
     const gstRate = typeof p.gstRate === "number" ? p.gstRate : 0;
 
     let lineSubtotal = 0;
-    let lineDiscount = 0;
     let lineGst = 0;
     let lineTotal = 0;
 
     if (hasPrice) {
       lineSubtotal = (p.price as number) * quantity;
-      lineDiscount = lineSubtotal * (discountPercentage / 100);
-      const lineAfterDiscount = lineSubtotal - lineDiscount;
-      lineGst = lineAfterDiscount * (gstRate / 100);
-      lineTotal = lineAfterDiscount + lineGst;
+      const summaryDiscount = lineSubtotal * (discountPercentage / 100);
+      const lineAfterSummaryDiscount = lineSubtotal - summaryDiscount;
+      lineGst = lineAfterSummaryDiscount * (gstRate / 100);
+      lineTotal = lineAfterSummaryDiscount + lineGst;
 
       subtotal += lineSubtotal;
       gstTotal += lineGst;
@@ -162,7 +186,11 @@ function computePricing(input: QuoteInput): PricingSummary {
       code: p.code || "N/A",
       hsnCode: p.hsnCode || "N/A",
       quantity,
-      unitPriceText: hasPrice ? formatINR(p.price as number) : "Price on request",
+      unitPriceText: hasPrice
+        ? formatINR(hasLineDiscount ? (basePrice as number) : (p.price as number))
+        : "Price on request",
+      discountText: hasLineDiscount ? `${discount}%` : null,
+      netUnitPriceText: hasLineDiscount ? formatINR(p.price as number) : null,
       gstRateText: typeof p.gstRate === "number" ? `${p.gstRate}%` : "N/A",
       lineTotalText: hasPrice ? formatINR(lineTotal) : "Price on request",
       hasPrice,
@@ -187,17 +215,22 @@ function computePricing(input: QuoteInput): PricingSummary {
 
 function renderProductLines(pricing: PricingSummary): string {
   return pricing.lines
-    .map(
-      (l) =>
-        `${l.index}. ${l.description}
+    .map((l) => {
+      const discountLines = l.discountText
+        ? `
+   Discount: ${l.discountText}
+   Net Unit Price: ${l.netUnitPriceText}`
+        : "";
+
+      return `${l.index}. ${l.description}
    Brand: ${l.brand}
    Code: ${l.code}
    HSN Code: ${l.hsnCode}
    Quantity: ${l.quantity}
-   Unit Price: ${l.unitPriceText}
+   Unit Price: ${l.unitPriceText}${discountLines}
    GST Rate: ${l.gstRateText}
-   Line Total: ${l.lineTotalText}`
-    )
+   Line Total: ${l.lineTotalText}`;
+    })
     .join("\n\n");
 }
 

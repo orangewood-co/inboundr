@@ -27,6 +27,21 @@ function money(value: number | null | undefined): string {
   }).format(value);
 }
 
+function normalizeDiscount(value: number | null | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : 0;
+}
+
+function baseUnitPrice(product: IRFQReplyProduct): number | null {
+  if (typeof product.basePrice === "number" && Number.isFinite(product.basePrice)) {
+    return product.basePrice;
+  }
+  const discount = normalizeDiscount(product.discountPercent);
+  if (product.price == null || discount <= 0 || discount >= 100) return product.price;
+  return product.price / (1 - discount / 100);
+}
+
 function lineSubtotal(product: IRFQReplyProduct): number | null {
   if (product.price == null) return null;
   return product.price * product.quantity;
@@ -58,18 +73,23 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
     .fillColor(PDF_COLORS.muted)
     .text("Item", PDF_PAGE.margin, y, { width: 260 })
     .text("Qty", PDF_PAGE.margin + 270, y, { width: 40, align: "right" })
-    .text("Rate", PDF_PAGE.margin + 320, y, { width: 70, align: "right" })
+    .text("Net Rate", PDF_PAGE.margin + 320, y, { width: 70, align: "right" })
     .text("GST", PDF_PAGE.margin + 400, y, { width: 40, align: "right" })
     .text("Amount", PDF_PAGE.width - PDF_PAGE.margin - 82, y, { width: 82, align: "right" });
   y += 18;
 
   products.forEach((product, index) => {
-    y = ensurePdfRoom(doc, y, 46);
+    const discount = normalizeDiscount(product.discountPercent);
+    const hasDiscount = discount > 0 && product.price != null;
+    y = ensurePdfRoom(doc, y, hasDiscount ? 58 : 46);
     const subtotal = lineSubtotal(product);
     const description = product.description || product.code || product.queryName;
     const meta = [product.brand, product.code, product.hsnCode ? `HSN ${product.hsnCode}` : null]
       .filter(Boolean)
       .join(" · ");
+    const pricingMeta = hasDiscount
+      ? `Price ${money(baseUnitPrice(product))} · Discount ${discount}% · Net ${money(product.price)}`
+      : null;
 
     doc
       .moveTo(PDF_PAGE.margin, y - 5)
@@ -86,6 +106,7 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
       .fontSize(8)
       .fillColor(PDF_COLORS.muted)
       .text(meta || product.queryName, PDF_PAGE.margin, y + 14, { width: 260, height: 12, ellipsis: true })
+      .text(pricingMeta || "", PDF_PAGE.margin, y + 26, { width: 260, height: 12, ellipsis: true })
       .fillColor(PDF_COLORS.text)
       .fontSize(9)
       .text(String(product.quantity), PDF_PAGE.margin + 270, y, { width: 40, align: "right" })
@@ -93,7 +114,7 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
       .text(product.gstRate == null ? "-" : `${product.gstRate}%`, PDF_PAGE.margin + 400, y, { width: 40, align: "right" })
       .text(money(subtotal), PDF_PAGE.width - PDF_PAGE.margin - 82, y, { width: 82, align: "right" });
 
-    y += 38;
+    y += hasDiscount ? 50 : 38;
   });
 
   return y + 8;

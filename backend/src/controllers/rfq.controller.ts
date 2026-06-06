@@ -107,6 +107,12 @@ function nullableNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function discountPercent(value: unknown): number {
+  const number = nullableNumber(value);
+  if (number == null) return 0;
+  return Math.min(100, Math.max(0, number));
+}
+
 function defaultPaymentTermsFromOrganization(organization: any): QuotePaymentTerms {
   const paymentTerms = organization.preferences?.paymentTerms;
   const defaultTemplate = Array.isArray(paymentTerms)
@@ -192,9 +198,9 @@ function resolveManualProduct(product: ManualQuoteProduct) {
   const quantity = positiveNumber(product.quantity);
   const description = nullableString(product.description);
   const code = nullableString(product.code);
-  const discountPercent = nullableNumber(product.discountPercent) ?? 0;
+  const discount = discountPercent(product.discountPercent);
   const basePrice = nullableNumber(product.price);
-  const finalPrice = basePrice != null ? basePrice * (1 - discountPercent / 100) : null;
+  const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
 
   if (!queryName || !quantity || (!description && !code)) {
     throw new Error("Manual products require a name, quantity, and description or code");
@@ -208,10 +214,11 @@ function resolveManualProduct(product: ManualQuoteProduct) {
     brand: nullableString(product.brand),
     description,
     code,
+    basePrice,
     price: finalPrice,
     hsnCode: nullableString(product.hsnCode),
     gstRate: nullableNumber(product.gstRate),
-    discountPercent,
+    discountPercent: discount,
     calibrationCharges: nullableNumber(product.calibrationCharges),
     deliveryTimeline: nullableString(product.deliveryTimeline),
     lineStatus: "quoted" as const,
@@ -250,9 +257,9 @@ function resolveSelectedProducts(
 
     const overrides = sel.overrides || {};
     const overridePrice = nullableNumber(overrides.price);
-    const overrideDiscount = nullableNumber(overrides.discountPercent) ?? 0;
+    const discount = discountPercent(overrides.discountPercent);
     const basePrice = overridePrice ?? match.price;
-    const finalPrice = basePrice != null ? basePrice * (1 - overrideDiscount / 100) : null;
+    const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
 
     return {
       searchResultIndex: sel.searchResultIndex,
@@ -262,10 +269,11 @@ function resolveSelectedProducts(
       brand: nullableString(overrides.brand) ?? match.brand,
       description: nullableString(overrides.description) ?? match.description,
       code: nullableString(overrides.code) ?? match.code,
+      basePrice,
       price: finalPrice,
       hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
       gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
-      discountPercent: overrideDiscount,
+      discountPercent: discount,
       calibrationCharges: nullableNumber(overrides.calibrationCharges) ?? match.calibrationCharges,
       deliveryTimeline: nullableString(overrides.deliveryTimeline),
       lineStatus: "quoted" as const,
@@ -289,6 +297,7 @@ function resolveSelectedProducts(
       brand: null,
       description: null,
       code: null,
+      basePrice: null,
       price: null,
       hsnCode: null,
       gstRate: null,
@@ -725,9 +734,11 @@ export const generateQuote = async (
         brand: p.brand,
         description: p.description,
         code: p.code,
+        basePrice: p.basePrice,
         price: p.price,
         hsnCode: p.hsnCode,
         gstRate: p.gstRate,
+        discountPercent: p.discountPercent ?? 0,
       })),
     });
 

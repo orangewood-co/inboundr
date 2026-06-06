@@ -122,6 +122,7 @@ interface RFQSearchMatch {
   brand: string | null
   description: string | null
   code: string | null
+  basePrice?: number | null
   price: number | null
   hsnCode: string | null
   gstRate: number | null
@@ -196,9 +197,11 @@ interface RFQReply {
     brand: string | null
     description: string | null
     code: string | null
+    basePrice?: number | null
     price: number | null
     hsnCode: string | null
     gstRate: number | null
+    discountPercent?: number
   }[]
   paymentTermTemplateId: string | null
   paymentTermName: string | null
@@ -305,6 +308,21 @@ function numberInputValue(value: number | string | null | undefined): string {
   if (value == null) return ""
   const number = Number(value)
   return Number.isFinite(number) ? String(number) : ""
+}
+
+function savedProductBasePriceInputValue(product: RFQSavedQuoteProduct): string {
+  if (product.basePrice != null) return numberInputValue(product.basePrice)
+  if (product.price == null) return ""
+
+  const discount = product.discountPercent != null && Number.isFinite(product.discountPercent)
+    ? Math.min(100, Math.max(0, product.discountPercent))
+    : 0
+
+  if (discount > 0 && discount < 100) {
+    return numberInputValue(product.price / (1 - discount / 100))
+  }
+
+  return numberInputValue(product.price)
 }
 
 function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult["query"]): ManualProduct {
@@ -694,7 +712,7 @@ export function DashboardPage() {
             code: product.code ?? "",
             hsnCode: product.hsnCode ?? "",
             gstRate: product.gstRate != null ? String(product.gstRate) : "",
-            price: product.price != null ? String(product.price) : "",
+            price: savedProductBasePriceInputValue(product),
             quantity: String(product.quantity),
             discountPercent: product.discountPercent ? String(product.discountPercent) : "",
             calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
@@ -715,7 +733,7 @@ export function DashboardPage() {
           brand: product.brand ?? "",
           description: product.description ?? "",
           code: product.code ?? "",
-          price: product.price != null ? String(product.price) : "",
+          price: savedProductBasePriceInputValue(product),
           discountPercent: product.discountPercent ? String(product.discountPercent) : "",
           hsnCode: product.hsnCode ?? "",
           gstRate: product.gstRate != null ? String(product.gstRate) : "",

@@ -45,6 +45,7 @@ export interface IRFQSavedQuoteProduct {
   brand: string | null;
   description: string | null;
   code: string | null;
+  basePrice: number | null;
   price: number | null;
   hsnCode: string | null;
   gstRate: number | null;
@@ -127,6 +128,7 @@ const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
     brand: { type: String, default: null },
     description: { type: String, default: null },
     code: { type: String, default: null },
+    basePrice: { type: Number, default: null },
     price: { type: Number, default: null },
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },

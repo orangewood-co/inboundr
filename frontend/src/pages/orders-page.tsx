@@ -50,9 +50,11 @@ interface RFQSavedQuoteProduct {
   brand: string | null
   description: string | null
   code: string | null
+  basePrice?: number | null
   price: number | null
   hsnCode: string | null
   gstRate: number | null
+  discountPercent?: number | null
   calibrationCharges?: number | null
   deliveryTimeline?: string | null
   lineStatus?: "quoted" | "regretted"
@@ -120,6 +122,53 @@ function sortQuoteProductsByItem(products: RFQSavedQuoteProduct[]): RFQSavedQuot
       return aIndex - bIndex || a.originalIndex - b.originalIndex
     })
     .map(({ product }) => product)
+}
+
+function normalizeDiscount(value: number | null | undefined): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(100, Math.max(0, value))
+    : 0
+}
+
+function resolveBasePrice(product: RFQSavedQuoteProduct): number | null {
+  if (typeof product.basePrice === "number" && Number.isFinite(product.basePrice)) {
+    return product.basePrice
+  }
+
+  const discount = normalizeDiscount(product.discountPercent)
+  if (product.price == null || discount <= 0 || discount >= 100) return product.price
+
+  return product.price / (1 - discount / 100)
+}
+
+function ProductPriceBreakdown({ product }: { product: RFQSavedQuoteProduct }) {
+  const discount = normalizeDiscount(product.discountPercent)
+  const hasDiscount = discount > 0 && product.price != null
+
+  if (!hasDiscount) {
+    return (
+      <p className={`text-sm font-bold tabular-nums ${product.price == null ? "text-muted-foreground" : ""}`}>
+        {formatPrice(product.price)}
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-0.5 text-xs tabular-nums">
+      <p className="text-muted-foreground">
+        <span className="mr-1">Price:</span>
+        <span className="line-through">{formatPrice(resolveBasePrice(product))}</span>
+      </p>
+      <p className="text-muted-foreground">
+        <span className="mr-1">Discount:</span>
+        <span>{discount}%</span>
+      </p>
+      <p className="font-bold text-emerald-600 dark:text-emerald-400">
+        <span className="mr-1 font-medium text-muted-foreground">Net:</span>
+        {formatPrice(product.price)}
+      </p>
+    </div>
+  )
 }
 
 function EmptyState() {
@@ -461,9 +510,7 @@ export function OrdersPage() {
                         </div>
                         {product.lineStatus !== "regretted" && (
                           <div className="shrink-0 text-right">
-                          <p className={`text-sm font-bold tabular-nums ${product.price == null ? "text-muted-foreground" : ""}`}>
-                            {formatPrice(product.price)}
-                          </p>
+                            <ProductPriceBreakdown product={product} />
                           </div>
                         )}
                       </div>
