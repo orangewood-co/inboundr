@@ -1,12 +1,15 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { PDFParse } from "pdf-parse";
+import * as XLSX from "xlsx";
 import type { EmailAttachment } from "../types/email.types";
 
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 const MAX_ATTACHMENTS = 4;
 const MAX_PDF_PAGES = 4;
 const MAX_EXTRACTED_CHARS_PER_ATTACHMENT = 12000;
+const MAX_SPREADSHEET_SHEETS = 2;
+const MAX_SPREADSHEET_ROWS_PER_SHEET = 100;
 
 const imageModel = new ChatOpenAI({
   model: "gpt-4o-mini",
@@ -31,10 +34,34 @@ const SUPPORTED_IMAGE_MIME_TYPES = new Set([
   "image/webp",
 ]);
 
+const SUPPORTED_SPREADSHEET_MIME_TYPES = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+function getAttachmentExtension(filename: string): string {
+  return filename.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function isSpreadsheetAttachment(attachment: EmailAttachment): boolean {
+  const mimeType = attachment.mimeType.toLowerCase();
+  const extension = getAttachmentExtension(attachment.filename);
+
+  return (
+    SUPPORTED_SPREADSHEET_MIME_TYPES.has(mimeType) ||
+    extension === "csv" ||
+    extension === "xls" ||
+    extension === "xlsx"
+  );
+}
+
 export function isSupportedRFQAttachment(attachment: EmailAttachment): boolean {
   return (
     attachment.mimeType === "application/pdf" ||
-    SUPPORTED_IMAGE_MIME_TYPES.has(attachment.mimeType)
+    SUPPORTED_IMAGE_MIME_TYPES.has(attachment.mimeType) ||
+    isSpreadsheetAttachment(attachment)
   );
 }
 
@@ -56,6 +83,88 @@ async function extractPDFText(data: Buffer): Promise<string> {
   } finally {
     await parser.destroy();
   }
+}
+
+function stringifyCell(cell: unknown): string {
+  if (cell == null) return "";
+  if (cell instanceof Date) {
+    return Number.isNaN(cell.getTime()) ? "" : cell.toISOString().slice(0, 10);
+  }
+
+  return String(cell).replace(/\s+/g, " ").trim();
+}
+
+function readSpreadsheetWorkbook(input: AttachmentExtractionInput): XLSX.WorkBook {
+  const isCsv = getAttachmentExtension(input.attachment.filename) === "csv";
+
+  if (isCsv) {
+    return XLSX.read(input.data.toString("utf-8"), {
+      type: "string",
+      cellDates: true,
+    });
+  }
+
+  return XLSX.read(input.data, { type: "buffer", cellDates: true });
+}
+
+function formatSpreadsheetRow(
+  row: string[],
+  headers: string[],
+  rowNumber: number
+): string | null {
+  const values = row.map(stringifyCell);
+  if (!values.some(Boolean)) return null;
+
+  const cells = values
+    .map((value, index) => {
+      if (!value) return null;
+      const header = headers[index] || `Column ${index + 1}`;
+      return `${header}=${value}`;
+    })
+    .filter((cell): cell is string => Boolean(cell));
+
+  return cells.length > 0 ? `ROW ${rowNumber}: ${cells.join("; ")}` : null;
+}
+
+async function extractSpreadsheetText(
+  input: AttachmentExtractionInput
+): Promise<string> {
+  const workbook = readSpreadsheetWorkbook(input);
+  const sheetSections: string[] = [];
+
+  for (const sheetName of workbook.SheetNames.slice(0, MAX_SPREADSHEET_SHEETS)) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: "",
+      raw: false,
+      blankrows: false,
+    });
+    const rows = rawRows
+      .map((row) => row.map(stringifyCell))
+      .filter((row) => row.some(Boolean));
+
+    if (rows.length === 0) continue;
+
+    const [headerRow = [], ...dataRows] = rows;
+    const headers = headerRow.map((cell, index) => cell || `Column ${index + 1}`);
+    const formattedRows = dataRows
+      .slice(0, MAX_SPREADSHEET_ROWS_PER_SHEET)
+      .map((row, index) => formatSpreadsheetRow(row, headers, index + 1))
+      .filter((row): row is string => Boolean(row));
+
+    const section = [
+      `SHEET: ${sheetName}`,
+      `COLUMNS: ${headers.join(" | ")}`,
+      ...formattedRows,
+    ].join("\n");
+
+    sheetSections.push(section);
+  }
+
+  return trimExtractedText(sheetSections.join("\n\n"));
 }
 
 async function extractImageText(input: AttachmentExtractionInput): Promise<string> {
@@ -108,10 +217,15 @@ export async function extractRFQAttachmentText(
   }
 
   try {
-    const text =
-      attachment.mimeType === "application/pdf"
-        ? await extractPDFText(data)
-        : await extractImageText(input);
+    let text: string;
+
+    if (attachment.mimeType === "application/pdf") {
+      text = await extractPDFText(data);
+    } else if (isSpreadsheetAttachment(attachment)) {
+      text = await extractSpreadsheetText(input);
+    } else {
+      text = await extractImageText(input);
+    }
 
     return {
       filename: attachment.filename,

@@ -143,6 +143,7 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
 
 const identifyProducts: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Identify Products");
+  console.log("EMAIL BODY: ", state.emailBody);
 
   const extractedProducts = z.object({
     products: z.array(queryProduct),

@@ -25,7 +25,7 @@ const checkRFQ: GraphNode<typeof State> = async (state) => {
   const response = await model.withStructuredOutput(isRFQemail).invoke([
     new SystemMessage(
       `You are a RFQ email checker.
-You are given an email and you need to check if it is an RFQ email.`
+       You are given an email and you need to check if it is an RFQ email.`
     ),
     new HumanMessage(state.emailBody),
   ]);
