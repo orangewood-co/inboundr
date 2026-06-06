@@ -122,7 +122,6 @@ interface RFQSearchMatch {
   brand: string | null
   description: string | null
   code: string | null
-  basePrice?: number | null
   price: number | null
   hsnCode: string | null
   gstRate: number | null
@@ -147,6 +146,7 @@ interface RFQSavedQuoteProduct {
   brand: string | null
   description: string | null
   code: string | null
+  basePrice?: number | null
   price: number | null
   hsnCode: string | null
   gstRate: number | null
