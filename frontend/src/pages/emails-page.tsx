@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import * as XLSX from "xlsx"
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
@@ -30,6 +31,8 @@ import {
 
 import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/email`
+const SPREADSHEET_PREVIEW_ROW_LIMIT = 200
+const SPREADSHEET_PREVIEW_COLUMN_LIMIT = 30
 
 interface EmailSummary {
   _id: string
@@ -49,6 +52,8 @@ interface EmailSummary {
   classificationReason: string | null
   rfqErrorMessage: string | null
 }
+
+type EmailAttachment = EmailSummary["attachments"][number]
 
 interface EmailDetail extends EmailSummary {
   cc: string | null
@@ -431,17 +436,229 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
   )
 }
 
-function isRFQSupportedAttachment(att: EmailSummary["attachments"][number]) {
-  return att.mimeType === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(att.mimeType)
+const SPREADSHEET_MIME_TYPES = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+])
+
+function getAttachmentExtension(filename: string) {
+  return filename.split(".").pop()?.toLowerCase() ?? ""
 }
 
-function isPreviewableAttachment(att: EmailSummary["attachments"][number]) {
-  return att.mimeType === "application/pdf" || ["image/gif", "image/jpeg", "image/png", "image/webp"].includes(att.mimeType)
+function isSpreadsheetAttachment(att: EmailAttachment) {
+  const mimeType = att.mimeType.toLowerCase()
+  const extension = getAttachmentExtension(att.filename)
+
+  return SPREADSHEET_MIME_TYPES.has(mimeType) || extension === "csv" || extension === "xls" || extension === "xlsx"
+}
+
+function isRFQSupportedAttachment(att: EmailAttachment) {
+  return (
+    att.mimeType === "application/pdf" ||
+    ["image/jpeg", "image/png", "image/webp"].includes(att.mimeType) ||
+    isSpreadsheetAttachment(att)
+  )
+}
+
+function isPreviewableAttachment(att: EmailAttachment) {
+  return (
+    att.mimeType === "application/pdf" ||
+    ["image/gif", "image/jpeg", "image/png", "image/webp"].includes(att.mimeType) ||
+    isSpreadsheetAttachment(att)
+  )
 }
 
 function buildAttachmentUrl(emailId: string, attachmentId: string, download = false) {
   const path = `${API_BASE}/${emailId}/attachments/${encodeURIComponent(attachmentId)}`
   return download ? `${path}/download` : path
+}
+
+function stringifySpreadsheetCell(cell: unknown) {
+  if (cell == null) return ""
+  if (cell instanceof Date) return Number.isNaN(cell.getTime()) ? "" : cell.toISOString().slice(0, 10)
+  return String(cell).replace(/\s+/g, " ").trim()
+}
+
+function getSpreadsheetRows(workbook: XLSX.WorkBook | null, sheetName: string) {
+  if (!workbook) return []
+
+  const sheet = workbook.Sheets[sheetName]
+  if (!sheet) return []
+
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: false,
+  })
+
+  return rows
+    .map((row) => row.slice(0, SPREADSHEET_PREVIEW_COLUMN_LIMIT).map(stringifySpreadsheetCell))
+    .filter((row) => row.some(Boolean))
+    .slice(0, SPREADSHEET_PREVIEW_ROW_LIMIT)
+}
+
+function SpreadsheetAttachmentPreview({
+  emailId,
+  attachment,
+}: {
+  emailId: string
+  attachment: EmailAttachment
+}) {
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [selectedSheet, setSelectedSheet] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadSpreadsheet() {
+      setLoading(true)
+      setError(null)
+      setWorkbook(null)
+      setSelectedSheet("")
+
+      try {
+        const response = await fetch(buildAttachmentUrl(emailId, attachment.attachmentId), {
+          credentials: "include",
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+        const buffer = await response.arrayBuffer()
+        const parsed = XLSX.read(buffer, { type: "array", cellDates: true })
+        const firstSheet = parsed.SheetNames.find((sheetName) => parsed.Sheets[sheetName])
+        if (!firstSheet) throw new Error("No worksheet found")
+
+        if (!controller.signal.aborted) {
+          setWorkbook(parsed)
+          setSelectedSheet(firstSheet)
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Unable to preview spreadsheet")
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    void loadSpreadsheet()
+
+    return () => controller.abort()
+  }, [attachment.attachmentId, emailId])
+
+  const sheetNames = workbook?.SheetNames.filter((sheetName) => workbook.Sheets[sheetName]) ?? []
+  const rows = useMemo(() => getSpreadsheetRows(workbook, selectedSheet), [workbook, selectedSheet])
+  const headerRow = rows[0] ?? []
+  const dataRows = rows.slice(1)
+
+  if (loading) {
+    return (
+      <div className="flex size-full flex-col gap-3 p-6">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-3/4" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-10 text-center">
+        <div className="surface-raised rounded-2xl p-5">
+          <AlertCircleIcon className="size-8 text-destructive/70" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[13px] font-semibold">Preview failed</p>
+          <p className="max-w-sm text-[12px] text-muted-foreground">
+            The spreadsheet could not be shown inline. You can still download the original file.
+          </p>
+          <p className="text-[11px] text-muted-foreground/60">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-10 text-center">
+        <div className="surface-raised rounded-2xl p-5">
+          <PaperclipIcon className="size-8 text-muted-foreground/50" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[13px] font-semibold">No rows to preview</p>
+          <p className="max-w-sm text-[12px] text-muted-foreground">
+            This spreadsheet does not contain visible rows in the selected sheet.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex size-full flex-col overflow-hidden bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+        <div>
+          <p className="text-[12px] font-semibold">Spreadsheet Preview</p>
+          <p className="text-[11px] text-muted-foreground">
+            Showing up to {SPREADSHEET_PREVIEW_ROW_LIMIT} rows and {SPREADSHEET_PREVIEW_COLUMN_LIMIT} columns.
+          </p>
+        </div>
+        {sheetNames.length > 1 && (
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            Sheet
+            <select
+              value={selectedSheet}
+              onChange={(event) => setSelectedSheet(event.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+            >
+              {sheetNames.map((sheetName) => (
+                <option key={sheetName} value={sheetName}>
+                  {sheetName}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <table className="w-max min-w-full border-separate border-spacing-0 text-left text-[12px]">
+          <thead>
+            <tr>
+              {headerRow.map((cell, index) => (
+                <th
+                  key={`${index}-${cell}`}
+                  className="sticky top-0 z-10 border-b border-r border-border/60 bg-muted px-3 py-2 font-semibold text-foreground"
+                >
+                  {cell || `Column ${index + 1}`}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="odd:bg-muted/20">
+                {headerRow.map((_, columnIndex) => (
+                  <td
+                    key={columnIndex}
+                    className="max-w-[280px] border-b border-r border-border/40 px-3 py-2 align-top text-muted-foreground"
+                    title={row[columnIndex] ?? ""}
+                  >
+                    <span className="line-clamp-3 wrap-break-word">{row[columnIndex] ?? ""}</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 function EmptyState() {
@@ -1047,6 +1264,8 @@ export function EmailsPage() {
                       className="mx-auto max-h-full max-w-full rounded-lg object-contain shadow-lg"
                     />
                   </div>
+                ) : isSpreadsheetAttachment(selectedAttachment) ? (
+                  <SpreadsheetAttachmentPreview emailId={detail._id} attachment={selectedAttachment} />
                 ) : (
                   <div className="flex flex-col items-center gap-4 p-10 text-center">
                     <div className="surface-raised rounded-2xl p-5">
