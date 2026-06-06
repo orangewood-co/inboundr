@@ -113,6 +113,28 @@ function discountPercent(value: unknown): number {
   return Math.min(100, Math.max(0, number));
 }
 
+function pricesEqual(a: number | null | undefined, b: number | null | undefined): boolean {
+  if (a == null || b == null) return false;
+  return Math.abs(a - b) < 0.001;
+}
+
+function resolveSubmittedBasePrice(
+  submittedPrice: number | null,
+  discount: number,
+  previous?: IRFQ["savedQuoteProducts"][number]
+): number | null {
+  if (
+    previous?.basePrice != null &&
+    discount > 0 &&
+    pricesEqual(previous.price, submittedPrice) &&
+    pricesEqual(previous.discountPercent ?? 0, discount)
+  ) {
+    return previous.basePrice;
+  }
+
+  return submittedPrice;
+}
+
 function defaultPaymentTermsFromOrganization(organization: any): QuotePaymentTerms {
   const paymentTerms = organization.preferences?.paymentTerms;
   const defaultTemplate = Array.isArray(paymentTerms)
@@ -193,13 +215,13 @@ function sortQuoteProductsByItem<T extends { searchResultIndex: number | null }>
     .map(({ product }) => product);
 }
 
-function resolveManualProduct(product: ManualQuoteProduct) {
+function resolveManualProduct(product: ManualQuoteProduct, previous?: IRFQ["savedQuoteProducts"][number]) {
   const queryName = nullableString(product.queryName);
   const quantity = positiveNumber(product.quantity);
   const description = nullableString(product.description);
   const code = nullableString(product.code);
   const discount = discountPercent(product.discountPercent);
-  const basePrice = nullableNumber(product.price);
+  const basePrice = resolveSubmittedBasePrice(nullableNumber(product.price), discount, previous);
   const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
 
   if (!queryName || !quantity || (!description && !code)) {
@@ -227,7 +249,7 @@ function resolveManualProduct(product: ManualQuoteProduct) {
 }
 
 function resolveSelectedProducts(
-  rfq: Pick<IRFQ, "searchResults">,
+  rfq: Pick<IRFQ, "searchResults" | "savedQuoteProducts">,
   selections: SelectedRFQProduct[],
   manualProducts: ManualQuoteProduct[],
   regrettedLines: RegrettedRFQLine[] = []
@@ -258,7 +280,13 @@ function resolveSelectedProducts(
     const overrides = sel.overrides || {};
     const overridePrice = nullableNumber(overrides.price);
     const discount = discountPercent(overrides.discountPercent);
-    const basePrice = overridePrice ?? match.price;
+    const previous = rfq.savedQuoteProducts.find(
+      (product) =>
+        product.lineStatus !== "regretted" &&
+        product.searchResultIndex === sel.searchResultIndex &&
+        product.productId === match.id
+    );
+    const basePrice = resolveSubmittedBasePrice(overridePrice ?? match.price, discount, previous);
     const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
 
     return {
@@ -311,7 +339,17 @@ function resolveSelectedProducts(
 
   return sortQuoteProductsByItem([
     ...selectedProducts,
-    ...manualProducts.map(resolveManualProduct),
+    ...manualProducts.map((product) => {
+      const previous = rfq.savedQuoteProducts.find(
+        (saved) =>
+          saved.lineStatus !== "regretted" &&
+          saved.searchResultIndex === indexNumber(product.searchResultIndex) &&
+          saved.productId === (nullableNumber(product.productId) ?? 0) &&
+          saved.queryName === nullableString(product.queryName)
+      );
+
+      return resolveManualProduct(product, previous);
+    }),
     ...regrettedProducts,
   ]);
 }

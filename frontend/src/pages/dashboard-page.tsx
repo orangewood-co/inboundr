@@ -696,8 +696,14 @@ export function DashboardPage() {
 
       let matched = false
 
-      for (let searchResultIndex = 0; searchResultIndex < detail.searchResults.length; searchResultIndex += 1) {
+      const searchResultIndexes =
+        product.searchResultIndex != null
+          ? [product.searchResultIndex]
+          : detail.searchResults.map((_, index) => index)
+
+      for (const searchResultIndex of searchResultIndexes) {
         const searchResult = detail.searchResults[searchResultIndex]
+        if (!searchResult) continue
         const matchIndex = searchResult.matches.findIndex((match) => match.id === product.productId)
 
         if (matchIndex >= 0 && product.productId !== 0) {
