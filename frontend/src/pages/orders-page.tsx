@@ -106,6 +106,22 @@ function formatPrice(value: number | null): string {
   return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 }
 
+function sortQuoteProductsByItem(products: RFQSavedQuoteProduct[]): RFQSavedQuoteProduct[] {
+  return products
+    .map((product, originalIndex) => ({ product, originalIndex }))
+    .sort((a, b) => {
+      const aIndex = a.product.searchResultIndex
+      const bIndex = b.product.searchResultIndex
+
+      if (aIndex == null && bIndex == null) return a.originalIndex - b.originalIndex
+      if (aIndex == null) return 1
+      if (bIndex == null) return -1
+
+      return aIndex - bIndex || a.originalIndex - b.originalIndex
+    })
+    .map(({ product }) => product)
+}
+
 function EmptyState() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
@@ -167,6 +183,10 @@ export function OrdersPage() {
   const selectedDraft = useMemo(
     () => drafts.find((draft) => draft._id === selectedId) ?? null,
     [drafts, selectedId]
+  )
+  const orderedSelectedProducts = useMemo(
+    () => sortQuoteProductsByItem(selectedDraft?.savedQuoteProducts ?? []),
+    [selectedDraft]
   )
 
   const fetchDrafts = useCallback(async () => {
@@ -401,7 +421,7 @@ export function OrdersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {selectedDraft.savedQuoteProducts.map((product, index) => (
+                  {orderedSelectedProducts.map((product, index) => (
                     <div key={`${product.productId}-${index}`} className={`rounded-lg border bg-card p-3 ${product.lineStatus === "regretted" ? "border-destructive/25 bg-destructive/5" : ""}`}>
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">

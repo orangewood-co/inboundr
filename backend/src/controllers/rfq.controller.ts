@@ -171,6 +171,22 @@ function indexNumber(value: unknown): number | null {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
+function sortQuoteProductsByItem<T extends { searchResultIndex: number | null }>(products: T[]): T[] {
+  return products
+    .map((product, originalIndex) => ({ product, originalIndex }))
+    .sort((a, b) => {
+      const aIndex = a.product.searchResultIndex;
+      const bIndex = b.product.searchResultIndex;
+
+      if (aIndex == null && bIndex == null) return a.originalIndex - b.originalIndex;
+      if (aIndex == null) return 1;
+      if (bIndex == null) return -1;
+
+      return aIndex - bIndex || a.originalIndex - b.originalIndex;
+    })
+    .map(({ product }) => product);
+}
+
 function resolveManualProduct(product: ManualQuoteProduct) {
   const queryName = nullableString(product.queryName);
   const quantity = positiveNumber(product.quantity);
@@ -284,7 +300,11 @@ function resolveSelectedProducts(
     };
   });
 
-  return [...selectedProducts, ...manualProducts.map(resolveManualProduct), ...regrettedProducts];
+  return sortQuoteProductsByItem([
+    ...selectedProducts,
+    ...manualProducts.map(resolveManualProduct),
+    ...regrettedProducts,
+  ]);
 }
 
 const rfqListStatuses = new Set(["all", "analyzing", "ready", "draft", "processed", "failed"]);
