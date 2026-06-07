@@ -1,13 +1,14 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { type ButtonHTMLAttributes, type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
 import {
+  AlertCircleIcon,
   CameraIcon,
   CheckCircle2Icon,
-  ClockIcon,
   LoaderIcon,
   MapPinIcon,
+  UploadIcon,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { API_ORIGIN } from "@/lib/env"
@@ -41,6 +42,35 @@ type LocationPayload = {
   longitude: number
   accuracy: number | null
   capturedAt: string
+}
+
+const KIOSK_BTN_BASE =
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/70 focus-visible:ring-offset-2"
+const KIOSK_BTN_PRIMARY =
+  "bg-slate-900 text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+const KIOSK_BTN_SECONDARY =
+  "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+
+function KioskButton({
+  variant = "primary",
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" }) {
+  return (
+    <button
+      className={`${KIOSK_BTN_BASE} ${variant === "primary" ? KIOSK_BTN_PRIMARY : KIOSK_BTN_SECONDARY} ${className}`}
+      {...props}
+    />
+  )
+}
+
+function CapturedBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+      <CheckCircle2Icon className="size-3.5" />
+      Captured
+    </span>
+  )
 }
 
 function localWorkDate() {
@@ -78,6 +108,7 @@ function blobFromDataUrl(dataUrl: string): Blob {
 
 export default function AttendancePage({ organizationId }: { organizationId: string }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
+  const [logoBroken, setLogoBroken] = useState(false)
   const [employeeCode, setEmployeeCode] = useState("")
   const [pin, setPin] = useState("")
   const [employee, setEmployee] = useState<Employee | null>(null)
@@ -301,206 +332,249 @@ export default function AttendancePage({ organizationId }: { organizationId: str
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-500">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-slate-950 text-slate-400">
         <LoaderIcon className="size-6 animate-spin" />
       </main>
     )
   }
 
+  if (!workspace) {
+    return (
+      <main className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-6">
+        <div className="max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+          <AlertCircleIcon className="mx-auto size-8 text-red-400" />
+          <p className="mt-3 text-sm font-medium text-slate-200">{error ?? "Attendance workspace is unavailable"}</p>
+        </div>
+      </main>
+    )
+  }
+
+  const accent = workspace.primaryColor || "#f5b400"
   const completed = Boolean(record?.checkInAt && (nextAction === "check_in" || record.checkOutAt))
+  const step: "identify" | "capture" | "success" = !employee ? "identify" : completed ? "success" : "capture"
+  const errorBox = "rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700"
 
   return (
-    <main className="h-screen bg-white text-slate-900">
-      <div className="grid h-full overflow-hidden bg-white lg:grid-cols-[0.85fr_1.15fr]">
-        <section className="flex flex-col justify-between border-slate-800 bg-slate-900 p-8 text-slate-300 lg:border-r">
-          <div className="flex items-center gap-3">
-            {workspace?.logoUrl ? (
-              <img src={workspace.logoUrl} alt={`${workspace.name} logo`} className="size-11 rounded-lg bg-white object-contain p-1.5" />
-            ) : (
-              <div className="flex size-11 items-center justify-center rounded-lg bg-slate-800 text-slate-300 ring-1 ring-slate-700">
-                <ClockIcon className="size-5" />
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Attendance Station</p>
-              <h1 className="text-lg font-semibold text-white">{workspace?.name ?? "Workspace"}</h1>
-            </div>
-          </div>
-
-          <div className="my-12 flex flex-col items-center text-center">
-            {workspace?.logoUrl ? (
+    <main className="min-h-[100dvh] bg-white text-slate-900">
+      <div className="grid min-h-[100dvh] lg:grid-cols-[0.85fr_1.15fr]">
+        <section
+          className="relative flex flex-col justify-between overflow-hidden p-8 text-slate-300 lg:border-r lg:border-white/5"
+          style={{ background: "linear-gradient(160deg, #1e293b 0%, #0b1120 50%, #000000 100%)" }}
+        >
+          <div className="relative flex items-center">
+            {workspace.logoUrl && !logoBroken ? (
               <img
                 src={workspace.logoUrl}
-                alt={`${workspace.name} logo`}
-                className="mb-8 h-20 max-w-[12rem] rounded-xl bg-white object-contain p-3"
+                alt={workspace.name}
+                onError={() => setLogoBroken(true)}
+                className="h-10 w-auto max-w-[14rem] object-contain"
               />
-            ) : null}
-            <p className="text-6xl font-semibold tabular-nums tracking-tight text-white">{clockTime}</p>
+            ) : (
+              <h1 className="text-lg font-semibold text-white">{workspace.name}</h1>
+            )}
+          </div>
+
+          <div className="relative my-12 flex flex-col items-center text-center">
+            <p className="text-6xl font-semibold tabular-nums tracking-tight text-white sm:text-7xl">{clockTime}</p>
             <p className="mt-3 text-sm text-slate-400">{clockDate}</p>
           </div>
 
-          <p className="max-w-xs text-sm leading-6 text-slate-400">
+          <p className="relative max-w-xs text-sm leading-6 text-slate-400">
             Enter your employee code and PIN to clock in or out.
           </p>
         </section>
 
-        <section className="bg-white p-6 text-slate-900 sm:p-10">
-          {!employee ? (
-            <form onSubmit={identify} className="mx-auto grid min-h-full w-full max-w-sm content-center gap-6">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight">Mark attendance</h2>
-                <p className="mt-1.5 text-sm text-slate-500">Use the employee code and attendance PIN assigned by your administrator.</p>
-              </div>
-              <div className="grid gap-4">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="employee-code">Employee code</Label>
-                  <Input
-                    id="employee-code"
-                    value={employeeCode}
-                    onChange={(event) => setEmployeeCode(event.target.value)}
-                    className="h-12 text-lg tracking-wide"
-                    autoComplete="off"
-                    autoFocus
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="attendance-pin">Attendance PIN</Label>
-                  <Input
-                    id="attendance-pin"
-                    type="password"
-                    inputMode="numeric"
-                    value={pin}
-                    onChange={(event) => setPin(event.target.value)}
-                    className="h-12 text-lg tracking-[0.3em]"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-              {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-              <Button className="h-12 text-sm" disabled={working || !employeeCode || !pin}>
-                {working && <LoaderIcon className="size-4 animate-spin" />}
-                Continue
-              </Button>
-            </form>
-          ) : completed ? (
-            <div className="mx-auto grid min-h-full w-full max-w-sm content-center gap-6 text-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex size-14 items-center justify-center rounded-full bg-emerald-50">
-                  <CheckCircle2Icon className="size-8 text-emerald-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight">Attendance recorded</h2>
-                  <p className="mt-1 text-sm text-slate-500">{employee.fullName}, your record has been saved.</p>
-                </div>
-              </div>
-              <div className="grid gap-3 rounded-lg border border-slate-200 p-5 text-left text-sm">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-slate-500">Check in</span>
-                  <span className="font-medium tabular-nums">{formatTime(record?.checkInAt)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-3">
-                  <span className="text-slate-500">Check out</span>
-                  <span className="font-medium tabular-nums">{formatTime(record?.checkOutAt)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-3">
-                  <span className="text-slate-500">Status</span>
-                  <span className="font-medium capitalize">{record?.status?.replace(/_/g, " ")}</span>
-                </div>
-              </div>
-              <Button type="button" className="h-12" onClick={resetForNextEmployee}>
-                Next employee
-              </Button>
-            </div>
-          ) : (
-            <div className="grid min-h-full content-center gap-5">
-              <div className="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Verified employee</p>
-                  <h2 className="mt-1 text-xl font-semibold tracking-tight">{employee.fullName}</h2>
-                  <p className="text-sm text-slate-500">{employee.title || employee.employeeCode}</p>
-                </div>
-                <div className="shrink-0 rounded-md bg-slate-900 px-4 py-2 text-center text-white">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Next action</p>
-                  <p className="text-sm font-semibold">{actionLabel(nextAction)}</p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold">
-                      <MapPinIcon className="size-4 text-slate-400" />
-                      Location
-                    </h3>
-                    {location ? (
-                      <span className="text-xs font-medium text-emerald-600">Captured</span>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400">Required</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-500">
-                    {location
-                      ? `Accuracy ${Math.round(location.accuracy ?? 0)} m`
-                      : "Allow location access so the site can be verified."}
+        <section className="flex items-center justify-center bg-white p-6 py-10 text-slate-900 sm:p-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="w-full"
+            >
+              {step === "identify" && (
+                <form onSubmit={identify} className="mx-auto w-full max-w-sm">
+                  <h2 className="text-2xl font-semibold tracking-tight">Mark attendance</h2>
+                  <p className="mt-1.5 text-sm text-slate-500">
+                    Use the employee code and attendance PIN assigned by your administrator.
                   </p>
-                  <Button type="button" className="mt-4 w-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50" onClick={() => void requestLocation().catch((err) => setError(err.message))}>
-                    Refresh location
-                  </Button>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold">
-                      <CameraIcon className="size-4 text-slate-400" />
-                      Photo
-                    </h3>
-                    {selfieDataUrl ? (
-                      <span className="text-xs font-medium text-emerald-600">Captured</span>
-                    ) : (
-                      <span className="text-xs font-medium text-slate-400">Required</span>
-                    )}
-                  </div>
-                  <div className="aspect-video overflow-hidden rounded-md bg-slate-900">
-                    {selfieDataUrl ? (
-                      <img src={selfieDataUrl} alt="Attendance selfie preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" className="flex-1" onClick={captureSelfie} disabled={!cameraReady}>
-                      Capture
-                    </Button>
-                    <label className="inline-flex flex-1 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
-                      Upload
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        capture="user"
-                        className="sr-only"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0]
-                          if (file) void loadSelfieFile(file)
-                          event.target.value = ""
-                        }}
+                  <div className="mt-7 grid gap-4">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="employee-code">Employee code</Label>
+                      <Input
+                        id="employee-code"
+                        value={employeeCode}
+                        onChange={(event) => setEmployeeCode(event.target.value)}
+                        className="h-12 text-base"
+                        autoComplete="off"
+                        autoFocus
                       />
-                    </label>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="attendance-pin">Attendance PIN</Label>
+                      <Input
+                        id="attendance-pin"
+                        type="password"
+                        inputMode="numeric"
+                        value={pin}
+                        onChange={(event) => setPin(event.target.value)}
+                        className="h-12 text-base tracking-[0.3em]"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  {error && <p className={`mt-5 ${errorBox}`}>{error}</p>}
+                  <KioskButton className="mt-6 w-full" disabled={working || !employeeCode || !pin}>
+                    {working && <LoaderIcon className="size-4 animate-spin" />}
+                    Continue
+                  </KioskButton>
+                  <p className="mt-4 text-center text-xs text-slate-400">
+                    Your location and a selfie are captured for verification.
+                  </p>
+                </form>
+              )}
+
+              {step === "success" && employee && (
+                <div className="mx-auto w-full max-w-sm text-center">
+                  <div
+                    className="mx-auto flex size-16 items-center justify-center rounded-full"
+                    style={{ backgroundColor: `${accent}1f` }}
+                  >
+                    <CheckCircle2Icon className="size-9" style={{ color: accent }} />
+                  </div>
+                  <h2 className="mt-6 text-2xl font-semibold tracking-tight">
+                    {record?.checkOutAt ? "Checked out" : "Attendance recorded"}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">{employee.fullName}, your record has been saved.</p>
+                  <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 text-left text-sm">
+                    <div className="flex items-center justify-between gap-4 border-b border-slate-100 p-4">
+                      <span className="text-slate-500">Check in</span>
+                      <span className="font-medium tabular-nums">{formatTime(record?.checkInAt)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 border-b border-slate-100 p-4">
+                      <span className="text-slate-500">Check out</span>
+                      <span className="font-medium tabular-nums">{formatTime(record?.checkOutAt)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 p-4">
+                      <span className="text-slate-500">Status</span>
+                      <span className="font-medium capitalize">{record?.status?.replace(/_/g, " ")}</span>
+                    </div>
+                  </div>
+                  <KioskButton type="button" className="mt-6 w-full" onClick={resetForNextEmployee}>
+                    Next employee
+                  </KioskButton>
+                </div>
+              )}
+
+              {step === "capture" && employee && (
+                <div className="mx-auto w-full max-w-md">
+                  <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Verified employee</p>
+                      <h2 className="mt-0.5 truncate text-lg font-semibold tracking-tight">{employee.fullName}</h2>
+                      <p className="truncate text-sm text-slate-500">{employee.title || employee.employeeCode}</p>
+                    </div>
+                    <div className="shrink-0 rounded-lg bg-slate-900 px-4 py-2 text-center text-white">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Next</p>
+                      <p className="text-sm font-semibold">{actionLabel(nextAction)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold">
+                        <CameraIcon className="size-4 text-slate-400" />
+                        Photo
+                      </h3>
+                      {selfieDataUrl ? <CapturedBadge /> : <span className="text-xs font-medium text-slate-400">Required</span>}
+                    </div>
+                    <div className="aspect-[4/3] overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-200">
+                      {selfieDataUrl ? (
+                        <img src={selfieDataUrl} alt="Attendance selfie preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <video ref={videoRef} playsInline muted className="h-full w-full -scale-x-100 object-cover" />
+                      )}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {selfieDataUrl ? (
+                        <KioskButton type="button" variant="secondary" className="w-full" onClick={() => setSelfieDataUrl("")}>
+                          <CameraIcon className="size-4" />
+                          Retake
+                        </KioskButton>
+                      ) : (
+                        <KioskButton type="button" className="w-full" onClick={captureSelfie} disabled={!cameraReady}>
+                          <CameraIcon className="size-4" />
+                          Capture
+                        </KioskButton>
+                      )}
+                      <label className={`${KIOSK_BTN_BASE} ${KIOSK_BTN_SECONDARY} w-full cursor-pointer`}>
+                        <UploadIcon className="size-4" />
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          capture="user"
+                          className="sr-only"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0]
+                            if (file) void loadSelfieFile(file)
+                            event.target.value = ""
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
+                        <MapPinIcon className="size-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">Location</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {location
+                            ? `Accuracy ${Math.round(location.accuracy ?? 0)} m`
+                            : "Allow access to verify the site."}
+                        </p>
+                      </div>
+                    </div>
+                    {location ? (
+                      <CapturedBadge />
+                    ) : (
+                      <KioskButton
+                        type="button"
+                        variant="secondary"
+                        className="shrink-0"
+                        onClick={() => void requestLocation().catch((err) => setError(err.message))}
+                      >
+                        Enable
+                      </KioskButton>
+                    )}
+                  </div>
+
+                  {error && <p className={`mt-4 ${errorBox}`}>{error}</p>}
+
+                  <div className="mt-5 flex gap-3">
+                    <KioskButton
+                      type="button"
+                      className="flex-1"
+                      disabled={working || !location || !selfieDataUrl}
+                      onClick={() => void submitAttendance()}
+                    >
+                      {working && <LoaderIcon className="size-4 animate-spin" />}
+                      {actionLabel(nextAction)}
+                    </KioskButton>
+                    <KioskButton type="button" variant="secondary" onClick={resetForNextEmployee}>
+                      Cancel
+                    </KioskButton>
                   </div>
                 </div>
-              </div>
-
-              {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button type="button" className="h-12 flex-1 text-sm" disabled={working || !location || !selfieDataUrl} onClick={() => void submitAttendance()}>
-                  {working && <LoaderIcon className="size-4 animate-spin" />}
-                  {actionLabel(nextAction)}
-                </Button>
-                <Button type="button" className="h-12 border border-slate-200 bg-white px-6 text-slate-700 hover:bg-slate-50" onClick={resetForNextEmployee}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
+              )}
+            </motion.div>
+          </AnimatePresence>
         </section>
       </div>
     </main>
