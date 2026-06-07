@@ -30,7 +30,7 @@ type SidebarCategory = {
   items: SidebarNavItem[]
 }
 
-const data = {
+const data: { navMain: SidebarCategory[] } = {
   navMain: [
     {
       category: "Quotation",
@@ -131,7 +131,7 @@ const data = {
         },
       ],
     },
-  ] satisfies SidebarCategory[],
+  ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
