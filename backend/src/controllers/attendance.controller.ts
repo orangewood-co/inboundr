@@ -134,6 +134,17 @@ async function attendanceWithPreview(record: any) {
   return serialized;
 }
 
+async function resolveOrganizationLogoUrl(rawLogo: unknown): Promise<string> {
+  const value = stringValue(rawLogo);
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return (await createPresignedViewUrl(value)).url;
+  } catch {
+    return "";
+  }
+}
+
 export async function getPublicAttendanceWorkspace(req: Request, res: Response): Promise<void> {
   try {
     const organizationId = String(req.params.organizationId ?? "");
@@ -150,7 +161,7 @@ export async function getPublicAttendanceWorkspace(req: Request, res: Response):
       organization: {
         _id: String(organization._id),
         name: organization.name,
-        logoUrl: organization.logoUrl,
+        logoUrl: await resolveOrganizationLogoUrl(organization.logoUrl),
         primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
       },
     });
