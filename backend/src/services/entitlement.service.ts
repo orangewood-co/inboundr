@@ -17,7 +17,7 @@ export interface PlanDefinition {
 }
 
 export const FEATURE_CATALOG: FeatureDefinition[] = [
-  { key: "rfq", label: "RFQ", description: "AI-assisted quote detection and RFQ workflows." },
+  { key: "rfq", label: "Quotations", description: "Gmail inbox ingestion, RFQ workflows, quote drafts, and orders." },
   { key: "invoices", label: "Invoices", description: "Create, send, and manage invoices." },
   { key: "links", label: "Links", description: "Trackable short links and engagement analytics." },
   { key: "forms", label: "Forms", description: "Published forms, submissions, and exports." },
@@ -78,6 +78,13 @@ export function getEffectiveFeatures(organization: Pick<IOrganization, "planSlug
     planFeatures.delete(feature);
   }
   return FEATURE_KEYS.filter((feature) => planFeatures.has(feature));
+}
+
+export function hasEffectiveFeature(
+  organization: Pick<IOrganization, "planSlug" | "enabledFeatures" | "disabledFeatures">,
+  feature: FeatureKey
+): boolean {
+  return isFeatureKey(feature) && getEffectiveFeatures(organization).includes(feature);
 }
 
 export function serializeEntitlements(organization: Pick<IOrganization, "planSlug" | "enabledFeatures" | "disabledFeatures">) {

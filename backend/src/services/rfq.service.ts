@@ -2,9 +2,21 @@ import { RFQ } from "../models/rfq.model";
 import { updateEmailStatus } from "./email.service";
 import { classifyEmail } from "../agents/check_rfq";
 import { generateRFQ } from "../agents/generate_rfq";
+import { Organization } from "../models/organization.model";
+import { hasEffectiveFeature } from "./entitlement.service";
 
 interface ProcessEmailForRFQOptions {
   resetExisting?: boolean;
+}
+
+async function isQuotationProcessingEnabled(organizationId?: string): Promise<boolean> {
+  if (!organizationId) return true;
+
+  const organization = await Organization.findById(organizationId)
+    .select("planSlug enabledFeatures disabledFeatures")
+    .lean();
+
+  return Boolean(organization && hasEffectiveFeature(organization, "rfq"));
 }
 
 export async function processEmailForRFQ(
@@ -16,6 +28,13 @@ export async function processEmailForRFQ(
   organizationId?: string,
   options: ProcessEmailForRFQOptions = {}
 ): Promise<void> {
+  if (!(await isQuotationProcessingEnabled(organizationId))) {
+    console.warn(
+      `Skipping RFQ processing for email ${messageId}: Quotations feature is disabled`
+    );
+    return;
+  }
+
   if (options.resetExisting) {
     await RFQ.deleteMany({
       emailId,

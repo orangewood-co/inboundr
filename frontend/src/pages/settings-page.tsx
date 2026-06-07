@@ -39,6 +39,7 @@ import { useTheme } from "@/components/theme-provider"
 import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organization-context"
+import { useEntitlements } from "@/lib/entitlements"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -1084,6 +1085,7 @@ function OrganizationTab() {
 
 function AccountTab() {
   const { data: session, isPending: loadingSession } = useSession()
+  const { hasFeature } = useEntitlements()
   const [accounts, setAccounts] = useState<GmailAccount[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [connecting, setConnecting] = useState(false)
@@ -1094,6 +1096,7 @@ function AccountTab() {
   const [cropOpen, setCropOpen] = useState(false)
   const [removingAvatar, setRemovingAvatar] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const quotationsEnabled = hasFeature("rfq")
 
   const fetchGmailAccounts = useCallback(async () => {
     setLoadingAccounts(true)
@@ -1117,6 +1120,11 @@ function AccountTab() {
   }, [fetchGmailAccounts])
 
   const handleConnectGmail = async () => {
+    if (!quotationsEnabled) {
+      setGmailError("Quotations are not enabled for this organization.")
+      return
+    }
+
     setConnecting(true)
     setGmailError(null)
     try {
@@ -1298,13 +1306,17 @@ function AccountTab() {
 
       <SettingsCard
         title="Connected Gmail"
-        description="Authorize Gmail inboxes for RFQ processing and quote replies."
+        description={
+          quotationsEnabled
+            ? "Authorize Gmail inboxes for RFQ processing and quote replies."
+            : "Quotations are disabled for this organization. Re-enable Quotations before connecting Gmail."
+        }
         action={
           <Button
             size="sm"
             className="gap-1.5"
             onClick={handleConnectGmail}
-            disabled={connecting}
+            disabled={connecting || !quotationsEnabled}
           >
             {connecting ? (
               <Spinner data-icon="inline-start" />
@@ -1331,7 +1343,9 @@ function AccountTab() {
               <div>
                 <p className="text-sm font-medium">No Gmail account connected</p>
                 <p className="text-xs text-muted-foreground">
-                  Connect Gmail to process incoming RFQs and send quotes on the same thread.
+                  {quotationsEnabled
+                    ? "Connect Gmail to process incoming RFQs and send quotes on the same thread."
+                    : "Gmail can be connected after Quotations are re-enabled."}
                 </p>
               </div>
             </div>

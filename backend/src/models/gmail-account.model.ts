@@ -7,7 +7,7 @@ export interface IGmailAccount extends Document {
   organizationId: mongoose.Types.ObjectId;
   emailAddress: string;
   accessToken: string | null;
-  refreshToken: string;
+  refreshToken: string | null;
   scope: string[];
   tokenExpiry: Date | null;
   historyId: string | null;
@@ -29,7 +29,7 @@ const gmailAccountSchema = new Schema<IGmailAccount>(
     },
     emailAddress: { type: String, required: true, lowercase: true, trim: true },
     accessToken: { type: String, default: null },
-    refreshToken: { type: String, required: true },
+    refreshToken: { type: String, default: null },
     scope: { type: [String], default: [] },
     tokenExpiry: { type: Date, default: null },
     historyId: { type: String, default: null },

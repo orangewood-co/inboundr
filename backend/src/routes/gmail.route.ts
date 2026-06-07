@@ -7,6 +7,7 @@ import {
 } from "../controllers/gmail.controller";
 import {
   requireAuth,
+  requireFeature,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -17,6 +18,7 @@ router.get(
   "/connect",
   requireAuth,
   requireOrganization,
+  requireFeature("rfq"),
   requireOrganizationRole(["owner", "admin"]),
   connectGmail
 );
@@ -26,6 +28,7 @@ router.delete(
   "/accounts/:id",
   requireAuth,
   requireOrganization,
+  requireFeature("rfq"),
   requireOrganizationRole(["owner", "admin"]),
   disconnectGmailAccount
 );

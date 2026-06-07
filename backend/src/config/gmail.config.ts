@@ -32,6 +32,10 @@ export function getGmailAuthUrl(state: string): string {
 export async function getGmailClientForAccount(
   account: IGmailAccount
 ): Promise<gmail_v1.Gmail> {
+  if (!account.refreshToken) {
+    throw new Error("Gmail account is not connected");
+  }
+
   const oauth = getGoogleOAuthClient();
   oauth.setCredentials({
     access_token: account.accessToken

@@ -1,12 +1,12 @@
 import type { Request, Response } from "express";
-import { google } from "googleapis";
 import { getGmailAuthUrl, exchangeGmailCode, getGmailProfileEmail } from "../config/gmail.config";
 import { GmailAccount } from "../models/gmail-account.model";
+import { Organization } from "../models/organization.model";
 import { createGmailOAuthState, verifyGmailOAuthState } from "../lib/oauth-state";
-import { startWatch } from "../services/gmail-watcher.service";
+import { startWatch, unlinkGmailAccount } from "../services/gmail-watcher.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
-import { decryptSecret } from "../lib/crypto";
 import { frontendOrigin } from "../config/origins.config";
+import { hasEffectiveFeature } from "../services/entitlement.service";
 
 export async function connectGmail(req: Request, res: Response): Promise<void> {
   try {
@@ -31,6 +31,17 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
     }
 
     const { userId, organizationId } = verifyGmailOAuthState(state);
+    const organization = organizationId
+      ? await Organization.findById(organizationId)
+          .select("planSlug enabledFeatures disabledFeatures")
+          .lean()
+      : null;
+
+    if (!organization || !hasEffectiveFeature(organization, "rfq")) {
+      res.redirect(`${frontendOrigin}/settings?gmail=disabled`);
+      return;
+    }
+
     const tokens = await exchangeGmailCode(code);
     const emailAddress = (await getGmailProfileEmail(tokens)).toLowerCase();
 
@@ -95,19 +106,7 @@ export async function disconnectGmailAccount(
       return;
     }
 
-    try {
-      const oauth = new google.auth.OAuth2();
-      if (account.accessToken) {
-        await oauth.revokeToken(decryptSecret(account.accessToken));
-      }
-    } catch (err) {
-      console.warn(`Failed to revoke Gmail token for ${account.emailAddress}:`, err);
-    }
-
-    await GmailAccount.updateOne(
-      { _id: account._id },
-      { status: "revoked", accessToken: null, errorMessage: null }
-    );
+    await unlinkGmailAccount(account);
 
     res.json({ message: "Gmail account disconnected" });
   } catch (err) {

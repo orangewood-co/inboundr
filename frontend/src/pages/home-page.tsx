@@ -38,8 +38,8 @@ type ModuleTile = {
 
 const moduleTiles: ModuleTile[] = [
   { title: "RFQ", url: "/rfq", icon: FileTextIcon, feature: "rfq", module: "rfq" },
-  { title: "Inbox", url: "/emails", icon: InboxIcon, module: "inbox" },
-  { title: "Orders", url: "/orders", icon: ShoppingCartIcon },
+  { title: "Inbox", url: "/emails", icon: InboxIcon, feature: "rfq", module: "inbox" },
+  { title: "Orders", url: "/orders", icon: ShoppingCartIcon, feature: "rfq", module: "rfq" },
   { title: "Products", url: "/products", icon: PackageIcon, module: "products" },
   { title: "Invoices", url: "/invoices", icon: ReceiptTextIcon, feature: "invoices", module: "invoices" },
   { title: "Customers", url: "/customers", icon: UsersIcon, module: "customers" },

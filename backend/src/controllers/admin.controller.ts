@@ -16,10 +16,12 @@ import { Organization } from "../models/organization.model";
 import {
   FEATURE_CATALOG,
   PLAN_DEFINITIONS,
+  getEffectiveFeatures,
   getPlanDefinition,
   normalizeFeatures,
   serializeEntitlements,
 } from "../services/entitlement.service";
+import { unlinkGmailAccountsForOrganization } from "../services/gmail-watcher.service";
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -484,13 +486,47 @@ export async function updateAdminOrganization(req: Request, res: Response): Prom
       return;
     }
 
+    const beforeOrganization = await Organization.findById(id).lean();
+    if (!beforeOrganization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    const hadRFQAccess = getEffectiveFeatures(beforeOrganization).includes("rfq");
     const organization = await Organization.findByIdAndUpdate(id, { $set: update }, { new: true });
     if (!organization) {
       res.status(404).json({ error: "Organization not found" });
       return;
     }
 
-    res.json({ organization: serializeOrganization(organization.toObject()) });
+    const hasRFQAccess = getEffectiveFeatures(organization).includes("rfq");
+    let quotationsCleanup:
+      | { triggered: boolean; accounts: Awaited<ReturnType<typeof unlinkGmailAccountsForOrganization>>; error?: string }
+      | undefined;
+
+    if (hadRFQAccess && !hasRFQAccess) {
+      try {
+        quotationsCleanup = {
+          triggered: true,
+          accounts: await unlinkGmailAccountsForOrganization(
+            organization._id.toString(),
+            "Quotations feature disabled"
+          ),
+        };
+      } catch (err: any) {
+        console.error("Failed to clean up Gmail accounts after disabling Quotations:", err);
+        quotationsCleanup = {
+          triggered: true,
+          accounts: [],
+          error: err?.message || "Failed to clean up Gmail accounts",
+        };
+      }
+    }
+
+    res.json({
+      organization: serializeOrganization(organization.toObject()),
+      ...(quotationsCleanup ? { quotationsCleanup } : {}),
+    });
   } catch (err) {
     console.error("Error updating admin organization:", err);
     res.status(500).json({ error: "Failed to update organization" });

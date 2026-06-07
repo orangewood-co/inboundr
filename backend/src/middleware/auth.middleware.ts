@@ -8,7 +8,7 @@ import {
 import type { OrganizationRole } from "../models/organization-member.model";
 import { PlatformAdmin } from "../models/platform-admin.model";
 import {
-  getEffectiveFeatures,
+  hasEffectiveFeature,
   isFeatureKey,
   type FeatureKey,
 } from "../services/entitlement.service";
@@ -95,7 +95,7 @@ export function requireFeature(feature: FeatureKey) {
       return;
     }
 
-    if (!isFeatureKey(feature) || !getEffectiveFeatures(organization).includes(feature)) {
+    if (!isFeatureKey(feature) || !hasEffectiveFeature(organization, feature)) {
       res.status(403).json({ error: "Feature is not enabled for this organization" });
       return;
     }
