@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import type { Request, Response } from "express";
 import { Customer } from "../models/customer.model";
 import { RFQ, type IRFQ } from "../models/rfq.model";
-import type { OrganizationRequest } from "../middleware/auth.middleware";
+import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import type { DatabaseConfig, Product } from "../types";
 
 type SearchType = "customer" | "product" | "rfq";
@@ -146,12 +146,14 @@ async function searchProducts(
 
 async function searchRFQs(
   organizationId: OrganizationRequest["organization"]["_id"],
+  userId: string,
   query: string,
   limit: number
 ): Promise<SearchResult[]> {
   const regex = new RegExp(escapeRegex(query), "i");
   const rfqs = await RFQ.find({
     organizationId,
+    userId,
     isRFQ: true,
     isArchived: { $ne: true },
     $or: [
@@ -202,6 +204,7 @@ async function searchRFQs(
 export const globalSearch = async (req: Request, res: Response): Promise<void> => {
   try {
     const orgReq = req as OrganizationRequest;
+    const authReq = req as AuthenticatedRequest;
     const query = normalizeQuery(req.query.q);
     const limit = parseLimit(req.query.limit);
 
@@ -224,7 +227,7 @@ export const globalSearch = async (req: Request, res: Response): Promise<void> =
     const [customers, products, rfqs] = await Promise.all([
       searchCustomers(organizationObjectId, query, limit),
       searchProducts(organizationId, query, limit),
-      searchRFQs(organizationObjectId, query, limit),
+      searchRFQs(organizationObjectId, authReq.user.id, query, limit),
     ]);
 
     res.json({
