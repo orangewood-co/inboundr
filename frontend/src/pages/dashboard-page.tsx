@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
@@ -493,6 +494,8 @@ function DetailPlaceholder() {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate()
+  const { rfq: selectedRfqId } = useSearch({ from: "/rfq" })
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "btsa:layout:rfq",
     storage: localStorage,
@@ -509,7 +512,7 @@ export function DashboardPage() {
   const [dateTo, setDateTo] = useState("")
   const [sortOption, setSortOption] = useState<RFQSortOption>("created_desc")
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(selectedRfqId ?? null)
   const [detail, setDetail] = useState<RFQSummary | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
@@ -626,6 +629,31 @@ export function DashboardPage() {
       setDetailLoading(false)
     }
   }, [])
+
+  const selectRFQ = useCallback(
+    (id: string | null) => {
+      setSelectedId(id)
+      if (!id) {
+        setDetail(null)
+        setReply(null)
+      }
+      void navigate({
+        to: "/rfq",
+        search: id ? { rfq: id } : {},
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  useEffect(() => {
+    const nextSelectedId = selectedRfqId ?? null
+    setSelectedId((current) => (current === nextSelectedId ? current : nextSelectedId))
+    if (!nextSelectedId) {
+      setDetail(null)
+      setReply(null)
+    }
+  }, [selectedRfqId])
 
   useEffect(() => {
     fetchList(1)
@@ -788,7 +816,7 @@ export function DashboardPage() {
           e.preventDefault()
           if (rfqs.length === 0) return
           const idx = rfqs.findIndex((r) => r._id === selectedId)
-          setSelectedId(rfqs[idx < rfqs.length - 1 ? idx + 1 : 0]._id)
+          selectRFQ(rfqs[idx < rfqs.length - 1 ? idx + 1 : 0]._id)
           break
         }
         case "k":
@@ -796,13 +824,11 @@ export function DashboardPage() {
           e.preventDefault()
           if (rfqs.length === 0) return
           const idx = rfqs.findIndex((r) => r._id === selectedId)
-          setSelectedId(rfqs[idx > 0 ? idx - 1 : rfqs.length - 1]._id)
+          selectRFQ(rfqs[idx > 0 ? idx - 1 : rfqs.length - 1]._id)
           break
         }
         case "Escape": {
-          setSelectedId(null)
-          setDetail(null)
-          setReply(null)
+          selectRFQ(null)
           break
         }
         case "r":
@@ -817,7 +843,7 @@ export function DashboardPage() {
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [rfqs, selectedId, refreshing, fetchList, page])
+  }, [rfqs, selectedId, refreshing, fetchList, page, selectRFQ])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -838,12 +864,10 @@ export function DashboardPage() {
         if (selectedId === id) {
           const refreshed = list?.rfqs.find((rfq) => rfq.emailId._id === detail?.emailId._id)
           if (refreshed) {
-            setSelectedId(refreshed._id)
+            selectRFQ(refreshed._id)
             await fetchDetail(refreshed._id)
           } else {
-            setSelectedId(null)
-            setDetail(null)
-            setReply(null)
+            selectRFQ(null)
           }
         }
         setRetrying(false)
@@ -1251,9 +1275,7 @@ export function DashboardPage() {
       }
 
       setArchiveConfirmOpen(false)
-      setSelectedId(null)
-      setDetail(null)
-      setReply(null)
+      selectRFQ(null)
       toast.success("RFQ archived")
       await fetchList(page)
     } catch (err: any) {
@@ -1770,7 +1792,7 @@ export function DashboardPage() {
                     return (
                       <button
                         key={rfq._id}
-                        onClick={() => setSelectedId(rfq._id)}
+                        onClick={() => selectRFQ(rfq._id)}
                         className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-colors ${
                           isSelected
                             ? "bg-primary/8 ring-1 ring-primary/20"
@@ -1929,10 +1951,7 @@ export function DashboardPage() {
                             variant="ghost"
                             size="icon"
                             className="size-7 shrink-0"
-                            onClick={() => {
-                              setSelectedId(null)
-                              setDetail(null)
-                            }}
+                            onClick={() => selectRFQ(null)}
                           >
                             <XIcon className="size-4" />
                           </Button>
