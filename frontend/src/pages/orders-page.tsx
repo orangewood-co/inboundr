@@ -157,7 +157,7 @@ function ProductPriceBreakdown({ product }: { product: RFQSavedQuoteProduct }) {
     <div className="space-y-0.5 text-xs tabular-nums">
       <p className="text-muted-foreground">
         <span className="mr-1">Price:</span>
-        <span className="line-through">{formatPrice(resolveBasePrice(product))}</span>
+        <span>{formatPrice(resolveBasePrice(product))}</span>
       </p>
       <p className="text-muted-foreground">
         <span className="mr-1">Discount:</span>
