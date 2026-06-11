@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom"
-import { useEffect, useState } from "react"
-import { useScroll, useMotionValueEvent } from "motion/react"
+import { useEffect } from "react"
+import { motion, useScroll } from "motion/react"
 import Header from "./Header"
 import Footer from "./Footer"
 
@@ -14,16 +14,8 @@ function ScrollToTop() {
 
 function ScrollProgress() {
   const { scrollYProgress } = useScroll()
-  const [width, setWidth] = useState(0)
 
-  useMotionValueEvent(scrollYProgress, "change", (v) => setWidth(v))
-
-  return (
-    <div
-      id="scroll-progress"
-      style={{ width: `${width * 100}%` }}
-    />
-  )
+  return <motion.div id="scroll-progress" style={{ scaleX: scrollYProgress }} />
 }
 
 export default function Layout() {

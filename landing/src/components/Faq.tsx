@@ -41,7 +41,7 @@ export function Faq({ items, defaultOpen = 0 }: { items: FaqItem[]; defaultOpen?
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <p className="max-w-2xl pb-6 text-base leading-relaxed text-text-muted">
+                  <p className="max-w-2xl text-pretty pb-6 text-base leading-relaxed text-text-muted">
                     {item.a}
                   </p>
                 </motion.div>

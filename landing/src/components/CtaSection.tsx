@@ -3,6 +3,8 @@ import { motion } from "motion/react"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
 import { FadeIn } from "@/components/FadeIn"
 
+const MotionLink = motion.create(Link)
+
 interface CtaAction {
   label: string
   href: string
@@ -22,11 +24,11 @@ export function CtaSection({ heading, description, actions, border = true }: Cta
   return (
     <section className={`px-6 py-24 sm:py-36 lg:px-8 ${border ? "border-t border-border" : ""}`}>
       <FadeIn className="mx-auto max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-[-0.02em] sm:text-4xl lg:text-5xl">
+        <h2 className="text-balance text-3xl font-bold tracking-[-0.02em] sm:text-4xl lg:text-5xl">
           {heading}
         </h2>
         {description && (
-          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-text-muted">
+          <p className="mx-auto mt-5 max-w-md text-pretty text-base leading-relaxed text-text-muted">
             {description}
           </p>
         )}
@@ -37,8 +39,13 @@ export function CtaSection({ heading, description, actions, border = true }: Cta
             const isSecondary = action.variant === "secondary"
 
             const className = isSecondary
-              ? "border border-border px-7 py-3.5 text-sm font-medium transition hover:border-text/20 hover:bg-surface"
-              : "bg-text px-7 py-3.5 text-sm font-semibold text-base transition hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
+              ? "inline-block border border-border px-7 py-3.5 text-sm font-medium transition-[border-color,background-color] duration-200 hover:border-text/20 hover:bg-surface"
+              : "inline-block bg-text px-7 py-3.5 text-sm font-semibold text-base transition-shadow duration-200 hover:shadow-[0_0_30px_rgba(62,207,142,0.15)]"
+
+            const motionProps = {
+              whileHover: { scale: 1.02 },
+              whileTap: { scale: 0.97 },
+            }
 
             const inner = (
               <>
@@ -47,14 +54,14 @@ export function CtaSection({ heading, description, actions, border = true }: Cta
               </>
             )
 
-            return (
-              <motion.span key={action.label} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                {action.external ? (
-                  <a href={action.href} className={className}>{inner}</a>
-                ) : (
-                  <Link to={action.href} className={className}>{inner}</Link>
-                )}
-              </motion.span>
+            return action.external ? (
+              <motion.a key={action.label} href={action.href} className={className} {...motionProps}>
+                {inner}
+              </motion.a>
+            ) : (
+              <MotionLink key={action.label} to={action.href} className={className} {...motionProps}>
+                {inner}
+              </MotionLink>
             )
           })}
         </div>

@@ -22,7 +22,7 @@ export default function Header() {
         <span className="relative z-10 mx-2 text-text-dim">|</span>
         <Link
           to="/features/invoices"
-          className="relative z-10 font-medium text-text transition hover:text-gold"
+          className="relative z-10 font-medium text-text transition-colors duration-200 hover:text-gold"
         >
           Learn more <ArrowRight className="mb-px inline size-3" />
         </Link>
@@ -36,7 +36,11 @@ export default function Header() {
           </Link>
           <div className="hidden gap-8 text-[13px] text-text-muted md:flex">
             {navLinks.map((link) => (
-              <Link key={link.to} to={link.to} className="transition hover:text-text">
+              <Link
+                key={link.to}
+                to={link.to}
+                className="link-underline transition-colors duration-200 hover:text-text"
+              >
                 {link.label}
               </Link>
             ))}
@@ -44,13 +48,13 @@ export default function Header() {
           <div className="flex items-center gap-3">
             <Link
               to="https://app.inboundr.co/"
-              className="border border-border bg-green px-4 py-1.5 text-[13px] font-medium transition hover:border-text/20 hover:bg-surface-raised"
+              className="inline-block border border-border bg-green px-4 py-1.5 text-[13px] font-medium transition-[transform,border-color,background-color] duration-200 ease-out hover:border-text/20 hover:bg-surface-raised active:scale-[0.97]"
             >
               Login
             </Link>
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="flex size-9 items-center justify-center text-text-muted transition hover:text-text md:hidden"
+              className="flex size-9 items-center justify-center text-text-muted transition-[color,transform] duration-200 ease-out hover:text-text active:scale-95 md:hidden"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -79,7 +83,7 @@ export default function Header() {
                     <Link
                       to={link.to}
                       onClick={() => setMobileOpen(false)}
-                      className="block py-3 text-sm font-medium text-text-muted transition hover:text-text"
+                      className="block py-3 text-sm font-medium text-text-muted transition-colors duration-200 hover:text-text"
                     >
                       {link.label}
                     </Link>
