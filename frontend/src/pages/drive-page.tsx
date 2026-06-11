@@ -1744,7 +1744,7 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
             Internal editors can modify content. Public links are view-only and expire in 30 days by default.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <div className="space-y-2">
             <Label>Share with organization user</Label>
             <div className="flex gap-2">
