@@ -2,7 +2,7 @@ const isProduction = process.env.NODE_ENV === "production";
 
 function requiredOrigin(name: string, localDefault: string): string {
   const value = process.env[name]?.trim();
-  if (value) return value;
+  if (value) return value.replace(/\/+$/, "");
 
   if (isProduction) {
     throw new Error(`${name} environment variable must be set in production`);

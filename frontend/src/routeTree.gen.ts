@@ -47,7 +47,6 @@ import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.att
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
-import { Route as DriveShareTokenRouteImport } from './routes/drive.share.$token'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
@@ -241,11 +240,6 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DriveShareTokenRoute = DriveShareTokenRouteImport.update({
-  id: '/share/$token',
-  path: '/share/$token',
-  getParentRoute: () => DriveRoute,
-} as any)
 const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
   id: '/admin_/organizations/$id',
   path: '/admin/organizations/$id',
@@ -262,7 +256,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
-  '/drive': typeof DriveRouteWithChildren
+  '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -297,7 +291,6 @@ export interface FileRoutesByFullPath {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
-  '/drive/share/$token': typeof DriveShareTokenRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesByTo {
@@ -305,7 +298,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
-  '/drive': typeof DriveRouteWithChildren
+  '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -337,7 +330,6 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
-  '/drive/share/$token': typeof DriveShareTokenRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesById {
@@ -346,7 +338,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
-  '/drive': typeof DriveRouteWithChildren
+  '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -381,7 +373,6 @@ export interface FileRoutesById {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
-  '/drive/share/$token': typeof DriveShareTokenRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRouteTypes {
@@ -426,7 +417,6 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/admin/organizations/$id'
-    | '/drive/share/$token'
     | '/projects/$id/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -466,7 +456,6 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/links'
     | '/admin/organizations/$id'
-    | '/drive/share/$token'
     | '/projects/$id/tasks/$taskId'
   id:
     | '__root__'
@@ -509,7 +498,6 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/admin_/organizations/$id'
-    | '/drive/share/$token'
     | '/projects_/$id_/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
@@ -518,7 +506,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   ChatRoute: typeof ChatRoute
   CustomersRoute: typeof CustomersRoute
-  DriveRoute: typeof DriveRouteWithChildren
+  DriveRoute: typeof DriveRoute
   EmailsRoute: typeof EmailsRoute
   EmployeesRoute: typeof EmployeesRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -816,13 +804,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/drive/share/$token': {
-      id: '/drive/share/$token'
-      path: '/share/$token'
-      fullPath: '/drive/share/$token'
-      preLoaderRoute: typeof DriveShareTokenRouteImport
-      parentRoute: typeof DriveRoute
-    }
     '/admin_/organizations/$id': {
       id: '/admin_/organizations/$id'
       path: '/admin/organizations/$id'
@@ -839,16 +820,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface DriveRouteChildren {
-  DriveShareTokenRoute: typeof DriveShareTokenRoute
-}
-
-const DriveRouteChildren: DriveRouteChildren = {
-  DriveShareTokenRoute: DriveShareTokenRoute,
-}
-
-const DriveRouteWithChildren = DriveRoute._addFileChildren(DriveRouteChildren)
 
 interface FormsRouteChildren {
   FormsSlugRoute: typeof FormsSlugRoute
@@ -897,7 +868,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   ChatRoute: ChatRoute,
   CustomersRoute: CustomersRoute,
-  DriveRoute: DriveRouteWithChildren,
+  DriveRoute: DriveRoute,
   EmailsRoute: EmailsRoute,
   EmployeesRoute: EmployeesRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

@@ -35,6 +35,7 @@ import {
   LayoutGridIcon,
   LinkIcon,
   ListIcon,
+  MailIcon,
   MoreHorizontalIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -97,6 +98,7 @@ import {
   createDriveExport,
   createDriveFolder,
   createDrivePublicLink,
+  emailDrivePublicLink,
   formatBytes,
   getDriveExport,
   getDriveFileUrl,
@@ -1691,6 +1693,9 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
   const [email, setEmail] = React.useState("")
   const [role, setRole] = React.useState<"viewer" | "editor">("viewer")
   const [password, setPassword] = React.useState("")
+  const [emailingLinkId, setEmailingLinkId] = React.useState<string | null>(null)
+  const [linkEmail, setLinkEmail] = React.useState("")
+  const [sendingEmail, setSendingEmail] = React.useState(false)
 
   const refresh = React.useCallback(async () => {
     if (!node) return
@@ -1735,6 +1740,21 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
     }
   }
 
+  async function sendLinkEmail(linkId: string) {
+    if (!node || !linkEmail.trim()) return
+    setSendingEmail(true)
+    try {
+      await emailDrivePublicLink(node._id, linkId, linkEmail.trim())
+      toast.success("Share email sent")
+      setEmailingLinkId(null)
+      setLinkEmail("")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send share email")
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   return (
     <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -1746,7 +1766,7 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
         </DialogHeader>
         <div className="min-w-0 space-y-5">
           <div className="space-y-2">
-            <Label>Share with organization user</Label>
+            <Label>Share with Organization User</Label>
             <div className="flex gap-2">
               <Input
                 value={email}
@@ -1785,7 +1805,7 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Public view link</Label>
+            <Label>Public View Link</Label>
             <div className="flex gap-2">
               <Input
                 value={password}
@@ -1799,20 +1819,50 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
             </div>
             <div className="space-y-2">
               {links.map((link) => (
-                <div
-                  key={link._id}
-                  className="group flex items-center justify-between gap-2 rounded-md border p-2 text-sm"
-                >
-                  <CopyableText value={link.shareUrl} label="Link copied" className="min-w-0">
-                    <span className="truncate">{link.shareUrl}</span>
-                  </CopyableText>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => node && void revokeDrivePublicLink(node._id, link._id).then(refresh)}
-                  >
-                    Revoke
-                  </Button>
+                <div key={link._id} className="space-y-2 rounded-md border p-2 text-sm">
+                  <div className="group flex items-center justify-between gap-2">
+                    <CopyableText value={link.shareUrl} label="Link copied" className="min-w-0">
+                      <span className="truncate">{link.shareUrl}</span>
+                    </CopyableText>
+                    <div className="flex shrink-0 items-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEmailingLinkId(emailingLinkId === link._id ? null : link._id)
+                          setLinkEmail("")
+                        }}
+                      >
+                        <MailIcon className="size-4" />
+                        Email
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => node && void revokeDrivePublicLink(node._id, link._id).then(refresh)}
+                      >
+                        Revoke
+                      </Button>
+                    </div>
+                  </div>
+                  {emailingLinkId === link._id && (
+                    <div className="flex gap-2">
+                      <Input
+                        type="email"
+                        value={linkEmail}
+                        onChange={(event) => setLinkEmail(event.target.value)}
+                        placeholder="recipient@example.com"
+                        autoFocus
+                      />
+                      <Button
+                        onClick={() => void sendLinkEmail(link._id)}
+                        disabled={sendingEmail || !linkEmail.trim()}
+                      >
+                        {sendingEmail ? <Spinner className="size-4" /> : <MailIcon className="size-4" />}
+                        Send
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

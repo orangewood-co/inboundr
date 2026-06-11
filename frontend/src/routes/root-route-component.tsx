@@ -15,7 +15,6 @@ const PAGE_TITLES: Record<string, string> = {
   "/customers/import": "Import Customers",
   "/customers/$id": "Customer Details",
   "/drive": "Drive",
-  "/drive/share/$token": "Shared Drive Item",
   "/emails": "Emails",
   "/employees": "Employees",
   "/employees/new": "New Employee",

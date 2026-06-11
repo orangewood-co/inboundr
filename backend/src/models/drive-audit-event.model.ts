@@ -13,6 +13,7 @@ export type DriveAuditAction =
   | "unshared"
   | "public_link_created"
   | "public_link_revoked"
+  | "public_link_emailed"
   | "public_link_accessed"
   | "downloaded"
   | "export_requested"

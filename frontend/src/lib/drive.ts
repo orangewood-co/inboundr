@@ -205,6 +205,16 @@ export async function createDrivePublicLink(id: string, input: { password?: stri
   })
 }
 
+export async function emailDrivePublicLink(id: string, linkId: string, to: string) {
+  return api<{ ok: true }>(
+    `/api/v1/drive/${encodeURIComponent(id)}/public-links/${encodeURIComponent(linkId)}/email`,
+    {
+      method: "POST",
+      body: JSON.stringify({ to }),
+    }
+  )
+}
+
 export async function revokeDrivePublicLink(id: string, linkId: string) {
   return api<{ ok: true }>(`/api/v1/drive/${encodeURIComponent(id)}/public-links/${encodeURIComponent(linkId)}`, {
     method: "DELETE",
@@ -218,37 +228,5 @@ export async function createDriveExport(id: string) {
 export async function getDriveExport(jobId: string, download = false) {
   return api<{ job?: DriveExportJob; url?: string }>(
     `/api/v1/drive/exports/${encodeURIComponent(jobId)}${download ? "/download" : ""}`
-  )
-}
-
-export async function getPublicDriveLink(token: string, password?: string) {
-  const query = password ? `?password=${encodeURIComponent(password)}` : ""
-  return api<{ locked: boolean; link?: DrivePublicLink; node?: DriveNode }>(`/api/v1/public/drive/${encodeURIComponent(token)}${query}`)
-}
-
-export async function listPublicDriveChildren(token: string, parentId: string, password?: string) {
-  const query = new URLSearchParams({ parentId })
-  if (password) query.set("password", password)
-  return api<{ nodes: DriveNode[] }>(`/api/v1/public/drive/${encodeURIComponent(token)}/children?${query.toString()}`)
-}
-
-export async function getPublicDriveFileUrl(token: string, nodeId: string, password?: string, download = false) {
-  const query = password ? `?password=${encodeURIComponent(password)}` : ""
-  return api<{ url: string }>(
-    `/api/v1/public/drive/${encodeURIComponent(token)}/files/${encodeURIComponent(nodeId)}/${download ? "download-url" : "view-url"}${query}`
-  )
-}
-
-export async function createPublicDriveExport(token: string, nodeId: string, password?: string) {
-  return api<{ job: DriveExportJob }>(`/api/v1/public/drive/${encodeURIComponent(token)}/export`, {
-    method: "POST",
-    body: JSON.stringify({ nodeId, password }),
-  })
-}
-
-export async function getPublicDriveExport(token: string, jobId: string, password?: string, download = false) {
-  const query = password ? `?password=${encodeURIComponent(password)}` : ""
-  return api<{ job?: DriveExportJob; url?: string }>(
-    `/api/v1/public/drive/${encodeURIComponent(token)}/exports/${encodeURIComponent(jobId)}${download ? "/download" : ""}${query}`
   )
 }

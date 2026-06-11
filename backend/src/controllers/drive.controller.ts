@@ -1,7 +1,10 @@
 import crypto from "crypto";
+import { createElement } from "react";
 import type { Request, Response } from "express";
 import mongoose, { type Types } from "mongoose";
-import { frontendOrigin } from "../config/origins.config";
+import { embedOrigin } from "../config/origins.config";
+import { DriveShareEmail } from "../emails/drive-share";
+import { sendEmail } from "../lib/email";
 import { DriveExportJob } from "../models/drive-export-job.model";
 import { DriveNode, type IDriveNode } from "../models/drive-node.model";
 import { DrivePermission, type DrivePermissionRole } from "../models/drive-permission.model";
@@ -61,7 +64,7 @@ function paramValue(req: Request, name: string): string {
 }
 
 function publicShareUrl(token: string): string {
-  return `${frontendOrigin}/drive/share/${encodeURIComponent(token)}`;
+  return new URL(`/d/${encodeURIComponent(token)}`, embedOrigin).toString();
 }
 
 function defaultPublicLinkExpiry(): Date {
@@ -988,6 +991,59 @@ export async function revokeDrivePublicLink(req: Request, res: Response): Promis
     res.json({ ok: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message || "Failed to revoke public link" });
+  }
+}
+
+export async function emailDrivePublicLink(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const node = await requireDriveNode({ organizationId: orgReq.organization._id, nodeId: paramValue(req, "id") });
+    if (!canManageDriveSharing({ node, userId: orgReq.user.id, organizationRole: orgReq.organizationMembership.role })) {
+      res.status(403).json({ error: "Drive sharing access denied" });
+      return;
+    }
+    const to = stringValue(req.body?.to).toLowerCase();
+    if (!to || !to.includes("@")) {
+      res.status(400).json({ error: "A valid recipient email is required" });
+      return;
+    }
+    const link = await DrivePublicLink.findOne({
+      _id: paramValue(req, "linkId"),
+      organizationId: orgReq.organization._id,
+      nodeId: node._id,
+      status: "active",
+    }).lean();
+    if (!link || (link.expiresAt && link.expiresAt.getTime() <= Date.now())) {
+      res.status(404).json({ error: "Public link not found" });
+      return;
+    }
+    await sendEmail({
+      to,
+      subject: `${orgReq.user.name || orgReq.organization.name} shared ${node.name} with you`,
+      react: createElement(DriveShareEmail, {
+        organizationName: orgReq.organization.name,
+        senderName: orgReq.user.name,
+        itemName: node.name,
+        itemType: node.type === "folder" ? "folder" : "file",
+        shareUrl: publicShareUrl(link.token),
+        hasPassword: Boolean(link.passwordHash),
+        expiresAt: link.expiresAt
+          ? link.expiresAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+          : null,
+      }),
+      replyTo: orgReq.user.email ? [orgReq.user.email] : undefined,
+    });
+    recordDriveAuditEvent({
+      organizationId: orgReq.organization._id,
+      nodeId: node._id,
+      actorUserId: orgReq.user.id,
+      action: "public_link_emailed",
+      metadata: { linkId: String(link._id), to },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error sending Drive share email:", err);
+    res.status(500).json({ error: "Failed to send share email" });
   }
 }
 

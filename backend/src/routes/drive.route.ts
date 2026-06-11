@@ -5,6 +5,7 @@ import {
   createDriveExport,
   createDriveFolder,
   createDrivePublicLink,
+  emailDrivePublicLink,
   getDriveExport,
   getDriveFileUrl,
   getDriveNode,
@@ -61,6 +62,7 @@ router.post("/:id/shares", shareDriveNode);
 router.delete("/:id/shares/:userId", unshareDriveNode);
 router.get("/:id/public-links", listDrivePublicLinks);
 router.post("/:id/public-links", createDrivePublicLink);
+router.post("/:id/public-links/:linkId/email", emailDrivePublicLink);
 router.delete("/:id/public-links/:linkId", revokeDrivePublicLink);
 router.post("/:id/export", createDriveExport);
 
