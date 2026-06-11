@@ -6,7 +6,8 @@ export function LoginPage() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <a href="https://inboundr.co" className="flex items-center gap-2 font-medium">
-            <img src="/logo.png" alt="logo" className="object-contain max-w-30" />
+            <img src="/logo-black.png" alt="logo" className="object-contain max-w-30 dark:hidden" />
+            <img src="/logo.png" alt="logo" className="hidden object-contain max-w-30 dark:block" />
           </a>
         </div>
         <div className="flex flex-1 items-center justify-center">

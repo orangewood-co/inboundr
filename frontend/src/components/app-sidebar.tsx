@@ -231,14 +231,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               ) : (
                 <>
                   <img
+                    src="/logo-black.png"
+                    alt="Inboundr"
+                    className="max-w-30 object-contain opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0 dark:hidden"
+                  />
+                  <img
                     src="/logo.png"
                     alt="Inboundr"
-                    className="max-w-30 object-contain opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0"
+                    className="hidden max-w-30 object-contain opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0 dark:block"
+                  />
+                  <img
+                    src="/mark-black.png"
+                    alt="Inboundr"
+                    className="absolute size-7 scale-90 object-contain opacity-0 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-100 group-data-[collapsible=icon]:opacity-100 dark:hidden"
                   />
                   <img
                     src="/mark.png"
                     alt="Inboundr"
-                    className="absolute size-7 scale-90 object-contain opacity-0 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-100 group-data-[collapsible=icon]:opacity-100"
+                    className="absolute hidden size-7 scale-90 object-contain opacity-0 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-100 group-data-[collapsible=icon]:opacity-100 dark:block"
                   />
                 </>
               )}
