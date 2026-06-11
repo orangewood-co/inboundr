@@ -1245,8 +1245,8 @@ function AccountTab() {
               className="group relative size-16 shrink-0 overflow-hidden rounded-2xl border shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               aria-label="Change profile picture"
             >
-              <Avatar className="size-full rounded-2xl">
-                <AvatarImage src={avatarUrl || undefined} alt={displayName} className="object-cover" />
+              <Avatar className="size-full rounded-2xl after:rounded-2xl">
+                <AvatarImage src={avatarUrl || undefined} alt={displayName} className="rounded-2xl object-cover" />
                 <AvatarFallback className="rounded-2xl bg-primary/10 text-xl font-bold text-primary">
                   {loadingSession ? <Spinner /> : initials}
                 </AvatarFallback>
