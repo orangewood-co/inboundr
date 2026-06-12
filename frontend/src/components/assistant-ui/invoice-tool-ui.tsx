@@ -151,15 +151,13 @@ function InvoiceMutationToolUI({
 
   if (statusType === "running") return <ToolPendingCard label={pendingLabel} />
   if (!result) return null
-  if (result.status === "created" || result.status === "updated") {
-    return (
-      <InvoiceArtifactCard
-        invoice={result.invoice}
-        autoOpen={ranLive && result.status === "created"}
-      />
-    )
-  }
-  return <ToolErrorNote message={result.error} />
+  if ("error" in result) return <ToolErrorNote message={result.error} />
+  return (
+    <InvoiceArtifactCard
+      invoice={result.invoice}
+      autoOpen={ranLive && result.status === "created"}
+    />
+  )
 }
 
 export const CreateInvoiceToolUI = makeAssistantToolUI<
