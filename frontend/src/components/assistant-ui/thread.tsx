@@ -42,7 +42,7 @@ export function Thread({ className }: { className?: string }) {
   return (
     <ThreadPrimitive.Root
       className={cn(
-        "flex min-h-0 flex-1 flex-col bg-white dark:bg-[#212121]",
+        "flex min-h-0 flex-1 flex-col bg-background",
         className,
       )}
     >
@@ -66,10 +66,10 @@ export function Thread({ className }: { className?: string }) {
             <div className="min-h-4 grow" />
           </div>
 
-          <ThreadPrimitive.ViewportFooter className="sticky bottom-0 bg-white dark:bg-[#212121]">
+          <ThreadPrimitive.ViewportFooter className="sticky bottom-0 bg-background">
             <div className="mx-auto w-full max-w-3xl px-4 pb-3">
               <Composer />
-              <p className="pt-2 text-center text-xs text-[#5d5d5d] dark:text-[#a8a8a8]">
+              <p className="pt-2 text-center text-xs text-muted-foreground">
                 Inboundr can make mistakes. Check important info.
               </p>
             </div>
@@ -83,9 +83,14 @@ export function Thread({ className }: { className?: string }) {
 function EmptyState() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 pb-16">
-      <h1 className="text-center text-2xl font-semibold tracking-tight text-[#0d0d0d] sm:text-3xl dark:text-[#ececec]">
-        Where should we begin?
-      </h1>
+      <div className="flex flex-col items-center gap-2">
+        <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Where should we begin?
+        </h1>
+        <p className="text-center text-sm text-muted-foreground">
+          Ask anything about your workspace, or start a conversation.
+        </p>
+      </div>
       <div className="w-full">
         <Composer />
       </div>
@@ -95,12 +100,12 @@ function EmptyState() {
 
 function Composer() {
   return (
-    <ComposerPrimitive.Root className="flex flex-col gap-1 rounded-[28px] border border-[#e5e5e5] bg-white p-2 shadow-sm dark:border-transparent dark:bg-[#303030]">
+    <ComposerPrimitive.Root className="flex flex-col gap-1 rounded-2xl border border-input bg-card p-2 shadow-sm">
       <ComposerPrimitive.Input
         rows={1}
         autoFocus
         placeholder="Ask anything"
-        className="max-h-48 min-h-[2.75rem] w-full resize-none bg-transparent px-3 py-2.5 text-[15px] text-[#0d0d0d] outline-none placeholder:text-[#8e8e8e] dark:text-[#ececec] dark:placeholder:text-[#9b9b9b]"
+        className="max-h-48 min-h-[2.75rem] w-full resize-none bg-transparent px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground"
       />
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-1">
@@ -108,7 +113,7 @@ function Composer() {
             <button
               type="button"
               aria-label="Add attachment"
-              className="flex size-9 items-center justify-center rounded-full text-[#5d5d5d] transition-colors hover:bg-[#0d0d0d]/5 dark:text-[#c5c5c5] dark:hover:bg-white/10"
+              className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <PlusIcon className="size-5" />
             </button>
@@ -135,7 +140,7 @@ function ToolsMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="hidden h-9 items-center gap-1.5 rounded-full px-3 text-sm text-[#5d5d5d] transition-colors hover:bg-[#0d0d0d]/5 sm:flex dark:text-[#c5c5c5] dark:hover:bg-white/10"
+          className="hidden h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
         >
           <span>Tools</span>
           <ChevronDownIcon className="size-4" />
@@ -161,7 +166,7 @@ function PrimaryAction() {
           <button
             type="button"
             aria-label="Stop response"
-            className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-[#0d0d0d]"
+            className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <SquareIcon className="size-4 fill-current" />
           </button>
@@ -177,7 +182,7 @@ function PrimaryAction() {
           <button
             type="submit"
             aria-label="Send message"
-            className="flex size-9 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-[#0d0d0d]"
+            className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <ArrowUpIcon className="size-5" />
           </button>
@@ -193,14 +198,14 @@ function PrimaryAction() {
           <button
             type="button"
             aria-label="Dictate"
-            className="flex size-9 items-center justify-center rounded-full text-[#5d5d5d] transition-colors hover:bg-[#0d0d0d]/5 dark:text-[#c5c5c5] dark:hover:bg-white/10"
+            className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <MicIcon className="size-5" />
           </button>
           <button
             type="button"
             aria-label="Voice mode"
-            className="flex size-9 items-center justify-center rounded-full bg-[#ff5d1f] text-white transition-opacity hover:opacity-90"
+            className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <AudioLinesIcon className="size-5" />
           </button>
@@ -213,12 +218,12 @@ function PrimaryAction() {
 function UserMessage() {
   return (
     <MessagePrimitive.Root className="group/message flex flex-col items-end gap-1">
-      <div className="max-w-[80%] rounded-3xl bg-[#f4f4f4] px-4 py-2.5 text-[15px] text-[#0d0d0d] dark:bg-[#303030] dark:text-[#ececec]">
+      <div className="max-w-[80%] rounded-3xl bg-muted px-4 py-2.5 text-sm text-foreground">
         <MessagePrimitive.Parts>
           {({ part }) => (part.type === "text" ? <MarkdownText /> : null)}
         </MessagePrimitive.Parts>
       </div>
-      <div className="flex items-center gap-1 pr-1 text-[#5d5d5d] opacity-0 transition-opacity group-hover/message:opacity-100 dark:text-[#a8a8a8]">
+      <div className="flex items-center gap-1 pr-1 text-muted-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
         <BranchPicker />
         <ActionBarPrimitive.Root hideWhenRunning>
           <CopyButton />
@@ -237,17 +242,17 @@ function UserEditComposer() {
   return (
     <MessagePrimitive.Root className="flex justify-end">
       <div className="w-full max-w-xl">
-        <ComposerPrimitive.Root className="rounded-3xl bg-[#f4f4f4] p-3 dark:bg-[#303030]">
+        <ComposerPrimitive.Root className="rounded-3xl bg-muted p-3">
           <ComposerPrimitive.Input
             rows={3}
             autoFocus
-            className="max-h-48 min-h-20 w-full resize-none bg-transparent px-1 py-1 text-[15px] text-[#0d0d0d] outline-none dark:text-[#ececec]"
+            className="max-h-48 min-h-20 w-full resize-none bg-transparent px-1 py-1 text-sm text-foreground outline-none"
           />
           <div className="mt-2 flex justify-end gap-2">
             <ComposerPrimitive.Cancel asChild>
               <button
                 type="button"
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-[#0d0d0d] transition-colors hover:bg-black/5 dark:text-[#ececec] dark:hover:bg-white/10"
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5"
               >
                 Cancel
               </button>
@@ -255,7 +260,7 @@ function UserEditComposer() {
             <ComposerPrimitive.Send asChild>
               <button
                 type="submit"
-                className="rounded-full bg-[#0d0d0d] px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-80 dark:bg-white dark:text-[#0d0d0d]"
+                className="rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 Send
               </button>
@@ -270,7 +275,7 @@ function UserEditComposer() {
 function AssistantMessage() {
   return (
     <MessagePrimitive.Root className="group/message flex w-full flex-col gap-1">
-      <div className="max-w-none text-[15px] leading-7 text-[#0d0d0d] dark:text-[#ececec]">
+      <div className="max-w-none text-sm leading-7 text-foreground">
         <MessagePrimitive.Parts>
           {({ part }) => {
             if (part.type === "text") return <MarkdownText />
@@ -287,7 +292,7 @@ function AssistantMessage() {
           <LoadingIndicator />
         </AuiIf>
       </div>
-      <div className="flex items-center gap-0.5 text-[#5d5d5d] dark:text-[#a8a8a8]">
+      <div className="flex items-center gap-0.5 text-muted-foreground">
         <ActionBarPrimitive.Root hideWhenRunning>
           <CopyButton />
         </ActionBarPrimitive.Root>
@@ -350,7 +355,7 @@ function ActionButton({
       type="button"
       aria-label={label}
       className={cn(
-        "flex size-8 items-center justify-center rounded-lg text-current transition-colors hover:bg-foreground/5 dark:hover:bg-white/10",
+        "flex size-8 items-center justify-center rounded-lg text-current transition-colors hover:bg-muted hover:text-foreground",
         className,
       )}
       {...props}
@@ -377,7 +382,7 @@ function DecorativeButton({
 function LoadingIndicator() {
   return (
     <div
-      className="flex items-center gap-1 py-1 text-[#5d5d5d] dark:text-[#a8a8a8]"
+      className="flex items-center gap-1 py-1 text-muted-foreground"
       role="status"
       aria-label="Generating response"
     >
