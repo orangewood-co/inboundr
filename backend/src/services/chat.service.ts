@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { ChatMessage } from "../models/chat-message.model";
 import { ChatThread, type ChatThreadStatus } from "../models/chat-thread.model";
+import { createInvoiceTools } from "../tools/invoice.tool";
 import { createProductTools } from "../tools/product.tool";
 
 const openrouter = createOpenAI({
@@ -24,7 +25,15 @@ const DEFAULT_TITLE_MODEL = "openai/gpt-5.4-nano";
 const DEFAULT_CHAT_SYSTEM_PROMPT = `You are a helpful assistant for Inboundr users.
 
 You can help users search and add products to their catalog when tools are available. You cannot remove products.
-After using a tool, summarize the result clearly for the user.`;
+After using a tool, summarize the result clearly for the user.
+
+You can also help users with invoices:
+- Before creating an invoice, resolve the customer with searchCustomers and pass its customerId. If several customers match, ask the user which one they mean. If there is no matching customer, fill in customerSnapshot from what the user tells you.
+- Use searchProducts to look up unitPrice, gstRate, hsnCode, and productId for catalog products before adding them as line items.
+- Invoices you create are always drafts. Create the draft directly once the customer and line items are clear; only ask for confirmation when something is ambiguous or missing.
+- Only draft invoices can be edited. When updating line items, send the complete list of items the invoice should have.
+- You cannot send invoices. If the user asks to send one, use sendInvoice and relay its instructions; never claim an invoice was sent.
+- Amounts are in INR.`;
 
 export type ChatStreamInput = {
   messages?: UIMessage[];
@@ -81,6 +90,7 @@ export async function createChatStreamResponse(
 ): Promise<globalThis.Response> {
   const aiTools = {
     ...createProductTools(context),
+    ...createInvoiceTools(context),
     ...frontendTools((input.tools ?? {}) as Parameters<typeof frontendTools>[0]),
   };
   const result = streamText({

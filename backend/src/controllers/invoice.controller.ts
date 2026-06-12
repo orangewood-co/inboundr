@@ -1,43 +1,26 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
-import {
-  Invoice,
-  type IInvoiceLineItem,
-  type InvoicePaymentMethod,
-  type InvoiceRecurringFrequency,
-  type InvoiceStatus,
-} from "../models/invoice.model";
-import { Customer } from "../models/customer.model";
+import { Invoice, type InvoiceStatus } from "../models/invoice.model";
 import { GmailAccount } from "../models/gmail-account.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { sendStandaloneEmail } from "../services/gmail-send.service";
+import {
+  InvoiceServiceError,
+  calculateTotals,
+  createInvoiceRecord,
+  nextInvoiceNumber,
+  normalizePaymentMethod,
+  parseInvoiceDate,
+  resolveStatus,
+  roundMoney,
+  searchInvoiceRecords,
+  toNumber,
+  updateDraftInvoiceRecord,
+} from "../services/invoice.service";
 import { renderInvoicePdfBuffer, streamInvoicePdf } from "../services/invoice-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 
 const ACTIVE_STATUSES = new Set<InvoiceStatus>(["sent", "viewed", "partially_paid", "overdue"]);
-const LOCKED_STATUSES = new Set<InvoiceStatus>(["cancelled", "written_off", "paid"]);
-const PAYMENT_METHODS = new Set<InvoicePaymentMethod>([
-  "cash",
-  "bank_transfer",
-  "upi",
-  "cheque",
-  "card",
-  "other",
-]);
-const RECURRING_FREQUENCIES = new Set<InvoiceRecurringFrequency>([
-  "weekly",
-  "monthly",
-  "quarterly",
-  "yearly",
-]);
-const TEMPLATES = new Set(["professional", "compact", "modern"]);
-const SEARCH_FIELDS = [
-  "invoiceNumber",
-  "customerSnapshot.name",
-  "customerSnapshot.company",
-  "customerSnapshot.email",
-  "poNumber",
-] as const;
 
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
   const parsed = parseInt(String(value ?? ""), 10);
@@ -45,154 +28,9 @@ function parsePositiveInt(value: unknown, fallback: number, max?: number): numbe
   return max ? Math.min(max, normalized) : normalized;
 }
 
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function toNumber(value: unknown, fallback = 0): number {
-  const parsed = Number(value ?? fallback);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function normalizeLineItems(items: unknown): IInvoiceLineItem[] {
-  if (!Array.isArray(items)) return [];
-
-  return items
-    .map((item) => {
-      const source = (item ?? {}) as Record<string, unknown>;
-      const quantity = Math.max(0, toNumber(source.quantity, 1));
-      const unitPrice = Math.max(0, toNumber(source.unitPrice));
-      const discountPercentage = Math.min(100, Math.max(0, toNumber(source.discountPercentage)));
-      const gstRate = Math.max(0, toNumber(source.gstRate));
-      const gross = quantity * unitPrice;
-      const discount = gross * (discountPercentage / 100);
-      const taxableAmount = roundMoney(gross - discount);
-      const taxAmount = roundMoney(taxableAmount * (gstRate / 100));
-
-      return {
-        productId: source.productId == null ? null : toNumber(source.productId),
-        description: String(source.description ?? "").trim(),
-        productCode: String(source.productCode ?? "").trim(),
-        hsnCode: String(source.hsnCode ?? "").trim(),
-        unit: String(source.unit ?? "").trim(),
-        quantity,
-        unitPrice,
-        discountPercentage,
-        gstRate,
-        taxableAmount,
-        taxAmount,
-        totalAmount: roundMoney(taxableAmount + taxAmount),
-      };
-    })
-    .filter((item) => item.description && item.quantity > 0);
-}
-
-function calculateTotals(lineItems: IInvoiceLineItem[], payments: { amount: number }[] = []) {
-  const subtotal = roundMoney(lineItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
-  const taxableTotal = roundMoney(lineItems.reduce((sum, item) => sum + item.taxableAmount, 0));
-  const taxTotal = roundMoney(lineItems.reduce((sum, item) => sum + item.taxAmount, 0));
-  const grandTotal = roundMoney(taxableTotal + taxTotal);
-  const paidTotal = roundMoney(payments.reduce((sum, payment) => sum + Math.max(0, payment.amount), 0));
-
-  return {
-    subtotal,
-    discountTotal: roundMoney(subtotal - taxableTotal),
-    taxableTotal,
-    taxTotal,
-    grandTotal,
-    paidTotal,
-    balanceDue: roundMoney(Math.max(0, grandTotal - paidTotal)),
-  };
-}
-
-function resolveStatus(
-  currentStatus: InvoiceStatus,
-  totals: ReturnType<typeof calculateTotals>,
-  dueDate: Date | null
-): InvoiceStatus {
-  if (LOCKED_STATUSES.has(currentStatus)) return currentStatus;
-  if (totals.grandTotal > 0 && totals.balanceDue <= 0) return "paid";
-  if (totals.paidTotal > 0) return "partially_paid";
-  if (currentStatus !== "draft" && dueDate && dueDate < new Date()) return "overdue";
-  return currentStatus;
-}
-
-async function nextInvoiceNumber(organizationId: mongoose.Types.ObjectId): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `INV-${year}-`;
-  const count = await Invoice.countDocuments({
-    organizationId,
-    invoiceNumber: { $regex: `^${prefix}` },
-  });
-  return `${prefix}${String(count + 1).padStart(4, "0")}`;
-}
-
-async function buildSnapshots(req: OrganizationRequest, body: Record<string, unknown>) {
-  const organization = req.organization;
-  const customerId = String(body.customerId ?? "");
-  const customer =
-    mongoose.Types.ObjectId.isValid(customerId)
-      ? await Customer.findOne({ _id: customerId, organizationId: organization._id }).lean()
-      : null;
-
-  const customerSnapshotInput = (body.customerSnapshot ?? {}) as Record<string, unknown>;
-  const customerSnapshot = {
-    name: String(customerSnapshotInput.name ?? customer?.name ?? "").trim(),
-    company: String(customerSnapshotInput.company ?? customer?.company ?? "").trim(),
-    email: String(customerSnapshotInput.email ?? customer?.email ?? "").trim(),
-    contactNumber: String(customerSnapshotInput.contactNumber ?? customer?.contactNumber ?? "").trim(),
-    billingAddress: String(customerSnapshotInput.billingAddress ?? customer?.address ?? "").trim(),
-    shippingAddress: String(customerSnapshotInput.shippingAddress ?? customer?.address ?? "").trim(),
-  };
-
-  return {
-    customerId: customer?._id ?? null,
-    customerSnapshot,
-    organizationSnapshot: {
-      name: organization.name ?? "",
-      email: organization.defaultContact?.email ?? "",
-      phoneNumber: organization.defaultContact?.phoneNumber ?? "",
-      address: organization.address ?? "",
-      logoUrl: organization.logoUrl ?? "",
-      website: organization.website ?? "",
-      primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
-    },
-  };
-}
-
-function normalizeRecurring(body: Record<string, unknown>) {
-  const recurring = (body.recurring ?? {}) as Record<string, unknown>;
-  const frequency = String(recurring.frequency ?? "");
-  return {
-    enabled: Boolean(recurring.enabled),
-    frequency: RECURRING_FREQUENCIES.has(frequency as InvoiceRecurringFrequency)
-      ? (frequency as InvoiceRecurringFrequency)
-      : null,
-    startDate: parseDate(recurring.startDate),
-    endDate: parseDate(recurring.endDate),
-    nextRunDate: parseDate(recurring.nextRunDate),
-    autoSend: Boolean(recurring.autoSend),
-  };
-}
-
-function normalizePaymentMethod(value: unknown): InvoicePaymentMethod {
-  const method = String(value ?? "bank_transfer");
-  return PAYMENT_METHODS.has(method as InvoicePaymentMethod)
-    ? (method as InvoicePaymentMethod)
-    : "bank_transfer";
-}
-
-function normalizeTemplate(value: unknown): "professional" | "compact" | "modern" {
-  const template = String(value ?? "professional");
-  return TEMPLATES.has(template)
-    ? (template as "professional" | "compact" | "modern")
-    : "professional";
+function invoiceServiceErrorStatus(error: InvoiceServiceError): number {
+  if (error.code === "not_found") return 404;
+  return 400;
 }
 
 function renderInvoiceEmail(invoice: any): string {
@@ -215,24 +53,15 @@ function renderInvoiceEmail(invoice: any): string {
 export const listInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
     const orgReq = req as OrganizationRequest;
-    const page = parsePositiveInt(req.query.page, 1);
-    const limit = parsePositiveInt(req.query.limit, 20, 50);
-    const skip = (page - 1) * limit;
-    const search = String(req.query.search ?? "").trim();
-    const status = String(req.query.status ?? "").trim();
-    const filter: Record<string, unknown> = { organizationId: orgReq.organization._id };
+    const result = await searchInvoiceRecords({
+      organizationId: orgReq.organization._id,
+      page: parsePositiveInt(req.query.page, 1),
+      limit: parsePositiveInt(req.query.limit, 20, 50),
+      query: String(req.query.search ?? ""),
+      status: String(req.query.status ?? ""),
+    });
 
-    if (status && status !== "all") filter.status = status;
-    if (search) {
-      filter.$or = SEARCH_FIELDS.map((field) => ({ [field]: { $regex: search, $options: "i" } }));
-    }
-
-    const [invoices, total] = await Promise.all([
-      Invoice.find(filter).sort({ issueDate: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Invoice.countDocuments(filter),
-    ]);
-
-    res.json({ invoices, total, page, limit, totalPages: Math.ceil(total / limit) });
+    res.json(result);
   } catch (err) {
     console.error("Error listing invoices:", err);
     res.status(500).json({ error: "Failed to fetch invoices" });
@@ -265,44 +94,14 @@ export const createInvoice = async (req: Request, res: Response): Promise<void> 
   try {
     const orgReq = req as OrganizationRequest;
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const lineItems = normalizeLineItems(body.lineItems);
-    if (lineItems.length === 0) {
-      res.status(400).json({ error: "At least one invoice line item is required" });
-      return;
-    }
-
-    const snapshots = await buildSnapshots(orgReq, body);
-    const payments = Array.isArray(body.payments) ? body.payments : [];
-    const normalizedPayments = payments.map((payment) => ({
-      amount: Math.max(0, toNumber((payment as any).amount)),
-      date: parseDate((payment as any).date) ?? new Date(),
-      method: normalizePaymentMethod((payment as any).method),
-      reference: String((payment as any).reference ?? "").trim(),
-      notes: String((payment as any).notes ?? "").trim(),
-    }));
-    const totals = calculateTotals(lineItems, normalizedPayments);
-    const status = resolveStatus(String(body.status ?? "draft") as InvoiceStatus, totals, parseDate(body.dueDate));
-
-    const invoice = await Invoice.create({
-      organizationId: orgReq.organization._id,
-      invoiceNumber: String(body.invoiceNumber ?? "").trim() || (await nextInvoiceNumber(orgReq.organization._id)),
-      template: normalizeTemplate(body.template),
-      status,
-      issueDate: parseDate(body.issueDate) ?? new Date(),
-      dueDate: parseDate(body.dueDate),
-      paymentTerms: String(body.paymentTerms ?? orgReq.organization.preferences?.defaultTerms ?? "").trim(),
-      poNumber: String(body.poNumber ?? "").trim(),
-      notes: String(body.notes ?? "").trim(),
-      termsAndConditions: String(body.termsAndConditions ?? orgReq.organization.preferences?.defaultTerms ?? "").trim(),
-      lineItems,
-      payments: normalizedPayments,
-      totals,
-      recurring: normalizeRecurring(body),
-      ...snapshots,
-    });
+    const invoice = await createInvoiceRecord(orgReq.organization, body);
 
     res.status(201).json(invoice);
   } catch (err: any) {
+    if (err instanceof InvoiceServiceError) {
+      res.status(invoiceServiceErrorStatus(err)).json({ error: err.message });
+      return;
+    }
     console.error("Error creating invoice:", err);
     res.status(err?.code === 11000 ? 409 : 500).json({
       error: err?.code === 11000 ? "Invoice number already exists" : "Failed to create invoice",
@@ -314,48 +113,15 @@ export const updateInvoice = async (req: Request, res: Response): Promise<void> 
   try {
     const orgReq = req as OrganizationRequest;
     const id = String(req.params.id ?? "");
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      res.status(400).json({ error: "Invalid invoice id" });
-      return;
-    }
-
-    const invoice = await Invoice.findOne({ _id: id, organizationId: orgReq.organization._id });
-    if (!invoice) {
-      res.status(404).json({ error: "Invoice not found" });
-      return;
-    }
-    if (invoice.status !== "draft") {
-      res.status(400).json({ error: "Only draft invoices can be edited" });
-      return;
-    }
-
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const lineItems = "lineItems" in body ? normalizeLineItems(body.lineItems) : invoice.lineItems;
-    if (lineItems.length === 0) {
-      res.status(400).json({ error: "At least one invoice line item is required" });
-      return;
-    }
+    const invoice = await updateDraftInvoiceRecord(orgReq.organization, id, body);
 
-    const snapshots = await buildSnapshots(orgReq, body);
-    invoice.set({
-      invoiceNumber: String(body.invoiceNumber ?? invoice.invoiceNumber).trim(),
-      template: normalizeTemplate(body.template ?? invoice.template),
-      issueDate: parseDate(body.issueDate) ?? invoice.issueDate,
-      dueDate: "dueDate" in body ? parseDate(body.dueDate) : invoice.dueDate,
-      paymentTerms: String(body.paymentTerms ?? invoice.paymentTerms).trim(),
-      poNumber: String(body.poNumber ?? invoice.poNumber).trim(),
-      notes: String(body.notes ?? invoice.notes).trim(),
-      termsAndConditions: String(body.termsAndConditions ?? invoice.termsAndConditions).trim(),
-      lineItems,
-      totals: calculateTotals(lineItems, invoice.payments),
-      recurring: normalizeRecurring(body),
-      ...snapshots,
-    });
-    invoice.status = resolveStatus(invoice.status, invoice.totals, invoice.dueDate);
-
-    await invoice.save();
     res.json(invoice);
   } catch (err: any) {
+    if (err instanceof InvoiceServiceError) {
+      res.status(invoiceServiceErrorStatus(err)).json({ error: err.message });
+      return;
+    }
     console.error("Error updating invoice:", err);
     res.status(err?.code === 11000 ? 409 : 500).json({
       error: err?.code === 11000 ? "Invoice number already exists" : "Failed to update invoice",
@@ -437,7 +203,7 @@ export const recordInvoicePayment = async (req: Request, res: Response): Promise
 
     invoice.payments.push({
       amount,
-      date: parseDate(body.date) ?? new Date(),
+      date: parseInvoiceDate(body.date) ?? new Date(),
       method: normalizePaymentMethod(body.method),
       reference: String(body.reference ?? "").trim(),
       notes: String(body.notes ?? "").trim(),
