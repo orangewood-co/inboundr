@@ -204,11 +204,29 @@
   }
 }
 
+@keyframes anniversary-confetti-fall {
+  0% {
+    transform: translateY(-16px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--fall, 120px)) translateX(var(--sway, 0px)) rotate(var(--spin, 360deg));
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .pro-badge-pop {
     animation: pro-badge-pop 0.5s ease-out;
   }
   .pro-badge-sparkle {
     animation: pro-badge-sparkle 0.8s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+  }
+  .anniversary-confetti {
+    animation: anniversary-confetti-fall var(--duration, 2.8s) ease-in forwards;
+    animation-delay: var(--delay, 0s);
   }
 }

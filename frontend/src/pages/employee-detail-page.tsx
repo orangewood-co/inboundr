@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { AnniversaryCelebration } from "@/components/anniversary-celebration"
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
@@ -820,7 +821,7 @@ export default function EmployeeDetailPage() {
             </div>
           ) : employee ? (
             <div className="space-y-6">
-              <section className="rounded-3xl border bg-card p-6">
+              <section className="relative overflow-hidden rounded-3xl border bg-card p-6">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-5">
                     <Avatar className="size-24 rounded-3xl" size="lg">
@@ -842,6 +843,7 @@ export default function EmployeeDetailPage() {
                       <p className="mt-1 text-muted-foreground">
                         {employee.title || "No title"} · {employee.team?.name ?? "No team"}
                       </p>
+                      <AnniversaryCelebration startDate={employee.startDate} />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">

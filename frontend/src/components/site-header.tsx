@@ -10,9 +10,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Link, useLocation } from "@tanstack/react-router"
-import { PanelLeftIcon } from "lucide-react"
-import { Fragment } from "react"
+import { MoonIcon, PanelLeftIcon } from "lucide-react"
+import { Fragment, useEffect, useState } from "react"
 
 import { ROUTE_LABELS } from "@/lib/route-meta"
 
@@ -46,6 +52,18 @@ function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
   return [{ label: "Home" }]
 }
 
+// Easter egg: a quiet moon for anyone working between 1 and 5 AM.
+function useIsLateNight() {
+  const [hour, setHour] = useState(() => new Date().getHours())
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setHour(new Date().getHours()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
+
+  return hour >= 1 && hour < 5
+}
+
 export function SiteHeader({
   breadcrumbs,
   actions,
@@ -55,6 +73,7 @@ export function SiteHeader({
 } = {}) {
   const { toggleSidebar } = useSidebar()
   const { pathname } = useLocation()
+  const isLateNight = useIsLateNight()
 
   const segments: BreadcrumbSegment[] = breadcrumbs ?? breadcrumbsForPath(pathname)
 
@@ -96,6 +115,18 @@ export function SiteHeader({
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+        {isLateNight && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="ml-1 hidden text-muted-foreground/70 sm:inline-flex">
+                  <MoonIcon className="size-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>It's late — go to sleep</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {actions ? (
           <div className="ml-auto flex items-center gap-2">{actions}</div>
         ) : (
