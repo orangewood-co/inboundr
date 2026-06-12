@@ -221,7 +221,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <a href="/" className="relative flex h-10 items-center pt-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pl-0">
+            <a href="/" className="relative flex h-10 items-center justify-between pt-2 pr-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pr-0 group-data-[collapsible=icon]:pl-0">
               {logoUrl ? (
                 <>
                   <img
@@ -264,7 +264,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </>
               )}
               {branding?.isPro && (
-                <ProBadge className="ml-2 opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0" />
+                <ProBadge className="opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:hidden" />
               )}
             </a>
           </SidebarMenuItem>

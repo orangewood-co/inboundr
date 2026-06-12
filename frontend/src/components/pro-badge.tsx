@@ -4,7 +4,7 @@ export function ProBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400",
+        "inline-flex shrink-0 items-center rounded-[5px] bg-amber-400 px-1.5 py-[3px] text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-amber-950",
         className
       )}
     >
