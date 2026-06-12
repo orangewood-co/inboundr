@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@langchain/openrouter": "^0.3.0",
+    "@livekit/agents": "^1.4.5",
     "@types/archiver": "^7.0.0",
     "archiver": "^8.0.0",
     "qrcode": "^1.5.4",
