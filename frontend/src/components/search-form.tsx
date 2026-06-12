@@ -74,7 +74,7 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
 
   function openResult(result: SearchResult) {
     setIsOpen(false)
-    window.location.href = result.url
+    void navigate({ to: result.url })
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {

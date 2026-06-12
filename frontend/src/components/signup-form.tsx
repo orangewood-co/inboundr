@@ -36,10 +36,10 @@ function getPostAuthPath(): string {
 
 const STRENGTH_CONFIG = [
   { label: "Too short", color: "bg-destructive" },
-  { label: "Weak", color: "bg-orange-500" },
-  { label: "Fair", color: "bg-amber-500" },
-  { label: "Good", color: "bg-emerald-400" },
-  { label: "Strong", color: "bg-emerald-500" },
+  { label: "Weak", color: "bg-destructive" },
+  { label: "Fair", color: "bg-warning" },
+  { label: "Good", color: "bg-success/70" },
+  { label: "Strong", color: "bg-success" },
 ] as const
 
 function getPasswordStrength(password: string): number {

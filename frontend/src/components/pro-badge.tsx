@@ -15,7 +15,7 @@ interface Particle {
 }
 
 function makeParticles(): Particle[] {
-  const colors = ["#fcd34d", "#fbbf24", "#f59e0b"]
+  const colors = ["var(--primary)", "color-mix(in oklab, var(--primary) 70%, white)", "color-mix(in oklab, var(--primary) 80%, black)"]
   return Array.from({ length: 8 }, (_, i) => {
     const angle = (i / 8) * Math.PI * 2 + (Math.random() - 0.5) * 0.6
     const distance = 18 + Math.random() * 14
@@ -61,7 +61,7 @@ export function ProBadge({ className }: { className?: string }) {
     <span className={cn("relative inline-flex shrink-0", className)} onClick={handleClick}>
       <span
         className={cn(
-          "inline-flex items-center rounded-[5px] bg-amber-400 px-1.5 py-[3px] text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-amber-950 select-none",
+          "inline-flex items-center rounded-[5px] bg-primary px-1.5 py-[3px] text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-primary-foreground select-none",
           particles && "pro-badge-pop"
         )}
       >

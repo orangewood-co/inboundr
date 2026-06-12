@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
-  AlertCircleIcon,
   ArchiveIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -16,6 +15,8 @@ import {
 
 import { AppLayout } from "@/components/app-layout"
 import { CopyableText } from "@/components/copy-button"
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
+import { PageToolbar } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -43,13 +44,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { formatDateTime, formatNumber, formatRelativeTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -128,83 +129,6 @@ function formToPayload(form: CustomerFormState) {
       ? specialDiscountPercentage
       : 0,
   }
-}
-
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
-function formatRelativeTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-
-  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000)
-  const divisions = [
-    { amount: 60, unit: "second" },
-    { amount: 60, unit: "minute" },
-    { amount: 24, unit: "hour" },
-    { amount: 7, unit: "day" },
-    { amount: 4.345, unit: "week" },
-    { amount: 12, unit: "month" },
-    { amount: Number.POSITIVE_INFINITY, unit: "year" },
-  ] as const
-
-  let duration = diffInSeconds
-  for (const division of divisions) {
-    if (Math.abs(duration) < division.amount) {
-      return new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" }).format(
-        Math.round(duration),
-        division.unit
-      )
-    }
-    duration /= division.amount
-  }
-
-  return "-"
-}
-
-function CustomerTableSkeleton() {
-  return (
-    <div className="divide-y">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="grid grid-cols-[1fr_1fr_1fr_0.8fr_5rem] gap-4 px-5 py-4">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-4 w-36" />
-          <Skeleton className="h-4 w-24" />
-          <div className="flex gap-1">
-            <Skeleton className="size-8 rounded-lg" />
-            <Skeleton className="size-8 rounded-lg" />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function EmptyState({ search }: { search: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-      <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-        <UsersIcon className="size-5 text-muted-foreground" />
-      </div>
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold">
-          {search ? "No Customers Match That Search" : "No Customers Identified Yet"}
-        </h3>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          {search
-            ? "Try a customer name, company, email, phone number, or address fragment."
-            : "Customers identified from RFQs will appear here after they are saved."}
-        </p>
-      </div>
-    </div>
-  )
 }
 
 function CustomerForm({
@@ -341,7 +265,7 @@ function CustomerMetadata({ customer }: { customer: Customer }) {
             Updated <span className="text-foreground/70">{formatRelativeTime(customer.updatedAt)}</span>
           </span>
         </TooltipTrigger>
-        <TooltipContent>{formatDate(customer.updatedAt)}</TooltipContent>
+        <TooltipContent>{formatDateTime(customer.updatedAt)}</TooltipContent>
       </Tooltip>
       <span className="text-border">·</span>
       <Tooltip>
@@ -350,7 +274,7 @@ function CustomerMetadata({ customer }: { customer: Customer }) {
             Created <span className="text-foreground/70">{formatRelativeTime(customer.createdAt)}</span>
           </span>
         </TooltipTrigger>
-        <TooltipContent>{formatDate(customer.createdAt)}</TooltipContent>
+        <TooltipContent>{formatDateTime(customer.createdAt)}</TooltipContent>
       </Tooltip>
     </div>
   )
@@ -507,63 +431,59 @@ export default function CustomersPage() {
     <AppLayout>
         <SiteHeader />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-2">
-              <UsersIcon className="size-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Customers</h2>
-              {!loading && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                  {total.toLocaleString("en-IN")}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => void fetchCustomers()}
-                    disabled={loading}
-                  >
-                    <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Refresh</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const params = new URLSearchParams()
-                      if (debouncedSearch) params.set("search", debouncedSearch)
-                      window.open(`${API_BASE}/export?${params}`, "_blank")
-                    }}
-                  >
-                    <DownloadIcon className="size-4" />
-                    Export
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Export customers as CSV</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void navigate({ to: "/customers/import" })}
-                  >
-                    <UploadIcon className="size-4" />
-                    Import
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Bulk import customers from CSV or Excel</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
+          <PageToolbar
+            icon={UsersIcon}
+            title="Customers"
+            count={loading ? null : total}
+            actions={
+              <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      onClick={() => void fetchCustomers()}
+                      disabled={loading}
+                    >
+                      <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const params = new URLSearchParams()
+                        if (debouncedSearch) params.set("search", debouncedSearch)
+                        window.open(`${API_BASE}/export?${params}`, "_blank")
+                      }}
+                    >
+                      <DownloadIcon className="size-4" />
+                      Export
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export customers as CSV</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void navigate({ to: "/customers/import" })}
+                    >
+                      <UploadIcon className="size-4" />
+                      Import
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Bulk import customers from CSV or Excel</TooltipContent>
+                </Tooltip>
+              </>
+            }
+          />
 
           <div className="flex items-center gap-4 border-b px-4 py-3">
             <div className="relative max-w-xl flex-1">
@@ -577,22 +497,24 @@ export default function CustomersPage() {
             </div>
             <span className="shrink-0 text-sm text-muted-foreground">
               Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
-              <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
+              <span className="font-semibold text-foreground">{formatNumber(total)}</span>
             </span>
           </div>
 
           {error ? (
-            <div className="flex flex-col items-center gap-2 p-8 text-center">
-              <AlertCircleIcon className="size-5 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void fetchCustomers()}>
-                Try Again
-              </Button>
-            </div>
+            <ErrorState message={error} onRetry={() => void fetchCustomers()} />
           ) : loading ? (
-            <CustomerTableSkeleton />
+            <ListSkeleton rows={8} columns={5} />
           ) : customers.length === 0 ? (
-            <EmptyState search={debouncedSearch} />
+            <EmptyState
+              icon={UsersIcon}
+              title={debouncedSearch ? "No Customers Match That Search" : "No Customers Identified Yet"}
+              description={
+                debouncedSearch
+                  ? "Try a customer name, company, email, phone number, or address fragment."
+                  : "Customers identified from RFQs will appear here after they are saved."
+              }
+            />
           ) : (
             <div className="flex-1 overflow-auto">
               <table className="w-full min-w-[820px] text-sm">
@@ -738,17 +660,17 @@ export default function CustomersPage() {
           {sheetMode === "view" && editingCustomer ? (
             <>
               <CustomerDetails customer={editingCustomer} />
-              <SheetFooter className="border-t bg-muted/30">
-                <Button onClick={() => openEditSheet(editingCustomer)}>
-                  <Edit3Icon className="size-4" />
-                  Edit Customer
+              <SheetFooter className="flex-row justify-end border-t bg-muted/30">
+                <Button variant="outline" onClick={() => setSheetOpen(false)}>
+                  Close
                 </Button>
                 <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)}>
                   <ArchiveIcon className="size-4" />
                   Archive
                 </Button>
-                <Button variant="outline" onClick={() => setSheetOpen(false)}>
-                  Close
+                <Button onClick={() => openEditSheet(editingCustomer)}>
+                  <Edit3Icon className="size-4" />
+                  Edit Customer
                 </Button>
               </SheetFooter>
             </>
@@ -763,17 +685,17 @@ export default function CustomersPage() {
                   {saveError}
                 </div>
               )}
-              <SheetFooter className="border-t bg-muted/30">
-                <Button onClick={saveCustomer} disabled={saving}>
-                  {saving && <Spinner data-icon="inline-start" />}
-                  Save Changes
+              <SheetFooter className="flex-row justify-end border-t bg-muted/30">
+                <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
+                  Cancel
                 </Button>
                 <Button variant="outline" className="text-destructive hover:bg-destructive/10" onClick={() => setArchiveConfirmOpen(true)} disabled={saving}>
                   <ArchiveIcon className="size-4" />
                   Archive
                 </Button>
-                <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
-                  Cancel
+                <Button onClick={saveCustomer} disabled={saving}>
+                  {saving && <Spinner data-icon="inline-start" />}
+                  Save Changes
                 </Button>
               </SheetFooter>
             </>

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertCircleIcon,
   BarChart3Icon,
   CalendarIcon,
   CheckCircle2Icon,
@@ -52,7 +51,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
+import { ErrorState } from "@/components/list-states"
+import { PageHeader } from "@/components/page-header"
 import { API_ORIGIN } from "@/lib/env"
+import { formatCompactNumber, formatNumber } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/stats`
 
 type StatsRange = "7d" | "30d" | "90d"
@@ -132,18 +134,14 @@ const matchChartConfig = {
   noMatch: { label: "No Match", color: "var(--chart-5)" },
 } satisfies ChartConfig
 
-function formatCompact(value: number) {
-  return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value)
-}
-
 function formatDayLabel(value: string) {
-  return new Date(`${value}T00:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric" })
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString("en-IN", { month: "short", day: "numeric" })
 }
 
 function formatRangeLabel(from: string, to: string) {
   const f = new Date(`${from}T00:00:00Z`)
   const t = new Date(`${to}T00:00:00Z`)
-  const fmt = new Intl.DateTimeFormat([], { month: "short", day: "numeric", year: "numeric" })
+  const fmt = new Intl.DateTimeFormat("en-IN", { month: "short", day: "numeric", year: "numeric" })
   return `${fmt.format(f)} \u2013 ${fmt.format(t)}`
 }
 
@@ -294,13 +292,10 @@ export function StatsPage() {
         />
         <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-5">
           {/* Header: title + inline filters */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Stats</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Organization activity across inbound mail, RFQs, and requested products.
-              </p>
-            </div>
+          <PageHeader
+            title="Stats"
+            description="Organization activity across inbound mail, RFQs, and requested products."
+            actions={
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <div className="flex rounded-lg border bg-muted/40 p-0.5">
                 {rangeOptions.map((option) => (
@@ -348,16 +343,17 @@ export function StatsPage() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+            }
+          />
 
           {loading ? (
             <StatsSkeleton />
           ) : error ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl border bg-card p-10 text-center">
-              <AlertCircleIcon className="size-6 text-destructive" />
-              <p className="text-sm font-medium text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>Retry</Button>
-            </div>
+            <ErrorState
+              message={error}
+              onRetry={handleRefresh}
+              className="min-h-[320px] justify-center rounded-xl border bg-card p-10"
+            />
           ) : !data || !hasData ? (
             <EmptyState />
           ) : (
@@ -366,21 +362,21 @@ export function StatsPage() {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   title="Total Emails"
-                  value={data.totals.emails.toLocaleString("en-IN")}
-                  helper={`${data.totals.nonRfqs.toLocaleString("en-IN")} non-RFQs this period`}
+                  value={formatNumber(data.totals.emails)}
+                  helper={`${formatNumber(data.totals.nonRfqs)} non-RFQs this period`}
                   tooltip="Total inbound emails received in the selected period"
                   icon={InboxIcon}
                 />
                 <StatCard
                   title="RFQs Received"
-                  value={data.totals.rfqs.toLocaleString("en-IN")}
+                  value={formatNumber(data.totals.rfqs)}
                   helper={`${rfqRate}% of received mail`}
                   tooltip="Emails classified as Requests for Quotation"
                   icon={BarChart3Icon}
                 />
                 <StatCard
                   title="Products Requested"
-                  value={data.totals.products.toLocaleString("en-IN")}
+                  value={formatNumber(data.totals.products)}
                   helper="Line items extracted from RFQs"
                   tooltip="Individual product line items extracted from RFQ emails"
                   icon={PackageIcon}
@@ -388,7 +384,7 @@ export function StatsPage() {
                 <StatCard
                   title="Match Rate"
                   value={`${matchRate}%`}
-                  helper={`${data.matchQuality.matched.toLocaleString("en-IN")} of ${matchTotal.toLocaleString("en-IN")} product lookups`}
+                  helper={`${formatNumber(data.matchQuality.matched)} of ${formatNumber(matchTotal)} product lookups`}
                   tooltip="Percentage of requested products matched to your catalog"
                   icon={CheckCircle2Icon}
                 />
@@ -406,7 +402,7 @@ export function StatsPage() {
                     <BarChart accessibilityLayer data={data.daily}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tickFormatter={formatDayLabel} />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} width={40} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompactNumber} width={40} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Bar dataKey="emails" fill="var(--color-emails)" radius={[4, 4, 0, 0]} />
@@ -432,7 +428,7 @@ export function StatsPage() {
                     <LineChart accessibilityLayer data={data.daily}>
                       <CartesianGrid vertical={false} />
                       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tickFormatter={formatDayLabel} />
-                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompact} width={40} />
+                      <YAxis tickLine={false} axisLine={false} tickFormatter={formatCompactNumber} width={40} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <ChartLegend content={<ChartLegendContent />} />
                       <Line type="monotone" dataKey="rfqs" stroke="var(--color-rfqs)" strokeWidth={2} dot={false} />
@@ -578,8 +574,8 @@ function BreakdownTable({
             {rows.map((row) => (
               <TableRow key={row.key}>
                 <TableCell className="max-w-72 truncate font-medium">{row.name}</TableCell>
-                <TableCell className="text-right tabular-nums">{row.first.toLocaleString("en-IN")}</TableCell>
-                <TableCell className="text-right tabular-nums">{row.second.toLocaleString("en-IN")}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatNumber(row.first)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatNumber(row.second)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

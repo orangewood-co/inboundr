@@ -17,6 +17,7 @@ import { useSession } from "@/lib/auth-client"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatNumber } from "@/lib/format"
 
 interface StatsOverview {
   totals: {
@@ -119,7 +120,7 @@ export function HomePage() {
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {todayFormatted}
               </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight lg:text-3xl">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight lg:text-3xl">
                 {getGreeting()}, {userName}
               </h1>
             </section>
@@ -176,7 +177,7 @@ function StatCard({
     >
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">
-        {value.toLocaleString("en-IN")}
+        {formatNumber(value)}
       </p>
       <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
     </div>

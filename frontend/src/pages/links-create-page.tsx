@@ -124,7 +124,7 @@ export default function LinksCreatePage() {
           <form onSubmit={handleSubmit} className="mx-auto max-w-2xl p-6 lg:p-8">
             {/* Page header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold tracking-tight">Create a New Link</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Create a New Link</h1>
             </div>
 
             {/* Link details card */}

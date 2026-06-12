@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
+import { ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { useDefaultLayout } from "react-resizable-panels"
@@ -57,6 +58,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText } from "@/components/copy-button"
 import { openDownload } from "@/lib/downloads"
+import { StatusBadge, type StatusTone } from "@/components/status-badge"
+import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/format"
 import { getAvatarColor } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -282,29 +285,6 @@ function parseSender(from: string): { name: string; email: string } {
   return { name: from, email: from }
 }
 
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  }
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday"
-  return d.toLocaleDateString([], { month: "short", day: "numeric" })
-}
-
-function formatFullDate(iso: string): string {
-  return new Date(iso).toLocaleString([], {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 function numberInputValue(value: number | string | null | undefined): string {
   if (value == null) return ""
   const number = Number(value)
@@ -352,32 +332,32 @@ type RFQSortOption = "created_desc" | "created_asc" | "updated_desc" | "updated_
 
 const statusConfig: Record<
   ProcessingStatus,
-  { icon: typeof LoaderIcon; label: string; className: string }
+  { icon: typeof LoaderIcon; label: string; tone: StatusTone }
 > = {
   analyzing: {
     icon: LoaderIcon,
     label: "Analyzing",
-    className: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    tone: "warning",
   },
   ready: {
     icon: CheckCircle2Icon,
     label: "Ready",
-    className: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    tone: "info",
   },
   draft: {
     icon: FileTextIcon,
     label: "Draft",
-    className: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    tone: "neutral",
   },
   processed: {
     icon: CheckCircle2Icon,
     label: "Processed",
-    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    tone: "success",
   },
   failed: {
     icon: AlertCircleIcon,
     label: "Failed",
-    className: "bg-red-500/10 text-red-600 dark:text-red-400",
+    tone: "destructive",
   },
 }
 
@@ -398,33 +378,25 @@ function getWorkflowStatusTooltip(rfq: Pick<RFQSummary, "isProcessed" | "errorMe
   return "Ready for product selection"
 }
 
-function StatusBadge({ rfq }: { rfq: Pick<RFQSummary, "isProcessed" | "errorMessage" | "workflowStatus"> }) {
+function RFQStatusBadge({ rfq }: { rfq: Pick<RFQSummary, "isProcessed" | "errorMessage" | "workflowStatus"> }) {
   const status = getWorkflowStatus(rfq)
   const config = statusConfig[status]
-  const Icon = config.icon
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${config.className}`}
-    >
-      <Icon className={`size-3 ${status === "analyzing" ? "animate-spin" : ""}`} />
+    <StatusBadge tone={config.tone} icon={config.icon} spin={status === "analyzing"}>
       {config.label}
-    </span>
+    </StatusBadge>
   )
 }
 
-const matchStatusConfig = {
-  matched: { label: "Matched", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-  ambiguous: { label: "Ambiguous", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
-  no_match: { label: "No Match", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
+const matchStatusConfig: Record<"matched" | "ambiguous" | "no_match", { label: string; tone: StatusTone }> = {
+  matched: { label: "Matched", tone: "success" },
+  ambiguous: { label: "Ambiguous", tone: "warning" },
+  no_match: { label: "No Match", tone: "destructive" },
 }
 
 function MatchStatusBadge({ status }: { status: "matched" | "ambiguous" | "no_match" }) {
   const config = matchStatusConfig[status]
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${config.className}`}>
-      {config.label}
-    </span>
-  )
+  return <StatusBadge tone={config.tone}>{config.label}</StatusBadge>
 }
 
 function EmptyState() {
@@ -1400,8 +1372,8 @@ export function DashboardPage() {
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
             </div>
             {finalPrice != null && discountPct > 0 && (
-              <span className="ml-auto text-xs font-semibold tabular-nums text-emerald-500 dark:text-emerald-400">
-                ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              <span className="ml-auto text-xs font-semibold tabular-nums text-success">
+                {formatMoney(finalPrice)}
                 <span className="ml-1 text-[10px] font-normal text-muted-foreground">
                   ({discountPct}% off)
                 </span>
@@ -1512,7 +1484,7 @@ export function DashboardPage() {
                       </span>
                     )}
                     {product.unitprice != null && (
-                      <span>₹{Number(product.unitprice).toLocaleString("en-IN")}</span>
+                      <span>{formatMoney(Number(product.unitprice))}</span>
                     )}
                   </div>
                 </div>
@@ -1771,13 +1743,7 @@ export function DashboardPage() {
               {listLoading ? (
                 <ListSkeleton />
               ) : listError ? (
-                <div className="flex flex-col items-center gap-2 p-8 text-center">
-                  <AlertCircleIcon className="size-5 text-destructive" />
-                  <p className="text-sm text-destructive">{listError}</p>
-                  <Button variant="outline" size="sm" onClick={() => fetchList(page)}>
-                    Retry
-                  </Button>
-                </div>
+                <ErrorState message={listError} onRetry={() => fetchList(page)} />
               ) : rfqs.length === 0 ? (
                 <EmptyState />
               ) : (
@@ -1815,7 +1781,7 @@ export function DashboardPage() {
                             )}
                           </div>
                           <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                            {formatDate(rfq.createdAt)}
+                            {formatListTimestamp(rfq.createdAt)}
                           </span>
                         </div>
                         <div className="pl-[42px]">
@@ -1826,7 +1792,7 @@ export function DashboardPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span>
-                                  <StatusBadge rfq={rfq} />
+                                  <RFQStatusBadge rfq={rfq} />
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -1905,14 +1871,14 @@ export function DashboardPage() {
                         {detail.emailId.subject || "(no subject)"}
                       </h1>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {formatFullDate(detail.createdAt)}
+                        {formatFullDateTime(detail.createdAt)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span>
-                            <StatusBadge rfq={detail} />
+                            <RFQStatusBadge rfq={detail} />
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -1961,9 +1927,9 @@ export function DashboardPage() {
                     </div>
                   </div>
                   {detail.workflowStatus === "draft" && (
-                    <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-xs text-violet-700 dark:text-violet-300">
+                    <div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                       Draft saved
-                      {detail.draftSavedAt ? ` ${formatFullDate(detail.draftSavedAt)}` : ""}
+                      {detail.draftSavedAt ? ` ${formatFullDateTime(detail.draftSavedAt)}` : ""}
                       {detail.savedQuoteProducts?.length
                         ? ` with ${detail.savedQuoteProducts.length} product${detail.savedQuoteProducts.length === 1 ? "" : "s"}`
                         : ""}
@@ -1971,10 +1937,10 @@ export function DashboardPage() {
                     </div>
                   )}
                   {detail.workflowStatus === "processed" && (
-                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    <div className="rounded-lg border border-success/20 bg-success/5 px-3 py-2 text-xs text-success">
                       <span className="font-semibold">Quote number:</span>{" "}
                       {detail.quoteNumber || "Entered"}
-                      {detail.processedAt ? ` · Processed ${formatFullDate(detail.processedAt)}` : ""}
+                      {detail.processedAt ? ` · Processed ${formatFullDateTime(detail.processedAt)}` : ""}
                     </div>
                   )}
                 </div>
@@ -2167,7 +2133,7 @@ export function DashboardPage() {
                                             {m.description || "—"}
                                           </p>
                                           {j === 0 && sr.status === "matched" && (
-                                            <span className="shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                            <span className="shrink-0 rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-success">
                                               Best
                                             </span>
                                           )}
@@ -2193,15 +2159,15 @@ export function DashboardPage() {
                                         {isSelected && discountPct > 0 && finalPrice != null ? (
                                           <>
                                             <p className="text-[11px] tabular-nums text-muted-foreground line-through">
-                                              ₹{(effectivePrice ?? 0).toLocaleString("en-IN")}
+                                              {formatMoney(effectivePrice ?? 0)}
                                             </p>
-                                            <p className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                                              ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                            <p className="text-sm font-bold tabular-nums text-success">
+                                              {formatMoney(finalPrice)}
                                             </p>
                                           </>
                                         ) : m.price != null ? (
                                           <p className="text-sm font-bold tabular-nums">
-                                            ₹{m.price.toLocaleString("en-IN")}
+                                            {formatMoney(m.price)}
                                           </p>
                                         ) : (
                                           <p className="text-[11px] text-muted-foreground">No price</p>
@@ -2284,8 +2250,8 @@ export function DashboardPage() {
                                               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">%</span>
                                             </div>
                                             {finalPrice != null && discountPct > 0 && (
-                                              <span className="ml-auto text-xs font-semibold tabular-nums text-emerald-500 dark:text-emerald-400">
-                                                ₹{finalPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                              <span className="ml-auto text-xs font-semibold tabular-nums text-success">
+                                                {formatMoney(finalPrice)}
                                                 <span className="ml-1 text-[10px] font-normal text-muted-foreground">
                                                   ({discountPct}% off)
                                                 </span>
@@ -2471,15 +2437,17 @@ export function DashboardPage() {
                     <div className="mb-3 flex items-center gap-2">
                       <SendIcon className="size-4 text-muted-foreground" />
                       <h2 className="text-sm font-semibold">Generated Quote</h2>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                        reply.sendStatus === "sent"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : reply.sendStatus === "failed"
-                            ? "bg-red-500/10 text-red-600 dark:text-red-400"
-                            : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      }`}>
+                      <StatusBadge
+                        tone={
+                          reply.sendStatus === "sent"
+                            ? "success"
+                            : reply.sendStatus === "failed"
+                              ? "destructive"
+                              : "warning"
+                        }
+                      >
                         {reply.sendStatus}
-                      </span>
+                      </StatusBadge>
                     </div>
                     <div className="rounded-lg border bg-muted/10">
                       {/* Email header */}
@@ -2493,8 +2461,8 @@ export function DashboardPage() {
                           <span className="font-medium">{reply.subject}</span>
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          Generated {formatFullDate(reply.generatedAt)}
-                          {reply.sentAt && ` · Sent ${formatFullDate(reply.sentAt)}`}
+                          Generated {formatFullDateTime(reply.generatedAt)}
+                          {reply.sentAt && ` · Sent ${formatFullDateTime(reply.sentAt)}`}
                         </div>
                       </div>
                       {/* Email body */}
@@ -2567,18 +2535,18 @@ export function DashboardPage() {
                 {/* Error message if any */}
                 {detail.errorMessage && (
                   <div className="px-6 pb-5">
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-900 dark:bg-red-950/30">
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5">
                       <div className="mb-1 flex items-center gap-1.5">
-                        <AlertCircleIcon className="size-3.5 text-red-600 dark:text-red-400" />
-                        <span className="text-xs font-semibold text-red-700 dark:text-red-400">
+                        <AlertCircleIcon className="size-3.5 text-destructive" />
+                        <span className="text-xs font-semibold text-destructive">
                           Processing Error
                         </span>
                       </div>
-                      <p className="text-xs text-red-600 dark:text-red-400">{detail.errorMessage}</p>
+                      <p className="text-xs text-destructive">{detail.errorMessage}</p>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="mt-2 gap-1.5 border-red-200 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950"
+                        className="mt-2 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
                         disabled={retrying}
                         onClick={() => handleRetry(detail._id)}
                       >

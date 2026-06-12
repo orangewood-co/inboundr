@@ -54,6 +54,7 @@ import type { EmployeeAccessModule } from "@/lib/entitlements"
 import { resolveUploadedImageUrl, uploadCroppedEmployeeImage } from "@/lib/uploaded-image"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
 const ORGANIZATION_API = `${API_ORIGIN}/api/v1/organization`
 
@@ -170,13 +171,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "IN"
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
 }
 
 function documentTimestamp(document: EmployeeDocument) {
@@ -839,12 +833,12 @@ export default function EmployeeDetailPage() {
                           {statusLabels[employee.status]}
                         </Badge>
                         {employee.platformAccess.enabled ? (
-                          <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">Access enabled</Badge>
+                          <Badge variant="outline" className="border-success/30 text-success">Access enabled</Badge>
                         ) : (
                           <Badge variant="outline">Access disabled</Badge>
                         )}
                       </div>
-                      <h1 className="text-3xl font-semibold tracking-tight">{employee.fullName}</h1>
+                      <h1 className="text-2xl font-semibold tracking-tight">{employee.fullName}</h1>
                       <p className="mt-1 text-muted-foreground">
                         {employee.title || "No title"} · {employee.team?.name ?? "No team"}
                       </p>

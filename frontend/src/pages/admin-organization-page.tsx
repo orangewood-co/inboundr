@@ -51,6 +51,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 
 interface Feature {
   key: string
@@ -116,10 +117,6 @@ type ConfirmAction =
   | { type: "transfer-owner"; member: OrganizationMember }
   | { type: "cancel-invitation"; invitation: OrganizationInvitation }
   | { type: "status"; status: OrganizationDetail["status"] }
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
-}
 
 function RoleBadge({ role }: { role: OrganizationMember["role"] }) {
   const variant = role === "owner" ? "default" : role === "admin" ? "secondary" : "outline"
@@ -484,7 +481,7 @@ export default function AdminOrganizationPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-3xl font-bold tracking-tight">{organization.name}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">{organization.name}</h1>
                 {organization.isPro && <ProBadge />}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">

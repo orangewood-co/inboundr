@@ -14,27 +14,11 @@ import { Link, useLocation } from "@tanstack/react-router"
 import { PanelLeftIcon } from "lucide-react"
 import { Fragment } from "react"
 
+import { ROUTE_LABELS } from "@/lib/route-meta"
+
 export type BreadcrumbSegment = {
   label: string
   href?: string
-}
-
-const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
-  "/chat": "AI Chat",
-  "/rfq": "RFQ",
-  "/emails": "Inbox",
-  "/employees": "Employees",
-  "/products": "Products",
-  "/projects": "Projects",
-  "/search": "Search",
-  "/settings": "Settings",
-  "/forms": "Forms",
-  "/links": "Links",
-  "/customers": "Customers",
-  "/invoices": "Invoices",
-  "/stats": "Stats",
-  "/admin": "Super Admin",
 }
 
 function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
@@ -45,7 +29,21 @@ function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
     ]
   }
 
-  return [{ label: pageTitles[pathname] ?? "Dashboard" }]
+  const label = ROUTE_LABELS[pathname]
+  if (label) return [{ label }]
+
+  // Unknown (usually dynamic) path: anchor the crumb to the nearest known ancestor.
+  const segments = pathname.split("/").filter(Boolean)
+  while (segments.length > 1) {
+    segments.pop()
+    const parentPath = `/${segments.join("/")}`
+    const parentLabel = ROUTE_LABELS[parentPath]
+    if (parentLabel) {
+      return [{ label: parentLabel, href: parentPath }, { label: "Details" }]
+    }
+  }
+
+  return [{ label: "Home" }]
 }
 
 export function SiteHeader({

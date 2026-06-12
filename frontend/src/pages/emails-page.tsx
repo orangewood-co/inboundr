@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as XLSX from "xlsx"
 import { AppLayout } from "@/components/app-layout"
+import { ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { useDefaultLayout } from "react-resizable-panels"
@@ -11,6 +12,7 @@ import { SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText, CopyButton } from "@/components/copy-button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { openDownload } from "@/lib/downloads"
+import { formatFullDateTime, formatListTimestamp } from "@/lib/format"
 import { getAvatarColor } from "@/lib/utils"
 import { toast } from "sonner"
 import {
@@ -301,33 +303,6 @@ function RecipientsBar({ to, cc }: { to: string; cc: string | null }) {
   )
 }
 
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  const isToday = d.toDateString() === now.toDateString()
-
-  if (isToday) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  }
-
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday"
-
-  return d.toLocaleDateString([], { month: "short", day: "numeric" })
-}
-
-function formatFullDate(iso: string): string {
-  return new Date(iso).toLocaleString([], {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 function buildGmailUrl(email: Pick<EmailSummary, "threadId" | "messageId" | "gmailAccountEmail">): string {
   const gmailId = email.threadId || email.messageId
   const authUser = email.gmailAccountEmail ? `?authuser=${encodeURIComponent(email.gmailAccountEmail)}` : ""
@@ -338,26 +313,26 @@ const statusConfig = {
   received: {
     label: "Received",
     description: "Email received and queued for processing",
-    dotClass: "bg-blue-500",
-    pillClass: "bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
+    dotClass: "bg-info",
+    pillClass: "bg-info/10 text-info",
   },
   processing: {
     label: "Processing",
     description: "AI is classifying this email",
-    dotClass: "bg-amber-500 animate-pulse",
-    pillClass: "bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400",
+    dotClass: "bg-warning animate-pulse",
+    pillClass: "bg-warning/10 text-warning",
   },
   processed: {
     label: "Processed",
     description: "Classification complete",
-    dotClass: "bg-emerald-500",
-    pillClass: "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400",
+    dotClass: "bg-success",
+    pillClass: "bg-success/10 text-success",
   },
   failed: {
     label: "Failed",
     description: "Processing failed — check error details",
-    dotClass: "bg-red-500",
-    pillClass: "bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-400",
+    dotClass: "bg-destructive",
+    pillClass: "bg-destructive/10 text-destructive",
   },
 }
 
@@ -383,7 +358,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-600 dark:bg-red-500/20 dark:text-red-400">
+          <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
             RFQ failed
           </span>
         </TooltipTrigger>
@@ -398,7 +373,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+          <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
             RFQ
           </span>
         </TooltipTrigger>
@@ -427,7 +402,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+        <span className="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">
           Pending
         </span>
       </TooltipTrigger>
@@ -893,11 +868,12 @@ export function EmailsPage() {
         <ResizablePanelGroup orientation="horizontal" className="flex-1" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           {/* ── Email List Panel ── */}
           <ResizablePanel id="list" defaultSize="28%" minSize="18%" maxSize="45%" className="flex flex-col overflow-hidden bg-surface">
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <h2 className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Inbox</h2>
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <div className="flex items-center gap-2">
+                <InboxIcon className="size-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Inbox</h2>
                 {!listLoading && (
-                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary dark:bg-primary/20">
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
                     {total}
                   </span>
                 )}
@@ -907,11 +883,11 @@ export function EmailsPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-7"
+                    className="size-8"
                     onClick={handleRefresh}
                     disabled={refreshing}
                   >
-                    <RefreshCwIcon className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                    <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Refresh (R)</TooltipContent>
@@ -922,13 +898,7 @@ export function EmailsPage() {
               {listLoading ? (
                 <ListSkeleton />
               ) : listError ? (
-                <div className="flex flex-col items-center gap-3 p-8 text-center">
-                  <AlertCircleIcon className="size-5 text-destructive" />
-                  <p className="text-[13px] text-destructive">{listError}</p>
-                  <Button variant="outline" size="sm" onClick={() => fetchList(page)}>
-                    Retry
-                  </Button>
-                </div>
+                <ErrorState message={listError} onRetry={() => fetchList(page)} />
               ) : emails.length === 0 ? (
                 <EmptyState />
               ) : (
@@ -963,10 +933,10 @@ export function EmailsPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
-                                {formatDate(email.date)}
+                                {formatListTimestamp(email.date)}
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent side="left">{formatFullDate(email.date)}</TooltipContent>
+                            <TooltipContent side="left">{formatFullDateTime(email.date)}</TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="flex items-start justify-between gap-2 pl-[38px]">
@@ -1141,7 +1111,7 @@ export function EmailsPage() {
                       <TooltipTrigger asChild>
                         <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground/60">
                           <ClockIcon className="size-3" />
-                          {formatFullDate(detail.date)}
+                          {formatFullDateTime(detail.date)}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>{new Date(detail.date).toISOString()}</TooltipContent>

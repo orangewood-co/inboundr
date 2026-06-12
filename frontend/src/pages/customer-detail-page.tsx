@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { formatDateTime, formatRelativeTime } from "@/lib/format"
 
 import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/customers`
@@ -89,44 +90,6 @@ function formToPayload(form: CustomerFormState) {
       ? specialDiscountPercentage
       : 0,
   }
-}
-
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
-function formatRelativeTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-
-  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000)
-  const divisions = [
-    { amount: 60, unit: "second" },
-    { amount: 60, unit: "minute" },
-    { amount: 24, unit: "hour" },
-    { amount: 7, unit: "day" },
-    { amount: 4.345, unit: "week" },
-    { amount: 12, unit: "month" },
-    { amount: Number.POSITIVE_INFINITY, unit: "year" },
-  ] as const
-
-  let duration = diffInSeconds
-  for (const division of divisions) {
-    if (Math.abs(duration) < division.amount) {
-      return new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" }).format(
-        Math.round(duration),
-        division.unit
-      )
-    }
-    duration /= division.amount
-  }
-
-  return "-"
 }
 
 function DetailSkeleton() {
@@ -315,7 +278,7 @@ export default function CustomerDetailPage() {
                       <UsersIcon className="size-6 text-primary" />
                     </div>
                     <div>
-                      <h1 className="text-2xl font-bold">{customer.name}</h1>
+                      <h1 className="text-2xl font-semibold tracking-tight">{customer.name}</h1>
                       <p className="text-sm text-muted-foreground">{customer.company}</p>
                     </div>
                   </div>
@@ -397,7 +360,7 @@ export default function CustomerDetailPage() {
                         Created <span className="font-medium text-foreground/70">{formatRelativeTime(customer.createdAt)}</span>
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>{formatDate(customer.createdAt)}</TooltipContent>
+                    <TooltipContent>{formatDateTime(customer.createdAt)}</TooltipContent>
                   </Tooltip>
                   <span className="text-border">·</span>
                   <Tooltip>
@@ -406,14 +369,14 @@ export default function CustomerDetailPage() {
                         Updated <span className="font-medium text-foreground/70">{formatRelativeTime(customer.updatedAt)}</span>
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>{formatDate(customer.updatedAt)}</TooltipContent>
+                    <TooltipContent>{formatDateTime(customer.updatedAt)}</TooltipContent>
                   </Tooltip>
                 </div>
               </div>
             ) : customer && editing ? (
               <div className="space-y-6 animate-in fade-in-0 duration-200">
                 <div className="flex items-center justify-between">
-                  <h1 className="text-2xl font-bold">Edit Customer</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight">Edit Customer</h1>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" onClick={cancelEditing} disabled={saving}>
                       <XIcon className="size-4" />

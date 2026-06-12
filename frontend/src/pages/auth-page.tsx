@@ -72,7 +72,7 @@ export function AuthPage({
 
   return (
     <div className="grid min-h-svh bg-background lg:grid-cols-[1.05fr_0.95fr]">
-      <section className="relative hidden overflow-hidden border-r bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.22),transparent_38%),linear-gradient(135deg,hsl(var(--background)),hsl(var(--muted)))] p-8 lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden border-r bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_22%,transparent),transparent_38%),linear-gradient(135deg,var(--background),var(--muted))] p-8 lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 opacity-50">
           <div className="absolute top-20 left-12 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
           <div className="absolute right-16 bottom-16 h-40 w-40 rounded-full bg-sidebar-primary/20 blur-3xl" />

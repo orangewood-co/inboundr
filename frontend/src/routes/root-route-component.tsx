@@ -2,38 +2,7 @@ import { useEffect } from "react"
 import { Outlet, useRouterState } from "@tanstack/react-router"
 
 import { PostHogAnalytics } from "@/lib/posthog"
-
-const APP_TITLE = "Inboundr"
-
-const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/admin": "Super Admin",
-  "/admin/organizations/$id": "Organization Admin",
-  "/chat": "AI Chat",
-  "/rfq": "RFQ",
-  "/customers": "Customers",
-  "/customers/import": "Import Customers",
-  "/customers/$id": "Customer Details",
-  "/drive": "Drive",
-  "/emails": "Emails",
-  "/employees": "Employees",
-  "/employees/new": "New Employee",
-  "/forgot-password": "Forgot Password",
-  "/forms": "Forms",
-  "/invoices": "Invoices",
-  "/invoices/new": "New Invoice",
-  "/links": "Links",
-  "/links/create": "Create Link",
-  "/links/$id": "Link Details",
-  "/login": "Login",
-  "/products": "Products",
-  "/projects": "Projects",
-  "/projects/new": "New Project",
-  "/register": "Register",
-  "/reset-password": "Reset Password",
-  "/settings": "Settings",
-  "/stats": "Stats",
-}
+import { documentTitleForPath } from "@/lib/route-meta"
 
 export function RootRouteComponent() {
   const pathname = useRouterState({
@@ -41,43 +10,7 @@ export function RootRouteComponent() {
   })
 
   useEffect(() => {
-    const exactTitle = PAGE_TITLES[pathname]
-    if (exactTitle) {
-      document.title = `${exactTitle} - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/forms/")) {
-      document.title = `Form Editor - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/invoices/") && pathname !== "/invoices/new") {
-      document.title = `Invoice Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/customers/") && pathname !== "/customers/import") {
-      document.title = `Customer Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/employees/") && pathname !== "/employees/new") {
-      document.title = `Employee Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.includes("/tasks/")) {
-      document.title = `Task Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/projects/") && pathname !== "/projects/new") {
-      document.title = `Project Details - ${APP_TITLE}`
-      return
-    }
-
-    document.title = APP_TITLE
+    document.title = documentTitleForPath(pathname)
   }, [pathname])
 
   return (

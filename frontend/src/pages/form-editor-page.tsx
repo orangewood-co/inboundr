@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
+import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
@@ -192,10 +193,6 @@ function newField(): FormField {
     allowedMimeTypes: [],
     multiple: false,
   }
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
 }
 
 function publicUrl(slug: string) {
@@ -441,7 +438,7 @@ export default function FormEditorPage() {
     if (!email) { setMessage("No email field found in this response."); return }
     const response = await fetch(CUSTOMERS_API_BASE, {
       method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, company, email, contactNumber, address, notes: `Created from form response on ${formatDate(sub.createdAt)}`, specialDiscountPercentage: 0 }),
+      body: JSON.stringify({ name, company, email, contactNumber, address, notes: `Created from form response on ${formatDateTime(sub.createdAt)}`, specialDiscountPercentage: 0 }),
     })
     const body = await response.json().catch(() => null)
     if (!response.ok) { setMessage(body?.error ?? "Failed to create customer"); return }
@@ -944,7 +941,7 @@ export default function FormEditorPage() {
                       {sortedSubmissions.map((sub, i) => (
                         <TableRow key={sub._id} className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => setDetailId(sub._id)}>
                           <TableCell className="text-center text-xs text-muted-foreground">{i + 1}</TableCell>
-                          <TableCell className="text-[13px]">{formatDate(sub.createdAt)}</TableCell>
+                          <TableCell className="text-[13px]">{formatDateTime(sub.createdAt)}</TableCell>
                           <TableCell>
                             <Badge variant={sub.status === "new" ? "default" : "outline"} className="text-[10px] capitalize">
                               {sub.status === "new" && <CircleIcon className="size-1.5 fill-current" />}
@@ -980,7 +977,7 @@ export default function FormEditorPage() {
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Submitted</p>
-                        <p className="mt-0.5 font-medium">{formatDate(detailSubmission.createdAt)}</p>
+                        <p className="mt-0.5 font-medium">{formatDateTime(detailSubmission.createdAt)}</p>
                       </div>
                       <div>
                         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Source</p>

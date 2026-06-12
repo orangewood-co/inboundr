@@ -25,7 +25,7 @@ export function CopyButton({
       }}
     >
       {copied ? (
-        <CheckIcon className="size-3 text-emerald-500" />
+        <CheckIcon className="size-3 text-success" />
       ) : (
         <CopyIcon className="size-3" />
       )}
@@ -60,7 +60,7 @@ export function CopyableText({
         }}
       >
         {copied ? (
-          <CheckIcon className="size-3 text-emerald-500" />
+          <CheckIcon className="size-3 text-success" />
         ) : (
           <CopyIcon className="size-3" />
         )}

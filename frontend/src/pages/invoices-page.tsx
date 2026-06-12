@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
-  AlertCircleIcon,
   DownloadIcon,
   PlusIcon,
   ReceiptTextIcon,
@@ -13,6 +12,8 @@ import { toast } from "sonner"
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 
 import { AppLayout } from "@/components/app-layout"
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
+import { PageToolbar } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { formatDate, formatMoney } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -97,17 +99,6 @@ interface InvoiceStats {
 }
 
 const statusOptions = ["all", "draft", "sent", "viewed", "partially_paid", "paid", "overdue", "cancelled", "written_off"]
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0)
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
-}
 
 function labelStatus(status: string) {
   return status.replaceAll("_", " ")
@@ -207,7 +198,11 @@ export default function InvoicesPage() {
       } catch { /* continue */ }
     }
     setBulkLoading(false)
-    toast.success(`Sent ${successCount} of ${drafts.length} invoices`)
+    if (successCount === drafts.length) {
+      toast.success(`Sent ${successCount} of ${drafts.length} invoices`)
+    } else {
+      toast.error(`Sent ${successCount} of ${drafts.length} invoices — ${drafts.length - successCount} failed`)
+    }
     setSelected(new Set())
     void fetchInvoices()
     void fetchStats()
@@ -228,7 +223,11 @@ export default function InvoicesPage() {
       } catch { /* continue */ }
     }
     setBulkLoading(false)
-    toast.success(`Cancelled ${successCount} of ${cancellable.length} invoices`)
+    if (successCount === cancellable.length) {
+      toast.success(`Cancelled ${successCount} of ${cancellable.length} invoices`)
+    } else {
+      toast.error(`Cancelled ${successCount} of ${cancellable.length} invoices — ${cancellable.length - successCount} failed`)
+    }
     setSelected(new Set())
     void fetchInvoices()
     void fetchStats()
@@ -261,29 +260,25 @@ export default function InvoicesPage() {
         <SiteHeader />
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {/* Top bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-            <div className="flex items-center gap-2">
-              <ReceiptTextIcon className="size-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Invoices</h2>
-              {!loading && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                  {total.toLocaleString("en-IN")}
-                </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={exportCsv} disabled={invoices.length === 0}>
-                <DownloadIcon className="size-4" />
-                Export CSV
-              </Button>
-              <Button size="sm" asChild>
-                <Link to="/invoices/new" search={{ edit: undefined }}>
-                  <PlusIcon className="size-4" />
-                  New Invoice
-                </Link>
-              </Button>
-            </div>
-          </div>
+          <PageToolbar
+            icon={ReceiptTextIcon}
+            title="Invoices"
+            count={loading ? null : total}
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={exportCsv} disabled={invoices.length === 0}>
+                  <DownloadIcon className="size-4" />
+                  Export CSV
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to="/invoices/new" search={{ edit: undefined }}>
+                    <PlusIcon className="size-4" />
+                    New Invoice
+                  </Link>
+                </Button>
+              </>
+            }
+          />
 
           {/* Stats */}
           <div className="grid gap-4 border-b p-4 lg:grid-cols-3">
@@ -342,38 +337,23 @@ export default function InvoicesPage() {
 
           {/* Content */}
           {error ? (
-            <div className="flex flex-col items-center gap-2 p-8 text-center">
-              <AlertCircleIcon className="size-5 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="outline" size="sm" onClick={() => void fetchInvoices()}>Try Again</Button>
-            </div>
+            <ErrorState message={error} onRetry={() => void fetchInvoices()} />
           ) : loading ? (
-            <div className="divide-y">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="grid grid-cols-[1fr_1fr_1fr_1fr] gap-4 px-5 py-4">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-4 w-36" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
-            </div>
+            <ListSkeleton rows={8} columns={4} />
           ) : invoices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-              <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-                <ReceiptTextIcon className="size-5 text-muted-foreground" />
-              </div>
-              <h3 className="text-sm font-semibold">No Invoices Yet</h3>
-              <p className="max-w-md text-sm text-muted-foreground">
-                Create your first invoice to start tracking payments and revenue.
-              </p>
-              <Button size="sm" asChild>
-                <Link to="/invoices/new" search={{ edit: undefined }}>
-                  <PlusIcon className="size-4" />
-                  Create Invoice
-                </Link>
-              </Button>
-            </div>
+            <EmptyState
+              icon={ReceiptTextIcon}
+              title="No Invoices Yet"
+              description="Create your first invoice to start tracking payments and revenue."
+              action={
+                <Button size="sm" asChild>
+                  <Link to="/invoices/new" search={{ edit: undefined }}>
+                    <PlusIcon className="size-4" />
+                    New Invoice
+                  </Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[980px] text-sm">
@@ -448,11 +428,16 @@ export default function InvoicesPage() {
 }
 
 const AGING_BUCKETS: Array<{ key: keyof InvoiceAging; label: string; bar: string; dot: string }> = [
-  { key: "current", label: "Current", bar: "bg-emerald-500", dot: "bg-emerald-500" },
-  { key: "d1_15", label: "1-15 Days", bar: "bg-amber-400", dot: "bg-amber-400" },
-  { key: "d16_30", label: "16-30 Days", bar: "bg-orange-500", dot: "bg-orange-500" },
-  { key: "d31_45", label: "31-45 Days", bar: "bg-rose-500", dot: "bg-rose-500" },
-  { key: "d45plus", label: "45+ Days", bar: "bg-red-700", dot: "bg-red-700" },
+  { key: "current", label: "Current", bar: "bg-success", dot: "bg-success" },
+  { key: "d1_15", label: "1-15 Days", bar: "bg-warning", dot: "bg-warning" },
+  {
+    key: "d16_30",
+    label: "16-30 Days",
+    bar: "bg-[color-mix(in_oklab,var(--warning)_50%,var(--destructive))]",
+    dot: "bg-[color-mix(in_oklab,var(--warning)_50%,var(--destructive))]",
+  },
+  { key: "d31_45", label: "31-45 Days", bar: "bg-destructive/75", dot: "bg-destructive/75" },
+  { key: "d45plus", label: "45+ Days", bar: "bg-destructive", dot: "bg-destructive" },
 ]
 
 function ReceivablesCard({ stats, className }: { stats: InvoiceStats | null; className?: string }) {

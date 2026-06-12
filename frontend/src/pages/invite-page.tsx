@@ -7,6 +7,7 @@ import { getSession } from "@/lib/auth-client"
 import { setActiveOrganizationId } from "@/lib/organization-context"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 
 interface InvitationPreview {
   email: string
@@ -98,7 +99,7 @@ export function InvitePage() {
 
   return (
     <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[#07090a] px-6 py-10 text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,hsl(var(--primary)/0.18),transparent_28%),radial-gradient(circle_at_80%_70%,hsl(var(--sidebar-primary)/0.16),transparent_32%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_28%),radial-gradient(circle_at_80%_70%,color-mix(in_oklab,var(--sidebar-primary)_16%,transparent),transparent_32%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       <div className="relative w-full max-w-xl rounded-[2rem] border border-white/10 bg-card/95 p-8 shadow-2xl shadow-black/40 backdrop-blur sm:p-10">
         {loading ? (
@@ -151,12 +152,12 @@ export function InvitePage() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-background/60 px-4 py-3 sm:text-right">
                 <p className="text-xs text-muted-foreground">Expires</p>
-                <p className="font-medium">{new Date(invitation.expiresAt).toLocaleDateString()}</p>
+                <p className="font-medium">{formatDate(invitation.expiresAt)}</p>
               </div>
             </div>
 
             {invitation.status !== "pending" ? (
-              <p className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+              <p className="rounded-2xl border border-warning/25 bg-warning/10 px-4 py-3 text-sm text-warning">
                 This invitation is {invitation.status}.
               </p>
             ) : signedInWithWrongEmail ? (
@@ -168,7 +169,7 @@ export function InvitePage() {
                 {error}
               </p>
             ) : message ? (
-              <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+              <p className="rounded-2xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
                 {message}
               </p>
             ) : null}

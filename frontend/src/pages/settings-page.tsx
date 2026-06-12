@@ -59,6 +59,7 @@ import {
 import { toast } from "sonner"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate, formatDateTime } from "@/lib/format"
 
 const createPaymentTermId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -216,7 +217,7 @@ function SectionHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
       </div>
       {action}
@@ -255,7 +256,7 @@ function SettingsCard({
 function RoleBadge({ role }: { role: "Owner" | "Admin" | "Member" }) {
   const styles = {
     Owner: "bg-primary/10 text-primary",
-    Admin: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    Admin: "bg-warning/10 text-warning",
     Member: "bg-muted text-muted-foreground",
   }
   return (
@@ -286,20 +287,9 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function formatShortDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "Unknown date"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
-}
-
 function formatLastSignIn(value?: string | null) {
-  if (!value) return "Never recorded"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "Never recorded"
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
+  const formatted = formatDateTime(value)
+  return formatted === "-" ? "Never recorded" : formatted
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -876,7 +866,7 @@ function OrganizationTab() {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold">{letterhead.originalName || "Letterhead image"}</p>
                               <p className="text-xs text-muted-foreground">
-                                {formatFileSize(letterhead.size)} · {formatShortDate(letterhead.createdAt)}
+                                {formatFileSize(letterhead.size)} · {formatDate(letterhead.createdAt)}
                               </p>
                             </div>
                             {isActive && (
@@ -1361,15 +1351,15 @@ function AccountTab() {
                       <p className="text-sm font-medium">{account.emailAddress}</p>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                         account.status === "connected"
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                          ? "bg-success/10 text-success"
+                          : "bg-warning/10 text-warning"
                       }`}>
                         {account.status}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {account.watchExpiration
-                        ? `Watch renews before ${new Date(account.watchExpiration).toLocaleDateString()}`
+                        ? `Watch renews before ${formatDate(account.watchExpiration)}`
                         : "Watch will start after Google authorization completes"}
                     </p>
                     {account.errorMessage && (
@@ -1641,7 +1631,7 @@ function MembersTab() {
         <div className={`rounded-lg border px-3 py-2 text-sm ${
           error
             ? "border-destructive/20 bg-destructive/10 text-destructive"
-            : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            : "border-success/20 bg-success/10 text-success"
         }`}>
           {error || (accepting ? "Accepting invitation..." : message)}
         </div>
@@ -1709,7 +1699,7 @@ function MembersTab() {
                     <p className="text-xs text-muted-foreground">{member.userEmail}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Joined {formatShortDate(member.createdAt)}
+                    Joined {formatDate(member.createdAt)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Last signed in {formatLastSignIn(member.lastSignInAt)}
@@ -1775,7 +1765,7 @@ function MembersTab() {
                 <div>
                   <p className="text-sm font-medium">{invitation.email}</p>
                   <p className="text-xs text-muted-foreground">
-                    Expires {new Date(invitation.expiresAt).toLocaleDateString()}
+                    Expires {formatDate(invitation.expiresAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1864,7 +1854,7 @@ export function SettingsPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="w-full max-w-5xl px-6 py-8 lg:px-10">
           <div className="mb-7 max-w-2xl">
-            <h1 className="mt-2 text-3xl font-bold tracking-tight">Settings</h1>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">Settings</h1>
           </div>
 
           <Tabs defaultValue={activeTab} key={activeTab}>

@@ -94,7 +94,7 @@ export function NavUser({
                 <BellIcon />
                 Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate({ to: "/settings", search: { tab: "organization" } })}>
+              <DropdownMenuItem onClick={() => navigate({ to: "/settings", search: { tab: undefined } })}>
                 <Settings2Icon />
                 Settings
               </DropdownMenuItem>

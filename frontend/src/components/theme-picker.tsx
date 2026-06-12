@@ -5,16 +5,19 @@ import type { ThemeConfig } from "@/lib/themes"
 
 function ThemeSwatch({
   theme,
+  mode,
   active,
   onClick,
 }: {
   theme: ThemeConfig
+  mode: "light" | "dark"
   active: boolean
   onClick: () => void
 }) {
-  const primary = theme.dark["--primary"]
-  const background = theme.dark["--background"]
-  const accent = theme.dark["--accent"]
+  const palette = mode === "dark" ? theme.dark : theme.light
+  const primary = palette["--primary"]
+  const background = palette["--background"]
+  const accent = palette["--accent"]
 
   return (
     <button
@@ -62,10 +65,16 @@ export function ThemePicker({
   onChange?: (themeName: string) => void
   className?: string
 }) {
-  const { colorTheme, setColorTheme, availableThemes } = useTheme()
+  const { theme: mode, colorTheme, setColorTheme, availableThemes } = useTheme()
 
   const activeTheme = value ?? colorTheme
   const handleChange = onChange ?? setColorTheme
+  const resolvedMode =
+    mode === "system"
+      ? window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : mode
 
   return (
     <div
@@ -78,6 +87,7 @@ export function ThemePicker({
         <ThemeSwatch
           key={theme.name}
           theme={theme}
+          mode={resolvedMode}
           active={activeTheme === theme.name}
           onClick={() => handleChange(theme.name)}
         />

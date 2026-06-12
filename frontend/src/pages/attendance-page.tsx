@@ -18,6 +18,7 @@ import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { PageHeader } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -48,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
+import { formatTime } from "@/lib/format"
 
 const API_BASE = `${API_ORIGIN}/api/v1/attendance`
 
@@ -114,13 +116,6 @@ function localDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0")
   const day = String(now.getDate()).padStart(2, "0")
   return `${year}-${month}-${day}`
-}
-
-function formatTime(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(date)
 }
 
 function statusVariant(status: AttendanceStatus): "default" | "secondary" | "outline" | "destructive" {
@@ -300,40 +295,38 @@ export default function AttendancePage() {
         }
       />
       <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Daily check-ins, location and selfie evidence, and corrections.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              type="date"
-              aria-label="Attendance date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              className="h-8 w-full sm:w-44"
-            />
-            <Button variant="outline" size="sm" onClick={() => void copyPosUrl()} disabled={!posUrl}>
-              <CopyIcon />
-              Copy POS Link
-            </Button>
-            {posUrl ? (
-              <Button variant="outline" size="sm" asChild>
-                <a href={posUrl} target="_blank" rel="noreferrer">
+        <PageHeader
+          title="Attendance"
+          description="Daily check-ins, location and selfie evidence, and corrections."
+          actions={
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                type="date"
+                aria-label="Attendance date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="h-8 w-full sm:w-44"
+              />
+              <Button variant="outline" size="sm" onClick={() => void copyPosUrl()} disabled={!posUrl}>
+                <CopyIcon />
+                Copy POS Link
+              </Button>
+              {posUrl ? (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={posUrl} target="_blank" rel="noreferrer">
+                    <ExternalLinkIcon />
+                    Open POS
+                  </a>
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" disabled>
                   <ExternalLinkIcon />
                   Open POS
-                </a>
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" disabled>
-                <ExternalLinkIcon />
-                Open POS
-              </Button>
-            )}
-          </div>
-        </div>
+                </Button>
+              )}
+            </div>
+          }
+        />
 
         {loading ? (
           <div className="grid gap-6">

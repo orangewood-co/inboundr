@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
-import { useSearch } from "@tanstack/react-router"
-import { AlertCircleIcon, Building2Icon, FileTextIcon, LoaderIcon, PackageIcon, SearchIcon } from "lucide-react"
+import { useNavigate, useSearch } from "@tanstack/react-router"
+import { AlertCircleIcon, Building2Icon, FileTextIcon, PackageIcon, SearchIcon } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
+import { ListSkeleton } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,12 +21,11 @@ const groups = [
 ] as const
 
 function ResultCard({ result }: { result: SearchResult }) {
+  const navigate = useNavigate()
   return (
     <button
       type="button"
-      onClick={() => {
-        window.location.href = result.url
-      }}
+      onClick={() => void navigate({ to: result.url })}
       className="group flex w-full items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent/50"
     >
       <div className="mt-0.5 rounded-lg bg-muted p-2">
@@ -46,6 +46,7 @@ function ResultCard({ result }: { result: SearchResult }) {
 }
 
 function SearchPageContent() {
+  const navigate = useNavigate()
   const search = useSearch({ strict: false }) as SearchParams
   const initialQuery = search.q ?? ""
   const [query, setQuery] = useState(initialQuery)
@@ -102,8 +103,7 @@ function SearchPageContent() {
               className="flex flex-col gap-2 sm:flex-row"
               onSubmit={(event) => {
                 event.preventDefault()
-                const trimmed = query.trim()
-                window.location.href = `/search?q=${encodeURIComponent(trimmed)}`
+                void navigate({ to: "/search", search: { q: query.trim() } })
               }}
             >
               <div className="relative flex-1">
@@ -121,10 +121,7 @@ function SearchPageContent() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-xl border bg-card p-5 text-sm text-muted-foreground">
-            <LoaderIcon className="size-4 animate-spin" />
-            Searching organization data...
-          </div>
+          <ListSkeleton rows={5} columns={2} className="rounded-xl border bg-card" />
         ) : error ? (
           <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
             <AlertCircleIcon className="size-4" />

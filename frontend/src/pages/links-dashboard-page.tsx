@@ -2,16 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   BarChart3Icon,
-  CalendarIcon,
   CopyIcon,
   EllipsisIcon,
   ExternalLinkIcon,
-  FilterIcon,
-  LayoutGridIcon,
-  LayoutListIcon,
   LinkIcon,
-  ListIcon,
-  LoaderIcon,
   LockIcon,
   MapPinIcon,
   PlusIcon,
@@ -22,6 +16,8 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { ListSkeleton } from "@/components/list-states"
+import { PageHeader } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +43,7 @@ import {
 } from "@/components/ui/tooltip"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/links`
 
 type ShortLink = {
@@ -95,14 +91,6 @@ function extractDomain(url: string) {
 function faviconUrl(destinationUrl: string) {
   const domain = extractDomain(destinationUrl)
   return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : ""
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 type StatusFilter = "active" | "all"
@@ -169,15 +157,17 @@ export default function LinksDashboardPage() {
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6 lg:p-8">
             {/* Page title + Create button */}
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold tracking-tight">Links</h1>
-              <Button asChild>
-                <Link to="/links/create">
-                  <PlusIcon className="size-4" />
-                  Create Link
-                </Link>
-              </Button>
-            </div>
+            <PageHeader
+              title="Links"
+              actions={
+                <Button asChild>
+                  <Link to="/links/create">
+                    <PlusIcon className="size-4" />
+                    New Link
+                  </Link>
+                </Button>
+              }
+            />
 
             {/* Toolbar */}
             <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -190,14 +180,6 @@ export default function LinksDashboardPage() {
                   className="w-56 pl-9"
                 />
               </div>
-              <Button variant="outline" size="sm" disabled>
-                <CalendarIcon className="size-4" />
-                Filter by Created Date
-              </Button>
-              <Button variant="outline" size="sm" disabled>
-                <FilterIcon className="size-4" />
-                Add Filters
-              </Button>
 
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
@@ -215,42 +197,12 @@ export default function LinksDashboardPage() {
                     <SelectItem value="all">Show: All</SelectItem>
                   </SelectContent>
                 </Select>
-                <Separator orientation="vertical" className="mx-1 h-5" />
-                <div className="flex items-center rounded-md border">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-r-none">
-                        <ListIcon className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>List view</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-none border-x" disabled>
-                        <LayoutListIcon className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Compact view</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-l-none" disabled>
-                        <LayoutGridIcon className="size-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Grid view</TooltipContent>
-                  </Tooltip>
-                </div>
               </div>
             </div>
 
             {/* Link list */}
             {loading ? (
-              <div className="mt-16 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <LoaderIcon className="size-4 animate-spin" />
-                Loading links...
-              </div>
+              <ListSkeleton rows={6} columns={3} className="mt-6 rounded-2xl border" />
             ) : filtered.length === 0 ? (
               <div className="mt-12 rounded-2xl border border-dashed p-14 text-center">
                 <LinkIcon className="mx-auto size-10 text-muted-foreground" />
@@ -266,7 +218,7 @@ export default function LinksDashboardPage() {
                   <Button className="mt-5" asChild>
                     <Link to="/links/create">
                       <PlusIcon className="size-4" />
-                      Create a Link
+                      New Link
                     </Link>
                   </Button>
                 )}

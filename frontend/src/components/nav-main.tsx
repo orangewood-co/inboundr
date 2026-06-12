@@ -1,4 +1,4 @@
-"use client"
+import { Link, useLocation } from "@tanstack/react-router"
 
 import {
   SidebarGroup,
@@ -24,6 +24,8 @@ export function NavMain({
 }: {
   categories: NavCategory[]
 }) {
+  const { pathname } = useLocation()
+
   return (
     <>
       {categories.map((category) => (
@@ -32,11 +34,15 @@ export function NavMain({
           <SidebarMenu>
             {category.items.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild tooltip={item.title}>
-                  <a href={item.url}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.title}
+                  isActive={pathname === item.url}
+                >
+                  <Link to={item.url}>
                     {item.icon}
                     <span>{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}

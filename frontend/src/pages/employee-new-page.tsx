@@ -356,7 +356,7 @@ export default function EmployeeNewPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <Badge variant="outline" className="mb-3">Employee setup</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight">Add Employee</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">New Employee</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Create the HR record first. Login access can be enabled during setup or adjusted later.
                 </p>

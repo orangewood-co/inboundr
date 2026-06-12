@@ -4,7 +4,6 @@ import {
   ClipboardListIcon,
   CopyIcon,
   EllipsisIcon,
-  LoaderIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -38,7 +37,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+import { ListSkeleton } from "@/components/list-states"
+import { PageHeader } from "@/components/page-header"
 import { API_ORIGIN } from "@/lib/env"
+import { formatDateTime, formatRelativeTime } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
 
 type ManagedForm = {
@@ -50,24 +52,6 @@ type ManagedForm = {
   fields: { id: string; label: string }[]
   submissionCount: number
   updatedAt: string
-}
-
-function relativeDate(value: string) {
-  const date = new Date(value)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / 86_400_000)
-
-  if (diffDays === 0) return "Today"
-  if (diffDays === 1) return "Yesterday"
-  if (diffDays < 7) return `${diffDays} days ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-  }).format(date)
 }
 
 const statusConfig = {
@@ -133,23 +117,31 @@ export default function FormsListPage() {
   }
 
   async function duplicateForm(form: ManagedForm) {
-    const response = await fetch(`${API_BASE}/${form._id}/duplicate`, {
-      method: "POST",
-      credentials: "include",
-    })
-    if (response.ok) {
+    try {
+      const response = await fetch(`${API_BASE}/${form._id}/duplicate`, {
+        method: "POST",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to duplicate form")
       toast.success("Form duplicated")
       void fetchForms()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to duplicate form")
     }
   }
 
   async function archiveForm(form: ManagedForm) {
-    await fetch(`${API_BASE}/${form._id}`, {
-      method: "DELETE",
-      credentials: "include",
-    })
-    toast.success("Form archived")
-    void fetchForms()
+    try {
+      const response = await fetch(`${API_BASE}/${form._id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to archive form")
+      toast.success("Form archived")
+      void fetchForms()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to archive form")
+    }
   }
 
   return (
@@ -157,28 +149,23 @@ export default function FormsListPage() {
         <SiteHeader breadcrumbs={[{ label: "Forms" }]} />
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-5xl p-6 lg:p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">Forms</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {forms.length} {forms.length === 1 ? "form" : "forms"}
-                </p>
-              </div>
-              <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
-                {creating ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <PlusIcon className="size-4" />
-                )}
-                Create Form
-              </Button>
-            </div>
+            <PageHeader
+              title="Forms"
+              description={`${forms.length} ${forms.length === 1 ? "form" : "forms"}`}
+              actions={
+                <Button onClick={() => setTemplateOpen(true)} disabled={creating}>
+                  {creating ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <PlusIcon className="size-4" />
+                  )}
+                  New Form
+                </Button>
+              }
+            />
 
             {loading ? (
-              <div className="mt-16 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                <LoaderIcon className="size-5 animate-spin" />
-                <p className="text-sm">Loading forms...</p>
-              </div>
+              <ListSkeleton rows={6} columns={3} className="mt-8 rounded-2xl border" />
             ) : forms.length === 0 ? (
               <div className="mt-16 flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed p-12 text-center">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
@@ -224,8 +211,8 @@ export default function FormsListPage() {
                         >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
-                                <ClipboardListIcon className="size-4 text-emerald-700 dark:text-emerald-400" />
+                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10">
+                                <ClipboardListIcon className="size-4 text-success" />
                               </div>
                               <div className="min-w-0">
                                 <p className="truncate font-medium">
@@ -257,10 +244,10 @@ export default function FormsListPage() {
                           <TableCell className="text-muted-foreground">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span>{relativeDate(form.updatedAt)}</span>
+                                <span>{formatRelativeTime(form.updatedAt)}</span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {new Date(form.updatedAt).toLocaleString()}
+                                {formatDateTime(form.updatedAt)}
                               </TooltipContent>
                             </Tooltip>
                           </TableCell>

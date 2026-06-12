@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatDateTime } from "@/lib/format"
 import {
   archiveProjectStage,
   createProjectStage,
@@ -696,7 +697,7 @@ export default function ProjectDetailPage() {
                     <p className="text-sm font-medium">{activity.message}</p>
                     <Badge variant="secondary">{activity.type.replaceAll("_", " ")}</Badge>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
                 </div>
               ))}
               {activities.length === 0 && <p className="p-8 text-center text-sm text-muted-foreground">No activity yet.</p>}
@@ -756,6 +757,9 @@ export default function ProjectDetailPage() {
               </Field>
             </div>
             <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setTaskDialogOpen(false)}>
+                Cancel
+              </Button>
               <Button type="submit">Create Task</Button>
             </DialogFooter>
           </form>
@@ -844,6 +848,9 @@ export default function ProjectDetailPage() {
                 </Field>
               </div>
               <DialogFooter className="mt-6">
+                <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+                  Cancel
+                </Button>
                 <Button onClick={() => void handleSaveSettings()}>
                   <SaveIcon />
                   Save Settings
