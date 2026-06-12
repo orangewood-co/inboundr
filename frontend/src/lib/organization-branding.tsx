@@ -17,6 +17,7 @@ interface OrganizationBranding {
   primaryColor: string
   theme: OrganizationTheme
   colorTheme: string
+  isPro: boolean
 }
 
 interface OrganizationBrandingContextValue {
@@ -169,6 +170,7 @@ export function OrganizationBrandingProvider({
           DEFAULT_PRIMARY_COLOR,
         theme: organization?.preferences?.theme === "light" ? "light" : "dark",
         colorTheme: organization?.preferences?.colorTheme ?? "default",
+        isPro: Boolean(organization?.isPro),
       }
 
       setBranding(freshBranding)

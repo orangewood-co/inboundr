@@ -13,6 +13,7 @@ import {
 import { useSession } from "@/lib/auth-client"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { getAdminMe } from "@/lib/admin"
+import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
 import { BarChart3Icon, BotMessageSquareIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
@@ -261,6 +262,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     className="absolute hidden size-7 scale-90 object-contain opacity-0 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-100 group-data-[collapsible=icon]:opacity-100 dark:block"
                   />
                 </>
+              )}
+              {branding?.isPro && (
+                <ProBadge className="ml-2 opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0" />
               )}
             </a>
           </SidebarMenuItem>

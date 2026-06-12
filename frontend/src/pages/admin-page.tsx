@@ -4,6 +4,7 @@ import { Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { ProBadge } from "@/components/pro-badge"
 import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -43,6 +44,7 @@ interface AdminOrganization {
   _id: string
   name: string
   status: "active" | "suspended"
+  isPro: boolean
   memberCount: number
   owner: { name: string; email: string } | null
   entitlements: {
@@ -558,9 +560,12 @@ export default function AdminPage() {
                       {filteredOrganizations.map((organization) => (
                         <TableRow key={organization._id}>
                           <TableCell className="pl-5">
-                            <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
-                              {organization.name}
-                            </Link>
+                            <div className="flex items-center gap-2">
+                              <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
+                                {organization.name}
+                              </Link>
+                              {organization.isPro && <ProBadge />}
+                            </div>
                             <div className="text-xs text-muted-foreground">{organization.owner?.email ?? "Owner pending"}</div>
                           </TableCell>
                           <TableCell className="capitalize">{planLabel(plans, organization.entitlements.planSlug)}</TableCell>
