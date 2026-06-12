@@ -165,3 +165,38 @@
     background: var(--muted-foreground);
   }
 }
+
+@keyframes pro-badge-pop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  30% {
+    transform: scale(1.15) rotate(-3deg);
+  }
+  60% {
+    transform: scale(0.97) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes pro-badge-sparkle {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pro-badge-pop {
+    animation: pro-badge-pop 0.5s ease-out;
+  }
+  .pro-badge-sparkle {
+    animation: pro-badge-sparkle 0.8s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+  }
+}
