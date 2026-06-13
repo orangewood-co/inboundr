@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
-import { Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
+import { Building2Icon, CrownIcon, MailIcon, PhoneIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, Trash2Icon, UsersIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
@@ -104,6 +104,16 @@ interface AdminUsersSummary {
   withoutMemberships: number
 }
 
+interface AdminPhoneNumber {
+  _id: string
+  number: string
+  label: string
+  active: boolean
+  organizationId: string
+  organization: { _id: string; name: string } | null
+  createdAt: string
+}
+
 const emptySummary: AdminSummary = {
   total: 0,
   active: 0,
@@ -198,6 +208,14 @@ export default function AdminPage() {
   const [moveMembership, setMoveMembership] = useState<AdminUserMembership | null>(null)
   const [moveOrganizationId, setMoveOrganizationId] = useState("")
   const [moveRole, setMoveRole] = useState<"admin" | "member">("member")
+  const [phoneNumbers, setPhoneNumbers] = useState<AdminPhoneNumber[]>([])
+  const [phoneNumbersLoading, setPhoneNumbersLoading] = useState(true)
+  const [assignNumberOpen, setAssignNumberOpen] = useState(false)
+  const [assigningNumber, setAssigningNumber] = useState(false)
+  const [newNumber, setNewNumber] = useState("")
+  const [newNumberLabel, setNewNumberLabel] = useState("")
+  const [newNumberOrganizationId, setNewNumberOrganizationId] = useState("")
+  const [phoneNumberBusy, setPhoneNumberBusy] = useState<string | null>(null)
 
   const visiblePlans = useMemo(() => plans.filter((plan) => plan.slug !== "all_features"), [plans])
   const membershipOrganizationOptions = useMemo(
@@ -258,6 +276,91 @@ export default function AdminPage() {
       toast.error(error instanceof Error ? error.message : "Failed to load users")
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  async function loadPhoneNumbers() {
+    setPhoneNumbersLoading(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers`, { credentials: "include" })
+      if (!response.ok) throw new Error("Failed to load phone numbers")
+      const data = await response.json()
+      setPhoneNumbers(data.phoneNumbers ?? [])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load phone numbers")
+    } finally {
+      setPhoneNumbersLoading(false)
+    }
+  }
+
+  async function assignPhoneNumber(event: React.FormEvent) {
+    event.preventDefault()
+    if (!newNumberOrganizationId) return
+    setAssigningNumber(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: newNumber, organizationId: newNumberOrganizationId, label: newNumberLabel }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to assign phone number")
+      }
+      setNewNumber("")
+      setNewNumberLabel("")
+      setNewNumberOrganizationId("")
+      setAssignNumberOpen(false)
+      toast.success("Phone number assigned")
+      await loadPhoneNumbers()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to assign phone number")
+    } finally {
+      setAssigningNumber(false)
+    }
+  }
+
+  async function togglePhoneNumber(phoneNumber: AdminPhoneNumber) {
+    setPhoneNumberBusy(phoneNumber._id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers/${phoneNumber._id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !phoneNumber.active }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to update phone number")
+      }
+      const data = await response.json()
+      setPhoneNumbers((current) => current.map((entry) => (entry._id === phoneNumber._id ? data.phoneNumber : entry)))
+      toast.success(phoneNumber.active ? "Phone number deactivated" : "Phone number activated")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update phone number")
+    } finally {
+      setPhoneNumberBusy(null)
+    }
+  }
+
+  async function deletePhoneNumber(phoneNumber: AdminPhoneNumber) {
+    setPhoneNumberBusy(phoneNumber._id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers/${phoneNumber._id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok && response.status !== 204) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to delete phone number")
+      }
+      setPhoneNumbers((current) => current.filter((entry) => entry._id !== phoneNumber._id))
+      toast.success("Phone number removed")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete phone number")
+    } finally {
+      setPhoneNumberBusy(null)
     }
   }
 
@@ -416,6 +519,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     void load()
+    void loadPhoneNumbers()
   }, [])
 
   useEffect(() => {
@@ -435,7 +539,7 @@ export default function AdminPage() {
             description="Create production organizations, invite owners, and assign feature access through plans and overrides."
             actions={
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { void load(); void loadUsers() }}>
+              <Button variant="outline" onClick={() => { void load(); void loadUsers(); void loadPhoneNumbers() }}>
                 <RefreshCwIcon className="mr-2 size-4" />
                 Refresh
               </Button>
@@ -500,6 +604,7 @@ export default function AdminPage() {
             <TabsList>
               <TabsTrigger value="organizations">Organizations</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="phone-numbers">Phone Numbers</TabsTrigger>
             </TabsList>
 
             <TabsContent value="organizations" className="mt-0">
@@ -689,6 +794,130 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </>
+                )}
+              </section>
+            </TabsContent>
+            <TabsContent value="phone-numbers" className="mt-0">
+              <section className="rounded-2xl border bg-background">
+                <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h2 className="font-semibold">Phone Numbers</h2>
+                    <p className="text-sm text-muted-foreground">Assign Vobiz numbers to organizations for the AI voice agent. Inbound calls are routed to the org by the dialed number.</p>
+                  </div>
+                  <Dialog open={assignNumberOpen} onOpenChange={setAssignNumberOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <PlusIcon className="mr-2 size-4" />
+                        Assign Number
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Assign Phone Number</DialogTitle>
+                        <DialogDescription>
+                          The number must already be purchased in the Vobiz console and routed to LiveKit.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={assignPhoneNumber} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="phone-number">Phone number (E.164)</Label>
+                          <Input id="phone-number" value={newNumber} onChange={(event) => setNewNumber(event.target.value)} placeholder="+918071387434" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Organization</Label>
+                          <Select value={newNumberOrganizationId} onValueChange={setNewNumberOrganizationId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select organization" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {organizations.map((organization) => (
+                                <SelectItem key={organization._id} value={organization._id}>
+                                  {organization.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone-label">Label (optional)</Label>
+                          <Input id="phone-label" value={newNumberLabel} onChange={(event) => setNewNumberLabel(event.target.value)} placeholder="Main reception line" />
+                        </div>
+                        <Button className="w-full" type="submit" disabled={assigningNumber || !newNumberOrganizationId}>
+                          {assigningNumber ? <Spinner data-icon="inline-start" /> : <PhoneIcon className="mr-2 size-4" />}
+                          Assign Number
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <Separator />
+                {phoneNumbersLoading ? (
+                  <div className="flex h-64 items-center justify-center">
+                    <Spinner />
+                  </div>
+                ) : phoneNumbers.length === 0 ? (
+                  <div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
+                    <PhoneIcon className="size-8 text-muted-foreground" />
+                    <p className="font-medium">No Phone Numbers Yet</p>
+                    <p className="text-sm text-muted-foreground">Assign a purchased Vobiz number to an organization to enable its voice agent.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-5">Number</TableHead>
+                        <TableHead>Organization</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {phoneNumbers.map((phoneNumber) => (
+                        <TableRow key={phoneNumber._id}>
+                          <TableCell className="pl-5">
+                            <div className="font-medium">{phoneNumber.number}</div>
+                            {phoneNumber.label && <div className="text-xs text-muted-foreground">{phoneNumber.label}</div>}
+                          </TableCell>
+                          <TableCell>
+                            {phoneNumber.organization ? (
+                              <Link className="hover:underline" to="/admin/organizations/$id" params={{ id: phoneNumber.organization._id }}>
+                                {phoneNumber.organization.name}
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground">Unknown</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={phoneNumber.active ? "default" : "secondary"}>
+                              {phoneNumber.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{formatDate(phoneNumber.createdAt)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void togglePhoneNumber(phoneNumber)}
+                                disabled={phoneNumberBusy === phoneNumber._id}
+                              >
+                                {phoneNumber.active ? "Deactivate" : "Activate"}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => void deletePhoneNumber(phoneNumber)}
+                                disabled={phoneNumberBusy === phoneNumber._id}
+                              >
+                                <Trash2Icon className="size-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </section>
             </TabsContent>

@@ -1,6 +1,6 @@
 import type { IOrganization } from "../models/organization.model";
 
-export const FEATURE_KEYS = ["rfq", "invoices", "links", "forms", "drive"] as const;
+export const FEATURE_KEYS = ["rfq", "invoices", "links", "forms", "drive", "calls"] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export interface FeatureDefinition {
@@ -22,6 +22,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "links", label: "Links", description: "Trackable short links and engagement analytics." },
   { key: "forms", label: "Forms", description: "Published forms, submissions, and exports." },
   { key: "drive", label: "Drive", description: "Shared file storage, folders, previews, and secure sharing." },
+  { key: "calls", label: "Calls", description: "AI voice agent that answers inbound phone calls and captures leads." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [
@@ -41,7 +42,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     slug: "enterprise",
     name: "Enterprise",
     description: "Full platform access for production customers.",
-    features: ["rfq", "invoices", "links", "forms", "drive"],
+    features: ["rfq", "invoices", "links", "forms", "drive", "calls"],
   },
   {
     slug: "all_features",

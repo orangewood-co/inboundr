@@ -28,11 +28,13 @@ import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as DriveRouteImport } from './routes/drive'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as CallsRouteImport } from './routes/calls'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as CallsIndexRouteImport } from './routes/calls.index'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
@@ -47,6 +49,7 @@ import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.att
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
+import { Route as CallsSettingsRouteImport } from './routes/calls.settings'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
@@ -145,6 +148,11 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CallsRoute = CallsRouteImport.update({
+  id: '/calls',
+  path: '/calls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -169,6 +177,11 @@ const FormsIndexRoute = FormsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => FormsRoute,
+} as any)
+const CallsIndexRoute = CallsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CallsRoute,
 } as any)
 const ProjectsNewRoute = ProjectsNewRouteImport.update({
   id: '/projects_/new',
@@ -240,6 +253,11 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CallsSettingsRoute = CallsSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => CallsRoute,
+} as any)
 const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
   id: '/admin_/organizations/$id',
   path: '/admin/organizations/$id',
@@ -254,6 +272,7 @@ const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/calls': typeof CallsRouteWithChildren
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRoute
@@ -273,6 +292,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/calls/settings': typeof CallsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -287,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/calls/': typeof CallsIndexRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -312,6 +333,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/calls/settings': typeof CallsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -326,6 +348,7 @@ export interface FileRoutesByTo {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/calls': typeof CallsIndexRoute
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
@@ -336,6 +359,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/calls': typeof CallsRouteWithChildren
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRoute
@@ -355,6 +379,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/calls/settings': typeof CallsSettingsRoute
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
@@ -369,6 +394,7 @@ export interface FileRoutesById {
   '/products_/import': typeof ProductsImportRoute
   '/projects_/$id': typeof ProjectsIdRoute
   '/projects_/new': typeof ProjectsNewRoute
+  '/calls/': typeof CallsIndexRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -380,6 +406,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/calls'
     | '/chat'
     | '/customers'
     | '/drive'
@@ -399,6 +426,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/calls/settings'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -413,6 +441,7 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/calls/'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -438,6 +467,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/calls/settings'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -452,6 +482,7 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/calls'
     | '/forms'
     | '/invoices'
     | '/links'
@@ -461,6 +492,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/calls'
     | '/chat'
     | '/customers'
     | '/drive'
@@ -480,6 +512,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/calls/settings'
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
@@ -494,6 +527,7 @@ export interface FileRouteTypes {
     | '/products_/import'
     | '/projects_/$id'
     | '/projects_/new'
+    | '/calls/'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -504,6 +538,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  CallsRoute: typeof CallsRouteWithChildren
   ChatRoute: typeof ChatRoute
   CustomersRoute: typeof CustomersRoute
   DriveRoute: typeof DriveRoute
@@ -671,6 +706,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calls': {
+      id: '/calls'
+      path: '/calls'
+      fullPath: '/calls'
+      preLoaderRoute: typeof CallsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -705,6 +747,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/forms/'
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
+    }
+    '/calls/': {
+      id: '/calls/'
+      path: '/'
+      fullPath: '/calls/'
+      preLoaderRoute: typeof CallsIndexRouteImport
+      parentRoute: typeof CallsRoute
     }
     '/projects_/new': {
       id: '/projects_/new'
@@ -804,6 +853,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calls/settings': {
+      id: '/calls/settings'
+      path: '/settings'
+      fullPath: '/calls/settings'
+      preLoaderRoute: typeof CallsSettingsRouteImport
+      parentRoute: typeof CallsRoute
+    }
     '/admin_/organizations/$id': {
       id: '/admin_/organizations/$id'
       path: '/admin/organizations/$id'
@@ -820,6 +876,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface CallsRouteChildren {
+  CallsSettingsRoute: typeof CallsSettingsRoute
+  CallsIndexRoute: typeof CallsIndexRoute
+}
+
+const CallsRouteChildren: CallsRouteChildren = {
+  CallsSettingsRoute: CallsSettingsRoute,
+  CallsIndexRoute: CallsIndexRoute,
+}
+
+const CallsRouteWithChildren = CallsRoute._addFileChildren(CallsRouteChildren)
 
 interface FormsRouteChildren {
   FormsSlugRoute: typeof FormsSlugRoute
@@ -866,6 +934,7 @@ const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  CallsRoute: CallsRouteWithChildren,
   ChatRoute: ChatRoute,
   CustomersRoute: CustomersRoute,
   DriveRoute: DriveRoute,

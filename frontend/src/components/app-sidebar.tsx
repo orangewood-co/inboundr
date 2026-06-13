@@ -16,7 +16,7 @@ import { getAdminMe } from "@/lib/admin"
 import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, BotMessageSquareIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, BotMessageSquareIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, PhoneIncomingIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -66,6 +66,12 @@ const data: { navMain: SidebarCategory[] } = {
           title: "Chat",
           url: "/chat",
           icon: <BotMessageSquareIcon />,
+        },
+        {
+          title: "Calls",
+          url: "/calls",
+          icon: <PhoneIncomingIcon />,
+          feature: "calls",
         },
       ],
     },

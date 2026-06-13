@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "backend/**"
+      - "voice/**"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/backend-deploy.yml"
@@ -16,6 +17,7 @@ on:
       - main
     paths:
       - "backend/**"
+      - "voice/**"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/backend-deploy.yml"
@@ -43,6 +45,9 @@ jobs:
 
       - name: Typecheck backend
         run: bun run typecheck:backend
+
+      - name: Typecheck voice agent
+        run: bun run typecheck:voice
 
   deploy:
     name: Deploy backend to EC2

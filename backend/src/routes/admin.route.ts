@@ -3,17 +3,21 @@ import {
   cancelAdminOrganizationInvitation,
   addAdminUserMembership,
   createAdminOrganization,
+  createAdminPhoneNumber,
+  deleteAdminPhoneNumber,
   getAdminMe,
   getAdminOrganization,
   getAdminPlans,
   inviteAdminOrganizationMember,
   listAdminOrganizations,
+  listAdminPhoneNumbers,
   listAdminUsers,
   moveAdminOrganizationMember,
   removeAdminOrganizationMember,
   transferAdminOrganizationOwner,
   updateAdminOrganizationMember,
   updateAdminOrganization,
+  updateAdminPhoneNumber,
 } from "../controllers/admin.controller";
 import { requireAuth, requireSuperAdmin } from "../middleware/auth.middleware";
 
@@ -35,5 +39,9 @@ router.patch("/organizations/:id/members/:memberId", updateAdminOrganizationMemb
 router.delete("/organizations/:id/members/:memberId", removeAdminOrganizationMember);
 router.post("/organizations/:id/members/:memberId/move", moveAdminOrganizationMember);
 router.post("/organizations/:id/members/:memberId/transfer-owner", transferAdminOrganizationOwner);
+router.get("/phone-numbers", listAdminPhoneNumbers);
+router.post("/phone-numbers", createAdminPhoneNumber);
+router.patch("/phone-numbers/:phoneNumberId", updateAdminPhoneNumber);
+router.delete("/phone-numbers/:phoneNumberId", deleteAdminPhoneNumber);
 
 export default router;

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
 import { API_ORIGIN } from "@/lib/env"
 
-export type FeatureKey = "rfq" | "invoices" | "links" | "forms" | "drive"
+export type FeatureKey = "rfq" | "invoices" | "links" | "forms" | "drive" | "calls"
 export type EmployeeAccessModule =
   | "rfq"
   | "inbox"

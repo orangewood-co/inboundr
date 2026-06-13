@@ -7,6 +7,8 @@ export const APP_TITLE = "Inboundr"
 export const ROUTE_LABELS: Record<string, string> = {
   "/": "Home",
   "/admin": "Super Admin",
+  "/calls": "Calls",
+  "/calls/settings": "Agent Settings",
   "/chat": "AI Chat",
   "/customers": "Customers",
   "/customers/import": "Import Customers",

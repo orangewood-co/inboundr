@@ -1,0 +1,20 @@
+[Unit]
+Description=inboundr Voice Agent Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/inboundr/voice
+EnvironmentFile=/home/ubuntu/inboundr/voice/.env
+ExecStart=/usr/bin/node dist/main.js start
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=60
+SyslogIdentifier=inboundr-voice
+
+[Install]
+WantedBy=multi-user.target

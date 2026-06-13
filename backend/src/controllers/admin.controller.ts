@@ -13,6 +13,7 @@ import {
   type OrganizationRole,
 } from "../models/organization-member.model";
 import { Organization } from "../models/organization.model";
+import { PhoneNumber } from "../models/phone-number.model";
 import {
   FEATURE_CATALOG,
   PLAN_DEFINITIONS,
@@ -819,6 +820,143 @@ export async function transferAdminOrganizationOwner(req: Request, res: Response
   } catch (err) {
     console.error("Error transferring admin organization owner:", err);
     res.status(500).json({ error: "Failed to transfer owner" });
+  }
+}
+
+function serializePhoneNumber(phoneNumber: any, organization?: any) {
+  return {
+    _id: phoneNumber._id,
+    number: phoneNumber.number,
+    label: phoneNumber.label ?? "",
+    active: Boolean(phoneNumber.active),
+    organizationId: phoneNumber.organizationId,
+    organization: organization
+      ? { _id: organization._id, name: organization.name }
+      : null,
+    createdAt: phoneNumber.createdAt,
+    updatedAt: phoneNumber.updatedAt,
+  };
+}
+
+function normalizePhoneNumberValue(value: unknown): string {
+  const raw = stringValue(value).replace(/[\s()-]/g, "");
+  return raw;
+}
+
+export async function listAdminPhoneNumbers(_req: Request, res: Response): Promise<void> {
+  try {
+    const phoneNumbers = await PhoneNumber.find({}).sort({ createdAt: -1 }).lean();
+    const organizationIds = [...new Set(phoneNumbers.map((entry) => String(entry.organizationId)))];
+    const organizations = await Organization.find({ _id: { $in: organizationIds } })
+      .select({ name: 1 })
+      .lean();
+    const organizationById = new Map(organizations.map((org) => [String(org._id), org]));
+
+    res.json({
+      phoneNumbers: phoneNumbers.map((entry) =>
+        serializePhoneNumber(entry, organizationById.get(String(entry.organizationId)))
+      ),
+    });
+  } catch (err) {
+    console.error("Error listing admin phone numbers:", err);
+    res.status(500).json({ error: "Failed to list phone numbers" });
+  }
+}
+
+export async function createAdminPhoneNumber(req: Request, res: Response): Promise<void> {
+  try {
+    const number = normalizePhoneNumberValue(req.body?.number);
+    const organizationId = stringValue(req.body?.organizationId);
+    const label = stringValue(req.body?.label);
+
+    if (!/^\+\d{6,15}$/.test(number)) {
+      res.status(400).json({ error: "Phone number must be in E.164 format, e.g. +918071387434" });
+      return;
+    }
+    if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+      res.status(400).json({ error: "Invalid organization id" });
+      return;
+    }
+
+    const organization = await Organization.findById(organizationId).lean();
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    const phoneNumber = await PhoneNumber.create({
+      number,
+      organizationId,
+      label,
+      active: true,
+    });
+
+    res.status(201).json({ phoneNumber: serializePhoneNumber(phoneNumber.toObject(), organization) });
+  } catch (err: any) {
+    console.error("Error creating admin phone number:", err);
+    res.status(err?.code === 11000 ? 409 : 500).json({
+      error: err?.code === 11000 ? "This phone number is already assigned" : "Failed to create phone number",
+    });
+  }
+}
+
+export async function updateAdminPhoneNumber(req: Request, res: Response): Promise<void> {
+  try {
+    const id = stringValue(req.params.phoneNumberId);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid phone number id" });
+      return;
+    }
+
+    const update: Record<string, unknown> = {};
+    if (req.body?.organizationId !== undefined) {
+      const organizationId = stringValue(req.body.organizationId);
+      if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+        res.status(400).json({ error: "Invalid organization id" });
+        return;
+      }
+      const organization = await Organization.findById(organizationId).lean();
+      if (!organization) {
+        res.status(404).json({ error: "Organization not found" });
+        return;
+      }
+      update.organizationId = organizationId;
+    }
+    if (req.body?.label !== undefined) update.label = stringValue(req.body.label);
+    if (req.body?.active !== undefined) update.active = Boolean(req.body.active);
+
+    const phoneNumber = await PhoneNumber.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
+    if (!phoneNumber) {
+      res.status(404).json({ error: "Phone number not found" });
+      return;
+    }
+
+    const organization = await Organization.findById(phoneNumber.organizationId).select({ name: 1 }).lean();
+    res.json({ phoneNumber: serializePhoneNumber(phoneNumber, organization) });
+  } catch (err) {
+    console.error("Error updating admin phone number:", err);
+    res.status(500).json({ error: "Failed to update phone number" });
+  }
+}
+
+export async function deleteAdminPhoneNumber(req: Request, res: Response): Promise<void> {
+  try {
+    const id = stringValue(req.params.phoneNumberId);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid phone number id" });
+      return;
+    }
+
+    const phoneNumber = await PhoneNumber.findByIdAndDelete(id);
+    if (!phoneNumber) {
+      res.status(404).json({ error: "Phone number not found" });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    console.error("Error deleting admin phone number:", err);
+    res.status(500).json({ error: "Failed to delete phone number" });
   }
 }
 

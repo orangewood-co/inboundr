@@ -6,7 +6,8 @@
     "backend",
     "frontend",
     "landing",
-    "embed"
+    "embed",
+    "voice"
   ],
   "scripts": {
     "dev:backend": "bun run --cwd backend dev",
@@ -29,11 +30,11 @@
     "dev:embed": "bun run --cwd embed dev",
     "build:embed": "bun run --cwd embed build",
     "lint:embed": "bun run --cwd embed lint",
-    "typecheck:embed": "bun run --cwd embed typecheck"
+    "typecheck:embed": "bun run --cwd embed typecheck",
+    "typecheck:voice": "bun run --cwd voice typecheck"
   },
   "dependencies": {
     "@langchain/openrouter": "^0.3.0",
-    "@livekit/agents": "^1.4.5",
     "@types/archiver": "^7.0.0",
     "archiver": "^8.0.0",
     "qrcode": "^1.5.4",
