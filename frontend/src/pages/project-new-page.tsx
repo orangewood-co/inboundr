@@ -202,7 +202,7 @@ export default function ProjectNewPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Create Project</p>
-                <h1 className="text-3xl font-semibold tracking-tight">Set Up the Workspace</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">Set Up the Workspace</h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                   Add project details, choose who can see it, and seed the people who should manage or follow it.
                 </p>

@@ -99,6 +99,7 @@ function osmEmbedUrl(lat: number, lng: number) {
 }
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate, formatDateTime, formatShortDate } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/links`
 
 type ShortLink = {
@@ -156,24 +157,6 @@ function extractDomain(url: string) {
 function faviconUrl(destinationUrl: string) {
   const domain = extractDomain(destinationUrl)
   return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : ""
-}
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
-
-function formatShortDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
 }
 
 const chartConfig = {
@@ -297,7 +280,7 @@ export default function LinksDetailPage() {
     return Array.from(buckets.entries()).map(([date, count]) => ({
       date,
       engagements: count,
-      label: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      label: formatShortDate(date),
     }))
   }, [events])
 
@@ -439,7 +422,7 @@ export default function LinksDetailPage() {
                 {/* Info */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold">
+                    <h1 className="text-xl font-semibold">
                       {link.title || `${extractDomain(link.destinationUrl)} – untitled`}
                     </h1>
                     {link.hasPassword && (
@@ -495,11 +478,11 @@ export default function LinksDetailPage() {
                   <Separator className="my-3" />
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{formatDate(link.createdAt)}</span>
+                    <span>{formatDateTime(link.createdAt)}</span>
                     <div className="flex items-center gap-1">
                       {link.expiresAt && (
                         <Badge variant="secondary" className="text-xs">
-                          Expires {formatShortDate(link.expiresAt)}
+                          Expires {formatDate(link.expiresAt)}
                         </Badge>
                       )}
                       {link.maxViews && (
@@ -559,7 +542,7 @@ export default function LinksDetailPage() {
               </div>
               <div className="rounded-xl border bg-card p-5">
                 <p className="text-sm font-medium text-muted-foreground">Weekly Change</p>
-                <p className={`mt-1 text-3xl font-bold tabular-nums ${stats.weeklyChange > 0 ? "text-green-600" : stats.weeklyChange < 0 ? "text-red-500" : ""}`}>
+                <p className={`mt-1 text-3xl font-bold tabular-nums ${stats.weeklyChange > 0 ? "text-success" : stats.weeklyChange < 0 ? "text-destructive" : ""}`}>
                   {stats.weeklyChange > 0 ? "+" : ""}{stats.weeklyChange}%
                 </p>
               </div>
@@ -693,7 +676,7 @@ export default function LinksDetailPage() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Showing the most recent precise location from {formatDate(latestPrecise.openedAt)}
+                  Showing the most recent precise location from {formatDateTime(latestPrecise.openedAt)}
                 </p>
               </div>
             )}
@@ -754,7 +737,7 @@ export default function LinksDetailPage() {
                               )}
                             </TableCell>
                             <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDate(event.openedAt)}
+                              {formatDateTime(event.openedAt)}
                             </TableCell>
                           </TableRow>
                         )

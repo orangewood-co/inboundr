@@ -4,6 +4,7 @@ import { AlertCircleIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
+import { formatMoney } from "@/lib/format"
 import { useInvoiceArtifact } from "@/lib/invoice-artifact"
 
 type InvoiceSummary = {
@@ -42,12 +43,6 @@ type SearchInvoicesResult = {
   total: number
   invoices: InvoiceSummary[]
 }
-
-const money = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  maximumFractionDigits: 2,
-})
 
 function statusBadgeVariant(status: string) {
   if (status === "paid") return "default" as const
@@ -117,7 +112,7 @@ function InvoiceArtifactCard({
         <p className="truncate text-xs text-muted-foreground">
           {invoice.customerName || "No customer"}
           {" · "}
-          {money.format(invoice.totals.grandTotal)}
+          {formatMoney(invoice.totals.grandTotal)}
         </p>
       </div>
       <span className="shrink-0 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
@@ -234,7 +229,7 @@ function SearchInvoicesResults({ result }: { result: SearchInvoicesResult }) {
                 </p>
               </div>
               <span className="shrink-0 text-sm font-medium tabular-nums">
-                {money.format(invoice.totals.grandTotal)}
+                {formatMoney(invoice.totals.grandTotal)}
               </span>
             </button>
           </li>

@@ -17,6 +17,7 @@ interface OrganizationBranding {
   primaryColor: string
   theme: OrganizationTheme
   colorTheme: string
+  isPro: boolean
 }
 
 interface OrganizationBrandingContextValue {
@@ -57,6 +58,34 @@ function readableForeground(hexColor: string): string {
   return luminance > 0.58 ? "#1f1600" : "#ffffff"
 }
 
+/**
+ * Theme tokens are authored in oklch; converting org hex colors keeps every
+ * CSS variable in the same color space (gradients/color-mix stay predictable).
+ */
+function hexToOklch(hexColor: string): string {
+  const toLinear = (channel: number) => {
+    const c = channel / 255
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  }
+  const r = toLinear(Number.parseInt(hexColor.slice(1, 3), 16))
+  const g = toLinear(Number.parseInt(hexColor.slice(3, 5), 16))
+  const b = toLinear(Number.parseInt(hexColor.slice(5, 7), 16))
+
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+
+  const lightness = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s
+  const aAxis = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s
+  const bAxis = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+
+  const chroma = Math.sqrt(aAxis * aAxis + bAxis * bAxis)
+  let hue = (Math.atan2(bAxis, aAxis) * 180) / Math.PI
+  if (hue < 0) hue += 360
+
+  return `oklch(${lightness.toFixed(4)} ${chroma.toFixed(4)} ${hue.toFixed(2)})`
+}
+
 function applyPrimaryColor(primaryColor: string | null | undefined) {
   const root = document.documentElement
   const normalized = normalizeHexColor(primaryColor)
@@ -75,8 +104,9 @@ function applyPrimaryColor(primaryColor: string | null | undefined) {
     return
   }
 
-  const foreground = readableForeground(normalized)
-  variables.forEach((variable) => root.style.setProperty(variable, normalized))
+  const primary = hexToOklch(normalized)
+  const foreground = hexToOklch(readableForeground(normalized))
+  variables.forEach((variable) => root.style.setProperty(variable, primary))
   root.style.setProperty("--primary-foreground", foreground)
   root.style.setProperty("--sidebar-primary-foreground", foreground)
 }
@@ -169,6 +199,7 @@ export function OrganizationBrandingProvider({
           DEFAULT_PRIMARY_COLOR,
         theme: organization?.preferences?.theme === "light" ? "light" : "dark",
         colorTheme: organization?.preferences?.colorTheme ?? "default",
+        isPro: Boolean(organization?.isPro),
       }
 
       setBranding(freshBranding)

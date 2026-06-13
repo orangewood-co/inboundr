@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
-  AlertCircleIcon,
   CheckCircle2Icon,
   ClipboardListIcon,
   FileTextIcon,
@@ -13,6 +12,7 @@ import { useDefaultLayout } from "react-resizable-panels"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +20,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/format"
 import { getAvatarColor } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -83,29 +84,9 @@ function parseSender(from: string): { name: string; email: string } {
   return { name: from, email: from }
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  const now = new Date()
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-  }
-  return date.toLocaleDateString([], { month: "short", day: "numeric" })
-}
-
-function formatFullDate(iso: string): string {
-  return new Date(iso).toLocaleString([], {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
 function formatPrice(value: number | null): string {
   if (value == null) return "No price"
-  return `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+  return formatMoney(value)
 }
 
 function sortQuoteProductsByItem(products: RFQSavedQuoteProduct[]): RFQSavedQuoteProduct[] {
@@ -163,7 +144,7 @@ function ProductPriceBreakdown({ product }: { product: RFQSavedQuoteProduct }) {
         <span className="mr-1">Discount:</span>
         <span>{discount}%</span>
       </p>
-      <p className="font-bold text-emerald-600 dark:text-emerald-400">
+      <p className="font-bold text-success">
         <span className="mr-1 font-medium text-muted-foreground">Net:</span>
         {formatPrice(product.price)}
       </p>
@@ -348,13 +329,7 @@ export function OrdersPage() {
             {loading ? (
               <ListSkeleton />
             ) : error ? (
-              <div className="flex flex-col items-center gap-2 p-8 text-center">
-                <AlertCircleIcon className="size-5 text-destructive" />
-                <p className="text-sm text-destructive">{error}</p>
-                <Button variant="outline" size="sm" onClick={handleRefresh}>
-                  Retry
-                </Button>
-              </div>
+              <ErrorState message={error} onRetry={handleRefresh} />
             ) : drafts.length === 0 ? (
               <EmptyState />
             ) : (
@@ -382,7 +357,7 @@ export function OrdersPage() {
                           <span className="truncate text-sm font-semibold">{senderName}</span>
                         </div>
                         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                          {formatDate(savedAt)}
+                          {formatListTimestamp(savedAt)}
                         </span>
                       </div>
                       <div className="pl-[42px]">
@@ -394,7 +369,7 @@ export function OrdersPage() {
                             <PackageIcon className="size-3" />
                             {draft.savedQuoteProducts.length} product{draft.savedQuoteProducts.length === 1 ? "" : "s"}
                           </span>
-                          <span className="rounded-full bg-violet-500/10 px-2 py-0.5 font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                          <span className="rounded-full bg-muted px-2 py-0.5 font-semibold uppercase tracking-wider text-muted-foreground">
                             Draft
                           </span>
                         </div>
@@ -418,11 +393,11 @@ export function OrdersPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Draft
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        Saved {formatFullDate(selectedDraft.draftSavedAt || selectedDraft.createdAt)}
+                        Saved {formatFullDateTime(selectedDraft.draftSavedAt || selectedDraft.createdAt)}
                       </span>
                     </div>
                     <h1 className="text-lg font-semibold leading-snug">

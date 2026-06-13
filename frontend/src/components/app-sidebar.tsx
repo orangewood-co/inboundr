@@ -13,6 +13,7 @@ import {
 import { useSession } from "@/lib/auth-client"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { getAdminMe } from "@/lib/admin"
+import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
 import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
@@ -232,7 +233,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <a href="/" className="relative flex h-10 items-center pt-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pl-0">
+            <a href="/" className="relative flex h-10 items-center justify-between pt-2 pr-2 pl-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:pr-0 group-data-[collapsible=icon]:pl-0">
               {logoUrl ? (
                 <>
                   <img
@@ -273,6 +274,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     className="absolute hidden size-7 scale-90 object-contain opacity-0 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:scale-100 group-data-[collapsible=icon]:opacity-100 dark:block"
                   />
                 </>
+              )}
+              {branding?.isPro && (
+                <ProBadge className="opacity-100 transition-[opacity,transform] duration-200 ease-linear group-data-[collapsible=icon]:hidden" />
               )}
             </a>
           </SidebarMenuItem>

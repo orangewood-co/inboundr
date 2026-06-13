@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { ProBadge } from "@/components/pro-badge"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,8 +48,10 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 
 interface Feature {
   key: string
@@ -66,6 +69,7 @@ interface OrganizationDetail {
   _id: string
   name: string
   status: "active" | "suspended"
+  isPro: boolean
   entitlements: {
     planSlug: string
     enabledFeatures: string[]
@@ -113,10 +117,6 @@ type ConfirmAction =
   | { type: "transfer-owner"; member: OrganizationMember }
   | { type: "cancel-invitation"; invitation: OrganizationInvitation }
   | { type: "status"; status: OrganizationDetail["status"] }
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
-}
 
 function RoleBadge({ role }: { role: OrganizationMember["role"] }) {
   const variant = role === "owner" ? "default" : role === "admin" ? "secondary" : "outline"
@@ -250,6 +250,7 @@ export default function AdminOrganizationPage() {
         body: JSON.stringify({
           name: organization.name,
           status: organization.status,
+          isPro: organization.isPro,
           planSlug: organization.entitlements.planSlug,
           enabledFeatures: organization.entitlements.enabledFeatures,
           disabledFeatures: organization.entitlements.disabledFeatures,
@@ -479,7 +480,10 @@ export default function AdminOrganizationPage() {
         <div className="mx-auto grid max-w-6xl gap-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{organization.name}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight">{organization.name}</h1>
+                {organization.isPro && <ProBadge />}
+              </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Owner: {organization.owner?.email ?? "Pending owner"} · Created {formatDate(organization.createdAt)}
               </p>
@@ -510,6 +514,17 @@ export default function AdminOrganizationPage() {
                     {plans.map((plan) => <SelectItem key={plan.slug} value={plan.slug}>{plan.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border p-4 md:col-span-2">
+                <div>
+                  <p className="text-sm font-medium">Pro organization</p>
+                  <p className="text-xs text-muted-foreground">Shows a Pro badge across the app. Purely visual — does not change feature access.</p>
+                </div>
+                <Switch
+                  checked={organization.isPro}
+                  onCheckedChange={(isPro) => setOrganization({ ...organization, isPro })}
+                  aria-label="Pro organization"
+                />
               </div>
               <div className="rounded-xl border p-4">
                 <p className="text-xs text-muted-foreground">Owner</p>

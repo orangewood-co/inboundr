@@ -31,8 +31,8 @@ import { cn } from "@/lib/utils"
 const PAGE_LIMIT = 24
 
 const STATUS_TONE: Record<Project["status"], string> = {
-  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  completed: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  active: "bg-success/10 text-success",
+  completed: "bg-info/10 text-info",
   archived: "bg-muted text-muted-foreground",
 }
 
@@ -208,7 +208,7 @@ export default function ProjectsPage() {
             <p className="mt-2 text-sm text-muted-foreground">{emptyMessage}</p>
             <Button className="mt-5" onClick={() => void navigate({ to: "/projects/new" })}>
               <PlusIcon />
-              Create Project
+              New Project
             </Button>
           </div>
         ) : (

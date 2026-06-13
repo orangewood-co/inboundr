@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { EmptyState, ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -163,7 +164,7 @@ function DirectorySkeleton() {
   return (
     <div className="grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="flex min-h-56 flex-col items-center justify-center rounded-sm border bg-card p-6">
+        <div key={index} className="flex min-h-56 flex-col items-center justify-center rounded-xl border bg-card p-6">
           <Skeleton className="size-28 rounded-full" />
           <div className="mt-6 flex w-full flex-col items-center gap-2">
             <Skeleton className="h-5 w-32" />
@@ -182,6 +183,7 @@ export default function EmployeesPage() {
   const [teams, setTeams] = useState<EmployeeTeam[]>([])
   const [modules, setModules] = useState<{ key: EmployeeAccessModule; label: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [teamFilter, setTeamFilter] = useState("all")
@@ -193,6 +195,7 @@ export default function EmployeesPage() {
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams({ page: "1", limit: String(PAGE_LIMIT) })
       if (search.trim()) params.set("search", search.trim())
@@ -203,7 +206,7 @@ export default function EmployeesPage() {
       const data = await response.json()
       setEmployees(data.employees ?? [])
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to fetch employees")
+      setError(err instanceof Error ? err.message : "Failed to fetch employees")
     } finally {
       setLoading(false)
     }
@@ -306,7 +309,7 @@ export default function EmployeesPage() {
             </Button>
             <Button onClick={openCreate}>
               <PlusIcon />
-              Add Employee
+              New Employee
             </Button>
           </>
         }
@@ -356,12 +359,25 @@ export default function EmployeesPage() {
 
         {loading ? (
           <DirectorySkeleton />
+        ) : error ? (
+          <ErrorState
+            message={error}
+            onRetry={() => void fetchEmployees()}
+            className="mx-auto max-w-7xl rounded-xl border bg-card p-12"
+          />
         ) : employees.length === 0 ? (
-          <div className="mx-auto max-w-7xl rounded-sm border bg-card p-12 text-center">
-            <IdCardIcon className="mx-auto mb-3 size-10 text-muted-foreground" />
-            <h2 className="text-lg font-semibold">No Employees Found</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Add the first profile or adjust your filters.</p>
-          </div>
+          <EmptyState
+            icon={IdCardIcon}
+            title="No Employees Found"
+            description="Add the first profile or adjust your filters."
+            action={
+              <Button size="sm" onClick={openCreate}>
+                <PlusIcon className="size-4" />
+                New Employee
+              </Button>
+            }
+            className="mx-auto max-w-7xl rounded-xl border bg-card"
+          />
         ) : (
           <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {employees.map((employee) => (
@@ -369,12 +385,12 @@ export default function EmployeesPage() {
                 key={employee._id}
                 type="button"
                 onClick={() => openEmployee(employee)}
-                className="relative flex min-h-56 flex-col items-center justify-center rounded-sm border bg-card p-6 text-center shadow-xs"
+                className="relative flex min-h-56 flex-col items-center justify-center rounded-xl border bg-card p-6 text-center shadow-xs transition-colors hover:bg-muted/40"
               >
                 <span
                   className={cn(
                     "absolute top-4 right-4 size-2 rounded-full",
-                    employee.status === "active" ? "bg-emerald-500" : "bg-muted-foreground/40"
+                    employee.status === "active" ? "bg-success" : "bg-muted-foreground/40"
                   )}
                 />
                 <Avatar className="size-28 rounded-full" size="lg">

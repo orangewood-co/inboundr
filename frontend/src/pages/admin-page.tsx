@@ -4,6 +4,8 @@ import { Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { PageHeader } from "@/components/page-header"
+import { ProBadge } from "@/components/pro-badge"
 import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -31,6 +33,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate, formatDateTime } from "@/lib/format"
 
 interface Plan {
   slug: string
@@ -43,6 +46,7 @@ interface AdminOrganization {
   _id: string
   name: string
   status: "active" | "suspended"
+  isPro: boolean
   memberCount: number
   owner: { name: string; email: string } | null
   entitlements: {
@@ -122,15 +126,9 @@ const emptyUsersPagination: AdminUsersPagination = {
   totalPages: 1,
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "Never recorded"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "Never recorded"
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date)
+function formatLastSignIn(value?: string | null) {
+  const formatted = formatDateTime(value)
+  return formatted === "-" ? "Never recorded" : formatted
 }
 
 function getInitials(value?: string | null) {
@@ -432,13 +430,10 @@ export default function AdminPage() {
       <SiteHeader breadcrumbs={[{ label: "Super Admin" }]} />
       <main className="h-full overflow-y-auto bg-muted/20 p-4 md:p-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Super Admin</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create production organizations, invite owners, and assign feature access through plans and overrides.
-              </p>
-            </div>
+          <PageHeader
+            title="Super Admin"
+            description="Create production organizations, invite owners, and assign feature access through plans and overrides."
+            actions={
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { void load(); void loadUsers() }}>
                 <RefreshCwIcon className="mr-2 size-4" />
@@ -483,14 +478,15 @@ export default function AdminPage() {
                       </Select>
                     </div>
                     <Button className="w-full" type="submit" disabled={creating}>
-                      {creating ? <Spinner className="mr-2 size-4" /> : <SendIcon className="mr-2 size-4" />}
+                      {creating ? <Spinner data-icon="inline-start" /> : <SendIcon className="mr-2 size-4" />}
                       Create and Invite
                     </Button>
                   </form>
                 </DialogContent>
               </Dialog>
             </div>
-          </div>
+            }
+          />
 
           <section className="grid gap-4 md:grid-cols-5">
             <StatCard title="Organizations" value={summary.total} icon={Building2Icon} />
@@ -558,9 +554,12 @@ export default function AdminPage() {
                       {filteredOrganizations.map((organization) => (
                         <TableRow key={organization._id}>
                           <TableCell className="pl-5">
-                            <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
-                              {organization.name}
-                            </Link>
+                            <div className="flex items-center gap-2">
+                              <Link className="font-medium hover:underline" to="/admin/organizations/$id" params={{ id: organization._id }}>
+                                {organization.name}
+                              </Link>
+                              {organization.isPro && <ProBadge />}
+                            </div>
                             <div className="text-xs text-muted-foreground">{organization.owner?.email ?? "Owner pending"}</div>
                           </TableCell>
                           <TableCell className="capitalize">{planLabel(plans, organization.entitlements.planSlug)}</TableCell>
@@ -655,7 +654,7 @@ export default function AdminPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{formatDateTime(user.lastSignInAt)}</TableCell>
+                            <TableCell className="text-muted-foreground">{formatLastSignIn(user.lastSignInAt)}</TableCell>
                             <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
                             <TableCell className="text-right">
                               <Button variant="outline" size="sm" onClick={() => setSelectedUser(user)}>
@@ -811,7 +810,7 @@ export default function AdminPage() {
                   </SelectContent>
                 </Select>
                 <Button onClick={() => void addMembership()} disabled={!membershipOrganizationId || membershipBusy === "add"}>
-                  {membershipBusy === "add" && <Spinner className="mr-2 size-4" />}
+                  {membershipBusy === "add" && <Spinner data-icon="inline-start" />}
                   Add Membership
                 </Button>
               </div>
@@ -863,7 +862,7 @@ export default function AdminPage() {
               Cancel
             </Button>
             <Button onClick={() => void moveSelectedMembership()} disabled={!moveOrganizationId || Boolean(membershipBusy)}>
-              {membershipBusy && <Spinner className="mr-2 size-4" />}
+              {membershipBusy && <Spinner data-icon="inline-start" />}
               Move User
             </Button>
           </DialogFooter>

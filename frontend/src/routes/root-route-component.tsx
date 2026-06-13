@@ -35,6 +35,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/stats": "Stats",
   "/support": "Support",
 }
+import { documentTitleForPath } from "@/lib/route-meta"
 
 export function RootRouteComponent() {
   const pathname = useRouterState({
@@ -42,43 +43,7 @@ export function RootRouteComponent() {
   })
 
   useEffect(() => {
-    const exactTitle = PAGE_TITLES[pathname]
-    if (exactTitle) {
-      document.title = `${exactTitle} - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/forms/")) {
-      document.title = `Form Editor - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/invoices/") && pathname !== "/invoices/new") {
-      document.title = `Invoice Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/customers/") && pathname !== "/customers/import") {
-      document.title = `Customer Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/employees/") && pathname !== "/employees/new") {
-      document.title = `Employee Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.includes("/tasks/")) {
-      document.title = `Task Details - ${APP_TITLE}`
-      return
-    }
-
-    if (pathname.startsWith("/projects/") && pathname !== "/projects/new") {
-      document.title = `Project Details - ${APP_TITLE}`
-      return
-    }
-
-    document.title = APP_TITLE
+    document.title = documentTitleForPath(pathname)
   }, [pathname])
 
   return (

@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -137,24 +138,6 @@ interface Invoice {
   writtenOffAt?: string | null
   createdAt: string
   updatedAt: string
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0)
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date)
 }
 
 function labelStatus(status: string) {
@@ -539,7 +522,7 @@ export default function InvoiceDetailPage() {
               <div className="mt-2 grid gap-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="font-medium text-green-600">{formatMoney(invoice.totals.paidTotal)}</span>
+                  <span className="font-medium text-success">{formatMoney(invoice.totals.paidTotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Balance</span>
@@ -606,7 +589,7 @@ export default function InvoiceDetailPage() {
                 {invoice.totals.discountTotal > 0 && (
                   <div className="flex justify-between py-1">
                     <span className="text-muted-foreground">Discount</span>
-                    <span className="text-green-600">-{formatMoney(invoice.totals.discountTotal)}</span>
+                    <span className="text-success">-{formatMoney(invoice.totals.discountTotal)}</span>
                   </div>
                 )}
                 <div className="flex justify-between py-1">
@@ -624,7 +607,7 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="font-medium text-green-600">{formatMoney(invoice.totals.paidTotal)}</span>
+                  <span className="font-medium text-success">{formatMoney(invoice.totals.paidTotal)}</span>
                 </div>
                 <div className="flex justify-between py-1 text-base font-semibold">
                   <span>Balance Due</span>

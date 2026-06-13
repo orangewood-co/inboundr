@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatNumber } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const UNMAPPED_COLUMN = "__unmapped__"
 
@@ -318,7 +319,7 @@ export default function ProductsImportPage() {
                   Back to Products
                 </Link>
               </Button>
-              <h1 className="text-2xl font-bold tracking-tight">Import Products</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Import Products</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Upload a product spreadsheet, match columns, review validation, and import into the catalog.
               </p>
@@ -373,7 +374,7 @@ export default function ProductsImportPage() {
                 <div>
                   <h2 className="text-xl font-semibold">Match Spreadsheet Columns</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Imported file: <span className="font-medium text-foreground">{parsedFile.fileName}</span> · {parsedFile.rows.length.toLocaleString("en-IN")} rows · {parsedFile.headers.length} columns.
+                    Imported file: <span className="font-medium text-foreground">{parsedFile.fileName}</span> · {formatNumber(parsedFile.rows.length)} rows · {parsedFile.headers.length} columns.
                   </p>
                 </div>
                 <Badge variant="outline">{mappedCount} fields mapped</Badge>
@@ -462,7 +463,7 @@ export default function ProductsImportPage() {
                 <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
                   <div className="flex items-center gap-2 font-medium">
                     <CheckCircle2Icon className="size-4" />
-                    {parsedFile.rows.length.toLocaleString("en-IN")} rows are ready to import.
+                    {formatNumber(parsedFile.rows.length)} rows are ready to import.
                   </div>
                 </div>
               )}
@@ -519,7 +520,7 @@ export default function ProductsImportPage() {
                 <div>
                   <h2 className="text-xl font-semibold">Import Complete</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Processed {result.summary.total.toLocaleString("en-IN")} rows from the uploaded file.
+                    Processed {formatNumber(result.summary.total)} rows from the uploaded file.
                   </p>
                 </div>
               </div>

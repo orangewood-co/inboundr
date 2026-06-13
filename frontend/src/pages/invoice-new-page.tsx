@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
+import { formatMoney } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -125,10 +126,6 @@ function emptyForm(): InvoiceFormState {
     recurringAutoSend: false,
     lineItems: [emptyLine()],
   }
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value || 0)
 }
 
 function calculatePreviewTotals(items: InvoiceLineItem[]) {
@@ -676,7 +673,7 @@ function TotalRow({ label, value, strong, negative }: { label: string; value: nu
   return (
     <div className={cn("flex justify-between py-1", strong && "text-base font-semibold")}>
       <span className={cn(!strong && "text-muted-foreground")}>{label}</span>
-      <span className={cn(negative && "text-green-600")}>{negative ? `-${formatMoney(value)}` : formatMoney(value)}</span>
+      <span className={cn(negative && "text-success")}>{negative ? `-${formatMoney(value)}` : formatMoney(value)}</span>
     </div>
   )
 }

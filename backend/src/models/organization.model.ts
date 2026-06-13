@@ -49,6 +49,7 @@ export interface IOrganization extends Document {
   name: string;
   ownerUserId: string;
   status: OrganizationStatus;
+  isPro: boolean;
   planSlug: string;
   enabledFeatures: string[];
   disabledFeatures: string[];
@@ -129,6 +130,7 @@ const organizationSchema = new Schema<IOrganization>(
       default: "active",
       index: true,
     },
+    isPro: { type: Boolean, default: false },
     planSlug: { type: String, default: "all_features", trim: true, index: true },
     enabledFeatures: { type: [String], default: [] },
     disabledFeatures: { type: [String], default: [] },

@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { AnniversaryCelebration } from "@/components/anniversary-celebration"
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
@@ -54,6 +55,7 @@ import type { EmployeeAccessModule } from "@/lib/entitlements"
 import { resolveUploadedImageUrl, uploadCroppedEmployeeImage } from "@/lib/uploaded-image"
 
 import { API_ORIGIN } from "@/lib/env"
+import { formatDate } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/employees`
 const ORGANIZATION_API = `${API_ORIGIN}/api/v1/organization`
 
@@ -170,13 +172,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("") || "IN"
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date)
 }
 
 function documentTimestamp(document: EmployeeDocument) {
@@ -826,7 +821,7 @@ export default function EmployeeDetailPage() {
             </div>
           ) : employee ? (
             <div className="space-y-6">
-              <section className="rounded-3xl border bg-card p-6">
+              <section className="relative overflow-hidden rounded-3xl border bg-card p-6">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-center gap-5">
                     <Avatar className="size-24 rounded-3xl" size="lg">
@@ -839,15 +834,16 @@ export default function EmployeeDetailPage() {
                           {statusLabels[employee.status]}
                         </Badge>
                         {employee.platformAccess.enabled ? (
-                          <Badge variant="outline" className="border-emerald-500/30 text-emerald-600">Access enabled</Badge>
+                          <Badge variant="outline" className="border-success/30 text-success">Access enabled</Badge>
                         ) : (
                           <Badge variant="outline">Access disabled</Badge>
                         )}
                       </div>
-                      <h1 className="text-3xl font-semibold tracking-tight">{employee.fullName}</h1>
+                      <h1 className="text-2xl font-semibold tracking-tight">{employee.fullName}</h1>
                       <p className="mt-1 text-muted-foreground">
                         {employee.title || "No title"} · {employee.team?.name ?? "No team"}
                       </p>
+                      <AnniversaryCelebration startDate={employee.startDate} />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">

@@ -10,31 +10,21 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Link, useLocation } from "@tanstack/react-router"
-import { PanelLeftIcon } from "lucide-react"
-import { Fragment } from "react"
+import { MoonIcon, PanelLeftIcon } from "lucide-react"
+import { Fragment, useEffect, useState } from "react"
+
+import { ROUTE_LABELS } from "@/lib/route-meta"
 
 export type BreadcrumbSegment = {
   label: string
   href?: string
-}
-
-const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
-  "/chat": "AI Chat",
-  "/rfq": "RFQ",
-  "/emails": "Inbox",
-  "/employees": "Employees",
-  "/products": "Products",
-  "/projects": "Projects",
-  "/search": "Search",
-  "/settings": "Settings",
-  "/forms": "Forms",
-  "/links": "Links",
-  "/customers": "Customers",
-  "/invoices": "Invoices",
-  "/stats": "Stats",
-  "/admin": "Super Admin",
 }
 
 function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
@@ -45,7 +35,33 @@ function breadcrumbsForPath(pathname: string): BreadcrumbSegment[] {
     ]
   }
 
-  return [{ label: pageTitles[pathname] ?? "Dashboard" }]
+  const label = ROUTE_LABELS[pathname]
+  if (label) return [{ label }]
+
+  // Unknown (usually dynamic) path: anchor the crumb to the nearest known ancestor.
+  const segments = pathname.split("/").filter(Boolean)
+  while (segments.length > 1) {
+    segments.pop()
+    const parentPath = `/${segments.join("/")}`
+    const parentLabel = ROUTE_LABELS[parentPath]
+    if (parentLabel) {
+      return [{ label: parentLabel, href: parentPath }, { label: "Details" }]
+    }
+  }
+
+  return [{ label: "Home" }]
+}
+
+// Easter egg: a quiet moon for anyone working between 1 and 5 AM.
+function useIsLateNight() {
+  const [hour, setHour] = useState(() => new Date().getHours())
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setHour(new Date().getHours()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
+
+  return hour >= 1 && hour < 5
 }
 
 export function SiteHeader({
@@ -57,6 +73,7 @@ export function SiteHeader({
 } = {}) {
   const { toggleSidebar } = useSidebar()
   const { pathname } = useLocation()
+  const isLateNight = useIsLateNight()
 
   const segments: BreadcrumbSegment[] = breadcrumbs ?? breadcrumbsForPath(pathname)
 
@@ -98,6 +115,18 @@ export function SiteHeader({
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+        {isLateNight && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="ml-1 hidden text-muted-foreground/70 sm:inline-flex">
+                  <MoonIcon className="size-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>It's late — go to sleep</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {actions ? (
           <div className="ml-auto flex items-center gap-2">{actions}</div>
         ) : (

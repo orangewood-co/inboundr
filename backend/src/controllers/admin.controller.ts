@@ -226,6 +226,7 @@ function serializeOrganization(organization: any, owner?: any, memberCount = 0) 
       ? { id: owner.id, name: owner.name ?? "", email: owner.email ?? "" }
       : null,
     status: organization.status ?? "active",
+    isPro: Boolean(organization.isPro),
     memberCount,
     defaultContact: organization.defaultContact,
     website: organization.website,
@@ -479,6 +480,9 @@ export async function updateAdminOrganization(req: Request, res: Response): Prom
     }
     if (req.body?.disabledFeatures !== undefined) {
       update.disabledFeatures = normalizeFeatures(req.body.disabledFeatures);
+    }
+    if (req.body?.isPro !== undefined) {
+      update.isPro = Boolean(req.body.isPro);
     }
 
     if (update.name === "") {

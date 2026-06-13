@@ -36,6 +36,10 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-info: var(--info);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -78,6 +82,10 @@
     --accent: oklch(0.963 0.002 197.1);
     --accent-foreground: oklch(0.218 0.008 223.9);
     --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.985 0 0);
+    --success: oklch(0.627 0.17 149.214);
+    --warning: oklch(0.666 0.179 58.318);
+    --info: oklch(0.588 0.158 241.966);
     --border: oklch(0.925 0.005 214.3);
     --input: oklch(0.925 0.005 214.3);
     --ring: oklch(0.723 0.014 214.4);
@@ -113,6 +121,10 @@
     --accent: oklch(0.275 0.011 216.9);
     --accent-foreground: oklch(0.987 0.002 197.1);
     --destructive: oklch(0.704 0.191 22.216);
+    --destructive-foreground: oklch(0.985 0 0);
+    --success: oklch(0.723 0.219 149.579);
+    --warning: oklch(0.769 0.188 70.08);
+    --info: oklch(0.685 0.169 237.323);
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.56 0.021 213.5);
@@ -163,5 +175,58 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted-foreground);
+  }
+}
+
+@keyframes pro-badge-pop {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  30% {
+    transform: scale(1.15) rotate(-3deg);
+  }
+  60% {
+    transform: scale(0.97) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes pro-badge-sparkle {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes anniversary-confetti-fall {
+  0% {
+    transform: translateY(-16px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--fall, 120px)) translateX(var(--sway, 0px)) rotate(var(--spin, 360deg));
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pro-badge-pop {
+    animation: pro-badge-pop 0.5s ease-out;
+  }
+  .pro-badge-sparkle {
+    animation: pro-badge-sparkle 0.8s cubic-bezier(0.2, 0.6, 0.4, 1) forwards;
+  }
+  .anniversary-confetti {
+    animation: anniversary-confetti-fall var(--duration, 2.8s) ease-in forwards;
+    animation-delay: var(--delay, 0s);
   }
 }

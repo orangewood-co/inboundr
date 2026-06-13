@@ -92,6 +92,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { PageToolbar } from "@/components/page-header"
+import { formatDateTime, formatRelativeTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
   canPreview,
@@ -133,44 +135,6 @@ const LAYOUT_STORAGE_KEY = "drive:layout"
 function getInitialLayout(): LayoutMode {
   if (typeof window === "undefined") return "list"
   return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "grid" ? "grid" : "list"
-}
-
-function formatDate(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date)
-}
-
-function formatRelativeTime(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "-"
-
-  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000)
-  const divisions = [
-    { amount: 60, unit: "second" },
-    { amount: 60, unit: "minute" },
-    { amount: 24, unit: "hour" },
-    { amount: 7, unit: "day" },
-    { amount: 4.345, unit: "week" },
-    { amount: 12, unit: "month" },
-    { amount: Number.POSITIVE_INFINITY, unit: "year" },
-  ] as const
-
-  let duration = diffInSeconds
-  for (const division of divisions) {
-    if (Math.abs(duration) < division.amount) {
-      return new Intl.RelativeTimeFormat("en-IN", { numeric: "auto" }).format(
-        Math.round(duration),
-        division.unit
-      )
-    }
-    duration /= division.amount
-  }
-
-  return "-"
 }
 
 function iconForNode(node: DriveNode): { Icon: typeof FileIcon; className: string } {
@@ -648,42 +612,38 @@ export default function DrivePage() {
           <input ref={filesInputRef} type="file" multiple className="hidden" onChange={(e) => void onFilesPicked(e)} />
           <input ref={folderInputRef} type="file" multiple className="hidden" onChange={(e) => void onFilesPicked(e)} />
 
-          <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-            <div className="flex items-center gap-2">
-              <HardDriveIcon className="size-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Drive</h2>
-              {!loading && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                  {nodes.length.toLocaleString("en-IN")}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setFolderDialog({ mode: "create" })}>
-                <FolderPlusIcon className="size-4" />
-                New Folder
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm">
-                    <UploadIcon className="size-4" />
-                    Upload
-                    <ChevronDownIcon className="size-3.5 opacity-70" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => filesInputRef.current?.click()}>
-                    <FileUpIcon className="size-4" />
-                    Upload Files
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => folderInputRef.current?.click()}>
-                    <FolderUpIcon className="size-4" />
-                    Upload Folder
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+          <PageToolbar
+            icon={HardDriveIcon}
+            title="Drive"
+            count={loading ? null : nodes.length}
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={() => setFolderDialog({ mode: "create" })}>
+                  <FolderPlusIcon className="size-4" />
+                  New Folder
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                      <UploadIcon className="size-4" />
+                      Upload
+                      <ChevronDownIcon className="size-3.5 opacity-70" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => filesInputRef.current?.click()}>
+                      <FileUpIcon className="size-4" />
+                      Upload Files
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => folderInputRef.current?.click()}>
+                      <FolderUpIcon className="size-4" />
+                      Upload Folder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
+          />
 
           <DndContext
             sensors={sensors}
@@ -1069,7 +1029,7 @@ function DriveListRow({
           <TooltipTrigger asChild>
             <span className="cursor-default">{formatRelativeTime(node.updatedAt)}</span>
           </TooltipTrigger>
-          <TooltipContent>{formatDate(node.updatedAt)}</TooltipContent>
+          <TooltipContent>{formatDateTime(node.updatedAt)}</TooltipContent>
         </Tooltip>
       </td>
       <td
@@ -1233,7 +1193,7 @@ function UploadQueuePanel({
           ) : failed > 0 ? (
             <AlertCircleIcon className="size-4 shrink-0 text-destructive" />
           ) : (
-            <CheckCircle2Icon className="size-4 shrink-0 text-emerald-500" />
+            <CheckCircle2Icon className="size-4 shrink-0 text-success" />
           )}
           <span className="truncate text-sm font-medium">{headerLabel}</span>
         </div>
@@ -1256,7 +1216,7 @@ function UploadQueuePanel({
             <div key={task.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
               <div className="shrink-0">
                 {task.status === "done" ? (
-                  <CheckCircle2Icon className="size-4 text-emerald-500" />
+                  <CheckCircle2Icon className="size-4 text-success" />
                 ) : task.status === "error" ? (
                   <AlertCircleIcon className="size-4 text-destructive" />
                 ) : task.status === "uploading" ? (

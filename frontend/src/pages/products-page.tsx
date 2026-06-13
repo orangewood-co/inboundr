@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
-  AlertCircleIcon,
   ArrowLeftIcon,
   BoxIcon,
   CalendarPlusIcon,
@@ -39,7 +38,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
+import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
+import { PageToolbar } from "@/components/page-header"
 import { API_ORIGIN } from "@/lib/env"
+import { formatNumber } from "@/lib/format"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 
@@ -181,44 +183,6 @@ function formToPayload(form: ProductFormState) {
       const stringValue = String(value)
       return [key, stringValue.trim() === "" ? null : stringValue.trim()]
     })
-  )
-}
-
-function ProductTableSkeleton() {
-  return (
-    <div className="divide-y">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="grid grid-cols-[1.1fr_2fr_1fr_0.8fr_0.8fr_0.7fr_3rem] gap-4 px-5 py-4">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="size-8 rounded-lg" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function EmptyState({ search }: { search: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-      <div className="flex size-10 items-center justify-center rounded-full bg-muted">
-        <BoxIcon className="size-5 text-muted-foreground" />
-      </div>
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold">
-          {search ? "No Products Match That Search" : "No Products in the Catalog Yet"}
-        </h3>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          {search
-            ? "Try a product code, brand, HSN code, or a shorter description fragment."
-            : "Add the first catalog item and it will appear in this table immediately."}
-        </p>
-      </div>
-    </div>
   )
 }
 
@@ -381,33 +345,25 @@ function DashboardView({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Total Products"
-            value={stats?.totalProducts.toLocaleString("en-IN") ?? "0"}
+            value={formatNumber(stats?.totalProducts ?? 0)}
             icon={BoxIcon}
             loading={statsLoading}
           />
           <StatCard
             label="Unique Brands"
-            value={stats?.uniqueBrands.toLocaleString("en-IN") ?? "0"}
+            value={formatNumber(stats?.uniqueBrands ?? 0)}
             icon={TagIcon}
             loading={statsLoading}
           />
           <StatCard
             label="Avg. Unit Price"
-            value={
-              stats?.avgUnitPrice
-                ? new Intl.NumberFormat("en-IN", {
-                    style: "currency",
-                    currency: "INR",
-                    maximumFractionDigits: 0,
-                  }).format(stats.avgUnitPrice)
-                : "—"
-            }
+            value={stats?.avgUnitPrice ? toCurrency(stats.avgUnitPrice) : "—"}
             icon={IndianRupeeIcon}
             loading={statsLoading}
           />
           <StatCard
             label="Added This Month"
-            value={stats?.recentlyAdded.toLocaleString("en-IN") ?? "0"}
+            value={formatNumber(stats?.recentlyAdded ?? 0)}
             icon={CalendarPlusIcon}
             loading={statsLoading}
           />
@@ -440,7 +396,7 @@ function DashboardView({
               <PackagePlusIcon className="size-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">Add Product</h3>
+              <h3 className="text-sm font-semibold">New Product</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Create a new catalog entry for future quotes and matching.
               </p>
@@ -730,8 +686,11 @@ export default function ProductsPage() {
             />
           ) : (
             <>
-              <div className="flex items-center justify-between border-b px-4 py-3">
-                <div className="flex items-center gap-2">
+              <PageToolbar
+                icon={BoxIcon}
+                title="Products"
+                count={loading ? null : total}
+                leading={
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -745,49 +704,44 @@ export default function ProductsPage() {
                     </TooltipTrigger>
                     <TooltipContent>Back to dashboard</TooltipContent>
                   </Tooltip>
-                  <BoxIcon className="size-4 text-muted-foreground" />
-                  <h2 className="text-sm font-semibold">Products</h2>
-                  {!loading && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                      {total.toLocaleString("en-IN")}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        onClick={() => void fetchProducts()}
-                        disabled={loading}
-                      >
-                        <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Refresh</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={openImportPage}>
-                        <UploadIcon className="size-4" />
-                        Bulk Upload
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Import products from CSV or Excel</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button size="sm" onClick={openCreateSheet}>
-                        <PackagePlusIcon className="size-4" />
-                        Add Product
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Add a new catalog product</TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
+                }
+                actions={
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={() => void fetchProducts()}
+                          disabled={loading}
+                        >
+                          <RefreshCwIcon className={cn("size-4", loading && "animate-spin")} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Refresh</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={openImportPage}>
+                          <UploadIcon className="size-4" />
+                          Import
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Import products from CSV or Excel</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button size="sm" onClick={openCreateSheet}>
+                          <PackagePlusIcon className="size-4" />
+                          New Product
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Add a new catalog product</TooltipContent>
+                    </Tooltip>
+                  </>
+                }
+              />
 
               <div className="flex items-center gap-4 border-b px-4 py-3">
                 <div className="relative max-w-xl flex-1">
@@ -801,22 +755,32 @@ export default function ProductsPage() {
                 </div>
                 <span className="shrink-0 text-sm text-muted-foreground">
                   Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
-                  <span className="font-semibold text-foreground">{total.toLocaleString("en-IN")}</span>
+                  <span className="font-semibold text-foreground">{formatNumber(total)}</span>
                 </span>
               </div>
 
               {error ? (
-                <div className="flex flex-col items-center gap-2 p-8 text-center">
-                  <AlertCircleIcon className="size-5 text-destructive" />
-                  <p className="text-sm text-destructive">{error}</p>
-                  <Button variant="outline" size="sm" onClick={() => void fetchProducts()}>
-                    Try Again
-                  </Button>
-                </div>
+                <ErrorState message={error} onRetry={() => void fetchProducts()} />
               ) : loading ? (
-                <ProductTableSkeleton />
+                <ListSkeleton rows={8} columns={6} />
               ) : products.length === 0 ? (
-                <EmptyState search={debouncedSearch} />
+                <EmptyState
+                  icon={BoxIcon}
+                  title={debouncedSearch ? "No Products Match That Search" : "No Products in the Catalog Yet"}
+                  description={
+                    debouncedSearch
+                      ? "Try a product code, brand, HSN code, or a shorter description fragment."
+                      : "Add the first catalog item and it will appear in this table immediately."
+                  }
+                  action={
+                    debouncedSearch ? undefined : (
+                      <Button size="sm" onClick={openCreateSheet}>
+                        <PackagePlusIcon className="size-4" />
+                        New Product
+                      </Button>
+                    )
+                  }
+                />
               ) : (
                 <div className="flex-1 overflow-auto animate-in fade-in-0 duration-300">
                   <table className="w-full min-w-[980px] text-sm">
@@ -920,7 +884,7 @@ export default function ProductsPage() {
         <SheetContent className="w-full overflow-y-auto sm:max-w-2xl" side="right">
           <SheetHeader className="px-5 pt-5">
             <SheetTitle className="text-xl">
-              {editingProduct ? "Edit Product" : "Add Product"}
+              {editingProduct ? "Edit Product" : "New Product"}
             </SheetTitle>
             <SheetDescription>
               {editingProduct
@@ -938,13 +902,13 @@ export default function ProductsPage() {
               {saveError}
             </div>
           )}
-          <SheetFooter className="border-t bg-muted/30">
+          <SheetFooter className="flex-row justify-end border-t bg-muted/30">
+            <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
             <Button onClick={saveProduct} disabled={saving}>
               {saving && <Spinner data-icon="inline-start" />}
               {editingProduct ? "Save Changes" : "Create Product"}
-            </Button>
-            <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
-              Cancel
             </Button>
           </SheetFooter>
         </SheetContent>
