@@ -8,6 +8,7 @@ import { RFQ } from "../models/rfq.model";
 import { DailyDigest } from "../emails/daily-digest";
 import { frontendOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
+import { normalizeTime, normalizeTimezone, sendHourUtcFromLocal } from "../lib/schedule";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 
 const DEFAULT_SECTIONS = {
@@ -18,7 +19,6 @@ const DEFAULT_SECTIONS = {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
@@ -79,48 +79,6 @@ function normalizeEmails(value: unknown): string[] {
   }
 
   return emails;
-}
-
-function normalizeTime(value: unknown): string {
-  const time = String(value ?? "").trim();
-  return TIME_RE.test(time) ? time : "08:00";
-}
-
-function normalizeTimezone(value: unknown): string {
-  const timezone = String(value ?? "").trim();
-  if (!timezone) return "UTC";
-
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(new Date());
-    return timezone;
-  } catch {
-    return "UTC";
-  }
-}
-
-function sendHourUtcFromLocal(sendTimeLocal: string, timezone: string): number {
-  const [hour, minute] = sendTimeLocal.split(":").map(Number);
-  const now = new Date();
-  const utcGuess = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour, minute));
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).formatToParts(utcGuess);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const localAsUtc = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute)
-  );
-  const offsetMs = localAsUtc - utcGuess.getTime();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour, minute) - offsetMs).getUTCHours();
 }
 
 async function normalizeMemberRecipients(organizationId: mongoose.Types.ObjectId, value: unknown): Promise<string[]> {
