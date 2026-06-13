@@ -11,13 +11,18 @@ import {
   nextInvoiceNumber,
   normalizePaymentMethod,
   parseInvoiceDate,
+  resolveInvoiceUpiId,
   resolveStatus,
   roundMoney,
   searchInvoiceRecords,
   toNumber,
   updateDraftInvoiceRecord,
 } from "../services/invoice.service";
-import { renderInvoicePdfBuffer, streamInvoicePdf } from "../services/invoice-pdf.service";
+import {
+  buildInvoiceUpiAssets,
+  renderInvoicePdfBuffer,
+  streamInvoicePdf,
+} from "../services/invoice-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 
 const ACTIVE_STATUSES = new Set<InvoiceStatus>(["sent", "viewed", "partially_paid", "overdue"]);
@@ -33,7 +38,7 @@ function invoiceServiceErrorStatus(error: InvoiceServiceError): number {
   return 400;
 }
 
-function renderInvoiceEmail(invoice: any): string {
+function renderInvoiceEmail(invoice: any, upiId = ""): string {
   const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
   return [
     `Hello ${invoice.customerSnapshot.name || invoice.customerSnapshot.company || "there"},`,
@@ -41,6 +46,7 @@ function renderInvoiceEmail(invoice: any): string {
     `Please find invoice ${invoice.invoiceNumber} from ${invoice.organizationSnapshot.name}.`,
     `Amount due: ${money.format(invoice.totals.balanceDue)}`,
     invoice.dueDate ? `Due date: ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(invoice.dueDate))}` : "",
+    upiId && invoice.totals.balanceDue > 0 ? `Pay via UPI: ${upiId}` : "",
     "",
     "The invoice PDF is attached to this email.",
     "",
@@ -49,6 +55,7 @@ function renderInvoiceEmail(invoice: any): string {
     .filter((line) => line !== "")
     .join("\n");
 }
+
 
 export const listInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -59,6 +66,8 @@ export const listInvoices = async (req: Request, res: Response): Promise<void> =
       limit: parsePositiveInt(req.query.limit, 20, 50),
       query: String(req.query.search ?? ""),
       status: String(req.query.status ?? ""),
+      customerId: String(req.query.customerId ?? ""),
+      outstandingOnly: req.query.outstandingOnly === "1" || req.query.outstandingOnly === "true",
     });
 
     res.json(result);
@@ -149,12 +158,13 @@ export const sendInvoice = async (req: Request, res: Response): Promise<void> =>
 
       if (account) {
         const branding = await resolveOrganizationPdfBranding(orgReq.organization);
-        const pdf = await renderInvoicePdfBuffer(invoice, branding);
+        const assets = await buildInvoiceUpiAssets(invoice, orgReq.organization);
+        const pdf = await renderInvoicePdfBuffer(invoice, branding, assets);
         gmailMessageId = await sendStandaloneEmail({
           account,
           to: invoice.customerSnapshot.email,
           subject: `Invoice ${invoice.invoiceNumber} from ${invoice.organizationSnapshot.name}`,
-          body: renderInvoiceEmail(invoice),
+          body: renderInvoiceEmail(invoice, assets?.upiQr?.upiId ?? resolveInvoiceUpiId(invoice, orgReq.organization)),
           attachments: [
             {
               filename: `${invoice.invoiceNumber}.pdf`,
@@ -218,6 +228,19 @@ export const recordInvoicePayment = async (req: Request, res: Response): Promise
   }
 };
 
+export const setInvoiceReminders = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const invoice = await mutateInvoice(req, res);
+    if (!invoice) return;
+    invoice.remindersEnabled = Boolean((req.body ?? {}).enabled);
+    await invoice.save();
+    res.json(invoice);
+  } catch (err) {
+    console.error("Error updating invoice reminders:", err);
+    res.status(500).json({ error: "Failed to update invoice reminders" });
+  }
+};
+
 export const cancelInvoice = async (req: Request, res: Response): Promise<void> => {
   try {
     const invoice = await mutateInvoice(req, res);
@@ -263,6 +286,7 @@ export const duplicateInvoice = async (req: Request, res: Response): Promise<voi
       issueDate: new Date(),
       dueDate: null,
       payments: [],
+      reminders: [],
       totals: calculateTotals(source.lineItems, []),
       sentAt: null,
       viewedAt: null,
@@ -290,7 +314,8 @@ export const downloadInvoicePdf = async (req: Request, res: Response): Promise<v
     }
 
     const branding = await resolveOrganizationPdfBranding(orgReq.organization);
-    streamInvoicePdf(invoice, branding, res, { inline: req.query.inline === "1" });
+    const assets = await buildInvoiceUpiAssets(invoice, orgReq.organization);
+    streamInvoicePdf(invoice, branding, res, { inline: req.query.inline === "1", assets });
   } catch (err) {
     console.error("Error rendering invoice PDF:", err);
     res.status(500).json({ error: "Failed to render invoice PDF" });
@@ -311,6 +336,87 @@ function agingBucketOf(dueDate: Date | null | undefined, now: Date): AgingBucket
   if (days <= 45) return "d31_45";
   return "d45plus";
 }
+
+type ReceivablesCustomer = {
+  key: string;
+  customerId: string | null;
+  name: string;
+  company: string;
+  email: string;
+  outstanding: number;
+  overdue: number;
+  aging: Record<AgingBucket, number>;
+  invoiceCount: number;
+  oldestDueDate: Date | null;
+};
+
+export const getReceivables = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const invoices = await Invoice.find({
+      organizationId: orgReq.organization._id,
+      status: { $nin: [...AGING_EXCLUDED_STATUSES] },
+      "totals.balanceDue": { $gt: 0 },
+    }).lean();
+    const now = new Date();
+
+    const groups = new Map<string, ReceivablesCustomer>();
+    for (const invoice of invoices) {
+      const snapshot = invoice.customerSnapshot ?? ({} as typeof invoice.customerSnapshot);
+      const key = invoice.customerId
+        ? String(invoice.customerId)
+        : `snapshot:${(snapshot.email || snapshot.company || snapshot.name || "unknown").toLowerCase()}`;
+
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          key,
+          customerId: invoice.customerId ? String(invoice.customerId) : null,
+          name: snapshot.name ?? "",
+          company: snapshot.company ?? "",
+          email: snapshot.email ?? "",
+          outstanding: 0,
+          overdue: 0,
+          aging: { current: 0, d1_15: 0, d16_30: 0, d31_45: 0, d45plus: 0 },
+          invoiceCount: 0,
+          oldestDueDate: null,
+        };
+        groups.set(key, group);
+      }
+
+      const balance = invoice.totals.balanceDue;
+      const bucket = agingBucketOf(invoice.dueDate, now);
+      group.outstanding = roundMoney(group.outstanding + balance);
+      group.invoiceCount += 1;
+      group.aging[bucket] = roundMoney(group.aging[bucket] + balance);
+
+      if (invoice.dueDate) {
+        const dueDate = new Date(invoice.dueDate);
+        if (dueDate < now) group.overdue = roundMoney(group.overdue + balance);
+        if (!group.oldestDueDate || dueDate < group.oldestDueDate) group.oldestDueDate = dueDate;
+      }
+
+      if (!group.name && snapshot.name) group.name = snapshot.name;
+      if (!group.company && snapshot.company) group.company = snapshot.company;
+      if (!group.email && snapshot.email) group.email = snapshot.email;
+    }
+
+    const customers = [...groups.values()].sort((a, b) => b.outstanding - a.outstanding);
+
+    res.json({
+      summary: {
+        outstanding: roundMoney(customers.reduce((sum, customer) => sum + customer.outstanding, 0)),
+        overdue: roundMoney(customers.reduce((sum, customer) => sum + customer.overdue, 0)),
+        customerCount: customers.length,
+        invoiceCount: invoices.length,
+      },
+      customers,
+    });
+  } catch (err) {
+    console.error("Error fetching receivables:", err);
+    res.status(500).json({ error: "Failed to fetch receivables" });
+  }
+};
 
 export const getInvoiceStats = async (req: Request, res: Response): Promise<void> => {
   try {

@@ -57,6 +57,13 @@ export interface IInvoiceTotals {
   balanceDue: number;
 }
 
+export interface IInvoiceReminder {
+  /** Days after the due date this reminder corresponds to (0 = on the due date). */
+  offsetDays: number;
+  sentAt: Date;
+  gmailMessageId: string;
+}
+
 export interface IInvoiceRecurringProfile {
   enabled: boolean;
   frequency: InvoiceRecurringFrequency | null;
@@ -78,6 +85,8 @@ export interface IInvoice extends Document {
   poNumber: string;
   notes: string;
   termsAndConditions: string;
+  /** Per-invoice UPI ID override; empty means use the organization default at render time. */
+  upiId: string;
   customerSnapshot: {
     name: string;
     company: string;
@@ -99,6 +108,8 @@ export interface IInvoice extends Document {
   payments: IInvoicePayment[];
   totals: IInvoiceTotals;
   recurring: IInvoiceRecurringProfile;
+  remindersEnabled: boolean;
+  reminders: IInvoiceReminder[];
   sentAt: Date | null;
   viewedAt: Date | null;
   cancelledAt: Date | null;
@@ -150,6 +161,15 @@ const invoiceTotalsSchema = new Schema<IInvoiceTotals>(
     grandTotal: { type: Number, default: 0 },
     paidTotal: { type: Number, default: 0 },
     balanceDue: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const invoiceReminderSchema = new Schema<IInvoiceReminder>(
+  {
+    offsetDays: { type: Number, required: true },
+    sentAt: { type: Date, required: true },
+    gmailMessageId: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -206,6 +226,7 @@ const invoiceSchema = new Schema<IInvoice>(
     poNumber: { type: String, default: "", trim: true },
     notes: { type: String, default: "", trim: true },
     termsAndConditions: { type: String, default: "", trim: true },
+    upiId: { type: String, default: "", trim: true, lowercase: true },
     customerSnapshot: {
       name: { type: String, default: "", trim: true },
       company: { type: String, default: "", trim: true },
@@ -227,6 +248,8 @@ const invoiceSchema = new Schema<IInvoice>(
     payments: { type: [invoicePaymentSchema], default: [] },
     totals: { type: invoiceTotalsSchema, default: () => ({}) },
     recurring: { type: invoiceRecurringSchema, default: () => ({}) },
+    remindersEnabled: { type: Boolean, default: true },
+    reminders: { type: [invoiceReminderSchema], default: [] },
     sentAt: { type: Date, default: null },
     viewedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },

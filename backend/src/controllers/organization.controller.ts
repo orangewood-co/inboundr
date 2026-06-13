@@ -12,6 +12,7 @@ import {
 } from "../models/organization-member.model";
 import { Organization } from "../models/organization.model";
 import { sendEmail } from "../lib/email";
+import { normalizeTime, normalizeTimezone, sendHourUtcFromLocal } from "../lib/schedule";
 import { serializeEntitlements } from "../services/entitlement.service";
 import { getEmployeeAccessState } from "../services/employee-access.service";
 import { keyBelongsToPrefix } from "../services/storage.service";
@@ -113,6 +114,45 @@ async function resolveUsersByIds(userIds: string[]) {
   return map;
 }
 
+const MAX_REMINDER_OFFSET_DAYS = 365;
+
+function normalizePaymentReminders(value: unknown) {
+  const source = (value ?? {}) as Record<string, unknown>;
+  const offsets = Array.isArray(source.offsets)
+    ? [
+        ...new Set(
+          source.offsets
+            .map((item) => Number(item))
+            .filter((offset) => Number.isInteger(offset) && offset >= 0 && offset <= MAX_REMINDER_OFFSET_DAYS)
+        ),
+      ].sort((a, b) => a - b)
+    : [0, 7, 14];
+
+  if (Boolean(source.enabled) && offsets.length === 0) {
+    throw validationError("Select at least one reminder schedule");
+  }
+
+  const sendTimeLocal = normalizeTime(source.sendTimeLocal, "10:00");
+  const timezone = normalizeTimezone(source.timezone);
+
+  return {
+    enabled: Boolean(source.enabled),
+    offsets,
+    sendTimeLocal,
+    timezone,
+    sendHourUtc: sendHourUtcFromLocal(sendTimeLocal, timezone),
+  };
+}
+
+function normalizeUpiId(value: unknown): string {
+  const upiId = stringValue(value).toLowerCase();
+  if (!upiId) return "";
+  if (!/^[a-z0-9][a-z0-9._-]*@[a-z][a-z0-9]*$/.test(upiId)) {
+    throw validationError("UPI ID must look like name@bank (e.g. business@upi)");
+  }
+  return upiId;
+}
+
 function normalizeHexColor(value: unknown): string {
   const color = stringValue(value);
   if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase();
@@ -144,13 +184,34 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
       : {}),
     ...(preferences
       ? {
+          // Only fields present in the payload are included, so partial saves
+          // (e.g. the notifications tab sending just paymentReminders) don't
+          // reset the rest of the organization preferences.
           preferences: {
-            primaryColor: normalizeHexColor(preferences.primaryColor),
-            theme: preferences.theme === "light" ? "light" : "dark",
-            colorTheme: stringValue(preferences.colorTheme) || "default",
-            pricing: stringValue(preferences.pricing) || "INR",
-            defaultTerms,
-            paymentTerms: normalizePaymentTerms(preferences.paymentTerms, defaultTerms),
+            ...(preferences.primaryColor !== undefined
+              ? { primaryColor: normalizeHexColor(preferences.primaryColor) }
+              : {}),
+            ...(preferences.theme !== undefined
+              ? { theme: preferences.theme === "light" ? "light" : "dark" }
+              : {}),
+            ...(preferences.colorTheme !== undefined
+              ? { colorTheme: stringValue(preferences.colorTheme) || "default" }
+              : {}),
+            ...(preferences.pricing !== undefined
+              ? { pricing: stringValue(preferences.pricing) || "INR" }
+              : {}),
+            ...(preferences.defaultTerms !== undefined || preferences.paymentTerms !== undefined
+              ? {
+                  defaultTerms,
+                  paymentTerms: normalizePaymentTerms(preferences.paymentTerms, defaultTerms),
+                }
+              : {}),
+            ...(preferences.defaultUpiId !== undefined
+              ? { defaultUpiId: normalizeUpiId(preferences.defaultUpiId) }
+              : {}),
+            ...(preferences.paymentReminders !== undefined
+              ? { paymentReminders: normalizePaymentReminders(preferences.paymentReminders) }
+              : {}),
           },
         }
       : {}),
@@ -218,6 +279,15 @@ export async function updateMyOrganization(
     if ("name" in input && !input.name) {
       res.status(400).json({ error: "Organization name is required" });
       return;
+    }
+
+    if (input.preferences) {
+      // Merge over the stored preferences so omitted fields keep their values.
+      const current =
+        typeof (organization.preferences as any)?.toObject === "function"
+          ? (organization.preferences as any).toObject()
+          : organization.preferences ?? {};
+      input.preferences = { ...current, ...input.preferences };
     }
 
     organization.set(input);

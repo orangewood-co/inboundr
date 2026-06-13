@@ -15,6 +15,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ReceivablesRouteImport } from './routes/receivables'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -78,6 +79,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceivablesRoute = ReceivablesRouteImport.update({
+  id: '/receivables',
+  path: '/receivables',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsRoute = ProjectsRouteImport.update({
@@ -267,6 +273,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
+  '/receivables': typeof ReceivablesRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -306,6 +313,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
+  '/receivables': typeof ReceivablesRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
+  '/receivables': typeof ReceivablesRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -393,6 +402,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/products'
     | '/projects'
+    | '/receivables'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -432,6 +442,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/products'
     | '/projects'
+    | '/receivables'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -474,6 +485,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/products'
     | '/projects'
+    | '/receivables'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -517,6 +529,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   ProductsRoute: typeof ProductsRoute
   ProjectsRoute: typeof ProjectsRoute
+  ReceivablesRoute: typeof ReceivablesRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RfqRoute: typeof RfqRoute
@@ -578,6 +591,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receivables': {
+      id: '/receivables'
+      path: '/receivables'
+      fullPath: '/receivables'
+      preLoaderRoute: typeof ReceivablesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects': {
@@ -879,6 +899,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   ProductsRoute: ProductsRoute,
   ProjectsRoute: ProjectsRoute,
+  ReceivablesRoute: ReceivablesRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RfqRoute: RfqRoute,

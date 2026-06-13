@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
   BanIcon,
+  BellIcon,
   CheckCircle2Icon,
   CircleDollarSignIcon,
   ClockIcon,
@@ -35,6 +36,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -73,6 +75,12 @@ interface InvoicePayment {
   notes: string
 }
 
+interface InvoiceReminder {
+  offsetDays: number
+  sentAt: string
+  gmailMessageId: string
+}
+
 interface Invoice {
   _id: string
   invoiceNumber: string
@@ -83,6 +91,7 @@ interface Invoice {
   poNumber: string
   notes: string
   termsAndConditions: string
+  upiId?: string
   customerId: string | null
   customerSnapshot: {
     name: string
@@ -103,6 +112,8 @@ interface Invoice {
   }
   lineItems: InvoiceLineItem[]
   payments: InvoicePayment[]
+  remindersEnabled?: boolean
+  reminders?: InvoiceReminder[]
   totals: {
     subtotal: number
     discountTotal: number
@@ -167,6 +178,11 @@ function paymentMethodLabel(method: string) {
     other: "Other",
   }
   return labels[method] || method
+}
+
+function reminderOffsetLabel(offsetDays: number) {
+  if (offsetDays <= 0) return "On the due date"
+  return `${offsetDays} day${offsetDays === 1 ? "" : "s"} after the due date`
 }
 
 export default function InvoiceDetailPage() {
@@ -236,6 +252,15 @@ export default function InvoiceDetailPage() {
         icon: <CircleDollarSignIcon className="size-3.5" />,
         label: `Payment of ${formatMoney(payment.amount)}`,
         detail: [paymentMethodLabel(payment.method), payment.reference].filter(Boolean).join(" · "),
+      })
+    }
+
+    for (const reminder of invoice.reminders ?? []) {
+      events.push({
+        date: reminder.sentAt,
+        icon: <BellIcon className="size-3.5" />,
+        label: "Payment reminder sent",
+        detail: reminderOffsetLabel(reminder.offsetDays),
       })
     }
 
@@ -499,6 +524,12 @@ export default function InvoiceDetailPage() {
                     <span className="font-medium">{invoice.poNumber}</span>
                   </div>
                 )}
+                {invoice.upiId && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">UPI ID</span>
+                    <span className="font-medium">{invoice.upiId}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -732,6 +763,36 @@ export default function InvoiceDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Payment reminders */}
+          <div className="rounded-xl border p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Payment Reminders</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Automatic reminder emails for this invoice while a balance is due. The schedule is configured in Settings → Notifications.
+                </p>
+              </div>
+              <Switch
+                checked={invoice.remindersEnabled ?? true}
+                disabled={actionLoading !== null}
+                onCheckedChange={(checked) => void runAction("reminders", { enabled: checked })}
+              />
+            </div>
+            {(invoice.reminders?.length ?? 0) > 0 && (
+              <div className="mt-4 divide-y rounded-lg border">
+                {invoice.reminders!.map((reminder, index) => (
+                  <div key={index} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <BellIcon className="size-3.5 text-muted-foreground" />
+                      <span className="text-sm">{reminderOffsetLabel(reminder.offsetDays)}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Notes */}

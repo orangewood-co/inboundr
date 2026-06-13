@@ -128,6 +128,7 @@ interface Organization {
     colorTheme: string
     pricing: string
     defaultTerms: string
+    defaultUpiId: string
     paymentTerms: PaymentTermTemplate[]
   }
   letterheads: OrganizationLetterhead[]
@@ -198,6 +199,7 @@ const emptyOrganizationForm: OrganizationFormState = {
     colorTheme: "default",
     pricing: "INR",
     defaultTerms: "",
+    defaultUpiId: "",
     paymentTerms: [],
   },
 }
@@ -355,6 +357,7 @@ function OrganizationTab() {
       colorTheme: organization.preferences?.colorTheme ?? "default",
       pricing: organization.preferences?.pricing ?? "INR",
       defaultTerms: defaultPaymentTerm?.text ?? organization.preferences?.defaultTerms ?? "",
+      defaultUpiId: organization.preferences?.defaultUpiId ?? "",
       paymentTerms,
     }
 
@@ -982,6 +985,20 @@ function OrganizationTab() {
                   <Label htmlFor="pricing">Pricing currency</Label>
                   <Input id="pricing" value={form.preferences.pricing} onChange={(event) => updatePreference("pricing", event.target.value)} />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="defaultUpiId">UPI ID</Label>
+                <p className="text-[13px] text-muted-foreground">
+                  Invoices with a balance due include a scan-to-pay UPI QR code on the PDF. Can be overridden per invoice.
+                </p>
+                <Input
+                  id="defaultUpiId"
+                  value={form.preferences.defaultUpiId}
+                  onChange={(event) => updatePreference("defaultUpiId", event.target.value)}
+                  placeholder="business@upi"
+                  className="sm:max-w-xs"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -2109,7 +2126,7 @@ function NotificationsTab() {
     <div className="space-y-6">
       <SectionHeader
         title="Notifications"
-        description="Control who gets the daily operating digest and when it lands."
+        description="Control the daily operating digest and automated payment reminders."
       />
 
       <SettingsCard
@@ -2329,7 +2346,250 @@ function NotificationsTab() {
           </div>
         </div>
       </SettingsCard>
+
+      <PaymentRemindersCard />
     </div>
+  )
+}
+
+// ─── Payment Reminders ───────────────────────────────────────
+
+interface PaymentReminderPrefs {
+  enabled: boolean
+  offsets: number[]
+  sendTimeLocal: string
+  timezone: string
+  sendHourUtc: number
+}
+
+const REMINDER_OFFSET_OPTIONS = [
+  { value: 0, label: "On due date" },
+  { value: 3, label: "3 days after" },
+  { value: 7, label: "7 days after" },
+  { value: 14, label: "14 days after" },
+  { value: 30, label: "30 days after" },
+]
+
+function reminderOffsetLabel(offset: number) {
+  const preset = REMINDER_OFFSET_OPTIONS.find((option) => option.value === offset)
+  return preset?.label ?? `${offset} days after`
+}
+
+function PaymentRemindersCard() {
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+  const [prefs, setPrefs] = useState<PaymentReminderPrefs>({
+    enabled: false,
+    offsets: [0, 7, 14],
+    sendTimeLocal: "10:00",
+    timezone: "UTC",
+    sendHourUtc: 10,
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch(`${API_ORIGIN}/api/v1/organization/me`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        const reminders = data?.organization?.preferences?.paymentReminders
+        if (reminders) {
+          setPrefs({
+            enabled: reminders.enabled ?? false,
+            offsets: Array.isArray(reminders.offsets) ? reminders.offsets : [0, 7, 14],
+            sendTimeLocal: reminders.sendTimeLocal ?? "10:00",
+            timezone: reminders.timezone ?? "UTC",
+            sendHourUtc: reminders.sendHourUtc ?? 10,
+          })
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to load payment reminder settings")
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    if (prefs.enabled && prefs.offsets.length === 0) {
+      toast.error("Select at least one reminder schedule")
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/me`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferences: { paymentReminders: prefs } }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save payment reminder settings")
+      const saved = data?.organization?.preferences?.paymentReminders
+      if (saved) {
+        setPrefs((prev) => ({ ...prev, ...saved }))
+      }
+      toast.success("Payment reminder settings saved")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save payment reminder settings")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleOffset = (value: number) => {
+    setPrefs((prev) => ({
+      ...prev,
+      offsets: prev.offsets.includes(value)
+        ? prev.offsets.filter((offset) => offset !== value)
+        : [...prev.offsets, value].sort((a, b) => a - b),
+    }))
+  }
+
+  const offsetOptions = [
+    ...REMINDER_OFFSET_OPTIONS,
+    ...prefs.offsets
+      .filter((offset) => !REMINDER_OFFSET_OPTIONS.some((option) => option.value === offset))
+      .map((offset) => ({ value: offset, label: reminderOffsetLabel(offset) })),
+  ].sort((a, b) => a.value - b.value)
+
+  const [sendHour = "10", sendMinute = "00"] = prefs.sendTimeLocal.split(":")
+  const sendHourNumber = Number(sendHour)
+  const sendPeriod = sendHourNumber >= 12 ? "PM" : "AM"
+  const sendDisplayHour = String(sendHourNumber % 12 || 12).padStart(2, "0")
+  const updateSendTime = (next: { hour?: string; minute?: string; period?: string }) => {
+    const hour12 = Number(next.hour ?? sendDisplayHour)
+    const minute = next.minute ?? sendMinute
+    const period = next.period ?? sendPeriod
+    const hour24 = period === "PM" ? (hour12 % 12) + 12 : hour12 % 12
+    setPrefs((prev) => ({
+      ...prev,
+      sendTimeLocal: `${String(hour24).padStart(2, "0")}:${minute}`,
+    }))
+  }
+
+  if (loading) {
+    return <div className="h-40 animate-pulse rounded-xl bg-muted" />
+  }
+
+  return (
+    <SettingsCard
+      title="Payment Reminders"
+      description="Email customers automatically when an invoice is due or overdue. Applies to the whole organization."
+      action={
+        <Switch
+          checked={prefs.enabled}
+          onCheckedChange={(checked) => setPrefs((prev) => ({ ...prev, enabled: checked }))}
+        />
+      }
+    >
+      <div className="space-y-5 px-5 py-4">
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold">Reminder Schedule</p>
+            <p className="text-xs text-muted-foreground">
+              Reminders are sent relative to each invoice's due date. Invoices keep getting reminders until they are paid, cancelled, or written off.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {offsetOptions.map((option) => {
+              const selected = prefs.offsets.includes(option.value)
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={!prefs.enabled}
+                  onClick={() => toggleOffset(option.value)}
+                  className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    selected ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+          {prefs.enabled && prefs.offsets.length === 0 && (
+            <p className="text-xs text-destructive">Select at least one reminder schedule.</p>
+          )}
+        </div>
+
+        <div className="rounded-xl border bg-muted/20 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Delivery Window</p>
+              <p className="text-xs text-muted-foreground">
+                Sent at {prefs.sendTimeLocal} in {prefs.timezone}. The backend queues reminders during hour {prefs.sendHourUtc.toString().padStart(2, "0")}:00 UTC.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Select
+                  value={sendDisplayHour}
+                  disabled={!prefs.enabled}
+                  onValueChange={(value) => updateSendTime({ hour: value })}
+                >
+                  <SelectTrigger className="h-10 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0")).map((hour) => (
+                      <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">:</span>
+                <Select
+                  value={sendMinute}
+                  disabled={!prefs.enabled}
+                  onValueChange={(value) => updateSendTime({ minute: value })}
+                >
+                  <SelectTrigger className="h-10 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["00", "15", "30", "45"].map((minute) => (
+                      <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={sendPeriod}
+                  disabled={!prefs.enabled}
+                  onValueChange={(value) => updateSendTime({ period: value })}
+                >
+                  <SelectTrigger className="h-10 w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AM">AM</SelectItem>
+                    <SelectItem value="PM">PM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                className="h-10"
+                disabled={!prefs.enabled}
+                onClick={() => setPrefs((prev) => ({ ...prev, timezone: browserTimezone }))}
+              >
+                Use local zone
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+          Reminders are sent from your connected Gmail account with the invoice PDF attached, and only for sent invoices with a due date, a balance due, and a customer email. Reminders can be turned off per invoice from its detail page.
+        </div>
+
+        <div className="flex pt-1">
+          <Button onClick={handleSave} disabled={saving || (prefs.enabled && prefs.offsets.length === 0)}>
+            {saving && <Spinner data-icon="inline-start" />}
+            Save Reminder Settings
+          </Button>
+        </div>
+      </div>
+    </SettingsCard>
   )
 }
 

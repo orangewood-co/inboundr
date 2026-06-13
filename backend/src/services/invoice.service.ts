@@ -121,6 +121,13 @@ export function calculateTotals(lineItems: IInvoiceLineItem[], payments: { amoun
   };
 }
 
+export function resolveInvoiceUpiId(
+  invoice: { upiId?: string | null },
+  organization: { preferences?: { defaultUpiId?: string } | null }
+): string {
+  return String(invoice.upiId || organization.preferences?.defaultUpiId || "").trim();
+}
+
 export function resolveStatus(
   currentStatus: InvoiceStatus,
   totals: ReturnType<typeof calculateTotals>,
@@ -257,6 +264,7 @@ export async function createInvoiceRecord(
     termsAndConditions: String(
       body.termsAndConditions ?? organization.preferences?.defaultTerms ?? ""
     ).trim(),
+    upiId: String(body.upiId ?? "").trim().toLowerCase(),
     lineItems,
     payments: normalizedPayments,
     totals,
@@ -307,6 +315,7 @@ export async function updateDraftInvoiceRecord(
     poNumber: String(body.poNumber ?? invoice.poNumber).trim(),
     notes: String(body.notes ?? invoice.notes).trim(),
     termsAndConditions: String(body.termsAndConditions ?? invoice.termsAndConditions).trim(),
+    upiId: String(body.upiId ?? invoice.upiId).trim().toLowerCase(),
     lineItems,
     totals: calculateTotals(lineItems, invoice.payments),
     recurring: "recurring" in body ? normalizeRecurring(body) : invoice.recurring,
@@ -322,11 +331,15 @@ export type InvoiceSearchOptions = {
   organizationId: mongoose.Types.ObjectId;
   query?: string;
   status?: string;
+  customerId?: string;
+  outstandingOnly?: boolean;
   dateFrom?: Date | null;
   dateTo?: Date | null;
   page?: number;
   limit?: number;
 };
+
+const OUTSTANDING_EXCLUDED_STATUSES: InvoiceStatus[] = ["draft", "cancelled", "written_off", "paid"];
 
 export async function searchInvoiceRecords(options: InvoiceSearchOptions) {
   const page = Math.max(1, options.page ?? 1);
@@ -335,6 +348,16 @@ export async function searchInvoiceRecords(options: InvoiceSearchOptions) {
 
   const status = String(options.status ?? "").trim();
   if (status && status !== "all") filter.status = status;
+
+  const customerId = String(options.customerId ?? "").trim();
+  if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
+    filter.customerId = new mongoose.Types.ObjectId(customerId);
+  }
+
+  if (options.outstandingOnly) {
+    filter["totals.balanceDue"] = { $gt: 0 };
+    if (!filter.status) filter.status = { $nin: OUTSTANDING_EXCLUDED_STATUSES };
+  }
 
   const query = String(options.query ?? "").trim();
   if (query) {

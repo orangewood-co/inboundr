@@ -48,3 +48,34 @@ export async function generateVCardQrPng(snapshot: IEmployeeDocumentSnapshot): P
     return null;
   }
 }
+
+export interface UpiPaymentParams {
+  upiId: string;
+  payeeName?: string;
+  amount?: number;
+  note?: string;
+}
+
+export function buildUpiPaymentUri(params: UpiPaymentParams): string {
+  const parts = [`pa=${encodeURIComponent(params.upiId)}`];
+  if (params.payeeName) parts.push(`pn=${encodeURIComponent(params.payeeName)}`);
+  if (params.amount && params.amount > 0) {
+    parts.push(`am=${params.amount.toFixed(2)}`, "cu=INR");
+  }
+  if (params.note) parts.push(`tn=${encodeURIComponent(params.note)}`);
+  return `upi://pay?${parts.join("&")}`;
+}
+
+export async function generateUpiQrPng(params: UpiPaymentParams): Promise<Buffer | null> {
+  try {
+    return await QRCode.toBuffer(buildUpiPaymentUri(params), {
+      type: "png",
+      margin: 1,
+      errorCorrectionLevel: "M",
+      width: 320,
+    });
+  } catch (err) {
+    console.warn("Failed to generate UPI QR code:", err);
+    return null;
+  }
+}

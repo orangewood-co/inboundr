@@ -6,10 +6,12 @@ import {
   downloadInvoicePdf,
   getInvoice,
   getInvoiceStats,
+  getReceivables,
   listInvoices,
   markInvoiceViewed,
   recordInvoicePayment,
   sendInvoice,
+  setInvoiceReminders,
   updateInvoice,
   writeOffInvoice,
 } from "../controllers/invoice.controller";
@@ -24,12 +26,14 @@ router.use(requireEmployeeModule("invoices"));
 
 router.get("/", listInvoices);
 router.get("/stats", getInvoiceStats);
+router.get("/receivables", getReceivables);
 router.post("/", createInvoice);
 router.get("/:id", getInvoice);
 router.put("/:id", updateInvoice);
 router.post("/:id/send", sendInvoice);
 router.post("/:id/viewed", markInvoiceViewed);
 router.post("/:id/payments", recordInvoicePayment);
+router.post("/:id/reminders", setInvoiceReminders);
 router.post("/:id/cancel", cancelInvoice);
 router.post("/:id/write-off", writeOffInvoice);
 router.post("/:id/duplicate", duplicateInvoice);

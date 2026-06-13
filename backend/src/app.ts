@@ -38,6 +38,7 @@ import {
   stopWatchRenewal,
 } from "./services/gmail-watcher.service";
 import { startDigestCron } from "./jobs/digest-cron";
+import { startPaymentReminderCron } from "./jobs/payment-reminder-cron";
 
 const app: Application = express();
 
@@ -103,6 +104,7 @@ export async function initializeServices(): Promise<void> {
   }
 
   startDigestCron();
+  startPaymentReminderCron();
 }
 
 async function shutdown(): Promise<void> {

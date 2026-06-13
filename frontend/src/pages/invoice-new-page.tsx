@@ -73,6 +73,7 @@ type InvoiceFormState = {
   poNumber: string
   notes: string
   termsAndConditions: string
+  upiId: string
   template: "professional" | "compact" | "modern"
   recurringEnabled: boolean
   recurringFrequency: "monthly" | "quarterly" | "yearly"
@@ -115,6 +116,7 @@ function emptyForm(): InvoiceFormState {
     poNumber: "",
     notes: "Thank you for your business.",
     termsAndConditions: "",
+    upiId: "",
     template: "professional",
     recurringEnabled: false,
     recurringFrequency: "monthly",
@@ -160,6 +162,7 @@ function formToPayload(form: InvoiceFormState) {
     poNumber: form.poNumber,
     notes: form.notes,
     termsAndConditions: form.termsAndConditions,
+    upiId: form.upiId,
     template: form.template,
     lineItems: form.lineItems,
     recurring: {
@@ -183,6 +186,20 @@ export default function InvoiceNewPage() {
   const [loadingEdit, setLoadingEdit] = useState(!!editId)
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [productPickerLine, setProductPickerLine] = useState<number | null>(null)
+  const [orgDefaultUpiId, setOrgDefaultUpiId] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`${API_ORIGIN}/api/v1/organization/me`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setOrgDefaultUpiId(data?.organization?.preferences?.defaultUpiId ?? "")
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const fetchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
     const params = new URLSearchParams({ limit: "20" })
@@ -223,6 +240,7 @@ export default function InvoiceNewPage() {
         poNumber: invoice.poNumber || "",
         notes: invoice.notes || "",
         termsAndConditions: invoice.termsAndConditions || "",
+        upiId: invoice.upiId || "",
         template: invoice.template || "professional",
         recurringEnabled: invoice.recurring?.enabled || false,
         recurringFrequency: invoice.recurring?.frequency || "monthly",
@@ -443,6 +461,19 @@ export default function InvoiceNewPage() {
                     <SelectItem value="modern">Modern</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs">UPI ID (optional)</Label>
+                <Input
+                  value={form.upiId}
+                  onChange={(e) => setForm((c) => ({ ...c, upiId: e.target.value }))}
+                  placeholder={orgDefaultUpiId || "business@upi"}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {orgDefaultUpiId
+                    ? `Leave empty to use the organization default (${orgDefaultUpiId}).`
+                    : "Shown as a scan-to-pay QR code on the invoice PDF."}
+                </p>
               </div>
             </div>
           </div>

@@ -9,13 +9,24 @@ export interface IOrganizationDefaultContact {
   phoneNumber: string;
 }
 
+export interface IOrganizationPaymentReminders {
+  enabled: boolean;
+  /** Days after the invoice due date when a reminder is sent (0 = on the due date). */
+  offsets: number[];
+  sendTimeLocal: string;
+  timezone: string;
+  sendHourUtc: number;
+}
+
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
   colorTheme: string;
   pricing: string;
   defaultTerms: string;
+  defaultUpiId: string;
   paymentTerms: IOrganizationPaymentTerm[];
+  paymentReminders: IOrganizationPaymentReminders;
 }
 
 export interface IOrganizationPaymentTerm {
@@ -61,6 +72,17 @@ const defaultContactSchema = new Schema<IOrganizationDefaultContact>(
   { _id: false }
 );
 
+const organizationPaymentRemindersSchema = new Schema<IOrganizationPaymentReminders>(
+  {
+    enabled: { type: Boolean, default: false },
+    offsets: { type: [Number], default: [0, 7, 14] },
+    sendTimeLocal: { type: String, default: "10:00" },
+    timezone: { type: String, default: "UTC" },
+    sendHourUtc: { type: Number, default: 10, min: 0, max: 23 },
+  },
+  { _id: false }
+);
+
 const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   {
     primaryColor: { type: String, default: "#f5b400" },
@@ -68,6 +90,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     colorTheme: { type: String, default: "default", trim: true },
     pricing: { type: String, default: "INR" },
     defaultTerms: { type: String, default: "" },
+    defaultUpiId: { type: String, default: "", trim: true },
     paymentTerms: {
       type: [
         {
@@ -79,6 +102,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
       ],
       default: [],
     },
+    paymentReminders: { type: organizationPaymentRemindersSchema, default: () => ({}) },
   },
   { _id: false }
 );

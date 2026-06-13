@@ -1,5 +1,7 @@
 import type { Response } from "express";
 import type { IInvoice, IInvoiceLineItem } from "../models/invoice.model";
+import { resolveInvoiceUpiId } from "./invoice.service";
+import { generateUpiQrPng } from "./pdf-image.service";
 import {
   createBrandedPdfDocument,
   drawPdfBrandHeader,
@@ -31,6 +33,31 @@ type PdfInvoice = Pick<
   | "lineItems"
   | "totals"
 >;
+
+export type InvoicePdfAssets = {
+  upiQr?: { buffer: Buffer; upiId: string } | null;
+};
+
+export async function buildInvoiceUpiAssets(
+  invoice: {
+    upiId?: string | null;
+    invoiceNumber: string;
+    totals: { balanceDue: number };
+    organizationSnapshot?: { name?: string };
+  },
+  organization: { name?: string | null; preferences?: { defaultUpiId?: string } | null }
+): Promise<InvoicePdfAssets | undefined> {
+  const upiId = resolveInvoiceUpiId(invoice, organization);
+  if (!upiId || invoice.totals.balanceDue <= 0) return undefined;
+
+  const buffer = await generateUpiQrPng({
+    upiId,
+    payeeName: invoice.organizationSnapshot?.name || organization.name || undefined,
+    amount: invoice.totals.balanceDue,
+    note: `Invoice ${invoice.invoiceNumber}`,
+  });
+  return buffer ? { upiQr: { buffer, upiId } } : undefined;
+}
 
 function money(value: number): string {
   return new Intl.NumberFormat("en-IN", {
@@ -248,7 +275,54 @@ function drawLineItems(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: num
   return y + 16;
 }
 
-function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number, primary: string): number {
+function drawUpiPaymentBlock(
+  doc: PDFKit.PDFDocument,
+  upiQr: { buffer: Buffer; upiId: string },
+  y: number,
+  boxHeight: number,
+  primary: string
+): void {
+  const x = PAGE.margin;
+  const boxWidth = 220;
+  const qrSize = 92;
+
+  doc.roundedRect(x, y, boxWidth, boxHeight, 10).fillAndStroke("#ffffff", COLORS.border);
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .fillColor(COLORS.text)
+    .text("Pay via UPI", x + 14, y + 14, { width: boxWidth - 28 });
+
+  try {
+    doc.image(upiQr.buffer, x + 14, y + 34, { fit: [qrSize, qrSize] });
+  } catch {
+    // Skip the image if PDFKit cannot embed it; the UPI ID text below still renders.
+  }
+
+  const textX = x + 14 + qrSize + 10;
+  const textWidth = boxWidth - 28 - qrSize - 10;
+  doc
+    .font("Helvetica")
+    .fontSize(7.5)
+    .fillColor(COLORS.muted)
+    .text("Scan with any UPI app to pay the balance due.", textX, y + 38, {
+      width: textWidth,
+      lineGap: 1.5,
+    });
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(8)
+    .fillColor(primary)
+    .text(upiQr.upiId, textX, y + 78, { width: textWidth, lineGap: 1 });
+}
+
+function drawTotals(
+  doc: PDFKit.PDFDocument,
+  invoice: PdfInvoice,
+  startY: number,
+  primary: string,
+  assets?: InvoicePdfAssets
+): number {
   let y = ensurePdfRoom(doc, startY, 178);
   const x = PAGE.width - PAGE.margin - 220;
   const boxHeight = 154;
@@ -264,6 +338,10 @@ function drawTotals(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number
 
   doc.roundedRect(x, y, 220, boxHeight, 10).fillAndStroke("#ffffff", COLORS.border);
   doc.font("Helvetica-Bold").fontSize(10).fillColor(COLORS.text).text("Totals", x + 14, y + 14, { width: 192 });
+
+  if (assets?.upiQr) {
+    drawUpiPaymentBlock(doc, assets.upiQr, y, boxHeight, primary);
+  }
 
   let rowY = y + 34;
   rows.forEach(([label, value]) => {
@@ -306,7 +384,11 @@ function drawNotes(doc: PDFKit.PDFDocument, invoice: PdfInvoice, startY: number)
   });
 }
 
-export function createInvoicePdfDocument(invoice: PdfInvoice, branding: PdfOrganizationBranding): PDFKit.PDFDocument {
+export function createInvoicePdfDocument(
+  invoice: PdfInvoice,
+  branding: PdfOrganizationBranding,
+  assets?: InvoicePdfAssets
+): PDFKit.PDFDocument {
   const organization = mergeBranding(invoice, branding);
   const primary = normalizePdfColor(organization.primaryColor);
   const doc = createBrandedPdfDocument({
@@ -325,7 +407,7 @@ export function createInvoicePdfDocument(invoice: PdfInvoice, branding: PdfOrgan
   y = drawInvoiceMeta(doc, invoice, y);
   y = drawPartyBlocks(doc, invoice, y);
   y = drawLineItems(doc, invoice, y, primary);
-  y = drawTotals(doc, invoice, y, primary);
+  y = drawTotals(doc, invoice, y, primary, assets);
   drawNotes(doc, invoice, y);
   drawPdfFooter(doc, invoice.invoiceNumber);
 
@@ -336,17 +418,21 @@ export function streamInvoicePdf(
   invoice: PdfInvoice,
   branding: PdfOrganizationBranding,
   res: Response,
-  options: { inline?: boolean } = {}
+  options: { inline?: boolean; assets?: InvoicePdfAssets } = {}
 ): void {
-  const doc = createInvoicePdfDocument(invoice, branding);
+  const doc = createInvoicePdfDocument(invoice, branding, options.assets);
   streamPdfDocument(doc, safePdfFilename(invoice.invoiceNumber), res, {
     disposition: options.inline ? "inline" : "attachment",
   });
 }
 
-export function renderInvoicePdfBuffer(invoice: PdfInvoice, branding: PdfOrganizationBranding): Promise<Buffer> {
+export function renderInvoicePdfBuffer(
+  invoice: PdfInvoice,
+  branding: PdfOrganizationBranding,
+  assets?: InvoicePdfAssets
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = createInvoicePdfDocument(invoice, branding);
+    const doc = createInvoicePdfDocument(invoice, branding, assets);
     const chunks: Buffer[] = [];
 
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
