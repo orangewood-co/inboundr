@@ -297,6 +297,62 @@ async function handleResolve(ws: SupportSocket, payload: Record<string, unknown>
   if (ticket) broadcastTicketUpdate(ws.context.organizationId, serializeTicket(ticket));
 }
 
+async function handleTyping(ws: SupportSocket, payload: Record<string, unknown>) {
+  if (!ws.context) return;
+  const isTyping = Boolean(payload.isTyping);
+  const ticketId =
+    ws.context.kind === "visitor"
+      ? ws.context.ticketId
+      : String(payload.ticketId ?? "");
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) return;
+
+  if (ws.context.kind === "agent") {
+    const exists = await Ticket.exists({
+      _id: ticketId,
+      organizationId: ws.context.organizationId,
+    });
+    if (!exists) return;
+  }
+
+  broadcast(
+    (context) =>
+      context.organizationId === ws.context!.organizationId &&
+      context.kind !== ws.context!.kind &&
+      ticketTopic(ticketId, context),
+    {
+      type: "typing",
+      ticketId,
+      actor: ws.context.kind,
+      isTyping,
+    }
+  );
+}
+
+async function handleMarkRead(ws: SupportSocket, payload: Record<string, unknown>) {
+  if (!ws.context) return;
+  const ticketId =
+    ws.context.kind === "visitor"
+      ? ws.context.ticketId
+      : String(payload.ticketId ?? "");
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) return;
+
+  const now = new Date();
+  const ticket = await Ticket.findOneAndUpdate(
+    {
+      _id: ticketId,
+      organizationId: ws.context.organizationId,
+    },
+    ws.context.kind === "visitor"
+      ? { lastVisitorReadAt: now }
+      : { lastAgentReadAt: now },
+    { new: true }
+  ).lean();
+
+  if (ticket) {
+    broadcastTicketUpdate(ws.context.organizationId, serializeTicket(ticket));
+  }
+}
+
 async function handleSocketMessage(ws: SupportSocket, raw: WebSocket.RawData) {
   const payload = parseJson(raw);
   if (!payload) {
@@ -319,6 +375,12 @@ async function handleSocketMessage(ws: SupportSocket, raw: WebSocket.RawData) {
       break;
     case "reopen_ticket":
       await handleResolve(ws, payload, false);
+      break;
+    case "typing":
+      await handleTyping(ws, payload);
+      break;
+    case "mark_read":
+      await handleMarkRead(ws, payload);
       break;
     case "ping":
       send(ws, { type: "pong" });

@@ -33,7 +33,6 @@ async function serializeAttachments(attachments: ITicketMessageAttachment[] = []
 }
 
 async function resolveAttachmentUrl(attachment: ITicketMessageAttachment): Promise<string | null> {
-  if (attachment.url) return attachment.url;
   try {
     return (await createPresignedViewUrl(attachment.key)).url;
   } catch {
@@ -54,6 +53,8 @@ export function serializeTicket(ticket: ITicket | any) {
     lastMessageAt: ticket.lastMessageAt,
     lastVisitorMessageAt: ticket.lastVisitorMessageAt,
     lastAgentMessageAt: ticket.lastAgentMessageAt,
+    lastVisitorReadAt: ticket.lastVisitorReadAt,
+    lastAgentReadAt: ticket.lastAgentReadAt,
     resolvedAt: ticket.resolvedAt,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,

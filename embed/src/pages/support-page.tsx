@@ -18,6 +18,7 @@ type SupportMessage = {
   authorType: "visitor" | "bot" | "agent" | "system"
   bodyText: string
   attachments: SupportAttachment[]
+  createdAt: string
 }
 
 type SupportAttachment = {
@@ -36,8 +37,18 @@ type PendingAttachment = {
 type SocketEvent =
   | { type: "connected" }
   | { type: "message.created"; message: SupportMessage }
+  | { type: "ticket.updated"; ticket: SupportTicket }
+  | { type: "typing"; ticketId: string; actor: "agent" | "visitor"; isTyping: boolean }
   | { type: "error"; error: string }
   | { type: "pong" }
+
+type SupportTicket = {
+  id: string
+  lastVisitorMessageAt: string | null
+  lastAgentMessageAt: string | null
+  lastVisitorReadAt: string | null
+  lastAgentReadAt: string | null
+}
 
 type Phase = "loading" | "unavailable" | "prechat" | "chat"
 
@@ -77,6 +88,26 @@ function fileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function formatTime(value?: string | null) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)
+}
+
+function formatFullTime(value?: string | null) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
 export default function SupportPage({ organizationId }: { organizationId: string }) {
   const [phase, setPhase] = useState<Phase>("loading")
   const [organization, setOrganization] = useState<SupportOrganization | null>(null)
@@ -88,18 +119,28 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [starting, setStarting] = useState(false)
 
   const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [messages, setMessages] = useState<SupportMessage[]>([])
   const [draft, setDraft] = useState("")
   const [files, setFiles] = useState<PendingAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [streamingText, setStreamingText] = useState<string | null>(null)
   const [socketReady, setSocketReady] = useState(false)
+  const [agentTyping, setAgentTyping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectRef = useRef<number | null>(null)
+  const typingTimeoutRef = useRef<number | null>(null)
+  const visitorTypingRef = useRef(false)
   const apiBase = `${API_ORIGIN}/api/v1/public/support`
+  const latestVisitorMessage = [...messages].reverse().find((message) => message.authorType === "visitor") ?? null
+  const latestVisitorSeenBySupport = Boolean(
+    latestVisitorMessage &&
+      ticket?.lastAgentReadAt &&
+      new Date(ticket.lastAgentReadAt).getTime() >= new Date(latestVisitorMessage.createdAt).getTime()
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +155,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
           if (cancelled) return
           if (response.ok && body) {
             setOrganization(body.organization)
+            setTicket(body.ticket ?? null)
             setMessages(body.messages ?? [])
             setSessionToken(storedToken)
             setPhase("chat")
@@ -164,6 +206,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
       socket.addEventListener("open", () => {
         setSocketReady(true)
+        socket.send(JSON.stringify({ type: "mark_read" }))
       })
 
       socket.addEventListener("message", (event) => {
@@ -173,6 +216,15 @@ export default function SupportPage({ organizationId }: { organizationId: string
             if (current.some((message) => message.id === payload.message.id)) return current
             return [...current, payload.message]
           })
+          if (payload.message.authorType === "agent") {
+            socket.send(JSON.stringify({ type: "mark_read" }))
+          }
+        }
+        if (payload.type === "ticket.updated") {
+          setTicket(payload.ticket)
+        }
+        if (payload.type === "typing" && payload.actor === "agent") {
+          setAgentTyping(payload.isTyping)
         }
         if (payload.type === "error") setError(payload.error)
       })
@@ -212,6 +264,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       window.localStorage.setItem(sessionStorageKey(organizationId), body.sessionToken)
       setSessionToken(body.sessionToken)
       setOrganization(body.organization)
+      setTicket(body.ticket ?? null)
       setMessages(body.messages ?? [])
       setPhase("chat")
     } catch (err) {
@@ -236,6 +289,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       if (socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(JSON.stringify({ type: "visitor_message", text, attachments }))
         setFiles([])
+        sendTyping(false)
         return
       }
       if (attachments.length > 0) {
@@ -243,7 +297,13 @@ export default function SupportPage({ organizationId }: { organizationId: string
       }
       setMessages((current) => [
         ...current,
-        { id: `local-${Date.now()}`, authorType: "visitor", bodyText: text, attachments: [] },
+        {
+          id: `local-${Date.now()}`,
+          authorType: "visitor",
+          bodyText: text,
+          attachments: [],
+          createdAt: new Date().toISOString(),
+        },
       ])
 
       const response = await fetch(`${apiBase}/session/${sessionToken}/messages`, {
@@ -274,7 +334,13 @@ export default function SupportPage({ organizationId }: { organizationId: string
       if (reply.trim()) {
         setMessages((current) => [
           ...current,
-          { id: `bot-${Date.now()}`, authorType: "bot", bodyText: reply.trim(), attachments: [] },
+          {
+            id: `bot-${Date.now()}`,
+            authorType: "bot",
+            bodyText: reply.trim(),
+            attachments: [],
+            createdAt: new Date().toISOString(),
+          },
         ])
       }
     } catch (err) {
@@ -291,6 +357,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     window.localStorage.removeItem(sessionStorageKey(organizationId))
     socketRef.current?.close()
     setSessionToken(null)
+    setTicket(null)
     setMessages([])
     setDraft("")
     setFiles([])
@@ -333,6 +400,20 @@ export default function SupportPage({ organizationId }: { organizationId: string
       .slice(0, Math.max(0, 5 - files.length))
       .map((file) => ({ id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`, file }))
     setFiles((current) => [...current, ...next].slice(0, 5))
+  }
+
+  function sendTyping(isTyping: boolean) {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
+    if (visitorTypingRef.current === isTyping) return
+    visitorTypingRef.current = isTyping
+    socketRef.current.send(JSON.stringify({ type: "typing", isTyping }))
+  }
+
+  function handleDraftChange(value: string) {
+    setDraft(value)
+    sendTyping(Boolean(value.trim()))
+    if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = window.setTimeout(() => sendTyping(false), 1200)
   }
 
   if (phase === "loading") {
@@ -453,6 +534,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   className={`flex ${message.authorType === "visitor" ? "justify-end" : "justify-start"}`}
                 >
                   <div
+                    title={formatFullTime(message.createdAt)}
                     className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                       message.authorType === "visitor"
                         ? "rounded-br-md bg-stone-900 text-white"
@@ -486,6 +568,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
                         ))}
                       </div>
                     )}
+                    <p className={`mt-1 text-[11px] ${message.authorType === "visitor" ? "text-white/60" : "text-stone-500"}`}>
+                      {formatTime(message.createdAt)}
+                      {message.authorType === "visitor" &&
+                      latestVisitorMessage?.id === message.id &&
+                      latestVisitorSeenBySupport
+                        ? " · Seen by support"
+                        : ""}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -494,6 +584,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 <div className="flex justify-start">
                   <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-800">
                     {streamingText ? streamingText : <TypingDots />}
+                  </div>
+                </div>
+              )}
+
+              {agentTyping && (
+                <div className="flex justify-start">
+                  <div className="rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm text-stone-500">
+                    Support Team is typing...
                   </div>
                 </div>
               )}
@@ -546,7 +644,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 <Input
                   id="support-message-input"
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => handleDraftChange(event.target.value)}
                   placeholder="Type your message…"
                   maxLength={MESSAGE_MAX_LENGTH}
                   disabled={sending}

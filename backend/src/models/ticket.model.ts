@@ -23,6 +23,8 @@ export interface ITicket extends Document {
   lastMessageAt: Date;
   lastVisitorMessageAt: Date | null;
   lastAgentMessageAt: Date | null;
+  lastVisitorReadAt: Date | null;
+  lastAgentReadAt: Date | null;
   resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +71,8 @@ const ticketSchema = new Schema<ITicket>(
     lastMessageAt: { type: Date, default: Date.now },
     lastVisitorMessageAt: { type: Date, default: null },
     lastAgentMessageAt: { type: Date, default: null },
+    lastVisitorReadAt: { type: Date, default: null },
+    lastAgentReadAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },
   },
   { timestamps: true }

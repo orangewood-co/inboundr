@@ -123,6 +123,7 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
     res.status(201).json({
       sessionToken: ticket.sessionToken,
       organization,
+      ticket: serializeTicket(ticket),
       requester: ticket.requester,
       messages: await listSessionMessages(ticket),
     });
@@ -149,6 +150,7 @@ export async function getSupportSession(req: Request, res: ExpressResponse): Pro
     res.json({
       sessionToken: ticket.sessionToken,
       organization,
+      ticket: serializeTicket(ticket),
       requester: ticket.requester,
       messages: await listSessionMessages(ticket),
     });

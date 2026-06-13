@@ -167,7 +167,6 @@ Guidelines:
 }
 
 async function resolveAttachmentUrl(attachment: ITicketMessageAttachment): Promise<string | null> {
-  if (attachment.url) return attachment.url;
   try {
     return (await createPresignedViewUrl(attachment.key)).url;
   } catch {

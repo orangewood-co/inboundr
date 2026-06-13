@@ -35,6 +35,8 @@ type Ticket = {
   lastMessageAt: string
   lastVisitorMessageAt: string | null
   lastAgentMessageAt: string | null
+  lastVisitorReadAt: string | null
+  lastAgentReadAt: string | null
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
@@ -63,6 +65,7 @@ type SocketEvent =
   | { type: "connected" }
   | { type: "ticket.updated"; ticket: Ticket }
   | { type: "message.created"; message: TicketMessage }
+  | { type: "typing"; ticketId: string; actor: "agent" | "visitor"; isTyping: boolean }
   | { type: "error"; error: string }
   | { type: "ticket.subscribed"; ticketId: string }
   | { type: "pong" }
@@ -101,6 +104,16 @@ function formatTime(value?: string | null) {
   }).format(date)
 }
 
+function formatFullTime(value?: string | null) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date)
+}
+
 function fileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -123,6 +136,7 @@ export default function SupportPage() {
   const [files, setFiles] = useState<PendingAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [socketReady, setSocketReady] = useState(false)
+  const [visitorTyping, setVisitorTyping] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [organizationId, setOrganizationId] = useState(() => getActiveOrganizationId() ?? "")
   const socketRef = useRef<WebSocket | null>(null)
@@ -138,6 +152,24 @@ export default function SupportPage() {
   const selectedMessages = useMemo(
     () => messages.filter((message) => message.ticketId === selectedTicketId),
     [messages, selectedTicketId]
+  )
+  const latestVisitorMessage = useMemo(
+    () => [...selectedMessages].reverse().find((message) => message.authorType === "visitor") ?? null,
+    [selectedMessages]
+  )
+  const latestAgentMessage = useMemo(
+    () => [...selectedMessages].reverse().find((message) => message.authorType === "agent") ?? null,
+    [selectedMessages]
+  )
+  const latestVisitorSeenByAgent = Boolean(
+    latestVisitorMessage &&
+      selectedTicket?.lastAgentReadAt &&
+      new Date(selectedTicket.lastAgentReadAt).getTime() >= new Date(latestVisitorMessage.createdAt).getTime()
+  )
+  const latestAgentSeenByVisitor = Boolean(
+    latestAgentMessage &&
+      selectedTicket?.lastVisitorReadAt &&
+      new Date(selectedTicket.lastVisitorReadAt).getTime() >= new Date(latestAgentMessage.createdAt).getTime()
   )
 
   const loadTickets = useCallback(async () => {
@@ -255,6 +287,12 @@ export default function SupportPage() {
             if (current.some((message) => message.id === payload.message.id)) return current
             return [...current, payload.message]
           })
+          if (payload.message.ticketId === selectedTicketIdRef.current && payload.message.authorType === "visitor") {
+            socket.send(JSON.stringify({ type: "mark_read", ticketId: payload.message.ticketId }))
+          }
+        }
+        if (payload.type === "typing" && payload.actor === "visitor") {
+          if (payload.ticketId === selectedTicketIdRef.current) setVisitorTyping(payload.isTyping)
         }
         if (payload.type === "error") setError(payload.error)
       })
@@ -278,6 +316,32 @@ export default function SupportPage() {
       socketRef.current?.close()
     }
   }, [filter])
+
+  useEffect(() => {
+    if (!selectedTicketId || !latestVisitorMessage || !socketReady) return
+    socketRef.current?.send(JSON.stringify({ type: "mark_read", ticketId: selectedTicketId }))
+  }, [latestVisitorMessage?.id, selectedTicketId, socketReady])
+
+  useEffect(() => {
+    setVisitorTyping(false)
+  }, [selectedTicketId])
+
+  const typingTimeoutRef = useRef<number | null>(null)
+  const agentTypingRef = useRef(false)
+
+  function sendTyping(isTyping: boolean) {
+    if (!selectedTicketId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
+    if (agentTypingRef.current === isTyping) return
+    agentTypingRef.current = isTyping
+    socketRef.current.send(JSON.stringify({ type: "typing", ticketId: selectedTicketId, isTyping }))
+  }
+
+  function handleReplyChange(value: string) {
+    setReply(value)
+    sendTyping(Boolean(value.trim()))
+    if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = window.setTimeout(() => sendTyping(false), 1200)
+  }
 
   async function uploadAttachment(file: File): Promise<TicketAttachment> {
     const response = await fetch(`${API_ORIGIN}/api/v1/uploads/presign`, {
@@ -332,6 +396,7 @@ export default function SupportPage() {
       )
       setReply("")
       setFiles([])
+      sendTyping(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send reply")
     } finally {
@@ -495,6 +560,17 @@ export default function SupportPage() {
                   {selectedTicket.status === "resolved" ? "Reopen" : "Resolve"}
                 </Button>
               </div>
+              <div className="border-b px-5 py-2 text-xs text-muted-foreground">
+                {latestVisitorMessage && !latestVisitorSeenByAgent ? (
+                  <span>Unread customer reply</span>
+                ) : latestAgentMessage && latestAgentSeenByVisitor ? (
+                  <span>Visitor has seen your latest reply</span>
+                ) : latestAgentMessage ? (
+                  <span>Latest reply sent</span>
+                ) : (
+                  <span>Conversation opened</span>
+                )}
+              </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-5 py-5">
                 {loadingDetail ? (
@@ -512,6 +588,7 @@ export default function SupportPage() {
                           className={cn("flex", isAgent ? "justify-end" : "justify-start")}
                         >
                           <div
+                            title={formatFullTime(message.createdAt)}
                             className={cn(
                               "max-w-[82%] rounded-2xl border bg-background px-4 py-3 text-sm shadow-xs",
                               isAgent && "border-primary/20 bg-primary text-primary-foreground",
@@ -547,7 +624,11 @@ export default function SupportPage() {
                                 ))}
                               </div>
                             )}
-                            <p className="mt-2 text-[11px] opacity-60">{formatTime(message.createdAt)}</p>
+                            <p className="mt-2 text-[11px] opacity-60">
+                              {formatTime(message.createdAt)}
+                              {isAgent && latestAgentMessage?.id === message.id && latestAgentSeenByVisitor ? " · Seen" : ""}
+                              {isVisitor && latestVisitorMessage?.id === message.id && latestVisitorSeenByAgent ? " · Read" : ""}
+                            </p>
                           </div>
                         </div>
                       )
@@ -558,6 +639,9 @@ export default function SupportPage() {
               </div>
 
               <form onSubmit={sendReply} className="border-t bg-background p-4">
+                {visitorTyping && (
+                  <p className="mb-2 text-xs text-muted-foreground">Customer is typing...</p>
+                )}
                 {files.length > 0 && (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {files.map((item) => (
@@ -593,7 +677,7 @@ export default function SupportPage() {
                   </label>
                   <textarea
                     value={reply}
-                    onChange={(event) => setReply(event.target.value)}
+                    onChange={(event) => handleReplyChange(event.target.value)}
                     placeholder="Write a reply..."
                     rows={2}
                     className="min-h-10 flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
