@@ -2,14 +2,35 @@ import mongoose, { Schema, type Document } from "mongoose";
 
 export type TicketMessageAuthorType = "visitor" | "bot" | "agent" | "system";
 
+export interface ITicketMessageAttachment {
+  key: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+  url: string | null;
+}
+
 export interface ITicketMessage extends Document {
   ticketId: mongoose.Types.ObjectId;
   organizationId: mongoose.Types.ObjectId;
   authorType: TicketMessageAuthorType;
+  authorUserId: string | null;
   bodyText: string;
+  attachments: ITicketMessageAttachment[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ticketMessageAttachmentSchema = new Schema<ITicketMessageAttachment>(
+  {
+    key: { type: String, required: true, trim: true },
+    originalName: { type: String, required: true, trim: true },
+    contentType: { type: String, required: true, trim: true },
+    size: { type: Number, required: true, min: 1 },
+    url: { type: String, default: null },
+  },
+  { _id: false }
+);
 
 const ticketMessageSchema = new Schema<ITicketMessage>(
   {
@@ -30,7 +51,9 @@ const ticketMessageSchema = new Schema<ITicketMessage>(
       enum: ["visitor", "bot", "agent", "system"],
       required: true,
     },
-    bodyText: { type: String, required: true },
+    authorUserId: { type: String, default: null, index: true },
+    bodyText: { type: String, default: "" },
+    attachments: { type: [ticketMessageAttachmentSchema], default: [] },
   },
   { timestamps: true }
 );

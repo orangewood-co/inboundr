@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
@@ -51,6 +52,11 @@ import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
@@ -280,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/support': typeof SupportRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -320,6 +327,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/support': typeof SupportRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -364,6 +372,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/support': typeof SupportRoute
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
@@ -409,6 +418,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/support'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/support'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -492,6 +503,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/support'
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
@@ -536,6 +548,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
+  SupportRoute: typeof SupportRoute
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
@@ -551,6 +564,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/stats': {
       id: '/stats'
       path: '/stats'
@@ -906,6 +926,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
+  SupportRoute: SupportRoute,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,

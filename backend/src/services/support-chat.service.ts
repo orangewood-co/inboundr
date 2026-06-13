@@ -1,11 +1,15 @@
 import crypto from "node:crypto";
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, type ModelMessage } from "ai";
+import { generateText, streamText, type ModelMessage } from "ai";
 import mongoose from "mongoose";
 
 import { Organization, type IOrganization } from "../models/organization.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
-import { TicketMessage } from "../models/ticket-message.model";
+import {
+  TicketMessage,
+  type ITicketMessage,
+  type ITicketMessageAttachment,
+} from "../models/ticket-message.model";
 import { createPresignedViewUrl } from "./storage.service";
 
 const openrouter = createOpenAI({
@@ -18,6 +22,10 @@ const DEFAULT_SUPPORT_MODEL = "moonshotai/kimi-k2.6";
 export const SUPPORT_MESSAGE_MAX_LENGTH = 4000;
 export const SUPPORT_MESSAGES_PER_SESSION = 50;
 const HISTORY_MESSAGE_LIMIT = 30;
+
+export type SupportMessageAttachmentInput = Omit<ITicketMessageAttachment, "url"> & {
+  url?: string | null;
+};
 
 export type SupportOrganizationBranding = {
   _id: string;
@@ -124,12 +132,23 @@ export async function listSessionMessages(ticket: ITicket) {
     .sort({ createdAt: 1 })
     .lean();
 
-  return messages.map((message) => ({
-    id: String(message._id),
-    authorType: message.authorType,
-    bodyText: message.bodyText,
-    createdAt: message.createdAt,
-  }));
+  return Promise.all(
+    messages.map(async (message) => ({
+      id: String(message._id),
+      authorType: message.authorType,
+      bodyText: message.bodyText,
+      attachments: await Promise.all(
+        (message.attachments ?? []).map(async (attachment) => ({
+          key: attachment.key,
+          originalName: attachment.originalName,
+          contentType: attachment.contentType,
+          size: attachment.size,
+          url: await resolveAttachmentUrl(attachment),
+        }))
+      ),
+      createdAt: message.createdAt,
+    }))
+  );
 }
 
 export async function countSessionMessages(ticket: ITicket): Promise<number> {
@@ -147,7 +166,16 @@ Guidelines:
 - Stay on the topic of ${organizationName} and its products or services. Politely decline unrelated requests.`;
 }
 
-export async function streamSupportReply(ticket: ITicket): Promise<globalThis.Response> {
+async function resolveAttachmentUrl(attachment: ITicketMessageAttachment): Promise<string | null> {
+  if (attachment.url) return attachment.url;
+  try {
+    return (await createPresignedViewUrl(attachment.key)).url;
+  } catch {
+    return null;
+  }
+}
+
+async function modelMessagesForTicket(ticket: ITicket): Promise<ModelMessage[]> {
   const history = await TicketMessage.find({
     ticketId: ticket._id,
     authorType: { $in: ["visitor", "bot"] },
@@ -156,13 +184,22 @@ export async function streamSupportReply(ticket: ITicket): Promise<globalThis.Re
     .limit(HISTORY_MESSAGE_LIMIT)
     .lean();
 
-  const messages: ModelMessage[] = history
+  return history
     .reverse()
     .map((message) => ({
       role: message.authorType === "visitor" ? ("user" as const) : ("assistant" as const),
-      content: message.bodyText,
+      content: [
+        message.bodyText,
+        ...(message.attachments ?? []).map(
+          (attachment) => `[Attachment: ${attachment.originalName} (${attachment.contentType})]`
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     }));
+}
 
+export async function streamSupportReply(ticket: ITicket): Promise<globalThis.Response> {
   const result = streamText({
     model: openrouter(process.env.SUPPORT_CHAT_MODEL ?? DEFAULT_SUPPORT_MODEL),
     system: buildSystemPrompt(
@@ -170,7 +207,7 @@ export async function streamSupportReply(ticket: ITicket): Promise<globalThis.Re
         "this business",
       ticket.requester.name
     ),
-    messages,
+    messages: await modelMessagesForTicket(ticket),
     onFinish: async ({ text }) => {
       const reply = text.trim();
       if (!reply) return;
@@ -191,17 +228,55 @@ export async function streamSupportReply(ticket: ITicket): Promise<globalThis.Re
   return result.toTextStreamResponse();
 }
 
-export async function appendVisitorMessage(ticket: ITicket, bodyText: string): Promise<void> {
-  await TicketMessage.create({
+export async function generateSupportBotMessage(ticket: ITicket): Promise<ITicketMessage | null> {
+  const result = await generateText({
+    model: openrouter(process.env.SUPPORT_CHAT_MODEL ?? DEFAULT_SUPPORT_MODEL),
+    system: buildSystemPrompt(
+      (await Organization.findById(ticket.organizationId).select("name").lean())?.name ??
+        "this business",
+      ticket.requester.name
+    ),
+    messages: await modelMessagesForTicket(ticket),
+  });
+
+  const reply = result.text.trim();
+  if (!reply) return null;
+
+  const message = await TicketMessage.create({
+    ticketId: ticket._id,
+    organizationId: ticket.organizationId,
+    authorType: "bot",
+    bodyText: reply,
+  });
+  await Ticket.updateOne({ _id: ticket._id }, { lastMessageAt: new Date() });
+  return message;
+}
+
+export async function appendVisitorMessage(
+  ticket: ITicket,
+  bodyText: string,
+  attachments: SupportMessageAttachmentInput[] = []
+): Promise<ITicketMessage> {
+  const message = await TicketMessage.create({
     ticketId: ticket._id,
     organizationId: ticket.organizationId,
     authorType: "visitor",
     bodyText,
+    attachments: attachments.map((attachment) => ({ ...attachment, url: attachment.url ?? null })),
   });
 
-  const update: Record<string, unknown> = { lastMessageAt: new Date() };
+  const now = new Date();
+  const update: Record<string, unknown> = {
+    lastMessageAt: now,
+    lastVisitorMessageAt: now,
+  };
+  if (ticket.status === "resolved" || ticket.status === "closed") {
+    update.status = "open";
+    update.resolvedAt = null;
+  }
   if (!ticket.subject) {
     update.subject = bodyText.slice(0, 80);
   }
   await Ticket.updateOne({ _id: ticket._id }, update);
+  return message;
 }

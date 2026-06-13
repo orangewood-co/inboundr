@@ -1,6 +1,7 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { Readable } from "node:stream";
 
+import { Ticket } from "../models/ticket.model";
 import {
   appendVisitorMessage,
   countSessionMessages,
@@ -12,8 +13,21 @@ import {
   SUPPORT_MESSAGE_MAX_LENGTH,
   SUPPORT_MESSAGES_PER_SESSION,
 } from "../services/support-chat.service";
+import { broadcastMessageCreated, broadcastTicketUpdate } from "../services/support-ws.service";
+import { createPresignedUpload } from "../services/storage.service";
+import { serializeTicket } from "../services/ticket.service";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SUPPORT_ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+];
+const SUPPORT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 // Lightweight in-memory rate limiter. Good enough for a single-process API;
 // swap for a shared store if the backend is ever scaled horizontally.
@@ -178,7 +192,18 @@ export async function postSupportSessionMessage(
       return;
     }
 
-    await appendVisitorMessage(ticket, text);
+    const message = await appendVisitorMessage(ticket, text);
+    await broadcastMessageCreated(message);
+    const updatedTicket = await Ticket.findById(ticket._id).lean();
+    if (updatedTicket) {
+      broadcastTicketUpdate(String(updatedTicket.organizationId), serializeTicket(updatedTicket));
+    }
+
+    if (!ticket.botEnabled) {
+      res.type("text/plain").send("");
+      return;
+    }
+
     const webResponse = await streamSupportReply(ticket);
     await pipeWebResponse(webResponse, res);
   } catch (err) {
@@ -186,5 +211,62 @@ export async function postSupportSessionMessage(
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to send message" });
     }
+  }
+}
+
+export async function createSupportUploadPresign(
+  req: Request,
+  res: ExpressResponse
+): Promise<void> {
+  try {
+    if (isRateLimited(`upload:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
+      res.status(429).json({ error: "Too many uploads. Please try again later." });
+      return;
+    }
+
+    const ticket = await findSessionTicket(String(req.params.token ?? ""));
+    if (!ticket) {
+      res.status(404).json({ error: "Chat session not found" });
+      return;
+    }
+
+    const fileName = String(req.body?.fileName ?? "").trim();
+    const contentType = String(req.body?.contentType ?? "").trim().toLowerCase();
+    const size = Number(req.body?.size ?? 0);
+
+    if (!fileName) {
+      res.status(400).json({ error: "File name is required" });
+      return;
+    }
+    if (!contentType) {
+      res.status(400).json({ error: "Content type is required" });
+      return;
+    }
+    if (!Number.isFinite(size) || size <= 0) {
+      res.status(400).json({ error: "File size is required" });
+      return;
+    }
+    if (size > SUPPORT_MAX_FILE_SIZE) {
+      res.status(400).json({ error: "File must be 10MB or smaller" });
+      return;
+    }
+    if (!SUPPORT_ALLOWED_MIME_TYPES.includes(contentType)) {
+      res.status(400).json({ error: "This file type is not allowed" });
+      return;
+    }
+
+    const presigned = await createPresignedUpload({
+      scope: "support",
+      organizationId: String(ticket.organizationId),
+      fileName,
+      contentType,
+      size,
+      prefixParts: [String(ticket._id), "visitor"],
+    });
+
+    res.json(presigned);
+  } catch (err) {
+    console.error("Failed to create support upload URL:", err);
+    res.status(500).json({ error: "Failed to create upload URL" });
   }
 }

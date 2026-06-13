@@ -1,6 +1,7 @@
 import "dotenv/config";
 import app, { initializeServices } from "./app";
 import { renderASCIILogo } from "./lib/branding";
+import { attachSupportWebSocketServer } from "./services/support-ws.service";
 
 renderASCIILogo();
 console.log("Logs: ");
@@ -11,9 +12,10 @@ const PORT = process.env.PORT || 3000;
 async function start(): Promise<void> {
   await initializeServices();
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
+  attachSupportWebSocketServer(server);
 }
 
 start().catch((err) => {

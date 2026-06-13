@@ -19,7 +19,11 @@ export interface ITicket extends Document {
   requester: ITicketRequester;
   /** Visitor resume key for chat-channel tickets. */
   sessionToken: string | null;
+  botEnabled: boolean;
   lastMessageAt: Date;
+  lastVisitorMessageAt: Date | null;
+  lastAgentMessageAt: Date | null;
+  resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,7 +65,11 @@ const ticketSchema = new Schema<ITicket>(
     },
     requester: { type: ticketRequesterSchema, required: true },
     sessionToken: { type: String, default: null },
+    botEnabled: { type: Boolean, default: true },
     lastMessageAt: { type: Date, default: Date.now },
+    lastVisitorMessageAt: { type: Date, default: null },
+    lastAgentMessageAt: { type: Date, default: null },
+    resolvedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

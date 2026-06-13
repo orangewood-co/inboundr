@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react"
-import { AlertCircleIcon, LoaderIcon, RotateCcwIcon, SendIcon } from "lucide-react"
+import { AlertCircleIcon, FileIcon, LoaderIcon, PaperclipIcon, RotateCcwIcon, SendIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,27 @@ type SupportMessage = {
   id: string
   authorType: "visitor" | "bot" | "agent" | "system"
   bodyText: string
+  attachments: SupportAttachment[]
 }
+
+type SupportAttachment = {
+  key: string
+  originalName: string
+  contentType: string
+  size: number
+  url: string | null
+}
+
+type PendingAttachment = {
+  id: string
+  file: File
+}
+
+type SocketEvent =
+  | { type: "connected" }
+  | { type: "message.created"; message: SupportMessage }
+  | { type: "error"; error: string }
+  | { type: "pong" }
 
 type Phase = "loading" | "unavailable" | "prechat" | "chat"
 
@@ -41,6 +61,22 @@ function TypingDots() {
   )
 }
 
+function supportWsUrl(sessionToken: string) {
+  const url = new URL(API_ORIGIN)
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+  url.pathname = "/api/v1/support/ws"
+  url.search = ""
+  url.searchParams.set("mode", "visitor")
+  url.searchParams.set("sessionToken", sessionToken)
+  return url.toString()
+}
+
+function fileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 export default function SupportPage({ organizationId }: { organizationId: string }) {
   const [phase, setPhase] = useState<Phase>("loading")
   const [organization, setOrganization] = useState<SupportOrganization | null>(null)
@@ -54,11 +90,15 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [sessionToken, setSessionToken] = useState<string | null>(null)
   const [messages, setMessages] = useState<SupportMessage[]>([])
   const [draft, setDraft] = useState("")
+  const [files, setFiles] = useState<PendingAttachment[]>([])
   const [sending, setSending] = useState(false)
   const [streamingText, setStreamingText] = useState<string | null>(null)
+  const [socketReady, setSocketReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const socketRef = useRef<WebSocket | null>(null)
+  const reconnectRef = useRef<number | null>(null)
   const apiBase = `${API_ORIGIN}/api/v1/public/support`
 
   useEffect(() => {
@@ -113,6 +153,48 @@ export default function SupportPage({ organizationId }: { organizationId: string
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
   }, [messages, streamingText, phase])
 
+  useEffect(() => {
+    if (phase !== "chat" || !sessionToken) return
+    let stopped = false
+
+    function connect() {
+      if (stopped || !sessionToken) return
+      const socket = new WebSocket(supportWsUrl(sessionToken))
+      socketRef.current = socket
+
+      socket.addEventListener("open", () => {
+        setSocketReady(true)
+      })
+
+      socket.addEventListener("message", (event) => {
+        const payload = JSON.parse(String(event.data)) as SocketEvent
+        if (payload.type === "message.created") {
+          setMessages((current) => {
+            if (current.some((message) => message.id === payload.message.id)) return current
+            return [...current, payload.message]
+          })
+        }
+        if (payload.type === "error") setError(payload.error)
+      })
+
+      socket.addEventListener("close", () => {
+        setSocketReady(false)
+        if (!stopped) reconnectRef.current = window.setTimeout(connect, 1500)
+      })
+
+      socket.addEventListener("error", () => {
+        setSocketReady(false)
+      })
+    }
+
+    connect()
+    return () => {
+      stopped = true
+      if (reconnectRef.current) window.clearTimeout(reconnectRef.current)
+      socketRef.current?.close()
+    }
+  }, [phase, sessionToken])
+
   async function startChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setStarting(true)
@@ -142,20 +224,28 @@ export default function SupportPage({ organizationId }: { organizationId: string
   async function sendMessage(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()
     const text = draft.trim()
-    if (!text || sending || !sessionToken) return
+    if ((!text && files.length === 0) || sending || !sessionToken) return
 
-    const optimistic: SupportMessage = {
-      id: `local-${Date.now()}`,
-      authorType: "visitor",
-      bodyText: text,
-    }
-    setMessages((current) => [...current, optimistic])
     setDraft("")
     setSending(true)
     setStreamingText("")
     setError(null)
 
     try {
+      const attachments = await Promise.all(files.map((item) => uploadAttachment(item.file, sessionToken)))
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: "visitor_message", text, attachments }))
+        setFiles([])
+        return
+      }
+      if (attachments.length > 0) {
+        throw new Error("Realtime connection is required to send attachments. Please try again in a moment.")
+      }
+      setMessages((current) => [
+        ...current,
+        { id: `local-${Date.now()}`, authorType: "visitor", bodyText: text, attachments: [] },
+      ])
+
       const response = await fetch(`${apiBase}/session/${sessionToken}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -164,7 +254,6 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
       if (!response.ok) {
         const body = await response.json().catch(() => null)
-        setMessages((current) => current.filter((message) => message.id !== optimistic.id))
         setDraft(text)
         throw new Error(body?.error ?? "Failed to send message")
       }
@@ -185,10 +274,11 @@ export default function SupportPage({ organizationId }: { organizationId: string
       if (reply.trim()) {
         setMessages((current) => [
           ...current,
-          { id: `bot-${Date.now()}`, authorType: "bot", bodyText: reply.trim() },
+          { id: `bot-${Date.now()}`, authorType: "bot", bodyText: reply.trim(), attachments: [] },
         ])
       }
     } catch (err) {
+      setDraft(text)
       setError(err instanceof Error ? err.message : "Failed to send message")
     } finally {
       setStreamingText(null)
@@ -199,11 +289,50 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   function startNewChat() {
     window.localStorage.removeItem(sessionStorageKey(organizationId))
+    socketRef.current?.close()
     setSessionToken(null)
     setMessages([])
     setDraft("")
+    setFiles([])
     setError(null)
     setPhase("prechat")
+  }
+
+  async function uploadAttachment(file: File, token: string): Promise<SupportAttachment> {
+    const response = await fetch(`${apiBase}/session/${token}/uploads/presign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream",
+        size: file.size,
+      }),
+    })
+    const presign = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(presign?.error ?? `Unable to upload ${file.name}`)
+
+    const upload = await fetch(presign.uploadUrl, {
+      method: presign.method,
+      headers: presign.headers,
+      body: file,
+    })
+    if (!upload.ok) throw new Error(`Upload failed for ${file.name}`)
+
+    return {
+      key: presign.file.key,
+      originalName: presign.file.originalName,
+      contentType: presign.file.contentType,
+      size: presign.file.size,
+      url: presign.file.url,
+    }
+  }
+
+  function addFiles(fileList: FileList | null) {
+    if (!fileList) return
+    const next = Array.from(fileList)
+      .slice(0, Math.max(0, 5 - files.length))
+      .map((file) => ({ id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`, file }))
+    setFiles((current) => [...current, ...next].slice(0, 5))
   }
 
   if (phase === "loading") {
@@ -247,8 +376,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-sm font-semibold text-stone-900">{organization.name}</h1>
         <p className="flex items-center gap-1.5 text-xs text-stone-500">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          Support assistant
+          <span className={`size-1.5 rounded-full ${socketReady ? "bg-emerald-500" : "bg-amber-500"}`} />
+          {socketReady ? "Support assistant" : "Connecting"}
         </p>
       </div>
       {phase === "chat" && (
@@ -330,7 +459,33 @@ export default function SupportPage({ organizationId }: { organizationId: string
                         : "rounded-bl-md bg-stone-100 text-stone-800"
                     }`}
                   >
-                    {message.bodyText}
+                    {message.authorType === "agent" && (
+                      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                        Support Team
+                      </p>
+                    )}
+                    {message.bodyText && <p>{message.bodyText}</p>}
+                    {message.attachments?.length > 0 && (
+                      <div className="mt-2 grid gap-2">
+                        {message.attachments.map((attachment) => (
+                          <a
+                            key={attachment.key}
+                            href={attachment.url ?? "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${
+                              message.authorType === "visitor"
+                                ? "border-white/20 bg-white/10 text-white"
+                                : "border-stone-200 bg-white text-stone-700"
+                            } ${!attachment.url ? "pointer-events-none opacity-60" : ""}`}
+                          >
+                            <FileIcon className="size-3.5" />
+                            <span className="min-w-0 flex-1 truncate">{attachment.originalName}</span>
+                            <span className="shrink-0 opacity-70">{fileSize(attachment.size)}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -353,31 +508,65 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
             <form
               onSubmit={sendMessage}
-              className="flex items-center gap-2 border-t border-stone-200 bg-white p-3"
+              className="border-t border-stone-200 bg-white p-3"
             >
-              <Input
-                id="support-message-input"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Type your message…"
-                maxLength={MESSAGE_MAX_LENGTH}
-                disabled={sending}
-                autoFocus
-                className="h-11 flex-1 rounded-xl"
-              />
-              <Button
-                type="submit"
-                disabled={sending || !draft.trim()}
-                title="Send"
-                className="size-11 shrink-0 rounded-xl p-0"
-                style={{ backgroundColor: accent }}
-              >
-                {sending ? (
-                  <LoaderIcon className="size-4 animate-spin" />
-                ) : (
-                  <SendIcon className="size-4" />
-                )}
-              </Button>
+              {files.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {files.map((item) => (
+                    <span
+                      key={item.id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600"
+                    >
+                      <PaperclipIcon className="size-3" />
+                      {item.file.name}
+                      <button
+                        type="button"
+                        className="text-stone-400 hover:text-stone-700"
+                        onClick={() => setFiles((current) => current.filter((file) => file.id !== item.id))}
+                      >
+                        Remove
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-stone-200 text-stone-500 transition hover:bg-stone-50">
+                  <PaperclipIcon className="size-4" />
+                  <input
+                    type="file"
+                    className="sr-only"
+                    multiple
+                    onChange={(event) => {
+                      addFiles(event.target.files)
+                      event.target.value = ""
+                    }}
+                  />
+                </label>
+                <Input
+                  id="support-message-input"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Type your message…"
+                  maxLength={MESSAGE_MAX_LENGTH}
+                  disabled={sending}
+                  autoFocus
+                  className="h-11 flex-1 rounded-xl"
+                />
+                <Button
+                  type="submit"
+                  disabled={sending || (!draft.trim() && files.length === 0)}
+                  title="Send"
+                  className="size-11 shrink-0 rounded-xl p-0"
+                  style={{ backgroundColor: accent }}
+                >
+                  {sending ? (
+                    <LoaderIcon className="size-4 animate-spin" />
+                  ) : (
+                    <SendIcon className="size-4" />
+                  )}
+                </Button>
+              </div>
             </form>
           </>
         )}

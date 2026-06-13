@@ -15,7 +15,7 @@ import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import { getAdminMe } from "@/lib/admin"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -65,6 +65,11 @@ const data: { navMain: SidebarCategory[] } = {
           title: "Chat",
           url: "/chat",
           icon: <BotMessageSquareIcon />,
+        },
+        {
+          title: "Support",
+          url: "/support",
+          icon: <HeadsetIcon />,
         },
       ],
     },

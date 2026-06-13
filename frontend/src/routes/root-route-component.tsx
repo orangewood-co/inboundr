@@ -33,6 +33,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/reset-password": "Reset Password",
   "/settings": "Settings",
   "/stats": "Stats",
+  "/support": "Support",
 }
 
 export function RootRouteComponent() {
