@@ -13,11 +13,13 @@ import {
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { getActiveOrganizationId, setActiveOrganizationId } from "@/lib/organization-context"
-import { cn, copyToClipboard } from "@/lib/utils"
+import { cn, copyToClipboard, getAvatarColor } from "@/lib/utils"
 
 type TicketStatus = "open" | "pending" | "resolved" | "closed"
 type TicketFilter = TicketStatus | "all"
@@ -114,6 +116,24 @@ function formatFullTime(value?: string | null) {
   }).format(date)
 }
 
+function formatRelativeTime(value?: string | null) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const diffMs = Date.now() - date.getTime()
+  const diffSec = Math.round(diffMs / 1000)
+  if (diffSec < 60) return "now"
+  const diffMin = Math.round(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m`
+  const diffHour = Math.round(diffMin / 60)
+  if (diffHour < 24) return `${diffHour}h`
+  const diffDay = Math.round(diffHour / 24)
+  if (diffDay < 7) return `${diffDay}d`
+  const diffWeek = Math.round(diffDay / 7)
+  if (diffWeek < 5) return `${diffWeek}w`
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date)
+}
+
 function fileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -122,6 +142,19 @@ function fileSize(bytes: number) {
 
 function ticketMatchesFilter(ticket: Ticket, filter: TicketFilter) {
   return filter === "all" || ticket.status === filter
+}
+
+function isUnread(ticket: Ticket) {
+  if (!ticket.lastVisitorMessageAt) return false
+  if (!ticket.lastAgentReadAt) return true
+  return new Date(ticket.lastVisitorMessageAt) > new Date(ticket.lastAgentReadAt)
+}
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return "?"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
 export default function SupportPage() {
@@ -148,6 +181,12 @@ export default function SupportPage() {
   const supportChatLink = useMemo(() => {
     return organizationId ? `${getEmbedOrigin()}/support/${organizationId}` : ""
   }, [organizationId])
+
+  const unreadCount = useMemo(() => tickets.filter(isUnread).length, [tickets])
+  const activeFilterLabel = useMemo(
+    () => TICKET_FILTERS.find((item) => item.value === filter)?.label ?? "Open",
+    [filter]
+  )
 
   const selectedMessages = useMemo(
     () => messages.filter((message) => message.ticketId === selectedTicketId),
@@ -423,24 +462,15 @@ export default function SupportPage() {
         breadcrumbs={[{ label: "Support" }]}
         actions={
           <>
-            {supportChatLink && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(supportChatLink, "Support chat link copied")}
-                >
-                  <CopyIcon />
-                  Copy Chat Link
-                </Button>
-                <Button variant="ghost" size="icon-sm" asChild>
-                  <a href={supportChatLink} target="_blank" rel="noreferrer" aria-label="Open support chat">
-                    <ExternalLinkIcon />
-                  </a>
-                </Button>
-              </>
-            )}
-            <Badge variant={socketReady ? "secondary" : "outline"}>{socketReady ? "Realtime" : "Connecting"}</Badge>
+            <Badge variant={socketReady ? "secondary" : "outline"} className="gap-1.5">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  socketReady ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
+                )}
+              />
+              {socketReady ? "Realtime" : "Connecting"}
+            </Badge>
             <Button variant="outline" size="sm" onClick={() => void loadTickets()}>
               <RefreshCcwIcon />
               Refresh
@@ -450,18 +480,27 @@ export default function SupportPage() {
       />
 
       <div className="flex h-[calc(100svh-var(--header-height))] min-h-0 flex-col bg-background">
-        <header className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Support</h1>
-            <p className="text-sm text-muted-foreground">View customer chats and reply from one shared inbox.</p>
+        {supportChatLink && (
+          <div className="flex items-center gap-2 border-b px-4 py-2">
+            <span className="shrink-0 text-xs font-medium text-muted-foreground">Public chat link</span>
+            <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1 text-xs text-foreground">
+              {supportChatLink}
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyToClipboard(supportChatLink, "Support chat link copied")}
+            >
+              <CopyIcon />
+              Copy
+            </Button>
+            <Button variant="ghost" size="icon-sm" asChild>
+              <a href={supportChatLink} target="_blank" rel="noreferrer" aria-label="Open support chat">
+                <ExternalLinkIcon />
+              </a>
+            </Button>
           </div>
-          {supportChatLink && (
-            <div className="hidden max-w-md items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground lg:flex">
-              <span className="shrink-0 font-medium text-foreground">Chat Link</span>
-              <span className="truncate">{supportChatLink}</span>
-            </div>
-          )}
-        </header>
+        )}
 
         {error && (
           <div className="border-b border-destructive/20 bg-destructive/10 px-6 py-2 text-sm text-destructive">
@@ -471,62 +510,136 @@ export default function SupportPage() {
 
       <main className="grid min-h-0 flex-1 lg:grid-cols-[22rem_1fr]">
         <aside className="flex min-h-0 flex-col border-r">
-          <div className="flex gap-2 border-b p-3">
+          <div className="flex items-center gap-1.5 border-b p-2">
             {TICKET_FILTERS.map((item) => (
               <Button
                 key={item.value}
                 type="button"
                 size="sm"
-                variant={filter === item.value ? "default" : "outline"}
+                variant={filter === item.value ? "default" : "ghost"}
+                className="gap-1.5"
                 onClick={() => {
                   setFilter(item.value)
                   setSelectedTicketId(null)
                 }}
               >
                 {item.label}
+                {item.value === "open" && unreadCount > 0 && (
+                  <Badge
+                    variant={filter === item.value ? "secondary" : "default"}
+                    className="h-4 min-w-4 px-1 text-[10px] tabular-nums"
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
               </Button>
             ))}
           </div>
 
+          {!loadingTickets && tickets.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span>{activeFilterLabel}</span>
+              <span className="tabular-nums">{tickets.length}</span>
+            </div>
+          )}
+
           <div className="min-h-0 flex-1 overflow-y-auto">
             {loadingTickets ? (
-              <div className="flex h-32 items-center justify-center text-muted-foreground">
-                <LoaderIcon className="size-5 animate-spin" />
+              <div className="flex flex-col">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="flex items-start gap-3 border-b p-4">
+                    <Skeleton className="size-9 shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Skeleton className="h-3.5 w-28" />
+                        <Skeleton className="h-3 w-8" />
+                      </div>
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : tickets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
-                <InboxIcon className="mb-3 size-8" />
+              <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-muted">
+                  <InboxIcon className="size-7 text-muted-foreground" />
+                </div>
                 <p className="text-sm font-medium text-foreground">No Tickets Found</p>
-                <p className="mt-1 text-sm">New support chats will appear here.</p>
+                <p className="mt-1 max-w-[15rem] text-sm text-muted-foreground">
+                  New support chats from your customers will appear here.
+                </p>
               </div>
             ) : (
-              tickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  type="button"
-                  onClick={() => setSelectedTicketId(ticket.id)}
-                  className={cn(
-                    "flex w-full flex-col gap-2 border-b p-4 text-left transition hover:bg-muted/60",
-                    selectedTicketId === ticket.id && "bg-muted"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
-                        #{ticket.ticketNumber} {ticket.requester.name}
+              tickets.map((ticket) => {
+                const unread = isUnread(ticket)
+                const selected = selectedTicketId === ticket.id
+                const avatar = getAvatarColor(ticket.requester.name)
+                return (
+                  <button
+                    key={ticket.id}
+                    type="button"
+                    onClick={() => setSelectedTicketId(ticket.id)}
+                    className={cn(
+                      "flex w-full items-start gap-3 border-b border-l-2 border-l-transparent p-4 text-left transition hover:bg-muted/60",
+                      selected && "border-l-primary bg-muted",
+                      unread && !selected && "bg-primary/5"
+                    )}
+                  >
+                    <Avatar className="mt-0.5">
+                      <AvatarFallback className={cn("font-medium", avatar.bg, avatar.text)}>
+                        {initialsFromName(ticket.requester.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            "min-w-0 flex-1 truncate text-sm",
+                            unread ? "font-semibold text-foreground" : "font-medium text-foreground/90"
+                          )}
+                        >
+                          {ticket.requester.name}
+                        </p>
+                        <span
+                          className="shrink-0 text-xs text-muted-foreground tabular-nums"
+                          title={formatFullTime(ticket.lastMessageAt)}
+                        >
+                          {formatRelativeTime(ticket.lastMessageAt)}
+                        </span>
+                      </div>
+                      <p
+                        className={cn(
+                          "mt-0.5 line-clamp-1 text-sm",
+                          unread ? "text-foreground/80" : "text-muted-foreground"
+                        )}
+                      >
+                        <span className="text-muted-foreground">#{ticket.ticketNumber}</span>{" "}
+                        {ticket.subject || "New support chat"}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">{ticket.requester.email}</p>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-xs capitalize",
+                            ticket.status === "resolved" ? "text-muted-foreground" : "text-foreground/70"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "size-1.5 rounded-full",
+                              ticket.status === "resolved" ? "bg-muted-foreground/40" : "bg-emerald-500"
+                            )}
+                          />
+                          {ticket.status}
+                        </span>
+                        {unread && (
+                          <span className="ml-auto size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+                        )}
+                      </div>
                     </div>
-                    <Badge variant={ticket.status === "resolved" ? "secondary" : "outline"} className="capitalize">
-                      {ticket.status}
-                    </Badge>
-                  </div>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    {ticket.subject || "New support chat"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{formatTime(ticket.lastMessageAt)}</p>
-                </button>
-              ))
+                  </button>
+                )
+              })
             )}
           </div>
         </aside>

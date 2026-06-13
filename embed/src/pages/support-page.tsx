@@ -573,7 +573,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                       {message.authorType === "visitor" &&
                       latestVisitorMessage?.id === message.id &&
                       latestVisitorSeenBySupport
-                        ? " · Seen by support"
+                        ? " · Seen"
                         : ""}
                     </p>
                   </div>
