@@ -38,7 +38,8 @@
     "archiver": "^8.0.0",
     "qrcode": "^1.5.4",
     "react-easy-crop": "^5.5.7",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "vite-bundle-analyzer": "^1.3.8"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.6"
