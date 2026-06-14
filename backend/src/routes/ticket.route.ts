@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getRelatedTickets,
   getSupportTicket,
   listSupportTickets,
   reopenSupportTicket,
@@ -14,6 +15,7 @@ router.use(requireOrganization);
 
 router.get("/", listSupportTickets);
 router.get("/:id", getSupportTicket);
+router.get("/:id/related", getRelatedTickets);
 router.patch("/:id/resolve", resolveSupportTicket);
 router.patch("/:id/reopen", reopenSupportTicket);
 

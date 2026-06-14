@@ -26,6 +26,11 @@ const SUPPORT_ALLOWED_MIME_TYPES = [
   "text/csv",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
 ];
 const SUPPORT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 

@@ -17,6 +17,8 @@ export interface ITicketMessage extends Document {
   authorUserId: string | null;
   bodyText: string;
   attachments: ITicketMessageAttachment[];
+  /** Agent-only internal note. Never surfaced to visitors. */
+  isInternal: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +56,7 @@ const ticketMessageSchema = new Schema<ITicketMessage>(
     authorUserId: { type: String, default: null, index: true },
     bodyText: { type: String, default: "" },
     attachments: { type: [ticketMessageAttachmentSchema], default: [] },
+    isInternal: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

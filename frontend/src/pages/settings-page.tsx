@@ -51,6 +51,7 @@ import {
   KeyIcon,
   LogOutIcon,
   MailIcon,
+  MessageSquareTextIcon,
   MoreVerticalIcon,
   PlusIcon,
   Trash2Icon,
@@ -1859,6 +1860,223 @@ function MembersTab() {
   )
 }
 
+// ─── Reply Templates Tab ─────────────────────────────────────
+
+interface ReplyTemplate {
+  id: string
+  title: string
+  body: string
+  shortcut: string
+  createdAt: string
+  updatedAt: string
+}
+
+const TEMPLATE_TEXTAREA_CLASS =
+  "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+
+function SupportTemplatesTab() {
+  const [templates, setTemplates] = useState<ReplyTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [title, setTitle] = useState("")
+  const [body, setBody] = useState("")
+  const [shortcut, setShortcut] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const fetchTemplates = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/templates`, { credentials: "include" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load templates")
+      setTemplates(data.templates ?? [])
+    } catch (err: any) {
+      setError(err.message || "Failed to load templates")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchTemplates()
+  }, [fetchTemplates])
+
+  const resetForm = () => {
+    setEditingId(null)
+    setTitle("")
+    setBody("")
+    setShortcut("")
+  }
+
+  const startEdit = (template: ReplyTemplate) => {
+    setEditingId(template.id)
+    setTitle(template.title)
+    setBody(template.body)
+    setShortcut(template.shortcut)
+  }
+
+  const save = async () => {
+    if (!title.trim() || !body.trim()) return
+    setSaving(true)
+    try {
+      const url = editingId
+        ? `${API_ORIGIN}/api/v1/support/templates/${editingId}`
+        : `${API_ORIGIN}/api/v1/support/templates`
+      const res = await fetch(url, {
+        method: editingId ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), body: body.trim(), shortcut: shortcut.trim() }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save template")
+      toast.success(editingId ? "Template updated" : "Template created")
+      resetForm()
+      await fetchTemplates()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save template")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (id: string) => {
+    setDeletingId(id)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/templates/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to delete template")
+      }
+      toast.success("Template deleted")
+      if (editingId === id) resetForm()
+      await fetchTemplates()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete template")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Reply Templates"
+        description="Saved responses your team can insert into support replies."
+      />
+
+      <SettingsCard
+        title={editingId ? "Edit Template" : "New Template"}
+        description="Use placeholders like {{name}}, {{first_name}}, or {{ticket_number}} — they fill in when inserted."
+      >
+        <div className="space-y-4 p-5">
+          {error && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
+            <div className="space-y-1.5">
+              <Label htmlFor="tplTitle">Title</Label>
+              <Input
+                id="tplTitle"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="e.g. Greeting"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tplShortcut">Shortcut (optional)</Label>
+              <Input
+                id="tplShortcut"
+                value={shortcut}
+                onChange={(event) => setShortcut(event.target.value)}
+                placeholder="greeting"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="tplBody">Message</Label>
+            <textarea
+              id="tplBody"
+              rows={5}
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              placeholder="Hi {{first_name}}, thanks for reaching out..."
+              className={TEMPLATE_TEXTAREA_CLASS}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={save} disabled={saving || !title.trim() || !body.trim()}>
+              {saving && <Spinner data-icon="inline-start" />}
+              {editingId ? "Save Changes" : "Create Template"}
+            </Button>
+            {editingId && (
+              <Button variant="outline" onClick={resetForm} disabled={saving}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Saved Templates"
+        description={`${templates.length} ${templates.length === 1 ? "template" : "templates"} available in the composer.`}
+      >
+        <div className="divide-y">
+          {loading ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">Loading templates...</div>
+          ) : templates.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              No templates yet. Create your first one above.
+            </div>
+          ) : (
+            templates.map((template) => (
+              <div key={template.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{template.title}</p>
+                    {template.shortcut && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        /{template.shortcut}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                    {template.body}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => startEdit(template)}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => remove(template.id)}
+                    disabled={deletingId === template.id}
+                    aria-label="Delete template"
+                  >
+                    {deletingId === template.id ? <Spinner /> : <Trash2Icon className="size-4" />}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </SettingsCard>
+    </div>
+  )
+}
+
 // ─── Main Page ───────────────────────────────────────────────
 
 export function SettingsPage() {
@@ -1889,6 +2107,10 @@ export function SettingsPage() {
                   <UsersIcon className="size-3.5" />
                   Members
                 </TabsTrigger>
+                <TabsTrigger value="support" className="gap-1.5">
+                  <MessageSquareTextIcon className="size-3.5" />
+                  Reply Templates
+                </TabsTrigger>
                 <TabsTrigger value="notifications" className="gap-1.5">
                   <MailIcon className="size-3.5" />
                   Notifications
@@ -1905,6 +2127,9 @@ export function SettingsPage() {
               </TabsContent>
               <TabsContent value="members" className="mt-0">
                 <MembersTab />
+              </TabsContent>
+              <TabsContent value="support" className="mt-0">
+                <SupportTemplatesTab />
               </TabsContent>
               <TabsContent value="notifications" className="mt-0">
                 <NotificationsTab />

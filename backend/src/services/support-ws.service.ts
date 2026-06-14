@@ -75,15 +75,17 @@ async function broadcastTicketById(ticketId: string): Promise<void> {
 }
 
 export async function broadcastMessageCreated(
-  message: unknown & { ticketId?: unknown; organizationId?: unknown }
+  message: unknown & { ticketId?: unknown; organizationId?: unknown; isInternal?: unknown }
 ) {
   const serialized = await serializeTicketMessage(message);
   const ticketId = String(message.ticketId ?? serialized.ticketId);
   const organizationId = String(message.organizationId ?? "");
+  const isInternal = Boolean(message.isInternal ?? serialized.isInternal);
   broadcast(
     (context) =>
       context.organizationId === organizationId &&
-      (context.kind === "agent" || ticketTopic(ticketId, context)),
+      // Internal notes are agent-only and must never reach a visitor socket.
+      (context.kind === "agent" || (!isInternal && ticketTopic(ticketId, context))),
     { type: "message.created", message: serialized }
   );
 }
@@ -192,6 +194,7 @@ async function handleSubscribeTicket(ws: SupportSocket, payload: Record<string, 
 async function handleAgentMessage(ws: SupportSocket, payload: Record<string, unknown>) {
   if (!ws.context || ws.context.kind !== "agent") return;
   const ticketId = String(payload.ticketId ?? "");
+  const isInternal = Boolean(payload.isInternal);
   const bodyText = sanitizeText(payload.text);
   const attachments = normalizeAttachments(
     payload.attachments,
@@ -220,7 +223,15 @@ async function handleAgentMessage(ws: SupportSocket, payload: Record<string, unk
     authorUserId: ws.context.userId,
     bodyText,
     attachments,
+    isInternal,
   });
+
+  // Internal notes are private annotations: they don't disable the bot, don't
+  // count as a customer-facing reply, and only fan out to agent sockets.
+  if (isInternal) {
+    await broadcastMessageCreated(message);
+    return;
+  }
 
   const now = new Date();
   await Ticket.updateOne(

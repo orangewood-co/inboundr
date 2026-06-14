@@ -8,6 +8,7 @@ import {
   FileIcon,
   HeadsetIcon,
   LoaderIcon,
+  MicIcon,
   MoonIcon,
   PaperclipIcon,
   SendIcon,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { VoiceRecorder } from "@/components/voice-recorder"
 import { API_ORIGIN } from "@/lib/env"
 import chatConnectedSound from "@/assets/support/chat-connected.mp3"
 import messageReceivedSound from "@/assets/support/message-received.mp3"
@@ -52,6 +54,7 @@ type SupportAttachment = {
 type PendingAttachment = {
   id: string
   file: File
+  audioUrl?: string
 }
 
 type SocketEvent =
@@ -458,6 +461,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       const attachments = await Promise.all(files.map((item) => uploadAttachment(item.file, sessionToken)))
       if (socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(JSON.stringify({ type: "visitor_message", text, attachments }))
+        files.forEach((item) => item.audioUrl && URL.revokeObjectURL(item.audioUrl))
         setFiles([])
         sendTyping(false)
         return
@@ -593,6 +597,21 @@ export default function SupportPage({ organizationId }: { organizationId: string
       .slice(0, Math.max(0, 5 - files.length))
       .map((file) => ({ id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`, file }))
     setFiles((current) => [...current, ...next].slice(0, 5))
+  }
+
+  function addVoice(file: File) {
+    setFiles((current) => {
+      if (current.length >= 5) return current
+      return [...current, { id: crypto.randomUUID(), file, audioUrl: URL.createObjectURL(file) }]
+    })
+  }
+
+  function removeFile(id: string) {
+    setFiles((current) => {
+      const target = current.find((item) => item.id === id)
+      if (target?.audioUrl) URL.revokeObjectURL(target.audioUrl)
+      return current.filter((item) => item.id !== id)
+    })
   }
 
   function sendTyping(isTyping: boolean) {
@@ -922,32 +941,55 @@ export default function SupportPage({ organizationId }: { organizationId: string
                       {message.bodyText && <p>{message.bodyText}</p>}
                       {message.attachments?.length > 0 && (
                         <div className="mt-2 grid gap-2">
-                          {message.attachments.map((attachment) => (
-                            <a
-                              key={attachment.key}
-                              href={attachment.url ?? "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${
-                                isVisitor
-                                  ? ""
-                                  : "border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200"
-                              } ${!attachment.url ? "pointer-events-none opacity-60" : ""}`}
-                              style={
-                                isVisitor
-                                  ? {
-                                      borderColor: `${onAccent}33`,
-                                      backgroundColor: `${onAccent}14`,
-                                      color: onAccent,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              <FileIcon className="size-3.5" />
-                              <span className="min-w-0 flex-1 truncate">{attachment.originalName}</span>
-                              <span className="shrink-0 opacity-70">{fileSize(attachment.size)}</span>
-                            </a>
-                          ))}
+                          {message.attachments.map((attachment) =>
+                            attachment.contentType.startsWith("audio/") ? (
+                              <div
+                                key={attachment.key}
+                                className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
+                                  isVisitor
+                                    ? ""
+                                    : "border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-900"
+                                }`}
+                                style={
+                                  isVisitor
+                                    ? { borderColor: `${onAccent}33`, backgroundColor: `${onAccent}14` }
+                                    : undefined
+                                }
+                              >
+                                <MicIcon className="size-3.5 shrink-0" />
+                                {attachment.url ? (
+                                  <audio controls preload="metadata" src={attachment.url} className="h-8 w-full max-w-[13rem]" />
+                                ) : (
+                                  <span className="text-xs opacity-70">Audio unavailable</span>
+                                )}
+                              </div>
+                            ) : (
+                              <a
+                                key={attachment.key}
+                                href={attachment.url ?? "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${
+                                  isVisitor
+                                    ? ""
+                                    : "border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200"
+                                } ${!attachment.url ? "pointer-events-none opacity-60" : ""}`}
+                                style={
+                                  isVisitor
+                                    ? {
+                                        borderColor: `${onAccent}33`,
+                                        backgroundColor: `${onAccent}14`,
+                                        color: onAccent,
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <FileIcon className="size-3.5" />
+                                <span className="min-w-0 flex-1 truncate">{attachment.originalName}</span>
+                                <span className="shrink-0 opacity-70">{fileSize(attachment.size)}</span>
+                              </a>
+                            )
+                          )}
                         </div>
                       )}
                       <p
@@ -997,23 +1039,41 @@ export default function SupportPage({ organizationId }: { organizationId: string
             >
               {files.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
-                  {files.map((item) => (
-                    <span
-                      key={item.id}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
-                    >
-                      <PaperclipIcon className="size-3 shrink-0" />
-                      <span className="truncate">{item.file.name}</span>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${item.file.name}`}
-                        className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
-                        onClick={() => setFiles((current) => current.filter((file) => file.id !== item.id))}
+                  {files.map((item) =>
+                    item.audioUrl ? (
+                      <span
+                        key={item.id}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 py-1 pr-1 pl-2.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                       >
-                        <XIcon className="size-3" />
-                      </button>
-                    </span>
-                  ))}
+                        <MicIcon className="size-3 shrink-0" />
+                        <audio controls src={item.audioUrl} className="h-7 max-w-[10rem]" />
+                        <button
+                          type="button"
+                          aria-label="Remove voice message"
+                          className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
+                          onClick={() => removeFile(item.id)}
+                        >
+                          <XIcon className="size-3" />
+                        </button>
+                      </span>
+                    ) : (
+                      <span
+                        key={item.id}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                      >
+                        <PaperclipIcon className="size-3 shrink-0" />
+                        <span className="truncate">{item.file.name}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.file.name}`}
+                          className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
+                          onClick={() => removeFile(item.id)}
+                        >
+                          <XIcon className="size-3" />
+                        </button>
+                      </span>
+                    )
+                  )}
                 </div>
               )}
               <div className="rounded-2xl border border-stone-200 bg-white transition focus-within:border-stone-400 focus-within:ring-4 focus-within:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800/40 dark:focus-within:border-stone-500 dark:focus-within:ring-white/5">
@@ -1030,18 +1090,26 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   className="block max-h-32 min-h-[40px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base leading-relaxed text-stone-900 outline-none placeholder:text-stone-400 disabled:opacity-60 sm:text-sm dark:text-stone-100 dark:placeholder:text-stone-500"
                 />
                 <div className="flex items-center justify-between px-2.5 pb-2">
-                  <label className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700/60 dark:hover:text-stone-300">
-                    <PaperclipIcon className="size-[18px]" />
-                    <input
-                      type="file"
-                      className="sr-only"
-                      multiple
-                      onChange={(event) => {
-                        addFiles(event.target.files)
-                        event.target.value = ""
-                      }}
+                  <div className="flex items-center gap-0.5">
+                    <label className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700/60 dark:hover:text-stone-300">
+                      <PaperclipIcon className="size-[18px]" />
+                      <input
+                        type="file"
+                        className="sr-only"
+                        multiple
+                        onChange={(event) => {
+                          addFiles(event.target.files)
+                          event.target.value = ""
+                        }}
+                      />
+                    </label>
+                    <VoiceRecorder
+                      onRecorded={addVoice}
+                      disabled={sending || files.length >= 5}
+                      accent={accent}
+                      onAccent={onAccent}
                     />
-                  </label>
+                  </div>
                   <button
                     type="submit"
                     disabled={!canSend}

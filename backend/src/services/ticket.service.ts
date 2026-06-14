@@ -56,9 +56,30 @@ export function serializeTicket(ticket: ITicket | any) {
     lastVisitorReadAt: ticket.lastVisitorReadAt,
     lastAgentReadAt: ticket.lastAgentReadAt,
     resolvedAt: ticket.resolvedAt,
+    // Optional list-only fields, populated by listTickets' aggregation.
+    lastMessagePreview: ticket.lastMessagePreview ?? null,
+    lastMessageAuthorType: ticket.lastMessageAuthorType ?? null,
+    lastMessageIsInternal: Boolean(ticket.lastMessageIsInternal),
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
   };
+}
+
+function previewFromMessage(message: any): string {
+  if (!message) return "";
+  const body = String(message.bodyText ?? "").replace(/\s+/g, " ").trim();
+  if (body) return body.slice(0, 140);
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  if (attachments.length > 0) {
+    const first = attachments[0];
+    if (typeof first?.contentType === "string" && first.contentType.startsWith("audio/")) {
+      return "Voice message";
+    }
+    return attachments.length === 1
+      ? String(first?.originalName ?? "Attachment")
+      : `${attachments.length} attachments`;
+  }
+  return "";
 }
 
 export async function serializeTicketMessage(message: ITicketMessage | any) {
@@ -69,6 +90,7 @@ export async function serializeTicketMessage(message: ITicketMessage | any) {
     authorUserId: message.authorUserId,
     bodyText: message.bodyText,
     attachments: await serializeAttachments(message.attachments ?? []),
+    isInternal: Boolean(message.isInternal),
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
   };
@@ -78,18 +100,40 @@ export async function listTickets(input: {
   organizationId: mongoose.Types.ObjectId;
   status: TicketListStatus;
 }) {
-  const filter: Record<string, unknown> = {
+  const match: Record<string, unknown> = {
     organizationId: input.organizationId,
     channel: "chat",
   };
-  if (input.status !== "all") filter.status = input.status;
+  if (input.status !== "all") match.status = input.status;
 
-  const tickets = await Ticket.find(filter)
-    .sort({ lastMessageAt: -1, createdAt: -1 })
-    .limit(100)
-    .lean();
+  const tickets = await Ticket.aggregate([
+    { $match: match },
+    { $sort: { lastMessageAt: -1, createdAt: -1 } },
+    { $limit: 100 },
+    {
+      $lookup: {
+        from: TicketMessage.collection.name,
+        let: { ticketId: "$_id" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$ticketId", "$$ticketId"] } } },
+          { $sort: { createdAt: -1 } },
+          { $limit: 1 },
+          { $project: { bodyText: 1, authorType: 1, isInternal: 1, attachments: 1 } },
+        ],
+        as: "lastMessage",
+      },
+    },
+    { $addFields: { lastMessage: { $arrayElemAt: ["$lastMessage", 0] } } },
+  ]);
 
-  return tickets.map(serializeTicket);
+  return tickets.map((ticket) =>
+    serializeTicket({
+      ...ticket,
+      lastMessagePreview: previewFromMessage(ticket.lastMessage),
+      lastMessageAuthorType: ticket.lastMessage?.authorType ?? null,
+      lastMessageIsInternal: Boolean(ticket.lastMessage?.isInternal),
+    })
+  );
 }
 
 export async function getTicketWithMessages(input: {
@@ -115,6 +159,36 @@ export async function getTicketWithMessages(input: {
     ticket: serializeTicket(ticket),
     messages: await Promise.all(messages.map(serializeTicketMessage)),
   };
+}
+
+export async function listRelatedTickets(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+
+  const ticket = await Ticket.findOne({
+    _id: input.ticketId,
+    organizationId: input.organizationId,
+  })
+    .select("requester.email")
+    .lean();
+  if (!ticket) return null;
+
+  const email = ticket.requester?.email;
+  if (!email) return [];
+
+  const related = await Ticket.find({
+    organizationId: input.organizationId,
+    channel: "chat",
+    _id: { $ne: ticket._id },
+    "requester.email": email,
+  })
+    .sort({ lastMessageAt: -1, createdAt: -1 })
+    .limit(20)
+    .lean();
+
+  return related.map(serializeTicket);
 }
 
 export async function resolveTicket(input: {

@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import {
   getTicketWithMessages,
+  listRelatedTickets,
   listTickets,
   normalizeTicketListStatus,
   reopenTicket as reopenTicketRecord,
@@ -39,6 +40,24 @@ export async function getSupportTicket(req: Request, res: Response): Promise<voi
   } catch (err) {
     console.error("Failed to fetch support ticket:", err);
     res.status(500).json({ error: "Failed to fetch support ticket" });
+  }
+}
+
+export async function getRelatedTickets(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const tickets = await listRelatedTickets({
+      organizationId: orgReq.organization._id,
+      ticketId: String(req.params.id ?? ""),
+    });
+    if (tickets === null) {
+      res.status(404).json({ error: "Ticket not found" });
+      return;
+    }
+    res.json({ tickets });
+  } catch (err) {
+    console.error("Failed to load related tickets:", err);
+    res.status(500).json({ error: "Failed to load related tickets" });
   }
 }
 

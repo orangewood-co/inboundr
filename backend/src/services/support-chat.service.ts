@@ -128,7 +128,10 @@ export async function findSessionTicket(sessionToken: string): Promise<ITicket |
 }
 
 export async function listSessionMessages(ticket: ITicket) {
-  const messages = await TicketMessage.find({ ticketId: ticket._id })
+  const messages = await TicketMessage.find({
+    ticketId: ticket._id,
+    isInternal: { $ne: true },
+  })
     .sort({ createdAt: 1 })
     .lean();
 
@@ -152,7 +155,7 @@ export async function listSessionMessages(ticket: ITicket) {
 }
 
 export async function countSessionMessages(ticket: ITicket): Promise<number> {
-  return TicketMessage.countDocuments({ ticketId: ticket._id });
+  return TicketMessage.countDocuments({ ticketId: ticket._id, isInternal: { $ne: true } });
 }
 
 function buildSystemPrompt(organizationName: string, requesterName: string): string {

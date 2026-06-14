@@ -13,6 +13,14 @@ const DEFAULT_ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
 ];
+const SUPPORT_AUDIO_MIME_TYPES = [
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+];
+const SUPPORT_ALLOWED_MIME_TYPES = [...DEFAULT_ALLOWED_MIME_TYPES, ...SUPPORT_AUDIO_MIME_TYPES];
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
@@ -43,6 +51,7 @@ function validateUploadBasics(input: ReturnType<typeof normalizeUploadRequest>, 
 
 function allowedMimeTypesForScope(scope: string): string[] {
   if (scope === "employee" || scope === "attendance") return AVATAR_ALLOWED_MIME_TYPES;
+  if (scope === "support") return SUPPORT_ALLOWED_MIME_TYPES;
   return IMAGE_UPLOAD_SCOPES.includes(scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES;
 }
 
