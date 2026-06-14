@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { PauseIcon, PlayIcon } from "lucide-react"
 
-import { cn } from "@/lib/utils"
-import { fileSize } from "./support-utils"
-import type { TicketAttachment } from "./types"
-
 function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00"
   const mins = Math.floor(seconds / 60)
@@ -12,7 +8,17 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
-export function AudioPlayer({ src, className }: { src: string; className?: string }) {
+export function AudioPlayer({
+  src,
+  surface = "neutral",
+  accent = "#f5b400",
+  onAccent = "#1c1917",
+}: {
+  src: string
+  surface?: "neutral" | "accent"
+  accent?: string
+  onAccent?: string
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
@@ -84,16 +90,21 @@ export function AudioPlayer({ src, className }: { src: string; className?: strin
     audio.currentTime = pct * duration
   }
 
+  const onAcc = surface === "accent"
+  const fill = onAcc ? onAccent : accent
+  const iconColor = onAcc ? accent : onAccent
+  const trackColor = onAcc ? `${onAccent}33` : `${accent}29`
   const ratio = duration > 0 ? Math.min(1, current / duration) : 0
   const displayTime = playing || current > 0 ? current : duration
 
   return (
-    <div className={cn("flex w-[14rem] max-w-full items-center gap-2.5", className)}>
+    <div className="flex w-[12.5rem] max-w-full items-center gap-2.5">
       <button
         type="button"
         onClick={toggle}
         aria-label={playing ? "Pause" : "Play"}
-        className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition active:scale-95"
+        className="flex size-8 shrink-0 items-center justify-center rounded-full transition active:scale-95"
+        style={{ backgroundColor: fill, color: iconColor }}
       >
         {playing ? (
           <PauseIcon className="size-4" />
@@ -103,43 +114,21 @@ export function AudioPlayer({ src, className }: { src: string; className?: strin
       </button>
       <div
         onClick={seek}
-        className="relative h-1.5 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-foreground/15"
+        className="relative h-1.5 min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full"
+        style={{ backgroundColor: trackColor }}
       >
         <div
-          className="absolute inset-y-0 left-0 rounded-full bg-primary"
-          style={{ width: `${ratio * 100}%` }}
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{ width: `${ratio * 100}%`, backgroundColor: fill }}
         />
       </div>
-      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+      <span
+        className={onAcc ? "shrink-0 text-[11px] tabular-nums" : "shrink-0 text-[11px] tabular-nums text-stone-500 dark:text-stone-400"}
+        style={onAcc ? { color: onAccent, opacity: 0.8 } : undefined}
+      >
         {formatDuration(displayTime)}
       </span>
       <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
-    </div>
-  )
-}
-
-export function AudioMessage({
-  attachment,
-  tone = "neutral",
-}: {
-  attachment: TicketAttachment
-  tone?: "neutral" | "agent"
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border px-3 py-2.5",
-        tone === "agent" ? "border-primary/20 bg-background/40" : "border-border bg-background/60"
-      )}
-    >
-      <p className="mb-1.5 text-xs font-medium text-foreground/70">
-        Voice message · {fileSize(attachment.size)}
-      </p>
-      {attachment.url ? (
-        <AudioPlayer src={attachment.url} />
-      ) : (
-        <p className="text-xs text-muted-foreground">Audio unavailable</p>
-      )}
     </div>
   )
 }

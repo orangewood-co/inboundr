@@ -8,7 +8,6 @@ import {
   FileIcon,
   HeadsetIcon,
   LoaderIcon,
-  MicIcon,
   MoonIcon,
   PaperclipIcon,
   SendIcon,
@@ -23,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { AudioPlayer } from "@/components/audio-player"
 import { VoiceRecorder } from "@/components/voice-recorder"
 import { API_ORIGIN } from "@/lib/env"
 import chatConnectedSound from "@/assets/support/chat-connected.mp3"
@@ -943,22 +943,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
                         <div className="mt-2 grid gap-2">
                           {message.attachments.map((attachment) =>
                             attachment.contentType.startsWith("audio/") ? (
-                              <div
-                                key={attachment.key}
-                                className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
-                                  isVisitor
-                                    ? ""
-                                    : "border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-900"
-                                }`}
-                                style={
-                                  isVisitor
-                                    ? { borderColor: `${onAccent}33`, backgroundColor: `${onAccent}14` }
-                                    : undefined
-                                }
-                              >
-                                <MicIcon className="size-3.5 shrink-0" />
+                              <div key={attachment.key} className="py-0.5">
                                 {attachment.url ? (
-                                  <audio controls preload="metadata" src={attachment.url} className="h-8 w-full max-w-[13rem]" />
+                                  <AudioPlayer
+                                    src={attachment.url}
+                                    surface={isVisitor ? "accent" : "neutral"}
+                                    accent={accent}
+                                    onAccent={onAccent}
+                                  />
                                 ) : (
                                   <span className="text-xs opacity-70">Audio unavailable</span>
                                 )}
@@ -1043,10 +1035,9 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     item.audioUrl ? (
                       <span
                         key={item.id}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 py-1 pr-1 pl-2.5 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                        className="inline-flex max-w-full items-center gap-2 rounded-xl bg-stone-100 px-2.5 py-1.5 dark:bg-stone-800"
                       >
-                        <MicIcon className="size-3 shrink-0" />
-                        <audio controls src={item.audioUrl} className="h-7 max-w-[10rem]" />
+                        <AudioPlayer src={item.audioUrl} surface="neutral" accent={accent} onAccent={onAccent} />
                         <button
                           type="button"
                           aria-label="Remove voice message"

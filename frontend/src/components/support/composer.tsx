@@ -2,7 +2,6 @@ import { useRef, useState } from "react"
 import {
   LoaderIcon,
   MessageSquareIcon,
-  MicIcon,
   PaperclipIcon,
   SendIcon,
   StickyNoteIcon,
@@ -11,6 +10,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { AudioPlayer } from "./audio-message"
 import { EmojiPicker } from "./emoji-picker"
 import { TemplatePicker } from "./template-picker"
 import { VoiceRecorder } from "./voice-recorder"
@@ -154,10 +154,9 @@ export function Composer({
             item.audioUrl ? (
               <div
                 key={item.id}
-                className="flex items-center gap-2 rounded-lg border bg-muted/40 py-1 pr-1 pl-2.5"
+                className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5"
               >
-                <MicIcon className="size-3.5 shrink-0 text-primary" />
-                <audio controls src={item.audioUrl} className="h-7 max-w-[12rem]" />
+                <AudioPlayer src={item.audioUrl} />
                 <button
                   type="button"
                   onClick={() => removeFile(item.id)}
