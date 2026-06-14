@@ -14,6 +14,7 @@ import {
   SUPPORT_MESSAGES_PER_SESSION,
 } from "../services/support-chat.service";
 import { broadcastMessageCreated, broadcastTicketUpdate } from "../services/support-ws.service";
+import { sendSupportTranscriptEmail } from "../services/support-email.service";
 import { createPresignedUpload } from "../services/storage.service";
 import { serializeTicket } from "../services/ticket.service";
 
@@ -108,6 +109,8 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
     const organizationId = String(req.body?.organizationId ?? "").trim();
     const name = String(req.body?.name ?? "").trim();
     const email = String(req.body?.email ?? "").trim().toLowerCase();
+    const subject = String(req.body?.subject ?? "").trim();
+    const emailTranscriptRequested = Boolean(req.body?.emailTranscript);
 
     if (!name || name.length > 120) {
       res.status(400).json({ error: "Please enter your name" });
@@ -124,7 +127,11 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
       return;
     }
 
-    const ticket = await createSupportSession(organization, { name, email });
+    const ticket = await createSupportSession(
+      organization,
+      { name, email },
+      { initialIssue: subject, emailTranscriptRequested }
+    );
     res.status(201).json({
       sessionToken: ticket.sessionToken,
       organization,
@@ -218,6 +225,76 @@ export async function postSupportSessionMessage(
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to send message" });
     }
+  }
+}
+
+export async function endSupportSession(req: Request, res: ExpressResponse): Promise<void> {
+  try {
+    if (isRateLimited(`end:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
+      res.status(429).json({ error: "Too many updates. Please try again later." });
+      return;
+    }
+
+    const ticket = await findSessionTicket(String(req.params.token ?? ""));
+    if (!ticket) {
+      res.status(404).json({ error: "Chat session not found" });
+      return;
+    }
+
+    const now = new Date();
+    const rawRating = req.body?.rating == null ? null : Number(req.body.rating);
+    const rating =
+      rawRating != null && Number.isFinite(rawRating)
+        ? Math.min(5, Math.max(1, Math.round(rawRating)))
+        : null;
+    const feedbackComment = String(req.body?.feedbackComment ?? "").trim().slice(0, 2000);
+
+    const update: Record<string, unknown> = {
+      visitorEndedAt: ticket.visitorEndedAt ?? now,
+    };
+    if (rating || feedbackComment) {
+      update.visitorFeedback = {
+        rating,
+        comment: feedbackComment,
+        submittedAt: now,
+      };
+    }
+
+    let updatedTicket = await Ticket.findByIdAndUpdate(ticket._id, update, { new: true }).lean();
+    if (!updatedTicket) {
+      res.status(404).json({ error: "Chat session not found" });
+      return;
+    }
+
+    broadcastTicketUpdate(String(updatedTicket.organizationId), serializeTicket(updatedTicket));
+
+    let transcriptEmailSent = false;
+    if (updatedTicket.emailTranscriptRequested && !updatedTicket.transcriptEmailSentAt) {
+      try {
+        transcriptEmailSent = await sendSupportTranscriptEmail(String(updatedTicket._id));
+        updatedTicket = await Ticket.findById(updatedTicket._id).lean();
+        if (!updatedTicket) {
+          res.status(404).json({ error: "Chat session not found" });
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to send support transcript email:", err);
+        res.status(502).json({
+          error: "Chat ended, but we could not email the transcript. Please try again.",
+          ticket: serializeTicket(updatedTicket),
+          transcriptEmailSent: false,
+        });
+        return;
+      }
+    }
+
+    res.json({
+      ticket: serializeTicket(updatedTicket),
+      transcriptEmailSent,
+    });
+  } catch (err) {
+    console.error("Failed to end support session:", err);
+    res.status(500).json({ error: "Failed to end support session" });
   }
 }
 

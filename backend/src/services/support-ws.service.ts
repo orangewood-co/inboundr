@@ -16,6 +16,7 @@ import {
   SUPPORT_MESSAGES_PER_SESSION,
   type SupportMessageAttachmentInput,
 } from "./support-chat.service";
+import { sendSupportResolvedEmail } from "./support-email.service";
 import { serializeTicket, serializeTicketMessage } from "./ticket.service";
 import { keyBelongsToPrefix } from "./storage.service";
 
@@ -69,7 +70,7 @@ export function broadcastTicketUpdate(organizationId: string, ticket: unknown): 
 }
 
 async function broadcastTicketById(ticketId: string): Promise<void> {
-  const ticket = await Ticket.findById(ticketId).lean();
+  const ticket = await Ticket.findById(ticketId).populate("customerId").lean();
   if (!ticket) return;
   broadcastTicketUpdate(String(ticket.organizationId), serializeTicket(ticket));
 }
@@ -305,7 +306,16 @@ async function handleResolve(ws: SupportSocket, payload: Record<string, unknown>
       : { status: "open", resolvedAt: null, lastMessageAt: now },
     { new: true }
   ).lean();
-  if (ticket) broadcastTicketUpdate(ws.context.organizationId, serializeTicket(ticket));
+  if (!ticket) return;
+  if (resolved) {
+    try {
+      await sendSupportResolvedEmail(String(ticket._id));
+    } catch (err) {
+      console.error(`Failed to send support resolution email for ticket ${ticket._id}:`, err);
+    }
+  }
+  const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
+  broadcastTicketUpdate(ws.context.organizationId, serializeTicket(fresh ?? ticket));
 }
 
 async function handleTyping(ws: SupportSocket, payload: Record<string, unknown>) {

@@ -10,18 +10,40 @@ export type Ticket = {
   priority: string
   channel: string
   requester: { name: string; email: string }
+  customerId: string | null
+  customer: SupportCustomer | null
+  initialIssue: string
+  emailTranscriptRequested: boolean
   botEnabled: boolean
   lastMessageAt: string
   lastVisitorMessageAt: string | null
   lastAgentMessageAt: string | null
   lastVisitorReadAt: string | null
   lastAgentReadAt: string | null
+  visitorEndedAt: string | null
+  visitorFeedback: {
+    rating: number | null
+    comment: string
+    submittedAt: string | null
+  }
+  transcriptEmailSentAt: string | null
+  resolvedEmailSentAt: string | null
   resolvedAt: string | null
   lastMessagePreview?: string | null
   lastMessageAuthorType?: MessageAuthorType | null
   lastMessageIsInternal?: boolean
   createdAt: string
   updatedAt: string
+}
+
+export type SupportCustomer = {
+  id: string
+  name: string
+  company: string
+  email: string
+  contactNumber: string | null
+  address: string | null
+  specialDiscountPercentage: number
 }
 
 export type TicketAttachment = {

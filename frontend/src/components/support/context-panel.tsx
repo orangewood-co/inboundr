@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { FileIcon, LoaderIcon, LockIcon, MicIcon } from "lucide-react"
+import { FileIcon, LoaderIcon, LockIcon, MicIcon, StarIcon, UserRoundCheckIcon } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { CopyableText } from "@/components/copy-button"
 import { API_ORIGIN } from "@/lib/env"
 import { cn, getAvatarColor } from "@/lib/utils"
@@ -14,7 +15,7 @@ import {
   isAudioAttachment,
   isImageAttachment,
 } from "./support-utils"
-import type { Ticket, TicketAttachment, TicketMessage } from "./types"
+import type { SupportCustomer, Ticket, TicketAttachment, TicketMessage } from "./types"
 
 const STATUS_STYLES: Record<string, string> = {
   open: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
@@ -151,6 +152,142 @@ function PastTickets({ ticket, onSelect }: { ticket: Ticket; onSelect: (id: stri
   )
 }
 
+function CustomerMapping({ ticket }: { ticket: Ticket }) {
+  const [candidates, setCandidates] = useState<SupportCustomer[]>([])
+  const [search, setSearch] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [company, setCompany] = useState(ticket.requester.name)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""
+    fetch(`${API_ORIGIN}/api/v1/tickets/${ticket.id}/customer-candidates${query}`, {
+      credentials: "include",
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled) setCandidates(data?.candidates ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setCandidates([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [search, ticket.id])
+
+  async function link(customerId: string | null) {
+    setBusyId(customerId ?? "unlink")
+    try {
+      await fetch(`${API_ORIGIN}/api/v1/tickets/${ticket.id}/customer`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId }),
+      })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function createCustomer() {
+    setCreating(true)
+    try {
+      await fetch(`${API_ORIGIN}/api/v1/tickets/${ticket.id}/customer`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: company.trim() || ticket.requester.name }),
+      })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  if (ticket.customer) {
+    return (
+      <div className="rounded-lg border bg-emerald-500/[0.06] p-3">
+        <div className="flex items-start gap-2">
+          <UserRoundCheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-300" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{ticket.customer.company || ticket.customer.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{ticket.customer.email}</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-2 h-7 text-muted-foreground"
+          disabled={busyId === "unlink"}
+          onClick={() => void link(null)}
+        >
+          Unlink
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Search customers..."
+        className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      />
+      {loading ? (
+        <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+          <LoaderIcon className="size-3.5 animate-spin" /> Searching...
+        </div>
+      ) : candidates.length > 0 ? (
+        <div className="space-y-1">
+          {candidates.map((customer) => (
+            <button
+              key={customer.id}
+              type="button"
+              onClick={() => void link(customer.id)}
+              disabled={busyId === customer.id}
+              className="flex w-full flex-col rounded-lg border bg-background px-2.5 py-2 text-left text-xs transition hover:bg-muted disabled:opacity-50"
+            >
+              <span className="font-medium">{customer.company || customer.name}</span>
+              <span className="text-muted-foreground">{customer.email}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No customer match found.</p>
+      )}
+      <div className="rounded-lg border border-dashed p-2">
+        <p className="mb-1.5 text-xs font-medium">Create customer from requester</p>
+        <input
+          value={company}
+          onChange={(event) => setCompany(event.target.value)}
+          placeholder="Company name"
+          className="mb-2 h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7"
+          disabled={creating}
+          onClick={() => void createCustomer()}
+        >
+          {creating && <LoaderIcon className="animate-spin" />}
+          Create and Link
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export function ContextPanel({
   ticket,
   messages,
@@ -208,8 +345,71 @@ export function ContextPanel({
           </MetaRow>
           <MetaRow label="Created">{formatFullTime(ticket.createdAt)}</MetaRow>
           <MetaRow label="Last activity">{formatRelativeTime(ticket.lastMessageAt)}</MetaRow>
+          {ticket.visitorEndedAt && <MetaRow label="Visitor ended">{formatFullTime(ticket.visitorEndedAt)}</MetaRow>}
           {ticket.resolvedAt && <MetaRow label="Resolved">{formatFullTime(ticket.resolvedAt)}</MetaRow>}
         </div>
+      </Section>
+
+      <Section title="Initial issue">
+        {ticket.initialIssue ? (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{ticket.initialIssue}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">No initial issue was provided.</p>
+        )}
+      </Section>
+
+      <Section title="Visitor feedback">
+        {ticket.visitorFeedback?.rating || ticket.visitorFeedback?.comment ? (
+          <div className="space-y-2">
+            {ticket.visitorFeedback.rating && (
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <StarIcon
+                    key={index}
+                    className={cn(
+                      "size-4",
+                      index < (ticket.visitorFeedback.rating ?? 0)
+                        ? "fill-primary text-primary"
+                        : "text-muted-foreground/30"
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+            {ticket.visitorFeedback.comment && (
+              <p className="rounded-lg border bg-muted/30 p-2 text-sm whitespace-pre-wrap">
+                {ticket.visitorFeedback.comment}
+              </p>
+            )}
+            {ticket.visitorFeedback.submittedAt && (
+              <p className="text-xs text-muted-foreground">
+                Submitted {formatRelativeTime(ticket.visitorFeedback.submittedAt)}
+              </p>
+            )}
+          </div>
+        ) : ticket.visitorEndedAt ? (
+          <p className="text-xs text-muted-foreground">The visitor ended without leaving feedback.</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Feedback appears here after the visitor ends the chat.</p>
+        )}
+      </Section>
+
+      <Section title="Transcript email">
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p>Requested: {ticket.emailTranscriptRequested ? "Yes" : "No"}</p>
+          <p>
+            Transcript sent:{" "}
+            {ticket.transcriptEmailSentAt ? formatFullTime(ticket.transcriptEmailSentAt) : "Not sent"}
+          </p>
+          <p>
+            Resolution sent:{" "}
+            {ticket.resolvedEmailSentAt ? formatFullTime(ticket.resolvedEmailSentAt) : "Not sent"}
+          </p>
+        </div>
+      </Section>
+
+      <Section title="Customer match">
+        <CustomerMapping ticket={ticket} />
       </Section>
 
       <Section title="Internal notes" count={notes.length}>

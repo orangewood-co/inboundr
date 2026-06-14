@@ -266,6 +266,9 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [menuOpen, setMenuOpen] = useState(false)
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
+  const [feedbackComment, setFeedbackComment] = useState("")
+  const [endingChat, setEndingChat] = useState(false)
+  const [endPersisted, setEndPersisted] = useState(false)
 
   const { muted, toggleMuted, playConnected, playReceived } = useSupportSounds()
   const { theme, toggleTheme } = useTheme()
@@ -545,21 +548,63 @@ export default function SupportPage({ organizationId }: { organizationId: string
     setSocketReady(false)
     setRating(0)
     setHoverRating(0)
+    setFeedbackComment("")
+    setEndingChat(false)
+    setEndPersisted(false)
     setMenuOpen(false)
     setIssue("")
     setEmailCopy(false)
     setPhase("prechat")
   }
 
-  function endChat() {
+  async function persistSupportEnd(input: { rating?: number; feedbackComment?: string } = {}) {
+    if (!sessionToken) return true
+    const response = await fetch(`${apiBase}/session/${sessionToken}/end`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+    const body = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(body?.error ?? "Failed to end chat")
+    if (body?.ticket) setTicket(body.ticket)
+    return true
+  }
+
+  async function endChat() {
+    setMenuOpen(false)
+    setEndingChat(true)
+    setError(null)
+    try {
+      await persistSupportEnd()
+      setEndPersisted(true)
+      window.localStorage.removeItem(sessionStorageKey(organizationId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to end chat")
+      setEndPersisted(false)
+    } finally {
+      setEndingChat(false)
+    }
     socketRef.current?.close()
     if (reconnectRef.current) window.clearTimeout(reconnectRef.current)
-    window.localStorage.removeItem(sessionStorageKey(organizationId))
-    setMenuOpen(false)
     setSocketReady(false)
     setAgentTyping(false)
     setStreamingText(null)
     setPhase("ended")
+  }
+
+  async function submitFeedback() {
+    if (!rating && !feedbackComment.trim()) return
+    setEndingChat(true)
+    setError(null)
+    try {
+      await persistSupportEnd({ rating, feedbackComment: feedbackComment.trim() })
+      setEndPersisted(true)
+      window.localStorage.removeItem(sessionStorageKey(organizationId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save feedback")
+    } finally {
+      setEndingChat(false)
+    }
   }
 
   async function uploadAttachment(file: File, token: string): Promise<SupportAttachment> {
@@ -1140,9 +1185,16 @@ export default function SupportPage({ organizationId }: { organizationId: string
               <p className="mt-1.5 max-w-xs text-sm text-stone-500 dark:text-stone-400">
                 Thanks for chatting with {organization.name}.{" "}
                 {emailCopy
-                  ? "A copy of this conversation is on its way to your inbox."
+                  ? endPersisted
+                    ? "A copy of this conversation is on its way to your inbox."
+                    : "We still need to save your transcript request."
                   : "We hope we were able to help."}
               </p>
+              {error && (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                  {error}
+                </p>
+              )}
 
               <div className="mt-6">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
@@ -1170,7 +1222,24 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     )
                   })}
                 </div>
-                {rating > 0 && (
+                <textarea
+                  value={feedbackComment}
+                  onChange={(event) => setFeedbackComment(event.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Anything else you'd like us to know?"
+                  className="mt-3 w-full max-w-xs resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-stone-400 focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500"
+                />
+                <Button
+                  type="button"
+                  onClick={() => void submitFeedback()}
+                  disabled={endingChat || (!rating && !feedbackComment.trim())}
+                  className="mt-3 h-10 w-full max-w-xs"
+                >
+                  {endingChat && <LoaderIcon className="size-4 animate-spin" />}
+                  Save Feedback
+                </Button>
+                {endPersisted && (rating > 0 || feedbackComment.trim()) && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1181,7 +1250,19 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 )}
               </div>
 
-              <Button type="button" onClick={startNewChat} className="mt-7 h-11 w-full max-w-xs">
+              {!endPersisted && (
+                <Button
+                  type="button"
+                  onClick={() => void endChat()}
+                  disabled={endingChat}
+                  className="mt-5 h-11 w-full max-w-xs"
+                >
+                  {endingChat && <LoaderIcon className="size-4 animate-spin" />}
+                  Retry Saving Chat
+                </Button>
+              )}
+
+              <Button type="button" onClick={startNewChat} className="mt-4 h-11 w-full max-w-xs">
                 Start new chat
               </Button>
               <p className="mt-4 text-xs text-stone-400 dark:text-stone-500">Powered by Inboundr</p>

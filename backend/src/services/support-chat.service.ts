@@ -3,6 +3,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateText, streamText, type ModelMessage } from "ai";
 import mongoose from "mongoose";
 
+import { Customer } from "../models/customer.model";
 import { Organization, type IOrganization } from "../models/organization.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
 import {
@@ -86,10 +87,22 @@ async function nextTicketNumber(
 
 export async function createSupportSession(
   organization: SupportOrganizationBranding,
-  requester: { name: string; email: string }
+  requester: { name: string; email: string },
+  options: { initialIssue?: string; emailTranscriptRequested?: boolean } = {}
 ): Promise<ITicket> {
   const organizationId = new mongoose.Types.ObjectId(organization._id);
   const sessionToken = crypto.randomBytes(24).toString("base64url");
+  const initialIssue = String(options.initialIssue ?? "").trim().slice(0, 2000);
+  const exactCustomers = await Customer.find({
+    organizationId,
+    email: requester.email,
+    isArchived: { $ne: true },
+  })
+    .select("_id")
+    .limit(2)
+    .lean();
+  const exactCustomer = exactCustomers.length === 1 ? exactCustomers[0] : null;
+  const customerId = exactCustomer?._id ?? null;
 
   let ticket: ITicket | null = null;
   // ticketNumber is assigned optimistically; retry on the rare concurrent clash.
@@ -98,10 +111,15 @@ export async function createSupportSession(
       ticket = await Ticket.create({
         organizationId,
         ticketNumber: await nextTicketNumber(organizationId),
-        subject: "",
+        customerId,
+        subject: initialIssue ? initialIssue.slice(0, 80) : "",
+        initialIssue,
         channel: "chat",
         requester,
         sessionToken,
+        emailTranscriptRequested: Boolean(options.emailTranscriptRequested),
+        lastMessageAt: new Date(),
+        lastVisitorMessageAt: initialIssue ? new Date() : null,
       });
       break;
     } catch (err: any) {
@@ -109,6 +127,15 @@ export async function createSupportSession(
     }
   }
   if (!ticket) throw new Error("Failed to create support session");
+
+  if (initialIssue) {
+    await TicketMessage.create({
+      ticketId: ticket._id,
+      organizationId,
+      authorType: "visitor",
+      bodyText: initialIssue,
+    });
+  }
 
   const firstName = requester.name.split(/\s+/)[0] || requester.name;
   await TicketMessage.create({

@@ -16,6 +16,9 @@ const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
 function previewParts(ticket: Ticket): { prefix: string | null; text: string; note: boolean } {
   const note = Boolean(ticket.lastMessageIsInternal)
   const preview = ticket.lastMessagePreview?.trim()
+  if (ticket.initialIssue?.trim()) {
+    return { prefix: "Issue", text: ticket.initialIssue.trim(), note: false }
+  }
   if (!preview) {
     return { prefix: null, text: ticket.subject || "New support chat", note: false }
   }
@@ -94,7 +97,14 @@ function ConversationListItem({
             <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
           )}
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground/60 tabular-nums">#{ticket.ticketNumber}</p>
+        <div className="mt-1 flex items-center gap-1.5">
+          <p className="text-[11px] text-muted-foreground/60 tabular-nums">#{ticket.ticketNumber}</p>
+          {ticket.visitorEndedAt && ticket.status === "open" && (
+            <span className="inline-flex rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+              Visitor ended
+            </span>
+          )}
+        </div>
       </div>
     </button>
   )
@@ -146,7 +156,10 @@ export function ConversationList({
       const haystack = [
         ticket.requester.name,
         ticket.requester.email,
+        ticket.customer?.name ?? "",
+        ticket.customer?.company ?? "",
         ticket.subject,
+        ticket.initialIssue,
         ticket.lastMessagePreview ?? "",
         `#${ticket.ticketNumber}`,
         String(ticket.ticketNumber),

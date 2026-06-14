@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+import { Customer } from "../models/customer.model";
 import { Ticket, type ITicket, type TicketStatus } from "../models/ticket.model";
 import {
   TicketMessage,
@@ -7,8 +8,32 @@ import {
   type ITicketMessageAttachment,
 } from "../models/ticket-message.model";
 import { createPresignedViewUrl } from "./storage.service";
+import { sendSupportResolvedEmail } from "./support-email.service";
 
 export type TicketListStatus = TicketStatus | "all";
+
+export function serializeCustomer(customer: any) {
+  if (!customer) return null;
+  return {
+    id: String(customer._id),
+    name: customer.name,
+    company: customer.company,
+    email: customer.email,
+    contactNumber: customer.contactNumber ?? null,
+    address: customer.address ?? null,
+    specialDiscountPercentage: customer.specialDiscountPercentage ?? 0,
+  };
+}
+
+function customerIdFromTicket(ticket: any): string | null {
+  if (!ticket.customerId) return null;
+  return String(ticket.customerId._id ?? ticket.customerId);
+}
+
+function customerFromTicket(ticket: any) {
+  const candidate = ticket.customer ?? ticket.customerId;
+  return candidate && typeof candidate === "object" && "email" in candidate ? candidate : null;
+}
 
 export function normalizeTicketListStatus(value: unknown): TicketListStatus {
   return value === "all" ||
@@ -49,12 +74,24 @@ export function serializeTicket(ticket: ITicket | any) {
     priority: ticket.priority,
     channel: ticket.channel,
     requester: ticket.requester,
+    customerId: customerIdFromTicket(ticket),
+    customer: serializeCustomer(customerFromTicket(ticket)),
+    initialIssue: ticket.initialIssue ?? "",
+    emailTranscriptRequested: Boolean(ticket.emailTranscriptRequested),
     botEnabled: ticket.botEnabled,
     lastMessageAt: ticket.lastMessageAt,
     lastVisitorMessageAt: ticket.lastVisitorMessageAt,
     lastAgentMessageAt: ticket.lastAgentMessageAt,
     lastVisitorReadAt: ticket.lastVisitorReadAt,
     lastAgentReadAt: ticket.lastAgentReadAt,
+    visitorEndedAt: ticket.visitorEndedAt ?? null,
+    visitorFeedback: {
+      rating: ticket.visitorFeedback?.rating ?? null,
+      comment: ticket.visitorFeedback?.comment ?? "",
+      submittedAt: ticket.visitorFeedback?.submittedAt ?? null,
+    },
+    transcriptEmailSentAt: ticket.transcriptEmailSentAt ?? null,
+    resolvedEmailSentAt: ticket.resolvedEmailSentAt ?? null,
     resolvedAt: ticket.resolvedAt,
     // Optional list-only fields, populated by listTickets' aggregation.
     lastMessagePreview: ticket.lastMessagePreview ?? null,
@@ -123,7 +160,16 @@ export async function listTickets(input: {
         as: "lastMessage",
       },
     },
+    {
+      $lookup: {
+        from: Customer.collection.name,
+        localField: "customerId",
+        foreignField: "_id",
+        as: "customer",
+      },
+    },
     { $addFields: { lastMessage: { $arrayElemAt: ["$lastMessage", 0] } } },
+    { $addFields: { customer: { $arrayElemAt: ["$customer", 0] } } },
   ]);
 
   return tickets.map((ticket) =>
@@ -145,7 +191,9 @@ export async function getTicketWithMessages(input: {
   const ticket = await Ticket.findOne({
     _id: input.ticketId,
     organizationId: input.organizationId,
-  }).lean();
+  })
+    .populate("customerId")
+    .lean();
   if (!ticket) return null;
 
   const messages = await TicketMessage.find({
@@ -191,6 +239,112 @@ export async function listRelatedTickets(input: {
   return related.map(serializeTicket);
 }
 
+export async function listCustomerCandidates(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+  search?: string;
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+
+  const ticket = await Ticket.findOne({
+    _id: input.ticketId,
+    organizationId: input.organizationId,
+  }).lean();
+  if (!ticket) return null;
+
+  const search = String(input.search ?? "").trim();
+  const requesterEmail = ticket.requester?.email ?? "";
+  const requesterName = ticket.requester?.name ?? "";
+  const baseFilter = {
+    organizationId: input.organizationId,
+    isArchived: { $ne: true },
+  };
+
+  const filter = search
+    ? {
+        ...baseFilter,
+        $or: ["name", "company", "email", "contactNumber"].map((field) => ({
+          [field]: { $regex: search, $options: "i" },
+        })),
+      }
+    : {
+        ...baseFilter,
+        $or: [
+          { email: requesterEmail },
+          { name: { $regex: requesterName, $options: "i" } },
+          { company: { $regex: requesterName, $options: "i" } },
+        ],
+      };
+
+  const customers = await Customer.find(filter).sort({ updatedAt: -1 }).limit(10).lean();
+  return {
+    linkedCustomerId: customerIdFromTicket(ticket),
+    candidates: customers.map(serializeCustomer),
+  };
+}
+
+export async function linkTicketCustomer(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+  customerId: string | null;
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+  if (input.customerId && !mongoose.Types.ObjectId.isValid(input.customerId)) return null;
+
+  if (input.customerId) {
+    const customer = await Customer.findOne({
+      _id: input.customerId,
+      organizationId: input.organizationId,
+      isArchived: { $ne: true },
+    }).lean();
+    if (!customer) return null;
+  }
+
+  const ticket = await Ticket.findOneAndUpdate(
+    { _id: input.ticketId, organizationId: input.organizationId },
+    { customerId: input.customerId ? new mongoose.Types.ObjectId(input.customerId) : null },
+    { new: true }
+  )
+    .populate("customerId")
+    .lean();
+
+  return ticket ? serializeTicket(ticket) : null;
+}
+
+export async function createAndLinkTicketCustomer(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+  company?: string;
+  contactNumber?: string;
+  address?: string;
+  notes?: string;
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+  const ticket = await Ticket.findOne({
+    _id: input.ticketId,
+    organizationId: input.organizationId,
+  }).lean();
+  if (!ticket) return null;
+
+  const customer = await Customer.create({
+    organizationId: input.organizationId,
+    name: ticket.requester.name,
+    company: String(input.company ?? ticket.requester.name).trim() || ticket.requester.name,
+    email: ticket.requester.email,
+    contactNumber: String(input.contactNumber ?? "").trim() || null,
+    address: String(input.address ?? "").trim() || null,
+    notes: String(input.notes ?? "Created from support conversation").trim() || null,
+  });
+
+  const linked = await linkTicketCustomer({
+    organizationId: input.organizationId,
+    ticketId: input.ticketId,
+    customerId: String(customer._id),
+  });
+
+  return linked;
+}
+
 export async function resolveTicket(input: {
   organizationId: mongoose.Types.ObjectId;
   ticketId: string;
@@ -202,7 +356,14 @@ export async function resolveTicket(input: {
     { status: "resolved", resolvedAt: now, botEnabled: false, lastMessageAt: now },
     { new: true }
   ).lean();
-  return ticket ? serializeTicket(ticket) : null;
+  if (!ticket) return null;
+  try {
+    await sendSupportResolvedEmail(String(ticket._id));
+  } catch (err) {
+    console.error(`Failed to send support resolution email for ticket ${ticket._id}:`, err);
+  }
+  const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
+  return fresh ? serializeTicket(fresh) : serializeTicket(ticket);
 }
 
 export async function reopenTicket(input: {
@@ -216,5 +377,7 @@ export async function reopenTicket(input: {
     { status: "open", resolvedAt: null, lastMessageAt: now },
     { new: true }
   ).lean();
-  return ticket ? serializeTicket(ticket) : null;
+  if (!ticket) return null;
+  const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
+  return fresh ? serializeTicket(fresh) : serializeTicket(ticket);
 }

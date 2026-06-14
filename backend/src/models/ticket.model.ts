@@ -9,22 +9,35 @@ export interface ITicketRequester {
   email: string;
 }
 
+export interface ITicketVisitorFeedback {
+  rating: number | null;
+  comment: string;
+  submittedAt: Date | null;
+}
+
 export interface ITicket extends Document {
   organizationId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId | null;
   ticketNumber: number;
   subject: string;
+  initialIssue: string;
   status: TicketStatus;
   priority: TicketPriority;
   channel: TicketChannel;
   requester: ITicketRequester;
   /** Visitor resume key for chat-channel tickets. */
   sessionToken: string | null;
+  emailTranscriptRequested: boolean;
   botEnabled: boolean;
   lastMessageAt: Date;
   lastVisitorMessageAt: Date | null;
   lastAgentMessageAt: Date | null;
   lastVisitorReadAt: Date | null;
   lastAgentReadAt: Date | null;
+  visitorEndedAt: Date | null;
+  visitorFeedback: ITicketVisitorFeedback;
+  transcriptEmailSentAt: Date | null;
+  resolvedEmailSentAt: Date | null;
   resolvedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +51,15 @@ const ticketRequesterSchema = new Schema<ITicketRequester>(
   { _id: false }
 );
 
+const ticketVisitorFeedbackSchema = new Schema<ITicketVisitorFeedback>(
+  {
+    rating: { type: Number, default: null, min: 1, max: 5 },
+    comment: { type: String, default: "", trim: true, maxlength: 2000 },
+    submittedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const ticketSchema = new Schema<ITicket>(
   {
     organizationId: {
@@ -46,8 +68,15 @@ const ticketSchema = new Schema<ITicket>(
       required: true,
       index: true,
     },
+    customerId: {
+      type: Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      index: true,
+    },
     ticketNumber: { type: Number, required: true },
     subject: { type: String, default: "", trim: true },
+    initialIssue: { type: String, default: "", trim: true, maxlength: 2000 },
     status: {
       type: String,
       enum: ["open", "pending", "resolved", "closed"],
@@ -67,12 +96,17 @@ const ticketSchema = new Schema<ITicket>(
     },
     requester: { type: ticketRequesterSchema, required: true },
     sessionToken: { type: String, default: null },
+    emailTranscriptRequested: { type: Boolean, default: false },
     botEnabled: { type: Boolean, default: true },
     lastMessageAt: { type: Date, default: Date.now },
     lastVisitorMessageAt: { type: Date, default: null },
     lastAgentMessageAt: { type: Date, default: null },
     lastVisitorReadAt: { type: Date, default: null },
     lastAgentReadAt: { type: Date, default: null },
+    visitorEndedAt: { type: Date, default: null },
+    visitorFeedback: { type: ticketVisitorFeedbackSchema, default: () => ({}) },
+    transcriptEmailSentAt: { type: Date, default: null },
+    resolvedEmailSentAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },
   },
   { timestamps: true }
@@ -84,5 +118,6 @@ ticketSchema.index(
   { unique: true, partialFilterExpression: { sessionToken: { $type: "string" } } }
 );
 ticketSchema.index({ organizationId: 1, status: 1, lastMessageAt: -1 });
+ticketSchema.index({ organizationId: 1, customerId: 1, lastMessageAt: -1 });
 
 export const Ticket = mongoose.model<ITicket>("Ticket", ticketSchema);

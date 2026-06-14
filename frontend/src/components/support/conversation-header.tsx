@@ -1,4 +1,5 @@
 import {
+  AlertCircleIcon,
   CheckCircle2Icon,
   CopyIcon,
   MailIcon,
@@ -41,7 +42,14 @@ export function ConversationHeader({
   const resolved = ticket.status === "resolved"
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+    <div className="border-b">
+      {ticket.visitorEndedAt && ticket.status === "open" && (
+        <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/[0.08] px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertCircleIcon className="size-3.5" />
+          Visitor ended this chat. Keep it open for follow-up or mark it resolved when done.
+        </div>
+      )}
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <Avatar size="lg">
           <AvatarFallback className={cn("font-semibold", avatar.bg, avatar.text)}>
@@ -61,6 +69,11 @@ export function ConversationHeader({
             {notesCount > 0 && (
               <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-amber-500/15 px-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                 {notesCount} {notesCount === 1 ? "Note" : "Notes"}
+              </span>
+            )}
+            {ticket.customer && (
+              <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-emerald-500/15 px-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                {ticket.customer.company || ticket.customer.name}
               </span>
             )}
           </div>
@@ -130,6 +143,7 @@ export function ConversationHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+    </div>
     </div>
   )
 }
