@@ -7,7 +7,7 @@ export function Label({
 }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={`text-sm font-medium text-stone-700 ${className}`}
+      className={`text-[13px] font-medium text-stone-600 dark:text-stone-300 ${className}`}
       {...props}
     >
       {children}

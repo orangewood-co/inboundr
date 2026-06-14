@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
+import { type FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { motion } from "motion/react"
 import {
   AlertCircleIcon,
@@ -8,9 +8,11 @@ import {
   FileIcon,
   HeadsetIcon,
   LoaderIcon,
+  MoonIcon,
   PaperclipIcon,
   SendIcon,
   StarIcon,
+  SunIcon,
   Volume2Icon,
   VolumeXIcon,
   XIcon,
@@ -72,6 +74,9 @@ type Phase = "loading" | "unavailable" | "prechat" | "chat" | "ended"
 
 const MESSAGE_MAX_LENGTH = 4000
 const MUTE_STORAGE_KEY = "inboundr-support-muted"
+const THEME_STORAGE_KEY = "inboundr-support-theme"
+
+type Theme = "light" | "dark"
 
 function sessionStorageKey(organizationId: string) {
   return `inboundr-support-session:${organizationId}`
@@ -151,14 +156,6 @@ function readableTextColor(hex: string): string {
   return luminance > 0.62 ? "#1c1917" : "#ffffff"
 }
 
-/** Lightens (positive amount) or darkens (negative amount) a hex color. */
-function adjustColor(hex: string, amount: number): string {
-  const rgb = hexToRgb(hex)
-  if (!rgb) return hex
-  const channels = rgb.map((channel) => Math.max(0, Math.min(255, Math.round(channel + amount))))
-  return `#${((channels[0] << 16) | (channels[1] << 8) | channels[2]).toString(16).padStart(6, "0")}`
-}
-
 function useSupportSounds() {
   const [muted, setMuted] = useState<boolean>(() => {
     try {
@@ -214,6 +211,31 @@ function useSupportSounds() {
   return { muted, toggleMuted, playConnected, playReceived }
 }
 
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+      if (stored === "light" || stored === "dark") return stored
+    } catch {
+      // Ignore storage access failures.
+    }
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+  })
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark")
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+    } catch {
+      // Ignore storage access failures.
+    }
+  }, [theme])
+
+  const toggleTheme = useCallback(() => setTheme((value) => (value === "dark" ? "light" : "dark")), [])
+
+  return { theme, toggleTheme }
+}
+
 export default function SupportPage({ organizationId }: { organizationId: string }) {
   const [phase, setPhase] = useState<Phase>("loading")
   const [organization, setOrganization] = useState<SupportOrganization | null>(null)
@@ -243,6 +265,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [hoverRating, setHoverRating] = useState(0)
 
   const { muted, toggleMuted, playConnected, playReceived } = useSupportSounds()
+  const { theme, toggleTheme } = useTheme()
 
   const bottomRef = useRef<HTMLDivElement | null>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
@@ -595,7 +618,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   if (phase === "loading") {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-stone-100 text-stone-400">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] text-stone-400 dark:bg-[#0a0908] dark:text-stone-500">
         <LoaderIcon className="size-6 animate-spin" />
       </main>
     )
@@ -603,10 +626,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   if (phase === "unavailable" || !organization) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-stone-100 px-6">
-        <div className="max-w-sm rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] px-6 dark:bg-[#0a0908]">
+        <div className="max-w-sm rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm dark:border-stone-800 dark:bg-stone-900">
           <AlertCircleIcon className="mx-auto size-8 text-red-500" />
-          <p className="mt-3 text-sm font-medium text-stone-700">{unavailableMessage}</p>
+          <p className="mt-3 text-sm font-medium text-stone-700 dark:text-stone-300">{unavailableMessage}</p>
         </div>
       </main>
     )
@@ -614,7 +637,6 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   const accent = organization.primaryColor || "#f5b400"
   const onAccent = readableTextColor(accent)
-  const headerGradient = `linear-gradient(135deg, ${adjustColor(accent, 22)} 0%, ${accent} 55%, ${adjustColor(accent, -26)} 100%)`
   const orgInitial = organization.name.charAt(0).toUpperCase()
 
   const headerAvatar =
@@ -623,12 +645,12 @@ export default function SupportPage({ organizationId }: { organizationId: string
         src={organization.logoUrl}
         alt={organization.name}
         onError={() => setLogoBroken(true)}
-        className="size-10 shrink-0 rounded-xl bg-white object-contain p-0.5 shadow-sm"
+        className="size-9 shrink-0 rounded-xl bg-white object-contain ring-1 ring-stone-200 dark:ring-stone-700"
       />
     ) : (
       <div
-        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-base font-bold shadow-sm"
-        style={{ color: accent }}
+        className="flex size-9 shrink-0 items-center justify-center rounded-xl font-display text-sm font-bold"
+        style={{ backgroundColor: accent, color: onAccent }}
       >
         {orgInitial}
       </div>
@@ -639,7 +661,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       <img
         src={organization.logoUrl}
         alt=""
-        className="size-7 shrink-0 rounded-full bg-white object-contain ring-1 ring-stone-200"
+        className="size-7 shrink-0 rounded-full bg-white object-contain ring-1 ring-stone-200 dark:ring-stone-700"
       />
     ) : (
       <div
@@ -650,37 +672,50 @@ export default function SupportPage({ organizationId }: { organizationId: string
       </div>
     )
 
-  const renderHeader = (subtitle: React.ReactNode, showMenu: boolean) => (
-    <header
-      className="flex items-center gap-3 px-4 py-3.5"
-      style={{ backgroundImage: headerGradient, color: onAccent }}
+  const iconButtonClasses =
+    "flex size-9 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
+
+  const themeToggle = (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      className={iconButtonClasses}
     >
+      {theme === "dark" ? <SunIcon className="size-[18px]" /> : <MoonIcon className="size-[18px]" />}
+    </button>
+  )
+
+  const renderHeader = (subtitle: React.ReactNode, showMenu: boolean) => (
+    <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
       {headerAvatar}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-sm font-semibold">{organization.name}</h1>
-        <div className="mt-0.5 flex items-center text-xs" style={{ color: onAccent }}>
-          {subtitle}
-        </div>
+        <h1 className="truncate font-display text-[15px] font-semibold tracking-tight text-stone-900 dark:text-stone-100">
+          {organization.name}
+        </h1>
+        {subtitle ? (
+          <div className="mt-0.5 flex items-center text-xs text-stone-500 dark:text-stone-400">{subtitle}</div>
+        ) : null}
       </div>
+      {themeToggle}
       {showMenu && (
         <div className="relative">
           <button
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-label="Chat options"
-            className="flex size-9 items-center justify-center rounded-lg transition hover:bg-black/10"
-            style={{ color: onAccent }}
+            className={iconButtonClasses}
           >
-            <EllipsisVerticalIcon className="size-5" />
+            <EllipsisVerticalIcon className="size-[18px]" />
           </button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 text-stone-700 shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 text-stone-700 shadow-lg dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200 dark:shadow-black/40">
                 <button
                   type="button"
                   onClick={toggleMuted}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm transition hover:bg-stone-50"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm transition hover:bg-stone-50 dark:hover:bg-stone-700/60"
                 >
                   {muted ? (
                     <VolumeXIcon className="size-4 text-stone-400" />
@@ -692,7 +727,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 <button
                   type="button"
                   onClick={endChat}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                 >
                   <XIcon className="size-4" />
                   End chat
@@ -707,38 +742,46 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   const connectionStatus = (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span className={`size-1.5 shrink-0 rounded-full ${socketReady ? "bg-emerald-400" : "bg-amber-300"}`} />
-      <span className="truncate opacity-90">
-        {socketReady ? "Typically replies in a few minutes" : "Connecting…"}
-      </span>
+      <span className={`size-1.5 shrink-0 rounded-full ${socketReady ? "bg-emerald-500" : "bg-amber-500"}`} />
+      <span className="truncate">{socketReady ? "Online" : "Connecting…"}</span>
     </span>
   )
 
+  const availabilityStatus = (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+      <span className="truncate">Online</span>
+    </span>
+  )
+
+  const canSend = !sending && (draft.trim().length > 0 || files.length > 0)
+
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-stone-100 sm:p-6">
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-[min(44rem,calc(100dvh-3rem))] sm:max-w-md sm:rounded-2xl sm:border sm:border-stone-200 sm:shadow-xl">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] dark:bg-[#0a0908] sm:p-6">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-stone-900 sm:h-[min(44rem,calc(100dvh-3rem))] sm:max-w-md sm:rounded-[20px] sm:ring-1 sm:ring-stone-900/5 sm:shadow-[0_24px_60px_-20px_rgba(28,25,23,0.35)] dark:sm:ring-white/10">
         {phase === "prechat" && (
           <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="px-6 pt-7 pb-6" style={{ backgroundImage: headerGradient, color: onAccent }}>
-              <div className="flex items-center gap-2.5">
-                {headerAvatar}
-                <span className="text-sm font-medium opacity-90">{organization.name}</span>
-              </div>
+            {renderHeader(availabilityStatus, false)}
+
+            <form
+              onSubmit={startChat}
+              className="thread-scroll flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-7"
+            >
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
-                <h2 className="mt-5 text-2xl font-bold tracking-tight">Hi there 👋</h2>
-                <p className="mt-1 text-sm opacity-90">
-                  Tell us a bit about your issue and we&apos;ll connect you with the team.
+                <h2 className="font-display text-[26px] font-semibold leading-tight tracking-tight text-stone-900 dark:text-stone-50">
+                  How can we help?
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+                  Describe your issue and we&apos;ll connect you with the team. We usually reply within a few minutes.
                 </p>
               </motion.div>
-            </div>
 
-            <form onSubmit={startChat} className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-6">
               <div className="grid gap-1.5">
-                <Label htmlFor="support-issue">How can we help?</Label>
+                <Label htmlFor="support-issue">Message</Label>
                 <Textarea
                   id="support-issue"
                   value={issue}
@@ -779,23 +822,23 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 type="button"
                 onClick={() => setEmailCopy((value) => !value)}
                 aria-pressed={emailCopy}
-                className="flex items-start gap-3 rounded-xl border border-stone-200 px-3.5 py-3 text-left transition hover:bg-stone-50"
+                className="flex items-center gap-3 rounded-xl border border-stone-200 px-3.5 py-3 text-left transition hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800/50"
               >
                 <span
-                  className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md border transition"
-                  style={
-                    emailCopy
-                      ? { backgroundColor: accent, borderColor: accent, color: onAccent }
-                      : { borderColor: "#d6d3d1" }
-                  }
+                  className={`flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border transition ${
+                    emailCopy ? "" : "border-stone-300 dark:border-stone-600"
+                  }`}
+                  style={emailCopy ? { backgroundColor: accent, borderColor: accent, color: onAccent } : undefined}
                 >
-                  {emailCopy && <CheckIcon className="size-3.5" strokeWidth={3} />}
+                  {emailCopy && <CheckIcon className="size-3" strokeWidth={3.5} />}
                 </span>
-                <span className="text-sm text-stone-600">Email me a copy of this conversation</span>
+                <span className="text-sm text-stone-600 dark:text-stone-300">
+                  Email me a copy of this conversation
+                </span>
               </button>
 
               {error && (
-                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
                   {error}
                 </p>
               )}
@@ -803,13 +846,12 @@ export default function SupportPage({ organizationId }: { organizationId: string
               <Button
                 type="submit"
                 disabled={starting || !issue.trim() || !name.trim() || !email.trim()}
-                className="h-11"
-                style={{ backgroundColor: accent, color: onAccent }}
+                className="mt-1 h-11 w-full"
               >
                 {starting && <LoaderIcon className="size-4 animate-spin" />}
                 Start chat
               </Button>
-              <p className="pt-1 text-center text-xs text-stone-400">Powered by Inboundr</p>
+              <p className="text-center text-xs text-stone-400 dark:text-stone-500">Powered by Inboundr</p>
             </form>
           </div>
         )}
@@ -818,7 +860,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
           <>
             {renderHeader(connectionStatus, true)}
 
-            <div className="flex-1 space-y-1 overflow-y-auto px-4 py-5" aria-live="polite">
+            <div
+              className="thread-scroll flex-1 space-y-2 overflow-y-auto bg-white px-4 py-5 dark:bg-stone-900"
+              aria-live="polite"
+            >
               {messages.length === 0 && streamingText === null && (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
@@ -827,7 +872,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   className="flex items-end gap-2"
                 >
                   {supportAvatar}
-                  <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-700">
+                  <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-700 dark:bg-stone-800 dark:text-stone-200">
                     {visitorName ? `Hi ${visitorName.split(/\s+/)[0]}! ` : "Hi! "}
                     Thanks for reaching out to {organization.name}. Someone from the team will be with you shortly — feel
                     free to share any extra details below.
@@ -835,11 +880,11 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 </motion.div>
               )}
 
-              {messages.map((message) => {
+              {messages.map((message, index) => {
                 if (message.authorType === "system") {
                   return (
                     <div key={message.id} className="flex justify-center py-1.5">
-                      <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500">
+                      <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-500 dark:bg-stone-800 dark:text-stone-400">
                         {message.bodyText}
                       </span>
                     </div>
@@ -847,6 +892,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 }
 
                 const isVisitor = message.authorType === "visitor"
+                const previous = messages[index - 1]
+                const showAvatar =
+                  !isVisitor &&
+                  (!previous || previous.authorType === "visitor" || previous.authorType === "system")
                 return (
                   <motion.div
                     key={message.id}
@@ -855,16 +904,18 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     transition={{ duration: 0.2, ease: "easeOut" }}
                     className={`flex items-end gap-2 ${isVisitor ? "justify-end" : "justify-start"}`}
                   >
-                    {!isVisitor && supportAvatar}
+                    {!isVisitor && (showAvatar ? supportAvatar : <div className="size-7 shrink-0" />)}
                     <div
                       title={formatFullTime(message.createdAt)}
                       className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                        isVisitor ? "rounded-br-md" : "rounded-bl-md bg-stone-100 text-stone-800"
+                        isVisitor
+                          ? "rounded-br-md"
+                          : "rounded-bl-md bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-100"
                       }`}
                       style={isVisitor ? { backgroundColor: accent, color: onAccent } : undefined}
                     >
-                      {message.authorType === "agent" && (
-                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                      {message.authorType === "agent" && showAvatar && (
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                           Support Team
                         </p>
                       )}
@@ -878,7 +929,9 @@ export default function SupportPage({ organizationId }: { organizationId: string
                               target="_blank"
                               rel="noreferrer"
                               className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs ${
-                                isVisitor ? "" : "border-stone-200 bg-white text-stone-700"
+                                isVisitor
+                                  ? ""
+                                  : "border-stone-200 bg-white text-stone-700 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200"
                               } ${!attachment.url ? "pointer-events-none opacity-60" : ""}`}
                               style={
                                 isVisitor
@@ -898,7 +951,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                         </div>
                       )}
                       <p
-                        className={`mt-1 text-[11px] ${isVisitor ? "" : "text-stone-500"}`}
+                        className={`mt-1 text-[11px] ${isVisitor ? "" : "text-stone-400 dark:text-stone-500"}`}
                         style={isVisitor ? { color: onAccent, opacity: 0.7 } : undefined}
                       >
                         {formatTime(message.createdAt)}
@@ -914,7 +967,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
               {streamingText !== null && (
                 <div className="flex items-end gap-2">
                   {supportAvatar}
-                  <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-800">
+                  <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-800 dark:bg-stone-800 dark:text-stone-100">
                     {streamingText ? streamingText : <TypingDots />}
                   </div>
                 </div>
@@ -923,21 +976,23 @@ export default function SupportPage({ organizationId }: { organizationId: string
               {agentTyping && (
                 <div className="flex items-end gap-2">
                   {supportAvatar}
-                  <div className="rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-3 text-stone-500">
+                  <div className="rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-3 dark:bg-stone-800">
                     <TypingDots />
                   </div>
                 </div>
               )}
 
               {error && (
-                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p>
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                  {error}
+                </p>
               )}
               <div ref={bottomRef} />
             </div>
 
             <form
               onSubmit={sendMessage}
-              className="border-t border-stone-200 bg-white px-3 pt-3"
+              className="border-t border-stone-200 bg-white px-3 pt-3 dark:border-stone-800 dark:bg-stone-900"
               style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
             >
               {files.length > 0 && (
@@ -945,13 +1000,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   {files.map((item) => (
                     <span
                       key={item.id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
                     >
-                      <PaperclipIcon className="size-3" />
-                      {item.file.name}
+                      <PaperclipIcon className="size-3 shrink-0" />
+                      <span className="truncate">{item.file.name}</span>
                       <button
                         type="button"
-                        className="text-stone-400 hover:text-stone-700"
+                        aria-label={`Remove ${item.file.name}`}
+                        className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
                         onClick={() => setFiles((current) => current.filter((file) => file.id !== item.id))}
                       >
                         <XIcon className="size-3" />
@@ -960,20 +1016,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   ))}
                 </div>
               )}
-              <div className="flex items-end gap-2">
-                <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-stone-200 text-stone-500 transition hover:bg-stone-50">
-                  <PaperclipIcon className="size-4" />
-                  <input
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    onChange={(event) => {
-                      addFiles(event.target.files)
-                      event.target.value = ""
-                    }}
-                  />
-                </label>
-                <Textarea
+              <div className="rounded-2xl border border-stone-200 bg-white transition focus-within:border-stone-400 focus-within:ring-4 focus-within:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800/40 dark:focus-within:border-stone-500 dark:focus-within:ring-white/5">
+                <textarea
                   id="support-message-input"
                   ref={composerRef}
                   value={draft}
@@ -983,18 +1027,36 @@ export default function SupportPage({ organizationId }: { organizationId: string
                   maxLength={MESSAGE_MAX_LENGTH}
                   disabled={sending}
                   rows={1}
-                  className="max-h-32 min-h-11 flex-1 self-stretch"
+                  className="block max-h-32 min-h-[40px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base leading-relaxed text-stone-900 outline-none placeholder:text-stone-400 disabled:opacity-60 sm:text-sm dark:text-stone-100 dark:placeholder:text-stone-500"
                 />
-                <Button
-                  type="submit"
-                  disabled={sending || (!draft.trim() && files.length === 0)}
-                  title="Send"
-                  aria-label="Send"
-                  className="size-11 shrink-0 rounded-xl p-0"
-                  style={{ backgroundColor: accent, color: onAccent }}
-                >
-                  {sending ? <LoaderIcon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
-                </Button>
+                <div className="flex items-center justify-between px-2.5 pb-2">
+                  <label className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700/60 dark:hover:text-stone-300">
+                    <PaperclipIcon className="size-[18px]" />
+                    <input
+                      type="file"
+                      className="sr-only"
+                      multiple
+                      onChange={(event) => {
+                        addFiles(event.target.files)
+                        event.target.value = ""
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={!canSend}
+                    title="Send"
+                    aria-label="Send"
+                    className={`flex size-8 items-center justify-center rounded-lg transition ${
+                      canSend
+                        ? "hover:brightness-95 active:scale-95"
+                        : "cursor-not-allowed bg-stone-200 text-stone-400 dark:bg-stone-700 dark:text-stone-500"
+                    }`}
+                    style={canSend ? { backgroundColor: accent, color: onAccent } : undefined}
+                  >
+                    {sending ? <LoaderIcon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
+                  </button>
+                </div>
               </div>
             </form>
           </>
@@ -1002,7 +1064,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
         {phase === "ended" && (
           <>
-            {renderHeader(<span className="truncate opacity-90">Conversation closed</span>, false)}
+            {renderHeader(<span className="truncate">Conversation closed</span>, false)}
             <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
@@ -1013,8 +1075,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
               >
                 <CircleCheckIcon className="size-8" style={{ color: accent }} />
               </motion.div>
-              <h2 className="mt-5 text-xl font-bold text-stone-900">Chat ended</h2>
-              <p className="mt-1.5 max-w-xs text-sm text-stone-500">
+              <h2 className="mt-5 font-display text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-50">
+                Chat ended
+              </h2>
+              <p className="mt-1.5 max-w-xs text-sm text-stone-500 dark:text-stone-400">
                 Thanks for chatting with {organization.name}.{" "}
                 {emailCopy
                   ? "A copy of this conversation is on its way to your inbox."
@@ -1022,10 +1086,13 @@ export default function SupportPage({ organizationId }: { organizationId: string
               </p>
 
               <div className="mt-6">
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-400">How was your experience?</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                  How was your experience?
+                </p>
                 <div className="mt-2 flex items-center justify-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => {
                     const active = star <= (hoverRating || rating)
+                    const inactiveColor = theme === "dark" ? "#57534e" : "#d6d3d1"
                     return (
                       <button
                         key={star}
@@ -1038,28 +1105,27 @@ export default function SupportPage({ organizationId }: { organizationId: string
                       >
                         <StarIcon
                           className="size-7"
-                          style={{ color: active ? accent : "#d6d3d1", fill: active ? accent : "none" }}
+                          style={{ color: active ? accent : inactiveColor, fill: active ? accent : "none" }}
                         />
                       </button>
                     )
                   })}
                 </div>
                 {rating > 0 && (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 text-xs text-stone-500">
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-2 text-xs text-stone-500 dark:text-stone-400"
+                  >
                     Thanks for your feedback!
                   </motion.p>
                 )}
               </div>
 
-              <Button
-                type="button"
-                onClick={startNewChat}
-                className="mt-7 h-11 w-full max-w-xs"
-                style={{ backgroundColor: accent, color: onAccent }}
-              >
+              <Button type="button" onClick={startNewChat} className="mt-7 h-11 w-full max-w-xs">
                 Start new chat
               </Button>
-              <p className="mt-4 text-xs text-stone-400">Powered by Inboundr</p>
+              <p className="mt-4 text-xs text-stone-400 dark:text-stone-500">Powered by Inboundr</p>
             </div>
           </>
         )}
