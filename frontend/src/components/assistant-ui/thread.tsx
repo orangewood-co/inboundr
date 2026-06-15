@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import {
   ActionBarPrimitive,
   AuiIf,
@@ -155,16 +156,25 @@ const TOOLS = [
 
 function ToolsMenu() {
   const composer = useComposerRuntime()
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   function applyPrompt(prompt: string) {
     composer.setText(prompt)
-    composer.focus()
+    requestAnimationFrame(() => {
+      const textarea = triggerRef.current
+        ?.closest("form")
+        ?.querySelector<HTMLTextAreaElement>('textarea[name="input"]')
+      if (!textarea) return
+      textarea.focus({ preventScroll: true })
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+    })
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           className="hidden h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
         >
