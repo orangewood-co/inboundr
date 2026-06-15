@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { makeAssistantToolUI } from "@assistant-ui/react"
 import { AlertCircleIcon, FileTextIcon, ReceiptTextIcon } from "lucide-react"
 
@@ -46,7 +46,11 @@ type SearchInvoicesResult = {
 
 function statusBadgeVariant(status: string) {
   if (status === "paid") return "default" as const
-  if (status === "overdue" || status === "cancelled" || status === "written_off") {
+  if (
+    status === "overdue" ||
+    status === "cancelled" ||
+    status === "written_off"
+  ) {
     return "destructive" as const
   }
   if (status === "draft") return "outline" as const
@@ -88,14 +92,22 @@ function InvoiceArtifactCard({
   useEffect(() => {
     if (!autoOpen || autoOpened.current) return
     autoOpened.current = true
-    openArtifact({ invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber })
+    openArtifact({
+      type: "invoice",
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+    })
   }, [autoOpen, invoice.id, invoice.invoiceNumber, openArtifact])
 
   return (
     <button
       type="button"
       onClick={() =>
-        openArtifact({ invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber })
+        openArtifact({
+          type: "invoice",
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+        })
       }
       className="group flex w-full max-w-md items-center gap-3 rounded-xl border bg-card p-3 text-left shadow-sm transition-colors hover:bg-muted/50"
     >
@@ -104,8 +116,13 @@ function InvoiceArtifactCard({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold">{invoice.invoiceNumber}</span>
-          <Badge variant={statusBadgeVariant(invoice.status)} className="capitalize">
+          <span className="truncate text-sm font-semibold">
+            {invoice.invoiceNumber}
+          </span>
+          <Badge
+            variant={statusBadgeVariant(invoice.status)}
+            className="capitalize"
+          >
             {statusLabel(invoice.status)}
           </Badge>
         </div>
@@ -128,9 +145,8 @@ function InvoiceArtifactCard({
  * freshly created invoices.
  */
 function useSawRunning(statusType: string) {
-  const sawRunning = useRef(false)
-  if (statusType === "running") sawRunning.current = true
-  return sawRunning.current
+  const [sawRunning] = useState(statusType === "running")
+  return sawRunning
 }
 
 function InvoiceMutationToolUI({
@@ -155,7 +171,7 @@ function InvoiceMutationToolUI({
   )
 }
 
-export const CreateInvoiceToolUI = makeAssistantToolUI<
+const CreateInvoiceToolUI = makeAssistantToolUI<
   Record<string, unknown>,
   InvoiceMutationResult
 >({
@@ -169,7 +185,7 @@ export const CreateInvoiceToolUI = makeAssistantToolUI<
   ),
 })
 
-export const UpdateInvoiceToolUI = makeAssistantToolUI<
+const UpdateInvoiceToolUI = makeAssistantToolUI<
   Record<string, unknown>,
   InvoiceMutationResult
 >({
@@ -200,7 +216,7 @@ function SearchInvoicesResults({ result }: { result: SearchInvoicesResult }) {
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <ReceiptTextIcon className="size-4 text-muted-foreground" />
         <span className="text-sm font-semibold">Invoices</span>
-        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary tabular-nums">
           {result.total}
         </span>
       </div>
@@ -211,6 +227,7 @@ function SearchInvoicesResults({ result }: { result: SearchInvoicesResult }) {
               type="button"
               onClick={() =>
                 openArtifact({
+                  type: "invoice",
                   invoiceId: invoice.id,
                   invoiceNumber: invoice.invoiceNumber,
                 })
@@ -219,8 +236,13 @@ function SearchInvoicesResults({ result }: { result: SearchInvoicesResult }) {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{invoice.invoiceNumber}</span>
-                  <Badge variant={statusBadgeVariant(invoice.status)} className="capitalize">
+                  <span className="truncate text-sm font-medium">
+                    {invoice.invoiceNumber}
+                  </span>
+                  <Badge
+                    variant={statusBadgeVariant(invoice.status)}
+                    className="capitalize"
+                  >
                     {statusLabel(invoice.status)}
                   </Badge>
                 </div>
@@ -239,13 +261,14 @@ function SearchInvoicesResults({ result }: { result: SearchInvoicesResult }) {
   )
 }
 
-export const SearchInvoicesToolUI = makeAssistantToolUI<
+const SearchInvoicesToolUI = makeAssistantToolUI<
   Record<string, unknown>,
   SearchInvoicesResult
 >({
   toolName: "searchInvoices",
   render: ({ result, status }) => {
-    if (status.type === "running") return <ToolPendingCard label="Searching invoices..." />
+    if (status.type === "running")
+      return <ToolPendingCard label="Searching invoices..." />
     if (!result) return null
     return <SearchInvoicesResults result={result} />
   },

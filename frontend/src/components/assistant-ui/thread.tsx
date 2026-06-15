@@ -5,25 +5,26 @@ import {
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useComposerRuntime,
 } from "@assistant-ui/react"
 import {
   ArrowUpIcon,
   AudioLinesIcon,
+  Building2Icon,
   CheckIcon,
   ChevronDownIcon,
   CopyIcon,
-  GlobeIcon,
-  ImageIcon,
-  LightbulbIcon,
+  FilePlus2Icon,
+  FileTextIcon,
   MicIcon,
   MoreHorizontalIcon,
+  PackagePlusIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  SearchIcon,
   Share2Icon,
-  SparklesIcon,
   SquareIcon,
-  TelescopeIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
   Volume2Icon,
@@ -41,10 +42,7 @@ import { cn } from "@/lib/utils"
 export function Thread({ className }: { className?: string }) {
   return (
     <ThreadPrimitive.Root
-      className={cn(
-        "flex min-h-0 flex-1 flex-col bg-background",
-        className,
-      )}
+      className={cn("flex min-h-0 flex-1 flex-col bg-background", className)}
     >
       <AuiIf condition={(state) => state.thread.isEmpty}>
         <EmptyState />
@@ -127,14 +125,42 @@ function Composer() {
 }
 
 const TOOLS = [
-  { icon: GlobeIcon, label: "Search the web" },
-  { icon: ImageIcon, label: "Create an image" },
-  { icon: TelescopeIcon, label: "Run deep research" },
-  { icon: LightbulbIcon, label: "Think longer" },
-  { icon: SparklesIcon, label: "Study and learn" },
+  {
+    icon: SearchIcon,
+    label: "Search Products",
+    prompt: "Search the product catalog for ",
+  },
+  {
+    icon: PackagePlusIcon,
+    label: "Add Product",
+    prompt:
+      "Add a new product with brand, product code, description, unit price, GST rate, and HSN code: ",
+  },
+  {
+    icon: Building2Icon,
+    label: "Find Customer",
+    prompt: "Find the customer named ",
+  },
+  {
+    icon: FilePlus2Icon,
+    label: "Create Invoice",
+    prompt: "Create a draft invoice for ",
+  },
+  {
+    icon: FileTextIcon,
+    label: "Find Invoice",
+    prompt: "Find invoices for ",
+  },
 ]
 
 function ToolsMenu() {
+  const composer = useComposerRuntime()
+
+  function applyPrompt(prompt: string) {
+    composer.setText(prompt)
+    composer.focus()
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -148,7 +174,11 @@ function ToolsMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
         {TOOLS.map((tool) => (
-          <DropdownMenuItem key={tool.label} className="gap-2.5">
+          <DropdownMenuItem
+            key={tool.label}
+            className="gap-2.5"
+            onSelect={() => applyPrompt(tool.prompt)}
+          >
             <tool.icon className="size-4 text-muted-foreground" />
             {tool.label}
           </DropdownMenuItem>
@@ -190,9 +220,7 @@ function PrimaryAction() {
       </AuiIf>
 
       <AuiIf
-        condition={(state) =>
-          !state.thread.isRunning && state.composer.isEmpty
-        }
+        condition={(state) => !state.thread.isRunning && state.composer.isEmpty}
       >
         <div className="flex items-center gap-1">
           <button
@@ -285,8 +313,7 @@ function AssistantMessage() {
         </MessagePrimitive.Parts>
         <AuiIf
           condition={(s) =>
-            s.message.status?.type === "running" &&
-            s.message.parts.length === 0
+            s.message.status?.type === "running" && s.message.parts.length === 0
           }
         >
           <LoadingIndicator />
@@ -356,7 +383,7 @@ function ActionButton({
       aria-label={label}
       className={cn(
         "flex size-8 items-center justify-center rounded-lg text-current transition-colors hover:bg-muted hover:text-foreground",
-        className,
+        className
       )}
       {...props}
     >
