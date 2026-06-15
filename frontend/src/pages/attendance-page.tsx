@@ -591,7 +591,8 @@ export default function AttendancePage() {
                     data={trend}
                     margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
                     onClick={(state) => {
-                      const point = state?.activePayload?.[0]?.payload as TrendPoint | undefined
+                      const index = state?.activeIndex
+                      const point = typeof index === "number" ? trend[index] : undefined
                       if (point?.date) setDate(point.date)
                     }}
                   >
