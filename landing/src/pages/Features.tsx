@@ -5,10 +5,18 @@ import { PageHeader } from "@/components/PageHeader"
 
 const features = [
   {
+    title: "Support",
+    description: "Live chat for your website backed by a realtime team inbox — with visitor context, file and voice messages, branding, and post-chat feedback, built right into Inboundr.",
+    date: "June 2026",
+    tag: "New",
+    to: "/features/support",
+    bg: "#1a6a5c",
+  },
+  {
     title: "Invoices",
     description: "GST-ready invoicing in INR with product-backed line items, Gmail sending, payment tracking, and a receivables dashboard — built right into Inboundr.",
     date: "June 2026",
-    tag: "New",
+    tag: "Feature",
     to: "/features/invoices",
     bg: "#1a5c3a",
   },
