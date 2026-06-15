@@ -23,7 +23,7 @@ router.get(
   connectGmail
 );
 router.get("/callback", gmailCallback);
-router.get("/accounts", requireAuth, requireOrganization, listGmailAccounts);
+router.get("/accounts", requireAuth, requireOrganization, requireFeature("rfq"), listGmailAccounts);
 router.delete(
   "/accounts/:id",
   requireAuth,

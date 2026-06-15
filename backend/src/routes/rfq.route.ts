@@ -6,6 +6,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("rfq"));
 router.use(requireEmployeeModule("rfq"));
 router.get("/", listRFQs);
 router.get("/drafts", listDraftRFQs);

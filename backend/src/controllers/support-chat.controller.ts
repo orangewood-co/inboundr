@@ -62,6 +62,18 @@ function clientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || "unknown";
 }
 
+async function ensureTicketSupportAvailable(
+  ticket: { organizationId: unknown },
+  res: ExpressResponse
+): Promise<boolean> {
+  const organization = await getSupportOrganization(String(ticket.organizationId));
+  if (!organization) {
+    res.status(404).json({ error: "Support is not available for this workspace" });
+    return false;
+  }
+  return true;
+}
+
 async function pipeWebResponse(
   webResponse: globalThis.Response,
   res: ExpressResponse
@@ -187,6 +199,7 @@ export async function postSupportSessionMessage(
       res.status(404).json({ error: "Chat session not found" });
       return;
     }
+    if (!(await ensureTicketSupportAvailable(ticket, res))) return;
 
     const text = String(req.body?.text ?? "").trim();
     if (!text) {
@@ -240,6 +253,7 @@ export async function endSupportSession(req: Request, res: ExpressResponse): Pro
       res.status(404).json({ error: "Chat session not found" });
       return;
     }
+    if (!(await ensureTicketSupportAvailable(ticket, res))) return;
 
     const now = new Date();
     const rawRating = req.body?.rating == null ? null : Number(req.body.rating);
@@ -313,6 +327,7 @@ export async function createSupportUploadPresign(
       res.status(404).json({ error: "Chat session not found" });
       return;
     }
+    if (!(await ensureTicketSupportAvailable(ticket, res))) return;
 
     const fileName = String(req.body?.fileName ?? "").trim();
     const contentType = String(req.body?.contentType ?? "").trim().toLowerCase();

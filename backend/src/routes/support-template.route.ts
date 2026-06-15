@@ -6,12 +6,14 @@ import {
   listSupportTemplates,
   updateSupportTemplate,
 } from "../controllers/support-template.controller";
-import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
+import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("support"));
+router.use(requireEmployeeModule("support"));
 
 router.get("/", listSupportTemplates);
 router.post("/", createSupportTemplate);

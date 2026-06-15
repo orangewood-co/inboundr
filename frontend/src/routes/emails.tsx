@@ -4,6 +4,6 @@ import { requireFeatureAndModuleAccess } from "@/lib/auth-guards"
 import EmailsPage from "@/pages/emails-page"
 
 export const Route = createFileRoute("/emails")({
-  beforeLoad: () => requireFeatureAndModuleAccess("rfq", "inbox"),
+  beforeLoad: () => requireFeatureAndModuleAccess("inbox", "inbox"),
   component: EmailsPage,
 })

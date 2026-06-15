@@ -8,6 +8,7 @@ import {
 import {
   requireAuth,
   requireEmployeeModule,
+  requireFeature,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -16,6 +17,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("employees"));
 router.use(requireEmployeeModule("employees"));
 
 router.get("/", listAttendance);

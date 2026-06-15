@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { requireModuleAccess } from "@/lib/auth-guards"
+import { requireFeatureAndModuleAccess } from "@/lib/auth-guards"
 import EmployeesPage from "@/pages/employees-page"
 
 export const Route = createFileRoute("/employees")({
-  beforeLoad: () => requireModuleAccess("employees"),
+  beforeLoad: () => requireFeatureAndModuleAccess("employees", "employees"),
   component: EmployeesPage,
 })

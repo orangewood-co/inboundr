@@ -549,7 +549,16 @@ export default function AdminOrganizationPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Feature Access" description={`Plan defaults from ${selectedPlan?.name ?? "the selected plan"} can be overridden per organization.`}>
+          <SectionCard
+            title="Feature & Module Access"
+            description={`Plan defaults from ${selectedPlan?.name ?? "the selected plan"} can be overridden per organization. Employee access can further narrow module availability.`}
+            action={
+              <Button onClick={() => void save()} disabled={saving}>
+                {saving ? <Spinner className="mr-2 size-4" /> : <SaveIcon className="mr-2 size-4" />}
+                Save Changes
+              </Button>
+            }
+          >
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               {features.map((feature) => {
                 const planFeatures = selectedPlan?.features ?? []

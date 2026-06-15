@@ -8,12 +8,13 @@ import {
   listCustomers,
   updateCustomer,
 } from "../controllers/customer.controller";
-import { requireAuth, requireEmployeeModule, requireOrganization, requireOrganizationRole } from "../middleware/auth.middleware";
+import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization, requireOrganizationRole } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("customers"));
 router.use(requireEmployeeModule("customers"));
 router.get("/", listCustomers);
 router.get("/export", exportCustomers);

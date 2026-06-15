@@ -10,6 +10,7 @@ import {
 import {
   requireAuth,
   requireEmployeeModule,
+  requireFeature,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -18,6 +19,7 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("products"));
 router.use(requireEmployeeModule("products"));
 router.get("/", listProducts);
 router.get("/stats", getProductStats);

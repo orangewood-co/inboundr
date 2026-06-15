@@ -7,10 +7,13 @@ import { auth } from "../lib/auth";
 import { Ticket } from "../models/ticket.model";
 import { TicketMessage, type ITicketMessageAttachment } from "../models/ticket-message.model";
 import { getOrganizationContextForUser } from "./organization.service";
+import { hasEffectiveFeature } from "./entitlement.service";
+import { getEmployeeAccessState } from "./employee-access.service";
 import {
   appendVisitorMessage,
   countSessionMessages,
   findSessionTicket,
+  getSupportOrganization,
   generateSupportBotMessage,
   SUPPORT_MESSAGE_MAX_LENGTH,
   SUPPORT_MESSAGES_PER_SESSION,
@@ -107,6 +110,19 @@ async function authenticateAgent(req: IncomingMessage, url: URL): Promise<Suppor
 
   const organizationId = url.searchParams.get("organizationId") ?? undefined;
   const context = await getOrganizationContextForUser(session.user, organizationId);
+  if (context.organization.status === "suspended" || !hasEffectiveFeature(context.organization, "support")) {
+    return null;
+  }
+
+  const access = await getEmployeeAccessState({
+    organizationId: context.organization._id,
+    organizationMemberId: context.membership._id,
+    role: context.membership.role,
+  });
+  if (!access.enabled || (access.restricted && !access.allowedModules.includes("support"))) {
+    return null;
+  }
+
   return {
     kind: "agent",
     userId: session.user.id,
@@ -119,6 +135,8 @@ async function authenticateVisitor(url: URL): Promise<SupportSocketContext | nul
   const sessionToken = (url.searchParams.get("sessionToken") ?? "").trim();
   const ticket = await findSessionTicket(sessionToken);
   if (!ticket) return null;
+  const organization = await getSupportOrganization(String(ticket.organizationId));
+  if (!organization) return null;
 
   return {
     kind: "visitor",
@@ -256,6 +274,11 @@ async function handleVisitorMessage(ws: SupportSocket, payload: Record<string, u
     send(ws, { type: "error", error: "Chat session not found" });
     return;
   }
+  const organization = await getSupportOrganization(String(ticket.organizationId));
+  if (!organization) {
+    send(ws, { type: "error", error: "Support is not available for this workspace" });
+    return;
+  }
 
   const bodyText = sanitizeText(payload.text);
   const attachments = normalizeAttachments(
@@ -374,12 +397,23 @@ async function handleMarkRead(ws: SupportSocket, payload: Record<string, unknown
   }
 }
 
+async function ensureSocketSupportAvailable(ws: SupportSocket): Promise<boolean> {
+  if (!ws.context) return false;
+  const organization = await getSupportOrganization(ws.context.organizationId);
+  if (!organization) {
+    send(ws, { type: "error", error: "Support is not available for this workspace" });
+    return false;
+  }
+  return true;
+}
+
 async function handleSocketMessage(ws: SupportSocket, raw: WebSocket.RawData) {
   const payload = parseJson(raw);
   if (!payload) {
     send(ws, { type: "error", error: "Invalid message payload" });
     return;
   }
+  if (payload.type !== "ping" && !(await ensureSocketSupportAvailable(ws))) return;
 
   switch (payload.type) {
     case "subscribe_ticket":

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { getEmployeeAccessState } from "../services/employee-access.service";
+import { hasEffectiveFeature } from "../services/entitlement.service";
 import {
   ProductServiceError,
   createProductRecord,
@@ -32,6 +33,10 @@ const addProductSchema = z.object({
 });
 
 async function ensureProductModuleAccess(context: ProductToolContext): Promise<void> {
+  if (!hasEffectiveFeature(context.organization, "products")) {
+    throw new Error("Products are not enabled for this organization.");
+  }
+
   const access = await getEmployeeAccessState({
     organizationId: context.organization._id,
     organizationMemberId: context.organizationMembership?._id ?? null,

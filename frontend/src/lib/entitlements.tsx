@@ -2,7 +2,20 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
 import { API_ORIGIN } from "@/lib/env"
 
-export type FeatureKey = "rfq" | "invoices" | "links" | "forms" | "drive"
+export type FeatureKey =
+  | "rfq"
+  | "inbox"
+  | "products"
+  | "customers"
+  | "invoices"
+  | "forms"
+  | "links"
+  | "drive"
+  | "stats"
+  | "employees"
+  | "projects"
+  | "chat"
+  | "support"
 export type EmployeeAccessModule =
   | "rfq"
   | "inbox"
@@ -15,6 +28,8 @@ export type EmployeeAccessModule =
   | "stats"
   | "employees"
   | "projects"
+  | "chat"
+  | "support"
 
 interface EntitlementState {
   effectiveFeatures: FeatureKey[]
@@ -34,7 +49,21 @@ interface EntitlementContextValue extends EntitlementState {
 }
 
 const DEFAULT_ENTITLEMENTS: EntitlementState = {
-  effectiveFeatures: ["rfq", "invoices", "links", "forms", "drive"],
+  effectiveFeatures: [
+    "rfq",
+    "inbox",
+    "products",
+    "customers",
+    "invoices",
+    "forms",
+    "links",
+    "drive",
+    "stats",
+    "employees",
+    "projects",
+    "chat",
+    "support",
+  ],
   planSlug: "all_features",
   employeeAccess: {
     restricted: false,

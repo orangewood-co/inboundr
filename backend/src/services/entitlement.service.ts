@@ -1,6 +1,20 @@
 import type { IOrganization } from "../models/organization.model";
 
-export const FEATURE_KEYS = ["rfq", "invoices", "links", "forms", "drive"] as const;
+export const FEATURE_KEYS = [
+  "rfq",
+  "inbox",
+  "products",
+  "customers",
+  "invoices",
+  "forms",
+  "links",
+  "drive",
+  "stats",
+  "employees",
+  "projects",
+  "chat",
+  "support",
+] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export interface FeatureDefinition {
@@ -18,10 +32,18 @@ export interface PlanDefinition {
 
 export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "rfq", label: "Quotations", description: "Gmail inbox ingestion, RFQ workflows, quote drafts, and orders." },
+  { key: "inbox", label: "Inbox", description: "Inbound email review, attachments, and RFQ triage." },
+  { key: "products", label: "Products", description: "Product catalog, imports, pricing, and SKU management." },
+  { key: "customers", label: "Customers", description: "Customer records, imports, contacts, and account history." },
   { key: "invoices", label: "Invoices", description: "Create, send, and manage invoices." },
-  { key: "links", label: "Links", description: "Trackable short links and engagement analytics." },
   { key: "forms", label: "Forms", description: "Published forms, submissions, and exports." },
+  { key: "links", label: "Links", description: "Trackable short links and engagement analytics." },
   { key: "drive", label: "Drive", description: "Shared file storage, folders, previews, and secure sharing." },
+  { key: "stats", label: "Stats", description: "Operational dashboards, activity metrics, and reporting." },
+  { key: "employees", label: "Employees", description: "Employee records, teams, attendance, and platform access." },
+  { key: "projects", label: "Projects", description: "Project workspaces, tasks, assignments, and progress tracking." },
+  { key: "chat", label: "Chat", description: "AI assistant chat for organization workflows." },
+  { key: "support", label: "Support", description: "Support inbox, tickets, templates, and public chat." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [
@@ -29,25 +51,25 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     slug: "starter",
     name: "Starter",
     description: "Core workflows for smaller teams.",
-    features: ["rfq", "forms"],
+    features: [...FEATURE_KEYS],
   },
   {
     slug: "growth",
     name: "Growth",
     description: "Sales operations with billing and link tracking.",
-    features: ["rfq", "invoices", "links", "forms", "drive"],
+    features: [...FEATURE_KEYS],
   },
   {
     slug: "enterprise",
     name: "Enterprise",
     description: "Full platform access for production customers.",
-    features: ["rfq", "invoices", "links", "forms", "drive"],
+    features: [...FEATURE_KEYS],
   },
   {
     slug: "all_features",
     name: "All Features",
     description: "Compatibility plan for existing organizations.",
-    features: ["rfq", "invoices", "links", "forms", "drive"],
+    features: [...FEATURE_KEYS],
   },
 ];
 

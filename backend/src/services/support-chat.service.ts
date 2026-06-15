@@ -11,6 +11,7 @@ import {
   type ITicketMessage,
   type ITicketMessageAttachment,
 } from "../models/ticket-message.model";
+import { hasEffectiveFeature } from "./entitlement.service";
 import { createPresignedViewUrl } from "./storage.service";
 
 const openrouter = createOpenAI({
@@ -55,9 +56,10 @@ export async function getSupportOrganization(
     _id: organizationId,
     status: "active",
   })
-    .select("name logoUrl preferences.primaryColor")
+    .select("name logoUrl preferences.primaryColor planSlug enabledFeatures disabledFeatures")
     .lean();
   if (!organization) return null;
+  if (!hasEffectiveFeature(organization, "support")) return null;
 
   return serializeBranding(organization);
 }

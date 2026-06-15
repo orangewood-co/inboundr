@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { requireSession } from "@/lib/auth-guards"
+import { requireFeatureAndModuleAccess } from "@/lib/auth-guards"
 import ChatPage from "@/pages/chat-page"
 
 export const Route = createFileRoute("/chat")({
-  beforeLoad: requireSession,
+  beforeLoad: () => requireFeatureAndModuleAccess("chat", "chat"),
   component: ChatPage,
 })

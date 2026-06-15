@@ -10,12 +10,14 @@ import {
   streamChat,
   updateChatThread,
 } from "../controllers/chat.controller";
-import { requireAuth, requireOrganization } from "../middleware/auth.middleware";
+import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
+router.use(requireFeature("chat"));
+router.use(requireEmployeeModule("chat"));
 
 router.post("/", streamChat);
 router.get("/threads", listChatThreads);
