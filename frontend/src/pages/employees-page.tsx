@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   CalendarCheckIcon,
+  FilterIcon,
   IdCardIcon,
+  MailIcon,
+  PhoneIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -26,6 +29,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -97,6 +105,15 @@ function initials(name: string) {
     .join("") || "IN"
 }
 
+async function copyContact(value: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    toast.success(`${label} copied`)
+  } catch {
+    toast.error(`Could not copy ${label.toLowerCase()}`)
+  }
+}
+
 function EmployeeAvatarImage({ source }: { source: string | null }) {
   const [displayUrl, setDisplayUrl] = useState("")
 
@@ -121,7 +138,7 @@ function EmployeeAvatarImage({ source }: { source: string | null }) {
     }
   }, [source])
 
-  return <AvatarImage src={displayUrl || undefined} />
+  return <AvatarImage src={displayUrl || undefined} className="rounded-2xl" />
 }
 
 function toggleModule(
@@ -162,14 +179,15 @@ function ModuleChecklist({
 
 function DirectorySkeleton() {
   return (
-    <div className="grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="mx-auto grid max-w-[96rem] gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
       {Array.from({ length: 8 }).map((_, index) => (
-        <div key={index} className="flex min-h-56 flex-col items-center justify-center rounded-xl border bg-card p-6">
-          <Skeleton className="size-28 rounded-full" />
-          <div className="mt-6 flex w-full flex-col items-center gap-2">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-40" />
+        <div key={index} className="flex items-start gap-4 rounded-xl border bg-card p-4">
+          <Skeleton className="size-16 rounded-2xl" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <Skeleton className="h-4 w-28" />
             <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-2 h-3 w-40" />
+            <Skeleton className="h-3 w-32" />
           </div>
         </div>
       ))}
@@ -293,6 +311,9 @@ export default function EmployeesPage() {
     }
   }
 
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) + (teamFilter !== "all" ? 1 : 0)
+
   return (
     <AppLayout>
       <SiteHeader
@@ -315,45 +336,83 @@ export default function EmployeesPage() {
         }
       />
       <main className="flex-1 overflow-auto bg-muted/20 p-5 md:p-8">
-        <section className="mx-auto mb-8 flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <section className="mx-auto mb-8 flex max-w-[96rem] flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="text-sm font-semibold tracking-tight">
             {employees.length} {employees.length === 1 ? "Employee" : "Employees"}
           </div>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <div className="relative md:w-72">
-            <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="h-9 rounded-full border-transparent bg-background pl-9 shadow-none"
-              placeholder="Search employees"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
+              <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="h-9 rounded-full border-transparent bg-background pl-9 shadow-none"
+                placeholder="Search employees"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-9 w-full border-transparent bg-transparent shadow-none md:w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {Object.entries(statusLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={teamFilter} onValueChange={setTeamFilter}>
-              <SelectTrigger className="h-9 w-full border-transparent bg-transparent shadow-none md:w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {teams.map((team) => (
-                  <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" onClick={() => void fetchEmployees()}>
-              <RefreshCwIcon />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9">
+                    <FilterIcon />
+                    Filters
+                    {activeFilterCount > 0 && (
+                      <Badge className="ml-1 size-5 justify-center rounded-full px-0 tabular-nums">
+                        {activeFilterCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64">
+                  <div className="grid gap-4">
+                    <div className="grid gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Status</span>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          {Object.entries(statusLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Team</span>
+                      <Select value={teamFilter} onValueChange={setTeamFilter}>
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Teams</SelectItem>
+                          {teams.map((team) => (
+                            <SelectItem key={team._id} value={team._id}>{team.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {activeFilterCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-self-start px-2"
+                        onClick={() => {
+                          setStatusFilter("all")
+                          setTeamFilter("all")
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button variant="ghost" size="icon" onClick={() => void fetchEmployees()}>
+                <RefreshCwIcon />
+              </Button>
+            </div>
           </div>
         </section>
 
@@ -363,7 +422,7 @@ export default function EmployeesPage() {
           <ErrorState
             message={error}
             onRetry={() => void fetchEmployees()}
-            className="mx-auto max-w-7xl rounded-xl border bg-card p-12"
+            className="mx-auto max-w-[96rem] rounded-xl border bg-card p-12"
           />
         ) : employees.length === 0 ? (
           <EmptyState
@@ -376,34 +435,78 @@ export default function EmployeesPage() {
                 New Employee
               </Button>
             }
-            className="mx-auto max-w-7xl rounded-xl border bg-card"
+            className="mx-auto max-w-[96rem] rounded-xl border bg-card"
           />
         ) : (
-          <div className="mx-auto grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {employees.map((employee) => (
-              <button
-                key={employee._id}
-                type="button"
-                onClick={() => openEmployee(employee)}
-                className="relative flex min-h-56 flex-col items-center justify-center rounded-xl border bg-card p-6 text-center shadow-xs transition-colors hover:bg-muted/40"
-              >
-                <span
-                  className={cn(
-                    "absolute top-4 right-4 size-2 rounded-full",
-                    employee.status === "active" ? "bg-success" : "bg-muted-foreground/40"
+          <div className="mx-auto grid max-w-[96rem] gap-4 [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
+            {employees.map((employee) => {
+              const phone = employee.phone
+              return (
+                <div
+                  key={employee._id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEmployee(employee)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault()
+                      openEmployee(employee)
+                    }
+                  }}
+                  className="relative flex cursor-pointer items-start gap-4 rounded-xl border bg-card p-4 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  {employee.employeeCode && (
+                    <span className="absolute top-3 right-3 font-mono text-xs text-muted-foreground">
+                      {employee.employeeCode}
+                    </span>
                   )}
-                />
-                <Avatar className="size-28 rounded-full" size="lg">
-                  <EmployeeAvatarImage source={employee.profileImageUrl} />
-                  <AvatarFallback className="rounded-full text-4xl font-semibold">{initials(employee.fullName)}</AvatarFallback>
-                </Avatar>
-                <div className="mt-6 min-w-0">
-                  <h2 className="truncate text-base font-semibold">{employee.fullName}</h2>
-                  <p className="mt-1 truncate text-sm text-foreground/80">{employee.title || "No title"}</p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{employee.team?.name ?? "No team"}</p>
+                  <Avatar className="size-16 rounded-2xl after:rounded-2xl">
+                    <EmployeeAvatarImage source={employee.profileImageUrl} />
+                    <AvatarFallback className="rounded-2xl text-lg font-semibold">{initials(employee.fullName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate pr-14 font-semibold">{employee.fullName}</h2>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{employee.title || "No title"}</p>
+                    <div className="mt-3 flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        title="Copy email"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void copyContact(employee.email, "Email")
+                        }}
+                        className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <MailIcon className="size-3.5 shrink-0" />
+                        <span className="truncate">{employee.email}</span>
+                      </button>
+                      {phone ? (
+                        <button
+                          type="button"
+                          title="Copy phone number"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void copyContact(phone, "Phone")
+                          }}
+                          className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <PhoneIcon className="size-3.5 shrink-0" />
+                          <span className="truncate">{phone}</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+                          <PhoneIcon className="size-3.5 shrink-0" />
+                          <span>—</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
