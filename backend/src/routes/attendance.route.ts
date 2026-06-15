@@ -1,8 +1,8 @@
 import { Router } from "express";
 import {
   createManualAttendance,
-  exportAttendanceCsv,
   listAttendance,
+  listAttendanceRange,
   updateAttendance,
 } from "../controllers/attendance.controller";
 import {
@@ -21,7 +21,7 @@ router.use(requireFeature("employees"));
 router.use(requireEmployeeModule("employees"));
 
 router.get("/", listAttendance);
-router.get("/export", exportAttendanceCsv);
+router.get("/range", listAttendanceRange);
 router.post("/manual", requireOrganizationRole(["owner", "admin"]), createManualAttendance);
 router.patch("/:id", requireOrganizationRole(["owner", "admin"]), updateAttendance);
 

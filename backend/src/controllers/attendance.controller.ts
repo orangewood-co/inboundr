@@ -34,6 +34,25 @@ function normalizeWorkDate(value: unknown): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : todayWorkDate();
 }
 
+const MAX_RANGE_DAYS = 366;
+
+function eachWorkDate(from: string, to: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(`${from}T00:00:00.000Z`);
+  const end = new Date(`${to}T00:00:00.000Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return dates;
+  for (let cursor = new Date(start); cursor.getTime() <= end.getTime(); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    dates.push(cursor.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+function workDateFromDate(value: unknown): string | null {
+  if (!value) return null;
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 function normalizeAction(value: unknown): AttendanceAction | null {
   return ATTENDANCE_ACTIONS.includes(value as AttendanceAction) ? (value as AttendanceAction) : null;
 }
@@ -436,33 +455,80 @@ export async function createManualAttendance(req: Request, res: Response): Promi
   }
 }
 
-export async function exportAttendanceCsv(req: Request, res: Response): Promise<void> {
+export async function listAttendanceRange(req: Request, res: Response): Promise<void> {
   try {
     const organization = (req as OrganizationRequest).organization;
-    const workDate = normalizeWorkDate(req.query.date);
-    const records = await Attendance.find({ organizationId: organization._id, workDate })
-      .sort({ employeeNameSnapshot: 1 })
+    const a = normalizeWorkDate(req.query.from);
+    const b = normalizeWorkDate(req.query.to);
+    const [from, to] = a <= b ? [a, b] : [b, a];
+
+    const dates = eachWorkDate(from, to);
+    if (dates.length === 0) {
+      res.status(400).json({ error: "Invalid date range" });
+      return;
+    }
+    if (dates.length > MAX_RANGE_DAYS) {
+      res.status(400).json({ error: `Date range cannot exceed ${MAX_RANGE_DAYS} days` });
+      return;
+    }
+
+    const employees = await Employee.find({
+      organizationId: organization._id,
+      status: "active",
+    })
+      .select("_id employeeCode fullName startDate")
+      .sort({ fullName: 1 })
       .lean();
-    const rows = [
-      ["Employee", "Employee Code", "Date", "Status", "Check In", "Check Out", "Notes"],
-      ...records.map((record) => [
-        record.employeeNameSnapshot,
-        record.employeeCodeSnapshot ?? "",
-        record.workDate,
-        record.status,
-        record.checkInAt ? record.checkInAt.toISOString() : "",
-        record.checkOutAt ? record.checkOutAt.toISOString() : "",
-        record.notes ?? "",
-      ]),
-    ];
-    const csv = rows
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="attendance-${workDate}.csv"`);
-    res.send(csv);
+
+    const records = await Attendance.find({
+      organizationId: organization._id,
+      workDate: { $gte: from, $lte: to },
+    }).lean();
+
+    const recordByKey = new Map<string, (typeof records)[number]>();
+    for (const record of records) {
+      recordByKey.set(`${String(record.employeeId)}|${record.workDate}`, record);
+    }
+
+    const startWorkDateByEmployee = new Map<string, string | null>();
+    for (const employee of employees) {
+      startWorkDateByEmployee.set(String(employee._id), workDateFromDate(employee.startDate));
+    }
+
+    const rows: {
+      employeeId: string;
+      employeeName: string;
+      employeeCode: string | null;
+      date: string;
+      status: AttendanceStatus;
+      checkInAt: string | null;
+      checkOutAt: string | null;
+      source: string | null;
+      notes: string | null;
+    }[] = [];
+    for (const date of dates) {
+      for (const employee of employees) {
+        const employeeId = String(employee._id);
+        const startWorkDate = startWorkDateByEmployee.get(employeeId);
+        if (startWorkDate && date < startWorkDate) continue;
+        const record = recordByKey.get(`${employeeId}|${date}`);
+        rows.push({
+          employeeId,
+          employeeName: record?.employeeNameSnapshot ?? employee.fullName,
+          employeeCode: record?.employeeCodeSnapshot ?? employee.employeeCode ?? null,
+          date,
+          status: record?.status ?? "absent",
+          checkInAt: record?.checkInAt ? new Date(record.checkInAt).toISOString() : null,
+          checkOutAt: record?.checkOutAt ? new Date(record.checkOutAt).toISOString() : null,
+          source: record?.source ?? null,
+          notes: record?.notes ?? null,
+        });
+      }
+    }
+
+    res.json({ from, to, rows });
   } catch (err) {
-    console.error("Error exporting attendance:", err);
-    res.status(500).json({ error: "Failed to export attendance" });
+    console.error("Error listing attendance range:", err);
+    res.status(500).json({ error: "Failed to list attendance range" });
   }
 }

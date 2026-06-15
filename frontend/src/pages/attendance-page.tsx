@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { format } from "date-fns"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   CalendarDaysIcon,
   CameraIcon,
   CheckCircle2Icon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   Clock3Icon,
   CopyIcon,
   DownloadIcon,
@@ -18,10 +22,20 @@ import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { DatePicker } from "@/components/date-picker"
 import { PageHeader } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import {
   Dialog,
   DialogContent,
@@ -30,8 +44,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -48,8 +69,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { downloadAttendanceWorkbook, type AttendanceExportRow } from "@/lib/attendance-export"
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { formatTime } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 const API_BASE = `${API_ORIGIN}/api/v1/attendance`
 
@@ -76,7 +99,18 @@ type AttendanceRecord = {
   checkOutSelfieKey: string | null
   selfiePreview: string | null
   status: AttendanceStatus
+  source: "embed_pos" | "manual" | null
   notes: string | null
+}
+
+type AttendanceRangeRow = AttendanceExportRow
+
+type TrendPoint = {
+  date: string
+  label: string
+  present: number
+  missingCheckout: number
+  absent: number
 }
 
 type AttendanceEmployee = {
@@ -118,6 +152,33 @@ function localDate() {
   return `${year}-${month}-${day}`
 }
 
+function parseWorkDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number)
+  return new Date(year || 1970, (month || 1) - 1, day || 1)
+}
+
+function toWorkDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function addWorkDays(value: string, delta: number): string {
+  const date = parseWorkDate(value)
+  date.setDate(date.getDate() + delta)
+  return toWorkDate(date)
+}
+
+const trendChartConfig = {
+  present: { label: "Present", color: "var(--chart-1)" },
+  missingCheckout: { label: "Missing Checkout", color: "var(--chart-3)" },
+  absent: { label: "Absent", color: "var(--chart-5)" },
+} satisfies ChartConfig
+
+const CHART_RANGES = [7, 30] as const
+type ChartRange = (typeof CHART_RANGES)[number]
+
 function statusVariant(status: AttendanceStatus): "default" | "secondary" | "outline" | "destructive" {
   if (status === "present") return "default"
   if (status === "missing_checkout" || status === "late" || status === "half_day") return "secondary"
@@ -150,6 +211,16 @@ export default function AttendancePage() {
     checkOutAt: "",
     notes: "",
   })
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [chartRange, setChartRange] = useState<ChartRange>(30)
+  const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [trendLoading, setTrendLoading] = useState(true)
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [rangeForm, setRangeForm] = useState({ from: "", to: "" })
+  const [rangeExporting, setRangeExporting] = useState(false)
+
+  const today = localDate()
+  const isToday = date >= today
 
   const posUrl = useMemo(() => {
     return organizationId ? `${getEmbedOrigin()}/attendance/${organizationId}` : ""
@@ -176,6 +247,36 @@ export default function AttendancePage() {
     }
   }, [date])
 
+  const fetchTrend = useCallback(async () => {
+    const from = addWorkDays(date, -(chartRange - 1))
+    const points: TrendPoint[] = []
+    for (let offset = chartRange - 1; offset >= 0; offset -= 1) {
+      const day = addWorkDays(date, -offset)
+      points.push({ date: day, label: format(parseWorkDate(day), "d MMM"), present: 0, missingCheckout: 0, absent: 0 })
+    }
+    const byDate = new Map(points.map((point) => [point.date, point]))
+    setTrendLoading(true)
+    try {
+      const params = new URLSearchParams({ from, to: date })
+      const response = await fetch(`${API_BASE}/range?${params.toString()}`, { credentials: "include" })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to load attendance trend")
+      for (const row of (body?.rows ?? []) as AttendanceRangeRow[]) {
+        const point = byDate.get(row.date)
+        if (!point) continue
+        if (row.status === "present") point.present += 1
+        else if (row.status === "missing_checkout") point.missingCheckout += 1
+        else if (row.status === "absent") point.absent += 1
+      }
+      setTrend(points)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load attendance trend")
+      setTrend(points)
+    } finally {
+      setTrendLoading(false)
+    }
+  }, [date, chartRange])
+
   useEffect(() => {
     void fetchOrganization()
   }, [fetchOrganization])
@@ -183,6 +284,10 @@ export default function AttendancePage() {
   useEffect(() => {
     void fetchAttendance()
   }, [fetchAttendance])
+
+  useEffect(() => {
+    void fetchTrend()
+  }, [fetchTrend])
 
   function openEdit(record: AttendanceRecord) {
     setEditing(record)
@@ -220,6 +325,7 @@ export default function AttendancePage() {
       setManualOpen(false)
       setManualForm({ employeeId: "", status: "present", checkInAt: "", checkOutAt: "", notes: "" })
       await fetchAttendance()
+      void fetchTrend()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add attendance")
     } finally {
@@ -247,6 +353,7 @@ export default function AttendancePage() {
       toast.success("Attendance updated")
       setEditing(null)
       await fetchAttendance()
+      void fetchTrend()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update attendance")
     } finally {
@@ -260,8 +367,61 @@ export default function AttendancePage() {
     toast.success("POS link copied")
   }
 
-  function exportCsv() {
-    window.open(`${API_BASE}/export?date=${encodeURIComponent(date)}`, "_blank")
+  function exportThisDay() {
+    if (!data) return
+    const rows: AttendanceExportRow[] = [
+      ...data.records.map((record) => ({
+        employeeName: record.employeeNameSnapshot,
+        employeeCode: record.employeeCodeSnapshot,
+        date: record.workDate,
+        status: record.status,
+        checkInAt: record.checkInAt,
+        checkOutAt: record.checkOutAt,
+        source: record.source,
+        notes: record.notes,
+      })),
+      ...data.absentEmployees.map((employee) => ({
+        employeeName: employee.fullName,
+        employeeCode: employee.employeeCode,
+        date,
+        status: "absent" as const,
+        checkInAt: null,
+        checkOutAt: null,
+        source: null,
+        notes: null,
+      })),
+    ].sort((a, b) => a.employeeName.localeCompare(b.employeeName))
+    downloadAttendanceWorkbook(rows, `attendance-${date}.xlsx`)
+  }
+
+  function openRangeDialog() {
+    setRangeForm({ from: addWorkDays(date, -29), to: date })
+    setRangeOpen(true)
+  }
+
+  async function exportRange() {
+    if (!rangeForm.from || !rangeForm.to) {
+      toast.error("Select a start and end date")
+      return
+    }
+    setRangeExporting(true)
+    try {
+      const params = new URLSearchParams({ from: rangeForm.from, to: rangeForm.to })
+      const response = await fetch(`${API_BASE}/range?${params.toString()}`, { credentials: "include" })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to export attendance")
+      const rows = (body?.rows ?? []) as AttendanceExportRow[]
+      if (rows.length === 0) {
+        toast.error("No attendance to export for this range")
+        return
+      }
+      downloadAttendanceWorkbook(rows, `attendance-${body.from}-to-${body.to}.xlsx`)
+      setRangeOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to export attendance")
+    } finally {
+      setRangeExporting(false)
+    }
   }
 
   const summary = data?.summary
@@ -279,14 +439,30 @@ export default function AttendancePage() {
         breadcrumbs={[{ label: "Employees", href: "/employees" }, { label: "Attendance" }]}
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => void fetchAttendance()} disabled={loading}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void fetchAttendance()
+                void fetchTrend()
+              }}
+              disabled={loading}
+            >
               <RefreshCwIcon className={loading ? "animate-spin" : ""} />
               Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <DownloadIcon />
-              Export CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={!data}>
+                  <DownloadIcon />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={exportThisDay}>Export This Day</DropdownMenuItem>
+                <DropdownMenuItem onClick={openRangeDialog}>Export Date Range...</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" onClick={() => setManualOpen(true)}>
               <PlusIcon />
               Add Attendance
@@ -300,13 +476,49 @@ export default function AttendancePage() {
           description="Daily check-ins, location and selfie evidence, and corrections."
           actions={
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                type="date"
-                aria-label="Attendance date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                className="h-8 w-full sm:w-44"
-              />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Previous day"
+                  onClick={() => setDate(addWorkDays(date, -1))}
+                >
+                  <ChevronLeftIcon />
+                </Button>
+                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-40 justify-start font-normal">
+                      <CalendarDaysIcon />
+                      {format(parseWorkDate(date), "dd MMM yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={parseWorkDate(date)}
+                      onSelect={(selected) => {
+                        if (selected) setDate(toWorkDate(selected))
+                        setPickerOpen(false)
+                      }}
+                      disabled={{ after: new Date() }}
+                      defaultMonth={parseWorkDate(date)}
+                      autoFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Next day"
+                  onClick={() => setDate(addWorkDays(date, 1))}
+                  disabled={isToday}
+                >
+                  <ChevronRightIcon />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDate(today)} disabled={isToday}>
+                  Today
+                </Button>
+              </div>
               <Button variant="outline" size="sm" onClick={() => void copyPosUrl()} disabled={!posUrl}>
                 <CopyIcon />
                 Copy POS Link
@@ -344,6 +556,64 @@ export default function AttendancePage() {
                 <StatCard key={label} title={label} value={value} helper={helper} icon={Icon} />
               ))}
             </div>
+
+            <section className="rounded-xl border bg-card p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold">Attendance Trend</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Daily breakdown for the {chartRange} days ending {format(parseWorkDate(date), "dd MMM yyyy")}.
+                  </p>
+                </div>
+                <div className="inline-flex rounded-lg border p-0.5">
+                  {CHART_RANGES.map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setChartRange(range)}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                        chartRange === range
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {range}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {trendLoading && trend.length === 0 ? (
+                <Skeleton className="h-64 w-full rounded-lg" />
+              ) : (
+                <ChartContainer config={trendChartConfig} className="aspect-auto h-64 w-full">
+                  <BarChart
+                    data={trend}
+                    margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
+                    onClick={(state) => {
+                      const point = state?.activePayload?.[0]?.payload as TrendPoint | undefined
+                      if (point?.date) setDate(point.date)
+                    }}
+                  >
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      minTickGap={16}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar dataKey="present" stackId="attendance" fill="var(--color-present)" />
+                    <Bar dataKey="missingCheckout" stackId="attendance" fill="var(--color-missingCheckout)" />
+                    <Bar dataKey="absent" stackId="attendance" fill="var(--color-absent)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              )}
+            </section>
 
             <section className="rounded-xl border bg-card p-5">
               <div className="mb-5">
@@ -468,6 +738,36 @@ export default function AttendancePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
             <Button onClick={() => void updateAttendance()} disabled={saving}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rangeOpen} onOpenChange={setRangeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Date Range</DialogTitle>
+            <DialogDescription>
+              Download an Excel file with one row per employee per day, including absent days.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DatePicker
+              label="From"
+              value={rangeForm.from}
+              onChange={(from) => setRangeForm((form) => ({ ...form, from }))}
+            />
+            <DatePicker
+              label="To"
+              value={rangeForm.to}
+              onChange={(to) => setRangeForm((form) => ({ ...form, to }))}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRangeOpen(false)}>Cancel</Button>
+            <Button onClick={() => void exportRange()} disabled={rangeExporting}>
+              <DownloadIcon />
+              Export Excel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
