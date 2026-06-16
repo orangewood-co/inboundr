@@ -594,11 +594,11 @@ export default function DrivePage() {
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            variant="destructive"
+            variant={view === "trash" ? "destructive" : undefined}
             onClick={() => (view === "trash" ? setDeleteTarget(node) : void moveToTrash(node))}
           >
             <Trash2Icon className="size-4" />
-            {view === "trash" ? "Delete Forever" : "Move to Trash"}
+            {view === "trash" ? "Delete Forever" : "Trash"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -685,7 +685,6 @@ export default function DrivePage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-destructive hover:bg-destructive/10"
                       onClick={() =>
                         void runBulk((id) => trashDriveNode(id), {
                           one: "Moved to Trash",
@@ -694,7 +693,7 @@ export default function DrivePage() {
                       }
                     >
                       <Trash2Icon className="size-4" />
-                      Move to Trash
+                      Trash
                     </Button>
                   )}
                 </div>
