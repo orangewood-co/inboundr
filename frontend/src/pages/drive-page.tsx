@@ -1718,24 +1718,27 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
 
   return (
     <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Share {node?.name}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="pr-8">Share {node?.name}</DialogTitle>
+          <DialogDescription className="max-w-xl">
             Internal editors can modify content. Public links are view-only and expire in 30 days by default.
           </DialogDescription>
         </DialogHeader>
-        <div className="min-w-0 space-y-5">
-          <div className="space-y-2">
-            <Label>Share with Organization User</Label>
-            <div className="flex gap-2">
+        <div className="min-w-0 space-y-4">
+          <section className="space-y-4 rounded-xl border bg-muted/20 p-4">
+            <div>
+              <h3 className="font-medium">Invite a teammate</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Give an organization user access to this item.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]">
               <Input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="teammate@company.com"
               />
               <Select value={role} onValueChange={(value) => setRole(value as "viewer" | "editor")}>
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1743,15 +1746,17 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
                   <SelectItem value="editor">Editor</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={() => void addShare()}>Share</Button>
+              <Button onClick={() => void addShare()} className="w-full sm:w-auto">
+                Share
+              </Button>
             </div>
             <div className="space-y-2">
               {shares.map((share) => (
                 <div
                   key={share.userId}
-                  className="flex items-center justify-between rounded-md border p-2 text-sm"
+                  className="flex items-center justify-between gap-3 rounded-lg border bg-background/70 px-3 py-2 text-sm"
                 >
-                  <span>
+                  <span className="min-w-0 truncate">
                     {share.user?.email ?? share.userId} · <span className="capitalize">{share.role}</span>
                   </span>
                   <Button
@@ -1764,28 +1769,37 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
                 </div>
               ))}
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Public View Link</Label>
-            <div className="flex gap-2">
-              <Input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Optional password"
-              />
-              <Button onClick={() => void createLink()}>
+          </section>
+          <section className="space-y-4 rounded-xl border bg-muted/20 p-4">
+            <div>
+              <h3 className="font-medium">Public view link</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Create a view-only link. Add a password if needed.</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="space-y-1.5">
+                <Label htmlFor="drive-link-password" className="sr-only">
+                  Optional password
+                </Label>
+                <Input
+                  id="drive-link-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Optional password"
+                />
+              </div>
+              <Button onClick={() => void createLink()} className="w-full sm:w-auto">
                 <LinkIcon className="size-4" />
                 Create
               </Button>
             </div>
             <div className="space-y-2">
               {links.map((link) => (
-                <div key={link._id} className="space-y-2 rounded-md border p-2 text-sm">
-                  <div className="group flex items-center justify-between gap-2">
-                    <CopyableText value={link.shareUrl} label="Link copied" className="min-w-0">
+                <div key={link._id} className="space-y-3 rounded-lg border bg-background/70 p-3 text-sm">
+                  <div className="group grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <CopyableText value={link.shareUrl} label="Link copied" className="min-w-0 rounded-md">
                       <span className="truncate">{link.shareUrl}</span>
                     </CopyableText>
-                    <div className="flex shrink-0 items-center">
+                    <div className="flex shrink-0 items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1807,7 +1821,7 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
                     </div>
                   </div>
                   {emailingLinkId === link._id && (
-                    <div className="flex gap-2">
+                    <div className="grid gap-2 border-t pt-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <Input
                         type="email"
                         value={linkEmail}
@@ -1818,6 +1832,7 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
                       <Button
                         onClick={() => void sendLinkEmail(link._id)}
                         disabled={sendingEmail || !linkEmail.trim()}
+                        className="w-full sm:w-auto"
                       >
                         {sendingEmail ? <Spinner className="size-4" /> : <MailIcon className="size-4" />}
                         Send
@@ -1827,9 +1842,9 @@ function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenCha
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         </div>
-        <DialogFooter showCloseButton />
+        <DialogFooter showCloseButton className="pt-1" />
       </DialogContent>
     </Dialog>
   )
