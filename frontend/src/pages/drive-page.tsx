@@ -1168,6 +1168,15 @@ function UploadQueuePanel({
   const done = tasks.filter((task) => task.status === "done").length
   const failed = tasks.filter((task) => task.status === "error").length
   const active = tasks.some((task) => task.status === "pending" || task.status === "uploading")
+  const progress = total
+    ? Math.round(
+        tasks.reduce((sum, task) => {
+          if (task.status === "done") return sum + 100
+          if (task.status === "uploading") return sum + task.progress
+          return sum
+        }, 0) / total
+      )
+    : 0
 
   React.useEffect(() => {
     if (!total || active || failed > 0) return
@@ -1186,8 +1195,8 @@ function UploadQueuePanel({
         : `Uploaded ${done} ${done === 1 ? "file" : "files"}`
 
   return (
-    <div className="fixed right-4 bottom-4 z-50 w-80 overflow-hidden rounded-xl border bg-card shadow-lg animate-in slide-in-from-bottom-2 fade-in-0">
-      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+    <div className="fixed right-4 bottom-4 z-50 w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-xl border bg-card shadow-lg animate-in slide-in-from-bottom-2 fade-in-0">
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           {active || preparing ? (
             <Spinner className="size-4 shrink-0 text-primary" />
@@ -1197,6 +1206,9 @@ function UploadQueuePanel({
             <CheckCircle2Icon className="size-4 shrink-0 text-success" />
           )}
           <span className="truncate text-sm font-medium">{headerLabel}</span>
+          {active && !preparing && (
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{progress}%</span>
+          )}
         </div>
         <div className="flex shrink-0 items-center">
           <Button variant="ghost" size="icon-sm" onClick={() => setCollapsed((value) => !value)}>
@@ -1214,14 +1226,20 @@ function UploadQueuePanel({
       {!collapsed && (
         <div className="max-h-72 overflow-auto p-2">
           {tasks.map((task) => (
-            <div key={task.id} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+            <div
+              key={task.id}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-2.5 py-2",
+                task.status === "uploading" && "bg-muted/30"
+              )}
+            >
               <div className="shrink-0">
                 {task.status === "done" ? (
                   <CheckCircle2Icon className="size-4 text-success" />
                 ) : task.status === "error" ? (
                   <AlertCircleIcon className="size-4 text-destructive" />
                 ) : task.status === "uploading" ? (
-                  <Spinner className="size-4 text-primary" />
+                  <FileUpIcon className="size-4 text-primary" />
                 ) : (
                   <FileIcon className="size-4 text-muted-foreground" />
                 )}
@@ -1231,12 +1249,10 @@ function UploadQueuePanel({
                   <span className="truncate text-xs font-medium" title={task.name}>
                     {task.name}
                   </span>
-                  {task.status === "uploading" && (
-                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{task.progress}%</span>
-                  )}
+                  <UploadTaskStatus task={task} />
                 </div>
                 {task.status === "uploading" && (
-                  <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-primary transition-all duration-300"
                       style={{ width: `${task.progress}%` }}
@@ -1253,6 +1269,19 @@ function UploadQueuePanel({
       )}
     </div>
   )
+}
+
+function UploadTaskStatus({ task }: { task: UploadTask }) {
+  if (task.status === "uploading") {
+    return <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{task.progress}%</span>
+  }
+  if (task.status === "pending") {
+    return <span className="shrink-0 text-[11px] text-muted-foreground">Queued</span>
+  }
+  if (task.status === "done") {
+    return <span className="shrink-0 text-[11px] text-success">Done</span>
+  }
+  return <span className="shrink-0 text-[11px] text-destructive">Failed</span>
 }
 
 function DriveSkeleton({ layout }: { layout: LayoutMode }) {
