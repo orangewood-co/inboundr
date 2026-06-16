@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { API_ORIGIN } from "@/lib/env"
+import { formatDriveNodeType } from "@/lib/drive-file-types"
 
 type SharedNode = {
   _id: string
@@ -177,6 +178,12 @@ export default function DriveSharePage({ token }: { token: string }) {
   const expiresOn = link?.expiresAt
     ? new Date(link.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
     : null
+  const nodeDescription =
+    node?.type === "folder"
+      ? "Shared folder"
+      : node
+        ? `${formatDriveNodeType(node)} · ${formatBytes(node.size)}`
+        : null
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-stone-100 p-4">
@@ -226,7 +233,7 @@ export default function DriveSharePage({ token }: { token: string }) {
               <div className="min-w-0">
                 <h1 className="text-xl font-bold break-words text-stone-900">{node.name}</h1>
                 <p className="mt-1 text-sm text-stone-500">
-                  {node.type === "folder" ? "Shared folder" : formatBytes(node.size)}
+                  {nodeDescription}
                   {expiresOn ? ` · Link expires on ${expiresOn}` : ""}
                 </p>
               </div>

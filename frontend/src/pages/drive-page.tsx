@@ -102,6 +102,7 @@ import {
   createDrivePublicLink,
   emailDrivePublicLink,
   formatBytes,
+  formatDriveNodeType,
   getDriveExport,
   getDriveFileUrl,
   listDriveNodes,
@@ -1018,7 +1019,7 @@ function DriveListRow({
         </div>
       </td>
       <td className="px-5 py-3 align-middle text-muted-foreground">
-        {node.type === "folder" ? "Folder" : node.contentType || "File"}
+        {formatDriveNodeType(node)}
       </td>
       <td className="px-5 py-3 align-middle tabular-nums text-muted-foreground">
         {node.type === "folder" ? "-" : formatBytes(node.size)}
@@ -1069,6 +1070,7 @@ function DriveGridCard({
   }
 
   const highlighted = (isFolder && drop.isOver) || isExternalTarget
+  const metadata = isFolder ? "Folder" : `${formatDriveNodeType(node)} · ${formatBytes(node.size)}`
 
   return (
     <div
@@ -1112,7 +1114,7 @@ function DriveGridCard({
           {node.name}
         </p>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {node.type === "folder" ? "Folder" : formatBytes(node.size)}
+          {metadata}
           {" · "}
           {formatRelativeTime(node.updatedAt)}
         </p>
