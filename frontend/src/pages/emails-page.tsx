@@ -1009,7 +1009,6 @@ export function EmailsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 pl-[38px]">
-                          <StatusBadge status={email.status} />
                           <ClassificationBadge email={email} />
                         </div>
                       </div>
