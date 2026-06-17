@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Form } from "../models/form.model";
+import { OrganizationMember } from "../models/organization-member.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { createPresignedUpload, createPresignedViewUrl, keyBelongsToPrefix } from "../services/storage.service";
 
@@ -58,6 +59,24 @@ function allowedMimeTypesForScope(scope: string): string[] {
 function fieldMaxBytes(maxFileSizeMb?: number): number {
   if (!maxFileSizeMb || !Number.isFinite(maxFileSizeMb)) return DEFAULT_MAX_FILE_SIZE;
   return Math.max(1, Math.min(maxFileSizeMb, 50)) * 1024 * 1024;
+}
+
+function avatarOwnerUserIdFromKey(key: string): string | null {
+  const [scope, userId] = key.split("/");
+  if (scope !== "avatar" || !userId) return null;
+  return userId;
+}
+
+async function canViewOrganizationMemberAvatar(orgReq: OrganizationRequest, key: string): Promise<boolean> {
+  const avatarOwnerUserId = avatarOwnerUserIdFromKey(key);
+  if (!avatarOwnerUserId) return false;
+
+  const member = await OrganizationMember.exists({
+    organizationId: orgReq.organization._id,
+    userId: avatarOwnerUserId,
+  });
+
+  return Boolean(member);
 }
 
 export async function createAuthenticatedPresign(req: Request, res: Response): Promise<void> {
@@ -136,6 +155,7 @@ export async function createAuthenticatedViewUrl(req: Request, res: Response): P
 
     const allowed =
       keyBelongsToPrefix(key, ["avatar", String(orgReq.user.id)]) ||
+      (key.startsWith("avatar/") && (await canViewOrganizationMemberAvatar(orgReq, key))) ||
       AUTHENTICATED_UPLOAD_SCOPES.some((scope) =>
         keyBelongsToPrefix(key, [scope, String(orgReq.organization._id)])
       );

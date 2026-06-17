@@ -315,7 +315,7 @@ function formatFileSize(bytes: number) {
 
 function formatLastSignIn(value?: string | null) {
   const formatted = formatDateTime(value)
-  return formatted === "-" ? "Never recorded" : formatted
+  return formatted === "-" ? "Sign-in activity unavailable" : `Last signed in ${formatted}`
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -1879,7 +1879,7 @@ function MembersTab() {
                     Joined {formatDate(member.createdAt)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Last signed in {formatLastSignIn(member.lastSignInAt)}
+                    {formatLastSignIn(member.lastSignInAt)}
                   </p>
                 </div>
               </div>
