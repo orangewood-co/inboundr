@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
+import * as XLSX from "xlsx"
 
 import { AppLayout } from "@/components/app-layout"
 import { ErrorState } from "@/components/list-states"
@@ -44,6 +45,9 @@ import {
   DownloadIcon,
   ArchiveIcon,
   SlidersHorizontalIcon,
+  PaperclipIcon,
+  ExternalLinkIcon,
+  EyeIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -54,6 +58,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText } from "@/components/copy-button"
@@ -64,7 +75,10 @@ import { getAvatarColor } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
+const EMAIL_API_BASE = `${API_ORIGIN}/api/v1/email`
 const PRODUCTS_API_BASE = `${API_ORIGIN}/api/v1/products`
+const SPREADSHEET_PREVIEW_ROW_LIMIT = 200
+const SPREADSHEET_PREVIEW_COLUMN_LIMIT = 30
 
 interface TermTemplate {
   id: string
@@ -113,11 +127,25 @@ const normalizeDeliveryTermTemplates = (
 
 interface RFQEmail {
   _id: string
+  messageId?: string
+  threadId?: string
   subject: string
   from: string
+  to?: string
+  cc?: string | null
   date: string
   snippet: string | null
+  bodyText?: string | null
+  bodyHtml?: string | null
   status: string
+  attachments?: RFQEmailAttachment[]
+}
+
+interface RFQEmailAttachment {
+  filename: string
+  mimeType: string
+  size: number
+  attachmentId: string
 }
 
 interface RFQCustomer {
@@ -301,6 +329,233 @@ function parseSender(from: string): { name: string; email: string } {
   const match = from.match(/^"?(.+?)"?\s*<(.+)>$/)
   if (match) return { name: match[1].trim(), email: match[2] }
   return { name: from, email: from }
+}
+
+const SPREADSHEET_MIME_TYPES = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+])
+
+function getAttachmentExtension(filename: string) {
+  return filename.split(".").pop()?.toLowerCase() ?? ""
+}
+
+function isSpreadsheetAttachment(att: RFQEmailAttachment) {
+  const mimeType = att.mimeType.toLowerCase()
+  const extension = getAttachmentExtension(att.filename)
+
+  return SPREADSHEET_MIME_TYPES.has(mimeType) || extension === "csv" || extension === "xls" || extension === "xlsx"
+}
+
+function isRFQSupportedAttachment(att: RFQEmailAttachment) {
+  const mimeType = att.mimeType.toLowerCase()
+  return (
+    mimeType === "application/pdf" ||
+    ["image/jpeg", "image/png", "image/webp"].includes(mimeType) ||
+    isSpreadsheetAttachment(att)
+  )
+}
+
+function isPreviewableAttachment(att: RFQEmailAttachment) {
+  const mimeType = att.mimeType.toLowerCase()
+  return (
+    mimeType === "application/pdf" ||
+    ["image/gif", "image/jpeg", "image/png", "image/webp"].includes(mimeType) ||
+    isSpreadsheetAttachment(att)
+  )
+}
+
+function buildSourceAttachmentUrl(emailId: string, attachmentId: string, download = false) {
+  const path = `${EMAIL_API_BASE}/${emailId}/attachments/${encodeURIComponent(attachmentId)}`
+  return download ? `${path}/download` : path
+}
+
+function stringifySpreadsheetCell(cell: unknown) {
+  if (cell == null) return ""
+  if (cell instanceof Date) return Number.isNaN(cell.getTime()) ? "" : cell.toISOString().slice(0, 10)
+  return String(cell).replace(/\s+/g, " ").trim()
+}
+
+function getSpreadsheetRows(workbook: XLSX.WorkBook | null, sheetName: string) {
+  if (!workbook) return []
+
+  const sheet = workbook.Sheets[sheetName]
+  if (!sheet) return []
+
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+    blankrows: false,
+  })
+
+  return rows
+    .map((row) => row.slice(0, SPREADSHEET_PREVIEW_COLUMN_LIMIT).map(stringifySpreadsheetCell))
+    .filter((row) => row.some(Boolean))
+    .slice(0, SPREADSHEET_PREVIEW_ROW_LIMIT)
+}
+
+function SourceSpreadsheetAttachmentPreview({
+  emailId,
+  attachment,
+}: {
+  emailId: string
+  attachment: RFQEmailAttachment
+}) {
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [selectedSheet, setSelectedSheet] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadSpreadsheet() {
+      setLoading(true)
+      setError(null)
+      setWorkbook(null)
+      setSelectedSheet("")
+
+      try {
+        const response = await fetch(buildSourceAttachmentUrl(emailId, attachment.attachmentId), {
+          credentials: "include",
+          signal: controller.signal,
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+        const buffer = await response.arrayBuffer()
+        const parsed = XLSX.read(buffer, { type: "array", cellDates: true })
+        const firstSheet = parsed.SheetNames.find((sheetName) => parsed.Sheets[sheetName])
+        if (!firstSheet) throw new Error("No worksheet found")
+
+        if (!controller.signal.aborted) {
+          setWorkbook(parsed)
+          setSelectedSheet(firstSheet)
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err instanceof Error ? err.message : "Unable to preview spreadsheet")
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
+    }
+
+    void loadSpreadsheet()
+
+    return () => controller.abort()
+  }, [attachment.attachmentId, emailId])
+
+  const sheetNames = workbook?.SheetNames.filter((sheetName) => workbook.Sheets[sheetName]) ?? []
+  const rows = useMemo(() => getSpreadsheetRows(workbook, selectedSheet), [workbook, selectedSheet])
+  const headerRow = rows[0] ?? []
+  const dataRows = rows.slice(1)
+
+  if (loading) {
+    return (
+      <div className="flex size-full flex-col gap-3 p-6">
+        <Skeleton className="h-9 w-48" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-3/4" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-10 text-center">
+        <div className="surface-raised rounded-2xl p-5">
+          <AlertCircleIcon className="size-8 text-destructive/70" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[13px] font-semibold">Preview failed</p>
+          <p className="max-w-sm text-[12px] text-muted-foreground">
+            The spreadsheet could not be shown inline. You can still download the original file.
+          </p>
+          <p className="text-[11px] text-muted-foreground/60">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 p-10 text-center">
+        <div className="surface-raised rounded-2xl p-5">
+          <PaperclipIcon className="size-8 text-muted-foreground/50" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[13px] font-semibold">No rows to preview</p>
+          <p className="max-w-sm text-[12px] text-muted-foreground">
+            This spreadsheet does not contain visible rows in the selected sheet.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex size-full flex-col overflow-hidden bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-4 py-3">
+        <div>
+          <p className="text-[12px] font-semibold">Spreadsheet Preview</p>
+          <p className="text-[11px] text-muted-foreground">
+            Showing up to {SPREADSHEET_PREVIEW_ROW_LIMIT} rows and {SPREADSHEET_PREVIEW_COLUMN_LIMIT} columns.
+          </p>
+        </div>
+        {sheetNames.length > 1 && (
+          <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            Sheet
+            <select
+              value={selectedSheet}
+              onChange={(event) => setSelectedSheet(event.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:ring-2 focus:ring-ring/40"
+            >
+              {sheetNames.map((sheetName) => (
+                <option key={sheetName} value={sheetName}>
+                  {sheetName}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <table className="w-max min-w-full border-separate border-spacing-0 text-left text-[12px]">
+          <thead>
+            <tr>
+              {headerRow.map((cell, index) => (
+                <th
+                  key={`${index}-${cell}`}
+                  className="sticky top-0 z-10 border-b border-r border-border/60 bg-muted px-3 py-2 font-semibold text-foreground"
+                >
+                  {cell || `Column ${index + 1}`}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="odd:bg-muted/20">
+                {headerRow.map((_, columnIndex) => (
+                  <td
+                    key={columnIndex}
+                    className="max-w-[280px] border-b border-r border-border/40 px-3 py-2 align-top text-muted-foreground"
+                    title={row[columnIndex] ?? ""}
+                  >
+                    <span className="line-clamp-3 wrap-break-word">{row[columnIndex] ?? ""}</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 function numberInputValue(value: number | string | null | undefined): string {
@@ -552,6 +807,8 @@ export function DashboardPage() {
   const [quoteNotes, setQuoteNotes] = useState<string>("")
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archivingRfq, setArchivingRfq] = useState(false)
+  const [sourceEmailOpen, setSourceEmailOpen] = useState(false)
+  const [selectedSourceAttachment, setSelectedSourceAttachment] = useState<RFQEmailAttachment | null>(null)
 
   const hasActiveFilters =
     statusFilter !== "all" ||
@@ -632,11 +889,23 @@ export function DashboardPage() {
       if (!id) {
         setDetail(null)
         setReply(null)
+        setSourceEmailOpen(false)
+        setSelectedSourceAttachment(null)
       }
       void navigate({
         to: "/rfq",
         search: id ? { rfq: id } : {},
         replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const openOriginalEmail = useCallback(
+    (emailId: string) => {
+      void navigate({
+        to: "/emails",
+        search: { email: emailId },
       })
     },
     [navigate],
@@ -691,6 +960,8 @@ export function DashboardPage() {
       setProductSearch("")
       setProductResults([])
       setProductSearchError(null)
+      setSourceEmailOpen(false)
+      setSelectedSourceAttachment(null)
       setSelectedPaymentTermId("")
       setPaymentTermName("")
       setPaymentTermsText("")
@@ -843,7 +1114,15 @@ export function DashboardPage() {
           break
         }
         case "Escape": {
-          selectRFQ(null)
+          if (selectedSourceAttachment) {
+            setSelectedSourceAttachment(null)
+          } else if (sourceEmailOpen) {
+            setSourceEmailOpen(false)
+          } else if (archiveConfirmOpen) {
+            setArchiveConfirmOpen(false)
+          } else {
+            selectRFQ(null)
+          }
           break
         }
         case "r":
@@ -858,7 +1137,7 @@ export function DashboardPage() {
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [rfqs, selectedId, refreshing, fetchList, page, selectRFQ])
+  }, [rfqs, selectedId, refreshing, fetchList, page, selectRFQ, selectedSourceAttachment, sourceEmailOpen, archiveConfirmOpen])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -1252,8 +1531,15 @@ export function DashboardPage() {
         throw new Error(err.error || `HTTP ${res.status}`)
       }
       const data: RFQSummary = await res.json()
-      setDetail(data)
-      setRfqs((current) => current.map((rfq) => (rfq._id === data._id ? data : rfq)))
+      const nextDetail: RFQSummary = {
+        ...data,
+        emailId: {
+          ...detail.emailId,
+          ...data.emailId,
+        },
+      }
+      setDetail(nextDetail)
+      setRfqs((current) => current.map((rfq) => (rfq._id === data._id ? nextDetail : rfq)))
       toast.success("RFQ draft saved")
     } catch (err) {
       toast.error("Failed to save RFQ draft")
@@ -1947,6 +2233,32 @@ export function DashboardPage() {
                         <TooltipContent>
                           {getWorkflowStatusTooltip(detail)}
                         </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 shrink-0"
+                            onClick={() => setSourceEmailOpen(true)}
+                          >
+                            <PaperclipIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View source attachments</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7 shrink-0"
+                            onClick={() => openOriginalEmail(detail.emailId._id)}
+                          >
+                            <ExternalLinkIcon className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Open original email in Inbox</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -2672,6 +2984,239 @@ export function DashboardPage() {
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
+
+      <Sheet
+        open={sourceEmailOpen && Boolean(detail)}
+        onOpenChange={(open) => {
+          setSourceEmailOpen(open)
+          if (!open) setSelectedSourceAttachment(null)
+        }}
+      >
+        <SheetContent className="w-full overflow-hidden p-0 sm:max-w-xl">
+          {detail && (
+            <>
+              <SheetHeader className="border-b border-border/50 px-5 py-4 pr-12">
+                <SheetTitle>Source Email</SheetTitle>
+                <SheetDescription>
+                  Review the original RFQ email context and attachments without leaving this quote.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                          {detail.emailId.subject || "(no subject)"}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatFullDateTime(detail.emailId.date)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 gap-1.5"
+                        onClick={() => openOriginalEmail(detail.emailId._id)}
+                      >
+                        <ExternalLinkIcon className="size-3.5" />
+                        Open in Inbox
+                      </Button>
+                    </div>
+                    {(() => {
+                      const sender = parseSender(detail.emailId.from)
+                      const colors = getAvatarColor(sender.name)
+                      return (
+                        <div className="flex items-center gap-3">
+                          <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-[13px] font-semibold ${colors.bg} ${colors.text}`}>
+                            {sender.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-medium">{sender.name}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">{sender.email}</p>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {(detail.emailId.snippet || detail.emailId.bodyText) && (
+                    <div className="rounded-xl border border-border/50 p-4">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        Body Snippet
+                      </p>
+                      <p className="line-clamp-5 whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
+                        {detail.emailId.snippet || detail.emailId.bodyText}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Attachments</p>
+                        <p className="text-xs text-muted-foreground">
+                          Diagrams and documents from the original email.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {detail.emailId.attachments?.length ?? 0}
+                      </span>
+                    </div>
+
+                    {detail.emailId.attachments?.length ? (
+                      <div className="space-y-2">
+                        {detail.emailId.attachments.map((attachment) => {
+                          const previewable = isPreviewableAttachment(attachment)
+                          return (
+                            <div
+                              key={attachment.attachmentId}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-background px-3 py-2.5"
+                            >
+                              <button
+                                type="button"
+                                className="min-w-0 flex-1 text-left"
+                                onClick={() => {
+                                  if (previewable) {
+                                    setSelectedSourceAttachment(attachment)
+                                  } else {
+                                    openDownload(buildSourceAttachmentUrl(detail.emailId._id, attachment.attachmentId, true))
+                                  }
+                                }}
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <PaperclipIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                                  <span className="truncate text-[13px] font-medium">
+                                    {attachment.filename}
+                                  </span>
+                                  {isRFQSupportedAttachment(attachment) && (
+                                    <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                      RFQ scan
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-1 pl-5 text-[11px] text-muted-foreground">
+                                  {attachment.mimeType || "Unknown type"} · {(attachment.size / 1024).toFixed(0)}KB
+                                </p>
+                              </button>
+                              <div className="flex shrink-0 items-center gap-1">
+                                {previewable && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7"
+                                        onClick={() => setSelectedSourceAttachment(attachment)}
+                                      >
+                                        <EyeIcon className="size-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Preview</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="size-7"
+                                      onClick={() => openDownload(buildSourceAttachmentUrl(detail.emailId._id, attachment.attachmentId, true))}
+                                    >
+                                      <DownloadIcon className="size-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Download</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border/70 p-6 text-center">
+                        <PaperclipIcon className="mx-auto mb-3 size-8 text-muted-foreground/40" />
+                        <p className="text-[13px] font-medium">No attachments on source email</p>
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          Open the full Inbox email if you need more context from the message body.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {detail && selectedSourceAttachment && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-6 backdrop-blur-sm animate-in fade-in-0 duration-200">
+          <div className="flex h-full max-h-[860px] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between gap-4 border-b border-border/50 px-5 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold">{selectedSourceAttachment.filename}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {selectedSourceAttachment.mimeType || "Unknown type"} · {(selectedSourceAttachment.size / 1024).toFixed(0)}KB
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href={buildSourceAttachmentUrl(detail.emailId._id, selectedSourceAttachment.attachmentId, true)}>
+                    <DownloadIcon className="mr-1.5 size-3.5" />
+                    Download
+                  </a>
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8" onClick={() => setSelectedSourceAttachment(null)}>
+                      <XIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Close (Esc)</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/30">
+              {selectedSourceAttachment.mimeType.toLowerCase() === "application/pdf" ? (
+                <iframe
+                  title={selectedSourceAttachment.filename}
+                  className="size-full border-0 bg-white"
+                  src={buildSourceAttachmentUrl(detail.emailId._id, selectedSourceAttachment.attachmentId)}
+                />
+              ) : selectedSourceAttachment.mimeType.toLowerCase().startsWith("image/") && isPreviewableAttachment(selectedSourceAttachment) ? (
+                <div className="size-full overflow-auto p-6 text-center">
+                  <img
+                    src={buildSourceAttachmentUrl(detail.emailId._id, selectedSourceAttachment.attachmentId)}
+                    alt={selectedSourceAttachment.filename}
+                    className="mx-auto max-h-full max-w-full rounded-lg object-contain shadow-lg"
+                  />
+                </div>
+              ) : isSpreadsheetAttachment(selectedSourceAttachment) ? (
+                <SourceSpreadsheetAttachmentPreview emailId={detail.emailId._id} attachment={selectedSourceAttachment} />
+              ) : (
+                <div className="flex flex-col items-center gap-4 p-10 text-center">
+                  <div className="surface-raised rounded-2xl p-5">
+                    <PaperclipIcon className="size-8 text-muted-foreground/50" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[13px] font-semibold">Preview not available</p>
+                    <p className="max-w-sm text-[12px] text-muted-foreground">
+                      This attachment type is available to download, but it is not shown inline for safety.
+                    </p>
+                  </div>
+                  <Button asChild>
+                    <a href={buildSourceAttachmentUrl(detail.emailId._id, selectedSourceAttachment.attachmentId, true)}>
+                      <DownloadIcon className="mr-2 size-4" />
+                      Download Attachment
+                    </a>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
         <DialogContent showCloseButton={false}>

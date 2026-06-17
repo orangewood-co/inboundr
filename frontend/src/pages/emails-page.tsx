@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import * as XLSX from "xlsx"
 import { AppLayout } from "@/components/app-layout"
 import { ErrorState } from "@/components/list-states"
@@ -29,6 +30,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   ChevronDownIcon,
+  FileTextIcon,
 } from "lucide-react"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -708,6 +710,8 @@ function DetailPlaceholder() {
 }
 
 export function EmailsPage() {
+  const navigate = useNavigate()
+  const { email: selectedEmailId } = useSearch({ from: "/emails" })
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "btsa:layout:inbox",
     storage: localStorage,
@@ -720,7 +724,7 @@ export function EmailsPage() {
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(selectedEmailId ?? null)
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [selectedAttachment, setSelectedAttachment] = useState<EmailDetail["attachments"][number] | null>(null)
@@ -767,7 +771,40 @@ export function EmailsPage() {
     }
   }, [])
 
+  const selectEmail = useCallback(
+    (id: string | null) => {
+      setSelectedId(id)
+      if (!id) {
+        setDetail(null)
+      }
+      void navigate({
+        to: "/emails",
+        search: id ? { email: id } : {},
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const openRFQ = useCallback(
+    (rfqId: string) => {
+      void navigate({
+        to: "/rfq",
+        search: { rfq: rfqId },
+      })
+    },
+    [navigate],
+  )
+
   useEffect(() => { fetchList(1) }, [fetchList])
+
+  useEffect(() => {
+    const nextSelectedId = selectedEmailId ?? null
+    setSelectedId((current) => (current === nextSelectedId ? current : nextSelectedId))
+    if (!nextSelectedId) {
+      setDetail(null)
+    }
+  }, [selectedEmailId])
 
   useEffect(() => {
     if (selectedId) fetchDetail(selectedId)
@@ -831,7 +868,7 @@ export function EmailsPage() {
         const currentIndex = emails.findIndex((em) => em._id === selectedId)
         const next = e.key === "j" ? currentIndex + 1 : currentIndex - 1
         if (next >= 0 && next < emails.length) {
-          setSelectedId(emails[next]._id)
+          selectEmail(emails[next]._id)
         }
       }
 
@@ -839,8 +876,7 @@ export function EmailsPage() {
         if (selectedAttachment) {
           setSelectedAttachment(null)
         } else if (detail) {
-          setSelectedId(null)
-          setDetail(null)
+          selectEmail(null)
         }
       }
 
@@ -852,7 +888,7 @@ export function EmailsPage() {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [emails, selectedId, selectedAttachment, detail, page])
+  }, [emails, selectedId, selectedAttachment, detail, page, selectEmail])
 
   const senderInitial = (from: string) => {
     const { name } = parseSender(from)
@@ -861,6 +897,7 @@ export function EmailsPage() {
   const canReprocessDetail = Boolean(
     detail && (detail.status === "failed" || detail.rfqErrorMessage)
   )
+  const canOpenDetailRFQ = Boolean(detail?.isRFQ === true && detail.rfqId)
 
   return (
     <AppLayout>
@@ -908,9 +945,17 @@ export function EmailsPage() {
                     const isSelected = selectedId === email._id
                     const colors = getAvatarColor(name)
                     return (
-                      <button
+                      <div
                         key={email._id}
-                        onClick={() => setSelectedId(email._id)}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => selectEmail(email._id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            selectEmail(email._id)
+                          }
+                        }}
                         className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-all duration-150 ${
                           isSelected
                             ? "surface-raised glow-primary"
@@ -967,7 +1012,7 @@ export function EmailsPage() {
                           <StatusBadge status={email.status} />
                           <ClassificationBadge email={email} />
                         </div>
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -1033,6 +1078,21 @@ export function EmailsPage() {
                           <TooltipContent>Reprocess RFQ</TooltipContent>
                         </Tooltip>
                       )}
+                      {canOpenDetailRFQ && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground/50 hover:text-foreground"
+                              onClick={() => openRFQ(detail.rfqId!)}
+                            >
+                              <FileTextIcon className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Open related RFQ</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1067,10 +1127,7 @@ export function EmailsPage() {
                             variant="ghost"
                             size="icon"
                             className="size-7 text-muted-foreground/50 hover:text-foreground"
-                            onClick={() => {
-                              setSelectedId(null)
-                              setDetail(null)
-                            }}
+                            onClick={() => selectEmail(null)}
                           >
                             <XIcon className="size-4" />
                           </Button>
