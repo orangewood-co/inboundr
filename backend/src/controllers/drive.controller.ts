@@ -78,6 +78,62 @@ function parseExpiry(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? defaultPublicLinkExpiry() : date;
 }
 
+const DRIVE_TYPE_REGEX: Record<string, string> = {
+  pdfs: "pdf",
+  images: "^image/",
+  videos: "^video/",
+  audios: "^audio/",
+  audio: "^audio/",
+  spreadsheets: "spreadsheetml|ms-excel|excel|csv",
+  presentations: "presentationml|ms-powerpoint|powerpoint",
+  documents: "msword|wordprocessingml|rtf|^text/",
+  archives: "zip|compressed|gzip|rar|tar|7z",
+};
+
+const DRIVE_KNOWN_FILE_REGEX = Object.entries(DRIVE_TYPE_REGEX)
+  .filter(([key]) => key !== "audio")
+  .map(([, regex]) => regex)
+  .join("|");
+
+function buildDriveTypeConditions(types: string[]): Record<string, unknown>[] {
+  const conditions: Record<string, unknown>[] = [];
+  for (const raw of types) {
+    const type = raw.trim().toLowerCase();
+    if (!type) continue;
+    if (type === "folders" || type === "folder") {
+      conditions.push({ type: "folder" });
+    } else if (type === "other" || type === "others") {
+      conditions.push({
+        type: "file",
+        contentType: { $not: { $regex: DRIVE_KNOWN_FILE_REGEX, $options: "i" } },
+      });
+    } else if (DRIVE_TYPE_REGEX[type]) {
+      conditions.push({
+        type: "file",
+        contentType: { $regex: DRIVE_TYPE_REGEX[type], $options: "i" },
+      });
+    }
+  }
+  return conditions;
+}
+
+function buildDriveSort(sortParam: string, dirParam: string): Record<string, 1 | -1> {
+  const direction: 1 | -1 = dirParam === "desc" ? -1 : 1;
+  const fieldMap: Record<string, string> = {
+    name: "name",
+    updatedAt: "updatedAt",
+    modified: "updatedAt",
+    size: "size",
+    type: "type",
+  };
+  const field = fieldMap[sortParam] ?? "name";
+  if (field === "type") {
+    return { type: direction, name: 1 };
+  }
+  // Folders always grouped first ("folder" sorts ahead of "file" with -1).
+  return { type: -1, [field]: direction, name: 1 };
+}
+
 function serializeNode(node: any, role?: string) {
   return {
     _id: String(node._id),
@@ -227,6 +283,8 @@ export async function listDriveNodes(req: Request, res: Response): Promise<void>
     const view = stringValue(req.query.view);
     const search = stringValue(req.query.search);
     const parentId = objectId(req.query.parentId);
+    const typesParam = stringValue(req.query.types);
+    const typeConditions = buildDriveTypeConditions(typesParam ? typesParam.split(",") : []);
 
     let query: Record<string, unknown> = {
       organizationId: orgReq.organization._id,
@@ -262,8 +320,12 @@ export async function listDriveNodes(req: Request, res: Response): Promise<void>
       }
     }
 
+    if (typeConditions.length > 0) {
+      query.$or = typeConditions;
+    }
+
     const nodes = await DriveNode.find(query)
-      .sort({ type: 1, name: 1, updatedAt: -1 })
+      .sort(buildDriveSort(stringValue(req.query.sort), stringValue(req.query.dir)))
       .limit(250);
 
     res.json({ nodes: await filterAccessible(nodes, orgReq) });

@@ -14,6 +14,8 @@ import {
 } from "@dnd-kit/core"
 import {
   AlertCircleIcon,
+  ArrowDownNarrowWideIcon,
+  ArrowUpNarrowWideIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -26,12 +28,14 @@ import {
   FileTextIcon,
   FileUpIcon,
   FileVideoIcon,
+  FilterIcon,
   FolderIcon,
   FolderInputIcon,
   FolderPlusIcon,
   FolderUpIcon,
   HardDriveIcon,
   ImageIcon,
+  InfoIcon,
   LayoutGridIcon,
   LinkIcon,
   ListIcon,
@@ -60,6 +64,13 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -71,11 +82,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -105,6 +121,7 @@ import {
   formatDriveNodeType,
   getDriveExport,
   getDriveFileUrl,
+  getDriveQuota,
   listDriveNodes,
   listDrivePublicLinks,
   listDriveShares,
@@ -119,7 +136,10 @@ import {
   unshareDriveNode,
   type DriveNode,
   type DrivePublicLink,
+  type DriveQuota,
   type DriveShare,
+  type DriveSortDir,
+  type DriveSortField,
 } from "@/lib/drive"
 import {
   buildDescriptorsFromEntries,
@@ -132,10 +152,53 @@ type DriveView = "my" | "shared" | "trash"
 type LayoutMode = "list" | "grid"
 
 const LAYOUT_STORAGE_KEY = "drive:layout"
+const SORT_STORAGE_KEY = "drive:sort"
+
+interface DriveSortState {
+  field: DriveSortField
+  dir: DriveSortDir
+}
+
+const DRIVE_SORT_OPTIONS: { id: DriveSortField; label: string }[] = [
+  { id: "name", label: "Name" },
+  { id: "updatedAt", label: "Last Modified" },
+  { id: "size", label: "Size" },
+  { id: "type", label: "Type" },
+]
+
+const DRIVE_TYPE_FILTERS: { id: string; label: string }[] = [
+  { id: "folders", label: "Folders" },
+  { id: "documents", label: "Documents" },
+  { id: "spreadsheets", label: "Spreadsheets" },
+  { id: "presentations", label: "Presentations" },
+  { id: "pdfs", label: "PDFs" },
+  { id: "images", label: "Images" },
+  { id: "videos", label: "Videos" },
+  { id: "audio", label: "Audio" },
+  { id: "archives", label: "Archives" },
+  { id: "other", label: "Other" },
+]
 
 function getInitialLayout(): LayoutMode {
   if (typeof window === "undefined") return "list"
   return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "grid" ? "grid" : "list"
+}
+
+function getInitialSort(): DriveSortState {
+  const fallback: DriveSortState = { field: "name", dir: "asc" }
+  if (typeof window === "undefined") return fallback
+  try {
+    const raw = window.localStorage.getItem(SORT_STORAGE_KEY)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw) as Partial<DriveSortState>
+    const field = DRIVE_SORT_OPTIONS.some((option) => option.id === parsed.field)
+      ? (parsed.field as DriveSortField)
+      : "name"
+    const dir: DriveSortDir = parsed.dir === "desc" ? "desc" : "asc"
+    return { field, dir }
+  } catch {
+    return fallback
+  }
 }
 
 function iconForNode(node: DriveNode): { Icon: typeof FileIcon; className: string } {
@@ -166,6 +229,11 @@ export default function DrivePage() {
   const [breadcrumbs, setBreadcrumbs] = React.useState<DriveNode[]>([])
   const [search, setSearch] = React.useState("")
   const [debouncedSearch, setDebouncedSearch] = React.useState("")
+  const [sort, setSort] = React.useState<DriveSortState>(getInitialSort)
+  const [typeFilters, setTypeFilters] = React.useState<Set<string>>(new Set())
+  const [quota, setQuota] = React.useState<DriveQuota | null>(null)
+  const [detailsOpen, setDetailsOpen] = React.useState(false)
+  const [detailsNode, setDetailsNode] = React.useState<DriveNode | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [viewer, setViewer] = React.useState<{ node: DriveNode; url: string } | null>(null)
   const [sharingNode, setSharingNode] = React.useState<DriveNode | null>(null)
@@ -195,6 +263,8 @@ export default function DrivePage() {
     return () => window.clearTimeout(timeout)
   }, [search])
 
+  const typeFilterKey = React.useMemo(() => [...typeFilters].sort().join(","), [typeFilters])
+
   const loadNodes = React.useCallback(async () => {
     setLoading(true)
     try {
@@ -202,6 +272,9 @@ export default function DrivePage() {
         parentId: view === "my" ? parent?._id : null,
         view,
         search: debouncedSearch,
+        sort: sort.field,
+        dir: sort.dir,
+        types: typeFilterKey ? typeFilterKey.split(",") : undefined,
       })
       setNodes(response.nodes)
     } catch (err: any) {
@@ -209,11 +282,23 @@ export default function DrivePage() {
     } finally {
       setLoading(false)
     }
-  }, [parent?._id, debouncedSearch, view])
+  }, [parent?._id, debouncedSearch, view, sort.field, sort.dir, typeFilterKey])
 
   React.useEffect(() => {
     void loadNodes()
   }, [loadNodes])
+
+  React.useEffect(() => {
+    let cancelled = false
+    void getDriveQuota()
+      .then((response) => {
+        if (!cancelled) setQuota(response.quota)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const clearSelection = React.useCallback(() => {
     setSelectedIds(new Set())
@@ -222,7 +307,34 @@ export default function DrivePage() {
 
   React.useEffect(() => {
     clearSelection()
-  }, [view, parent?._id, debouncedSearch, clearSelection])
+  }, [view, parent?._id, debouncedSearch, typeFilterKey, clearSelection])
+
+  // Keep the Details panel in sync with the single selected item.
+  React.useEffect(() => {
+    if (!detailsOpen) return
+    if (selectedIds.size === 1) {
+      const id = [...selectedIds][0]
+      const match = nodes.find((node) => node._id === id)
+      if (match) setDetailsNode(match)
+    }
+  }, [detailsOpen, selectedIds, nodes])
+
+  React.useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+      if (detailsOpen) {
+        setDetailsOpen(false)
+        return
+      }
+      if (selectedIds.size > 0) clearSelection()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [detailsOpen, selectedIds, clearSelection])
 
   const uploads = useDriveUploads(loadNodes)
 
@@ -236,6 +348,33 @@ export default function DrivePage() {
   function changeLayout(next: LayoutMode) {
     setLayout(next)
     window.localStorage.setItem(LAYOUT_STORAGE_KEY, next)
+  }
+
+  function persistSort(next: DriveSortState) {
+    setSort(next)
+    window.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(next))
+  }
+
+  function changeSortField(field: DriveSortField) {
+    persistSort({ field, dir: sort.dir })
+  }
+
+  function toggleSortDir() {
+    persistSort({ field: sort.field, dir: sort.dir === "asc" ? "desc" : "asc" })
+  }
+
+  function toggleTypeFilter(id: string) {
+    setTypeFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function openDetails(node: DriveNode) {
+    setDetailsNode(node)
+    setDetailsOpen(true)
   }
 
   function changeView(next: DriveView) {
@@ -359,6 +498,11 @@ export default function DrivePage() {
     setSelectedIds((prev) => (prev.size === nodes.length ? new Set() : new Set(nodes.map((node) => node._id))))
   }
 
+  function selectOnly(id: string, index: number) {
+    setSelectedIds(new Set([id]))
+    setLastIndex(index)
+  }
+
   function handleItemClick(event: React.MouseEvent, node: DriveNode, index: number) {
     if (event.metaKey || event.ctrlKey) {
       event.preventDefault()
@@ -370,8 +514,15 @@ export default function DrivePage() {
       selectRange(index)
       return
     }
-    if (anySelected) clearSelection()
+    selectOnly(node._id, index)
+  }
+
+  function handleItemDoubleClick(node: DriveNode) {
     activateNode(node)
+  }
+
+  function handleContextSelect(node: DriveNode, index: number) {
+    if (!selectedIds.has(node._id)) selectOnly(node._id, index)
   }
 
   function handleCheckboxClick(event: React.MouseEvent, node: DriveNode, index: number) {
@@ -401,6 +552,13 @@ export default function DrivePage() {
     clearSelection()
     await loadNodes()
   }
+
+  async function downloadSelection() {
+    const selected = nodes.filter((node) => selectedIds.has(node._id))
+    for (const node of selected) await downloadNode(node)
+  }
+
+  const singleSelectedNode = selectedIds.size === 1 ? nodes.find((node) => selectedIds.has(node._id)) ?? null : null
 
   // --- Drag to move --------------------------------------------------------
 
@@ -584,9 +742,13 @@ export default function DrivePage() {
                 <Share2Icon className="size-4" />
                 Share
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
             </>
           )}
+          <DropdownMenuItem onClick={() => openDetails(node)}>
+            <InfoIcon className="size-4" />
+            Details
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           {view === "trash" && (
             <DropdownMenuItem onClick={() => void restoreNode(node)}>
               <RotateCcwIcon className="size-4" />
@@ -602,6 +764,107 @@ export default function DrivePage() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    )
+  }
+
+  function renderItemMenu(node: DriveNode, index: number, children: React.ReactNode) {
+    const isMulti = selectedIds.has(node._id) && selectedIds.size > 1
+    return (
+      <ContextMenu
+        onOpenChange={(open) => {
+          if (open) handleContextSelect(node, index)
+        }}
+      >
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent className="w-52">
+          {isMulti ? (
+            <>
+              <ContextMenuItem onSelect={() => void downloadSelection()}>
+                <DownloadIcon className="size-4" />
+                Download
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              {view === "trash" ? (
+                <>
+                  <ContextMenuItem
+                    onSelect={() =>
+                      void runBulk((id) => restoreDriveNode(id), {
+                        one: "Restored",
+                        many: (n) => `${n} items restored`,
+                      })
+                    }
+                  >
+                    <RotateCcwIcon className="size-4" />
+                    Restore
+                  </ContextMenuItem>
+                  <ContextMenuItem variant="destructive" onSelect={() => setBulkDeleteOpen(true)}>
+                    <Trash2Icon className="size-4" />
+                    Delete Forever
+                  </ContextMenuItem>
+                </>
+              ) : (
+                <ContextMenuItem
+                  onSelect={() =>
+                    void runBulk((id) => trashDriveNode(id), {
+                      one: "Moved to Trash",
+                      many: (n) => `${n} items moved to Trash`,
+                    })
+                  }
+                >
+                  <Trash2Icon className="size-4" />
+                  Trash
+                </ContextMenuItem>
+              )}
+            </>
+          ) : (
+            <>
+              <ContextMenuItem onSelect={() => activateNode(node)}>
+                {node.type === "folder" ? <FolderIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                Open
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => void downloadNode(node)}>
+                <DownloadIcon className="size-4" />
+                Download
+              </ContextMenuItem>
+              {view !== "trash" && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onSelect={() => setFolderDialog({ mode: "rename", node })}>
+                    <Edit3Icon className="size-4" />
+                    Rename
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => setMoveNodeTarget(node)}>
+                    <FolderInputIcon className="size-4" />
+                    Move
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => setSharingNode(node)}>
+                    <Share2Icon className="size-4" />
+                    Share
+                  </ContextMenuItem>
+                </>
+              )}
+              <ContextMenuItem onSelect={() => openDetails(node)}>
+                <InfoIcon className="size-4" />
+                Details
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              {view === "trash" && (
+                <ContextMenuItem onSelect={() => void restoreNode(node)}>
+                  <RotateCcwIcon className="size-4" />
+                  Restore
+                </ContextMenuItem>
+              )}
+              <ContextMenuItem
+                variant={view === "trash" ? "destructive" : undefined}
+                onSelect={() => (view === "trash" ? setDeleteTarget(node) : void moveToTrash(node))}
+              >
+                <Trash2Icon className="size-4" />
+                {view === "trash" ? "Delete Forever" : "Trash"}
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
     )
   }
 
@@ -654,12 +917,49 @@ export default function DrivePage() {
             onDragCancel={() => setActiveNode(null)}
           >
             {anySelected ? (
-              <div className="flex items-center gap-3 border-b bg-muted/30 px-4 py-3">
+              <div className="flex min-h-15 flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-2.5">
                 <Button variant="ghost" size="icon-sm" onClick={clearSelection}>
                   <XIcon className="size-4" />
                   <span className="sr-only">Clear selection</span>
                 </Button>
                 <span className="text-sm font-medium">{selectedIds.size} selected</span>
+                <div className="mx-1 h-5 w-px shrink-0 self-center bg-border" />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button variant="ghost" size="sm" onClick={() => void downloadSelection()}>
+                    <DownloadIcon className="size-4" />
+                    Download
+                  </Button>
+                  {view !== "trash" && (
+                    <>
+                      {singleSelectedNode && (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => setSharingNode(singleSelectedNode)}>
+                            <Share2Icon className="size-4" />
+                            Share
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setMoveNodeTarget(singleSelectedNode)}>
+                            <FolderInputIcon className="size-4" />
+                            Move
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFolderDialog({ mode: "rename", node: singleSelectedNode })}
+                          >
+                            <Edit3Icon className="size-4" />
+                            Rename
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {singleSelectedNode && (
+                    <Button variant="ghost" size="sm" onClick={() => openDetails(singleSelectedNode)}>
+                      <InfoIcon className="size-4" />
+                      Details
+                    </Button>
+                  )}
+                </div>
                 <div className="ml-auto flex items-center gap-2">
                   {view === "trash" ? (
                     <>
@@ -699,7 +999,7 @@ export default function DrivePage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+              <div className="flex min-h-15 flex-wrap items-center gap-3 border-b px-4 py-3">
                 <Tabs value={view} onValueChange={(value) => changeView(value as DriveView)}>
                   <TabsList>
                     <TabsTrigger value="my">My Files</TabsTrigger>
@@ -714,9 +1014,23 @@ export default function DrivePage() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search Drive"
-                    className="pl-9"
+                    className="pl-9 pr-9"
                   />
+                  {search && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="absolute top-1/2 right-1 size-7 -translate-y-1/2 text-muted-foreground"
+                      onClick={() => setSearch("")}
+                    >
+                      <XIcon className="size-4" />
+                      <span className="sr-only">Clear search</span>
+                    </Button>
+                  )}
                 </div>
+
+                <DriveFilterControl selected={typeFilters} onToggle={toggleTypeFilter} onClear={() => setTypeFilters(new Set())} />
+                <DriveSortControl sort={sort} onChangeField={changeSortField} onToggleDir={toggleSortDir} />
 
                 <div className="flex items-center rounded-lg border p-0.5">
                   <Tooltip>
@@ -787,13 +1101,20 @@ export default function DrivePage() {
               </div>
             )}
 
-            <div
-              className="relative flex min-h-0 flex-1 flex-col"
-              onDragEnter={onAreaDragEnter}
-              onDragOver={onAreaDragOver}
-              onDragLeave={onAreaDragLeave}
-              onDrop={onAreaDrop}
-            >
+            <div className="flex min-h-0 flex-1">
+              <AreaContextMenu
+                enabled={view === "my"}
+                onNewFolder={() => setFolderDialog({ mode: "create" })}
+                onUploadFiles={() => filesInputRef.current?.click()}
+                onUploadFolder={() => folderInputRef.current?.click()}
+              >
+                <div
+                  className="relative flex min-h-0 flex-1 flex-col"
+                  onDragEnter={onAreaDragEnter}
+                  onDragOver={onAreaDragOver}
+                  onDragLeave={onAreaDragLeave}
+                  onDrop={onAreaDrop}
+                >
               {loading ? (
                 <DriveSkeleton layout={layout} />
               ) : isEmpty ? (
@@ -834,10 +1155,12 @@ export default function DrivePage() {
                           dragEnabled={dragEnabled}
                           isExternalTarget={externalTargetId === node._id}
                           onItemClick={handleItemClick}
+                          onItemDoubleClick={handleItemDoubleClick}
                           onCheckboxClick={handleCheckboxClick}
                           onFolderDragOver={onFolderDragOver}
                           onFolderDragLeave={onFolderDragLeave}
                           actions={renderActions(node)}
+                          renderMenu={(children) => renderItemMenu(node, index, children)}
                         />
                       ))}
                     </tbody>
@@ -856,10 +1179,12 @@ export default function DrivePage() {
                         dragEnabled={dragEnabled}
                         isExternalTarget={externalTargetId === node._id}
                         onItemClick={handleItemClick}
+                        onItemDoubleClick={handleItemDoubleClick}
                         onCheckboxClick={handleCheckboxClick}
                         onFolderDragOver={onFolderDragOver}
                         onFolderDragLeave={onFolderDragLeave}
                         actions={renderActions(node)}
+                        renderMenu={(children) => renderItemMenu(node, index, children)}
                       />
                     ))}
                   </div>
@@ -876,7 +1201,27 @@ export default function DrivePage() {
                   </div>
                 </div>
               )}
+                </div>
+              </AreaContextMenu>
+              {detailsOpen && (
+                <DriveDetailsPanel
+                  node={detailsNode}
+                  locationName={parent?.name ?? "Drive"}
+                  onClose={() => setDetailsOpen(false)}
+                />
+              )}
             </div>
+
+            <DriveStatusBar
+              nodes={nodes}
+              selectedCount={selectedIds.size}
+              selectedBytes={nodes.reduce(
+                (sum, node) => (selectedIds.has(node._id) && node.type === "file" ? sum + node.size : sum),
+                0
+              )}
+              quota={quota}
+              capped={!loading && nodes.length >= 250}
+            />
 
             <DragOverlay dropAnimation={null}>
               {activeNode ? (
@@ -948,10 +1293,12 @@ interface ItemViewProps {
   dragEnabled: boolean
   isExternalTarget: boolean
   onItemClick: (event: React.MouseEvent, node: DriveNode, index: number) => void
+  onItemDoubleClick: (node: DriveNode) => void
   onCheckboxClick: (event: React.MouseEvent, node: DriveNode, index: number) => void
   onFolderDragOver: (event: React.DragEvent, node: DriveNode) => void
   onFolderDragLeave: (event: React.DragEvent, node: DriveNode) => void
   actions: React.ReactNode
+  renderMenu: (children: React.ReactNode) => React.ReactNode
 }
 
 function DriveListRow({
@@ -962,10 +1309,12 @@ function DriveListRow({
   dragEnabled,
   isExternalTarget,
   onItemClick,
+  onItemDoubleClick,
   onCheckboxClick,
   onFolderDragOver,
   onFolderDragLeave,
   actions,
+  renderMenu,
 }: ItemViewProps) {
   const isFolder = node.type === "folder"
   const { Icon, className } = iconForNode(node)
@@ -979,7 +1328,7 @@ function DriveListRow({
 
   const highlighted = (isFolder && drop.isOver) || isExternalTarget
 
-  return (
+  return renderMenu(
     <tr
       ref={setRefs}
       {...(dragEnabled ? drag.attributes : {})}
@@ -991,6 +1340,8 @@ function DriveListRow({
         drag.isDragging && "opacity-40"
       )}
       onClick={(event) => onItemClick(event, node, index)}
+      onDoubleClick={() => onItemDoubleClick(node)}
+      onContextMenu={(event) => event.stopPropagation()}
       onDragOver={isFolder ? (event) => onFolderDragOver(event, node) : undefined}
       onDragLeave={isFolder ? (event) => onFolderDragLeave(event, node) : undefined}
     >
@@ -1053,10 +1404,12 @@ function DriveGridCard({
   dragEnabled,
   isExternalTarget,
   onItemClick,
+  onItemDoubleClick,
   onCheckboxClick,
   onFolderDragOver,
   onFolderDragLeave,
   actions,
+  renderMenu,
 }: ItemViewProps) {
   const isFolder = node.type === "folder"
   const { Icon, className } = iconForNode(node)
@@ -1071,7 +1424,7 @@ function DriveGridCard({
   const highlighted = (isFolder && drop.isOver) || isExternalTarget
   const metadata = isFolder ? "Folder" : `${formatDriveNodeType(node)} · ${formatBytes(node.size)}`
 
-  return (
+  return renderMenu(
     <div
       ref={setRefs}
       {...(dragEnabled ? drag.attributes : {})}
@@ -1083,6 +1436,8 @@ function DriveGridCard({
         drag.isDragging && "opacity-40"
       )}
       onClick={(event) => onItemClick(event, node, index)}
+      onDoubleClick={() => onItemDoubleClick(node)}
+      onContextMenu={(event) => event.stopPropagation()}
       onDragOver={isFolder ? (event) => onFolderDragOver(event, node) : undefined}
       onDragLeave={isFolder ? (event) => onFolderDragLeave(event, node) : undefined}
     >
@@ -1118,6 +1473,231 @@ function DriveGridCard({
           {formatRelativeTime(node.updatedAt)}
         </p>
       </div>
+    </div>
+  )
+}
+
+function DriveSortControl({
+  sort,
+  onChangeField,
+  onToggleDir,
+}: {
+  sort: DriveSortState
+  onChangeField: (field: DriveSortField) => void
+  onToggleDir: () => void
+}) {
+  const activeLabel = DRIVE_SORT_OPTIONS.find((option) => option.id === sort.field)?.label ?? "Name"
+  const DirIcon = sort.dir === "asc" ? ArrowDownNarrowWideIcon : ArrowUpNarrowWideIcon
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <DirIcon className="size-4" />
+          {activeLabel}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={sort.field} onValueChange={(value) => onChangeField(value as DriveSortField)}>
+          {DRIVE_SORT_OPTIONS.map((option) => (
+            <DropdownMenuRadioItem key={option.id} value={option.id}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={(event) => event.preventDefault()} onSelect={(event) => { event.preventDefault(); onToggleDir() }}>
+          <DirIcon className="size-4" />
+          {sort.dir === "asc" ? "Ascending" : "Descending"}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function DriveFilterControl({
+  selected,
+  onToggle,
+  onClear,
+}: {
+  selected: Set<string>
+  onToggle: (id: string) => void
+  onClear: () => void
+}) {
+  const count = selected.size
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm">
+          <FilterIcon className="size-4" />
+          Filters
+          {count > 0 && (
+            <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground tabular-nums">
+              {count}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-2">
+        <div className="flex items-center justify-between px-2 py-1">
+          <span className="text-xs font-medium text-muted-foreground">File Type</span>
+          {count > 0 && (
+            <Button variant="ghost" size="sm" className="h-auto px-1.5 py-0.5 text-xs" onClick={onClear}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <div className="mt-1 space-y-0.5">
+          {DRIVE_TYPE_FILTERS.map((type) => (
+            <button
+              key={type.id}
+              type="button"
+              onClick={() => onToggle(type.id)}
+              className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+            >
+              <Checkbox checked={selected.has(type.id)} tabIndex={-1} className="pointer-events-none" />
+              {type.label}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function AreaContextMenu({
+  enabled,
+  onNewFolder,
+  onUploadFiles,
+  onUploadFolder,
+  children,
+}: {
+  enabled: boolean
+  onNewFolder: () => void
+  onUploadFiles: () => void
+  onUploadFolder: () => void
+  children: React.ReactNode
+}) {
+  if (!enabled) return <>{children}</>
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onSelect={onNewFolder}>
+          <FolderPlusIcon className="size-4" />
+          New Folder
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={onUploadFiles}>
+          <FileUpIcon className="size-4" />
+          Upload Files
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onUploadFolder}>
+          <FolderUpIcon className="size-4" />
+          Upload Folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+function DriveDetailRow({
+  label,
+  value,
+  capitalize,
+}: {
+  label: string
+  value: string
+  capitalize?: boolean
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("break-words text-foreground", capitalize && "capitalize")}>{value}</dd>
+    </div>
+  )
+}
+
+function DriveDetailsPanel({
+  node,
+  locationName,
+  onClose,
+}: {
+  node: DriveNode | null
+  locationName: string
+  onClose: () => void
+}) {
+  const { Icon, className } = node ? iconForNode(node) : { Icon: FileIcon, className: "text-muted-foreground" }
+  return (
+    <aside className="flex w-72 shrink-0 flex-col border-l bg-card animate-in slide-in-from-right-2 fade-in-0">
+      <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+        <h2 className="text-sm font-semibold">Details</h2>
+        <Button variant="ghost" size="icon-sm" onClick={onClose}>
+          <XIcon className="size-4" />
+          <span className="sr-only">Close details</span>
+        </Button>
+      </div>
+      {node ? (
+        <div className="flex-1 overflow-auto p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/40">
+              <Icon className={cn("size-5", className)} />
+            </div>
+            <p className="min-w-0 truncate text-sm font-medium" title={node.name}>
+              {node.name}
+            </p>
+          </div>
+          <Separator className="my-4" />
+          <dl className="space-y-3.5 text-sm">
+            <DriveDetailRow label="Type" value={formatDriveNodeType(node)} />
+            <DriveDetailRow label="Size" value={node.type === "folder" ? "—" : formatBytes(node.size)} />
+            <DriveDetailRow label="Location" value={locationName} />
+            <DriveDetailRow label="Modified" value={formatDateTime(node.updatedAt)} />
+            <DriveDetailRow label="Created" value={formatDateTime(node.createdAt)} />
+            <DriveDetailRow label="Access" value={node.role ?? "viewer"} capitalize />
+          </dl>
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          Select an item to see its details.
+        </div>
+      )}
+    </aside>
+  )
+}
+
+function DriveStatusBar({
+  nodes,
+  selectedCount,
+  selectedBytes,
+  quota,
+  capped,
+}: {
+  nodes: DriveNode[]
+  selectedCount: number
+  selectedBytes: number
+  quota: DriveQuota | null
+  capped: boolean
+}) {
+  const folderCount = nodes.filter((node) => node.type === "folder").length
+  const fileCount = nodes.length - folderCount
+  const totalBytes = nodes.reduce((sum, node) => (node.type === "file" ? sum + node.size : sum), 0)
+  const left =
+    selectedCount > 0
+      ? `${selectedCount} selected · ${formatBytes(selectedBytes)}`
+      : `${folderCount} ${folderCount === 1 ? "folder" : "folders"}, ${fileCount} ${
+          fileCount === 1 ? "file" : "files"
+        } · ${formatBytes(totalBytes)}`
+  const usage = quota
+    ? `${formatBytes(quota.usedBytes + quota.reservedBytes)} of ${formatBytes(quota.limitBytes)} used`
+    : null
+  return (
+    <div className="flex items-center justify-between gap-3 border-t bg-muted/20 px-4 py-1.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <span>{left}</span>
+        {capped && <span className="text-amber-600 dark:text-amber-500">Showing first 250</span>}
+      </div>
+      {usage && <span className="shrink-0 tabular-nums">{usage}</span>}
     </div>
   )
 }

@@ -130,16 +130,35 @@ export function canPreview(node: DriveNode) {
   )
 }
 
+export type DriveSortField = "name" | "updatedAt" | "size" | "type"
+export type DriveSortDir = "asc" | "desc"
+
 export async function listDriveNodes(params: {
   parentId?: string | null
   view?: "my" | "shared" | "trash"
   search?: string
+  sort?: DriveSortField
+  dir?: DriveSortDir
+  types?: string[]
 }) {
   const query = new URLSearchParams()
   if (params.parentId) query.set("parentId", params.parentId)
   if (params.view && params.view !== "my") query.set("view", params.view)
   if (params.search) query.set("search", params.search)
+  if (params.sort) query.set("sort", params.sort)
+  if (params.dir) query.set("dir", params.dir)
+  if (params.types && params.types.length) query.set("types", params.types.join(","))
   return api<{ nodes: DriveNode[] }>(`/api/v1/drive?${query.toString()}`)
+}
+
+export interface DriveQuota {
+  limitBytes: number
+  usedBytes: number
+  reservedBytes: number
+}
+
+export async function getDriveQuota() {
+  return api<{ quota: DriveQuota }>("/api/v1/drive/quota")
 }
 
 export async function getDriveNode(id: string) {
