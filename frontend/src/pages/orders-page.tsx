@@ -471,15 +471,15 @@ export function OrdersPage() {
                               : product.description || "No description"}
                           </p>
                           {product.lineStatus !== "regretted" && (
-                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-foreground/70">
                             {product.brand && <span>{product.brand}</span>}
                             {product.brand && product.code && <span>·</span>}
                             {product.code && <span className="font-mono">{product.code}</span>}
                             {(product.brand || product.code) && product.hsnCode && <span>·</span>}
-                            {product.hsnCode && <span>HSN: {product.hsnCode}</span>}
-                            {product.gstRate != null && <span>· GST: {product.gstRate}%</span>}
-                            {product.calibrationCharges != null && <span>· Calibration: {formatPrice(product.calibrationCharges)}</span>}
-                            {product.deliveryTimeline && <span>· Delivery: {product.deliveryTimeline}</span>}
+                            {product.hsnCode && <span>HSN: <span className="font-medium">{product.hsnCode}</span></span>}
+                            {product.gstRate != null && <span>· GST: <span className="font-medium">{product.gstRate}%</span></span>}
+                            {product.calibrationCharges != null && <span>· Calibration: <span className="font-medium">{formatPrice(product.calibrationCharges)}</span></span>}
+                            {product.deliveryTimeline && <span>· Delivery: <span className="font-medium">{product.deliveryTimeline}</span></span>}
                             </div>
                           )}
                         </div>
