@@ -89,7 +89,7 @@ function SearchPageContent() {
   )
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col min-h-0 overflow-y-auto">
       <div className="@container/main flex flex-1 flex-col gap-6 p-4 md:p-6">
         <div className="rounded-2xl border bg-card p-5 shadow-sm">
           <div className="max-w-3xl space-y-4">
