@@ -49,6 +49,7 @@ import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.att
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
+import { Route as EmployeesAttendanceLogsRouteImport } from './routes/employees_.attendance_.logs'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
@@ -252,6 +253,11 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmployeesAttendanceLogsRoute = EmployeesAttendanceLogsRouteImport.update({
+  id: '/employees_/attendance_/logs',
+  path: '/employees/attendance/logs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
   id: '/admin_/organizations/$id',
   path: '/admin/organizations/$id',
@@ -305,6 +311,7 @@ export interface FileRoutesByFullPath {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
+  '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesByTo {
@@ -346,6 +353,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
+  '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesById {
@@ -391,6 +399,7 @@ export interface FileRoutesById {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
+  '/employees_/attendance_/logs': typeof EmployeesAttendanceLogsRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRouteTypes {
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/admin/organizations/$id'
+    | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -478,6 +488,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/links'
     | '/admin/organizations/$id'
+    | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
   id:
     | '__root__'
@@ -522,6 +533,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/admin_/organizations/$id'
+    | '/employees_/attendance_/logs'
     | '/projects_/$id_/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
@@ -559,6 +571,7 @@ export interface RootRouteChildren {
   ProjectsIdRoute: typeof ProjectsIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
+  EmployeesAttendanceLogsRoute: typeof EmployeesAttendanceLogsRoute
   ProjectsIdTasksTaskIdRoute: typeof ProjectsIdTasksTaskIdRoute
 }
 
@@ -844,6 +857,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/employees_/attendance_/logs': {
+      id: '/employees_/attendance_/logs'
+      path: '/employees/attendance/logs'
+      fullPath: '/employees/attendance/logs'
+      preLoaderRoute: typeof EmployeesAttendanceLogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/organizations/$id': {
       id: '/admin_/organizations/$id'
       path: '/admin/organizations/$id'
@@ -937,6 +957,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsIdRoute: ProjectsIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
+  EmployeesAttendanceLogsRoute: EmployeesAttendanceLogsRoute,
   ProjectsIdTasksTaskIdRoute: ProjectsIdTasksTaskIdRoute,
 }
 export const routeTree = rootRouteImport

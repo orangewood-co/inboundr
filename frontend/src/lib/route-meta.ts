@@ -14,6 +14,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/emails": "Inbox",
   "/employees": "Employees",
   "/employees/attendance": "Attendance",
+  "/employees/attendance/logs": "Attendance Logs",
   "/employees/new": "New Employee",
   "/forgot-password": "Forgot Password",
   "/forms": "Forms",

@@ -3,7 +3,6 @@ import { format } from "date-fns"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   CalendarDaysIcon,
-  CameraIcon,
   CheckCircle2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -11,7 +10,6 @@ import {
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
-  MapPinIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -22,6 +20,7 @@ import type { LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { LocationEvidence, SelfieEvidence } from "@/components/attendance-evidence"
 import { DatePicker } from "@/components/date-picker"
 import { PageHeader } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
@@ -184,10 +183,6 @@ function statusVariant(status: AttendanceStatus): "default" | "secondary" | "out
   if (status === "missing_checkout" || status === "late" || status === "half_day") return "secondary"
   if (status === "flagged") return "destructive"
   return "outline"
-}
-
-function mapUrl(location: AttendanceLocation) {
-  return `https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=18/${location.latitude}/${location.longitude}`
 }
 
 export default function AttendancePage() {
@@ -451,6 +446,12 @@ export default function AttendancePage() {
               <RefreshCwIcon className={loading ? "animate-spin" : ""} />
               Refresh
             </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/employees/attendance/logs">
+                <Clock3Icon />
+                Today's Logs
+              </a>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={!data}>
@@ -647,20 +648,18 @@ export default function AttendancePage() {
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
                           {record.selfiePreview && (
-                            <Button variant="outline" size="xs" asChild>
-                              <a href={record.selfiePreview} target="_blank" rel="noreferrer">
-                                <CameraIcon />
-                                Selfie
-                              </a>
-                            </Button>
+                            <SelfieEvidence
+                              src={record.selfiePreview}
+                              title={record.employeeNameSnapshot}
+                              subtitle={formatTime(record.checkOutAt ?? record.checkInAt)}
+                            />
                           )}
                           {(record.checkOutLocation ?? record.checkInLocation) && (
-                            <Button variant="outline" size="xs" asChild>
-                              <a href={mapUrl((record.checkOutLocation ?? record.checkInLocation)!)} target="_blank" rel="noreferrer">
-                                <MapPinIcon />
-                                Map
-                              </a>
-                            </Button>
+                            <LocationEvidence
+                              location={(record.checkOutLocation ?? record.checkInLocation)!}
+                              title={record.employeeNameSnapshot}
+                              subtitle={formatTime(record.checkOutAt ?? record.checkInAt)}
+                            />
                           )}
                         </div>
                       </TableCell>

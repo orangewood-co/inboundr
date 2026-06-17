@@ -137,19 +137,30 @@ function nextAction(record: any | null): AttendanceAction {
 function serializeAttendance(record: any) {
   return {
     ...record,
+    checkInSelfiePreview: null,
+    checkOutSelfiePreview: null,
     selfiePreview: null,
   };
 }
 
+async function selfiePreviewUrl(key: string | null | undefined): Promise<string | null> {
+  if (!key) return null;
+  try {
+    return (await createPresignedViewUrl(key)).url;
+  } catch {
+    return null;
+  }
+}
+
 async function attendanceWithPreview(record: any) {
   const serialized = serializeAttendance(record);
-  const key = record.checkOutSelfieKey ?? record.checkInSelfieKey;
-  if (!key) return serialized;
-  try {
-    serialized.selfiePreview = (await createPresignedViewUrl(key)).url;
-  } catch {
-    serialized.selfiePreview = null;
-  }
+  const [checkInSelfiePreview, checkOutSelfiePreview] = await Promise.all([
+    selfiePreviewUrl(record.checkInSelfieKey),
+    selfiePreviewUrl(record.checkOutSelfieKey),
+  ]);
+  serialized.checkInSelfiePreview = checkInSelfiePreview;
+  serialized.checkOutSelfiePreview = checkOutSelfiePreview;
+  serialized.selfiePreview = checkOutSelfiePreview ?? checkInSelfiePreview;
   return serialized;
 }
 
