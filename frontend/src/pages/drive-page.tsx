@@ -99,6 +99,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -109,6 +116,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { PageToolbar } from "@/components/page-header"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { formatDateTime, formatRelativeTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
@@ -234,6 +242,7 @@ export default function DrivePage() {
   const [quota, setQuota] = React.useState<DriveQuota | null>(null)
   const [detailsOpen, setDetailsOpen] = React.useState(false)
   const [detailsNode, setDetailsNode] = React.useState<DriveNode | null>(null)
+  const isMobile = useIsMobile()
   const [loading, setLoading] = React.useState(true)
   const [viewer, setViewer] = React.useState<{ node: DriveNode; url: string } | null>(null)
   const [sharingNode, setSharingNode] = React.useState<DriveNode | null>(null)
@@ -1203,7 +1212,7 @@ export default function DrivePage() {
               )}
                 </div>
               </AreaContextMenu>
-              {detailsOpen && (
+              {detailsOpen && !isMobile && (
                 <DriveDetailsPanel
                   node={detailsNode}
                   locationName={parent?.name ?? "Drive"}
@@ -1211,6 +1220,20 @@ export default function DrivePage() {
                 />
               )}
             </div>
+
+            {isMobile && (
+              <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-sm">
+                  <SheetHeader className="border-b px-4 py-3">
+                    <SheetTitle className="text-sm">Details</SheetTitle>
+                    <SheetDescription className="sr-only">
+                      Details for the selected file or folder.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <DriveDetailsContent node={detailsNode} locationName={parent?.name ?? "Drive"} />
+                </SheetContent>
+              </Sheet>
+            )}
 
             <DriveStatusBar
               nodes={nodes}
@@ -1618,6 +1641,44 @@ function DriveDetailRow({
   )
 }
 
+function DriveDetailsContent({
+  node,
+  locationName,
+}: {
+  node: DriveNode | null
+  locationName: string
+}) {
+  if (!node) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+        Select an item to see its details.
+      </div>
+    )
+  }
+  const { Icon, className } = iconForNode(node)
+  return (
+    <div className="flex-1 overflow-auto p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/40">
+          <Icon className={cn("size-5", className)} />
+        </div>
+        <p className="min-w-0 truncate text-sm font-medium" title={node.name}>
+          {node.name}
+        </p>
+      </div>
+      <Separator className="my-4" />
+      <dl className="space-y-3.5 text-sm">
+        <DriveDetailRow label="Type" value={formatDriveNodeType(node)} />
+        <DriveDetailRow label="Size" value={node.type === "folder" ? "—" : formatBytes(node.size)} />
+        <DriveDetailRow label="Location" value={locationName} />
+        <DriveDetailRow label="Modified" value={formatDateTime(node.updatedAt)} />
+        <DriveDetailRow label="Created" value={formatDateTime(node.createdAt)} />
+        <DriveDetailRow label="Access" value={node.role ?? "viewer"} capitalize />
+      </dl>
+    </div>
+  )
+}
+
 function DriveDetailsPanel({
   node,
   locationName,
@@ -1627,7 +1688,6 @@ function DriveDetailsPanel({
   locationName: string
   onClose: () => void
 }) {
-  const { Icon, className } = node ? iconForNode(node) : { Icon: FileIcon, className: "text-muted-foreground" }
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l bg-card animate-in slide-in-from-right-2 fade-in-0">
       <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
@@ -1637,31 +1697,7 @@ function DriveDetailsPanel({
           <span className="sr-only">Close details</span>
         </Button>
       </div>
-      {node ? (
-        <div className="flex-1 overflow-auto p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/40">
-              <Icon className={cn("size-5", className)} />
-            </div>
-            <p className="min-w-0 truncate text-sm font-medium" title={node.name}>
-              {node.name}
-            </p>
-          </div>
-          <Separator className="my-4" />
-          <dl className="space-y-3.5 text-sm">
-            <DriveDetailRow label="Type" value={formatDriveNodeType(node)} />
-            <DriveDetailRow label="Size" value={node.type === "folder" ? "—" : formatBytes(node.size)} />
-            <DriveDetailRow label="Location" value={locationName} />
-            <DriveDetailRow label="Modified" value={formatDateTime(node.updatedAt)} />
-            <DriveDetailRow label="Created" value={formatDateTime(node.createdAt)} />
-            <DriveDetailRow label="Access" value={node.role ?? "viewer"} capitalize />
-          </dl>
-        </div>
-      ) : (
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          Select an item to see its details.
-        </div>
-      )}
+      <DriveDetailsContent node={node} locationName={locationName} />
     </aside>
   )
 }
