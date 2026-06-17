@@ -11,6 +11,7 @@ import {
   listAdminUsers,
   moveAdminOrganizationMember,
   removeAdminOrganizationMember,
+  sendAdminSampleNotification,
   transferAdminOrganizationOwner,
   updateAdminOrganizationMember,
   updateAdminOrganization,
@@ -25,6 +26,7 @@ router.use(requireSuperAdmin);
 router.get("/plans", getAdminPlans);
 router.get("/organizations", listAdminOrganizations);
 router.get("/users", listAdminUsers);
+router.post("/notifications/sample", sendAdminSampleNotification);
 router.post("/users/:userId/memberships", addAdminUserMembership);
 router.post("/organizations", createAdminOrganization);
 router.get("/organizations/:id", getAdminOrganization);

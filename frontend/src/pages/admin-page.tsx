@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
-import { Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
+import { BellRingIcon, Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
@@ -88,6 +88,13 @@ interface AdminUser {
   lastSignInAt: string | null
   createdAt: string
   memberships: AdminUserMembership[]
+}
+
+interface AdminNotificationMember {
+  _id: string
+  userId: string
+  role: "owner" | "admin" | "member"
+  user: { id: string; name: string; email: string } | null
 }
 
 interface AdminUsersPagination {
@@ -198,6 +205,14 @@ export default function AdminPage() {
   const [moveMembership, setMoveMembership] = useState<AdminUserMembership | null>(null)
   const [moveOrganizationId, setMoveOrganizationId] = useState("")
   const [moveRole, setMoveRole] = useState<"admin" | "member">("member")
+  const [sampleOrganizationId, setSampleOrganizationId] = useState("")
+  const [sampleMembers, setSampleMembers] = useState<AdminNotificationMember[]>([])
+  const [sampleRecipientUserId, setSampleRecipientUserId] = useState("")
+  const [sampleTitle, setSampleTitle] = useState("Sample Notification")
+  const [sampleBody, setSampleBody] = useState("This is a sample in-app notification from Super Admin.")
+  const [sampleActionUrl, setSampleActionUrl] = useState("/")
+  const [sampleMembersLoading, setSampleMembersLoading] = useState(false)
+  const [sampleSending, setSampleSending] = useState(false)
 
   const visiblePlans = useMemo(() => plans.filter((plan) => plan.slug !== "all_features"), [plans])
   const membershipOrganizationOptions = useMemo(
@@ -270,14 +285,70 @@ export default function AdminPage() {
       ])
       if (!orgResponse.ok || !planResponse.ok) throw new Error("Failed to load admin data")
       const [orgData, planData] = await Promise.all([orgResponse.json(), planResponse.json()])
-      setOrganizations(orgData.organizations ?? [])
+      const nextOrganizations = orgData.organizations ?? []
+      setOrganizations(nextOrganizations)
       setSummary(orgData.summary ?? emptySummary)
       setPlans(planData.plans ?? [])
       setPlanSlug((planData.plans?.[0]?.slug as string | undefined) ?? "all_features")
+      setSampleOrganizationId((current) => current || nextOrganizations[0]?._id || "")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load admin dashboard")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadSampleMembers(organizationId: string) {
+    if (!organizationId) {
+      setSampleMembers([])
+      setSampleRecipientUserId("")
+      return
+    }
+
+    setSampleMembersLoading(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${organizationId}`, { credentials: "include" })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error ?? "Failed to load organization members")
+      const nextMembers: AdminNotificationMember[] = data.members ?? []
+      setSampleMembers(nextMembers)
+      setSampleRecipientUserId((current) =>
+        nextMembers.some((member) => member.userId === current) ? current : nextMembers[0]?.userId ?? ""
+      )
+    } catch (error) {
+      setSampleMembers([])
+      setSampleRecipientUserId("")
+      toast.error(error instanceof Error ? error.message : "Failed to load notification recipients")
+    } finally {
+      setSampleMembersLoading(false)
+    }
+  }
+
+  async function sendSampleNotification(event: React.FormEvent) {
+    event.preventDefault()
+    if (!sampleOrganizationId || !sampleRecipientUserId) return
+
+    setSampleSending(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/notifications/sample`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: sampleOrganizationId,
+          recipientUserId: sampleRecipientUserId,
+          title: sampleTitle,
+          body: sampleBody,
+          actionUrl: sampleActionUrl,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error ?? "Failed to send sample notification")
+      toast.success(data.message ?? "Sample notification sent")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send sample notification")
+    } finally {
+      setSampleSending(false)
     }
   }
 
@@ -419,6 +490,10 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => {
+    void loadSampleMembers(sampleOrganizationId)
+  }, [sampleOrganizationId])
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       void loadUsers(userPage, userSearch)
     }, 250)
@@ -494,6 +569,99 @@ export default function AdminPage() {
             <StatCard title="Suspended" value={summary.suspended} icon={ShieldAlertIcon} />
             <StatCard title="Pending Owners" value={summary.pendingOwner} icon={CrownIcon} />
             <StatCard title="Pending Invites" value={summary.pendingInvites} icon={MailIcon} />
+          </section>
+
+          <section className="rounded-2xl border bg-background p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-xl">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+                    <BellRingIcon className="size-4" />
+                  </div>
+                  <h2 className="font-semibold">Send Sample Notification</h2>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Send an in-app notification to an organization member to validate the notification pipeline.
+                </p>
+              </div>
+              <form onSubmit={sendSampleNotification} className="grid w-full gap-3 lg:max-w-3xl lg:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Organization</Label>
+                  <Select value={sampleOrganizationId} onValueChange={setSampleOrganizationId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations.map((organization) => (
+                        <SelectItem key={organization._id} value={organization._id}>
+                          {organization.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Recipient</Label>
+                  <Select
+                    value={sampleRecipientUserId}
+                    onValueChange={setSampleRecipientUserId}
+                    disabled={sampleMembersLoading || sampleMembers.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={sampleMembersLoading ? "Loading members" : "Select member"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sampleMembers.map((member) => (
+                        <SelectItem key={member._id} value={member.userId}>
+                          {member.user?.email || member.user?.name || member.userId}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sample-title">Title</Label>
+                  <Input
+                    id="sample-title"
+                    value={sampleTitle}
+                    onChange={(event) => setSampleTitle(event.target.value)}
+                    placeholder="Sample Notification"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sample-action-url">Action URL</Label>
+                  <Input
+                    id="sample-action-url"
+                    value={sampleActionUrl}
+                    onChange={(event) => setSampleActionUrl(event.target.value)}
+                    placeholder="/"
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <Label htmlFor="sample-body">Body</Label>
+                  <Input
+                    id="sample-body"
+                    value={sampleBody}
+                    onChange={(event) => setSampleBody(event.target.value)}
+                    placeholder="Write a short message"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 lg:col-span-2">
+                  <p className="text-xs text-muted-foreground">
+                    {sampleMembers.length === 0 && !sampleMembersLoading
+                      ? "Select an organization with at least one member."
+                      : "The selected recipient should see this in the bell immediately."}
+                  </p>
+                  <Button
+                    type="submit"
+                    disabled={!sampleOrganizationId || !sampleRecipientUserId || sampleSending}
+                  >
+                    {sampleSending ? <Spinner data-icon="inline-start" /> : <SendIcon className="mr-2 size-4" />}
+                    Send Sample
+                  </Button>
+                </div>
+              </form>
+            </div>
           </section>
 
           <Tabs defaultValue="organizations" className="gap-4">

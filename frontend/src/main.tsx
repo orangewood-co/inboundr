@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { OrganizationBrandingProvider } from "@/lib/organization-branding"
 import { EntitlementProvider } from "@/lib/entitlements"
+import { NotificationProvider } from "@/lib/notifications-context"
 import { API_ORIGIN, POSTHOG_ENABLED, POSTHOG_HOST, POSTHOG_PROJECT_TOKEN } from "@/lib/env"
 import { installOrganizationFetchContext } from "@/lib/organization-context"
 import { renderASCIILogo } from "@/lib/branding"
@@ -33,9 +34,11 @@ createRoot(document.getElementById("root")!).render(
         <OrganizationBrandingProvider>
           <EntitlementProvider>
             <TooltipProvider>
-              <RouterProvider router={router} />
-              <AppVersionCheck />
-              <Toaster richColors position="top-right" />
+              <NotificationProvider>
+                <RouterProvider router={router} />
+                <AppVersionCheck />
+                <Toaster richColors position="top-right" />
+              </NotificationProvider>
             </TooltipProvider>
           </EntitlementProvider>
         </OrganizationBrandingProvider>

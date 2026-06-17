@@ -1,4 +1,5 @@
 import { SearchForm } from "@/components/search-form"
+import { NotificationBell } from "@/components/notification-bell"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -128,9 +129,15 @@ export function SiteHeader({
           </TooltipProvider>
         )}
         {actions ? (
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
+          <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
+            {actions}
+          </div>
         ) : (
-          <SearchForm className="w-full sm:ml-auto sm:w-auto" />
+          <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+            <NotificationBell />
+            <SearchForm className="w-full sm:w-auto" />
+          </div>
         )}
       </div>
     </header>

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import app, { initializeServices } from "./app";
 import { renderASCIILogo } from "./lib/branding";
+import { attachNotificationWebSocketServer } from "./services/notification-ws.service";
 import { attachSupportWebSocketServer } from "./services/support-ws.service";
 
 renderASCIILogo();
@@ -16,6 +17,7 @@ async function start(): Promise<void> {
     console.log(`Server running on port ${PORT}`);
   });
   attachSupportWebSocketServer(server);
+  attachNotificationWebSocketServer(server);
 }
 
 start().catch((err) => {

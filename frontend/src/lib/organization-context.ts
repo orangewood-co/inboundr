@@ -1,4 +1,5 @@
 export const ACTIVE_ORGANIZATION_ID_KEY = "btsa.activeOrganizationId"
+export const ACTIVE_ORGANIZATION_CHANGED_EVENT = "btsa:active-organization-changed"
 
 export function getActiveOrganizationId(): string | null {
   return window.localStorage.getItem(ACTIVE_ORGANIZATION_ID_KEY)
@@ -6,6 +7,7 @@ export function getActiveOrganizationId(): string | null {
 
 export function setActiveOrganizationId(organizationId: string): void {
   window.localStorage.setItem(ACTIVE_ORGANIZATION_ID_KEY, organizationId)
+  window.dispatchEvent(new CustomEvent(ACTIVE_ORGANIZATION_CHANGED_EVENT, { detail: { organizationId } }))
 }
 
 export function installOrganizationFetchContext(apiOrigin: string): void {

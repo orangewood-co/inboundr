@@ -6,6 +6,7 @@ import { OrganizationInvitationEmail } from "../emails/organization-invitation";
 import { frontendOrigin } from "../config/origins.config";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { isPlatformAdmin } from "../middleware/auth.middleware";
+import { emitDomainEvent } from "../events/domain-events";
 import { sendEmail } from "../lib/email";
 import { OrganizationInvitation } from "../models/organization-invitation.model";
 import {
@@ -13,6 +14,7 @@ import {
   type OrganizationRole,
 } from "../models/organization-member.model";
 import { Organization } from "../models/organization.model";
+import { ensureNotificationRecipient } from "../services/notification.service";
 import {
   FEATURE_CATALOG,
   PLAN_DEFINITIONS,
@@ -632,6 +634,49 @@ export async function addAdminUserMembership(req: Request, res: Response): Promi
     console.error("Error adding admin user membership:", err);
     res.status(err?.code === 11000 ? 409 : 500).json({
       error: err?.code === 11000 ? "User is already a member of this organization" : "Failed to add user membership",
+    });
+  }
+}
+
+export async function sendAdminSampleNotification(req: Request, res: Response): Promise<void> {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organizationId = stringValue(req.body?.organizationId);
+    const recipientUserId = stringValue(req.body?.recipientUserId);
+    const title = stringValue(req.body?.title) || "Sample Notification";
+    const body = stringValue(req.body?.body) || "This is a sample in-app notification from Super Admin.";
+    const actionUrl = stringValue(req.body?.actionUrl) || null;
+
+    if (!mongoose.Types.ObjectId.isValid(organizationId)) {
+      res.status(400).json({ error: "Invalid organization id" });
+      return;
+    }
+    if (!recipientUserId) {
+      res.status(400).json({ error: "Recipient user id is required" });
+      return;
+    }
+
+    const organization = await Organization.findById(organizationId).lean();
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    await ensureNotificationRecipient(organizationId, recipientUserId);
+    await emitDomainEvent("admin.notification_sample.requested", {
+      organizationId,
+      recipientUserId,
+      title,
+      body,
+      actionUrl,
+      actorUserId: authReq.user.id,
+    });
+
+    res.status(201).json({ message: "Sample notification sent" });
+  } catch (err: any) {
+    console.error("Error sending sample notification:", err);
+    res.status(err?.statusCode || 500).json({
+      error: err?.statusCode ? err.message : "Failed to send sample notification",
     });
   }
 }

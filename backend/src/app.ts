@@ -32,9 +32,11 @@ import publicSupportRouter from "./routes/public-support.route";
 import chatRouter from "./routes/chat.route";
 import ticketRouter from "./routes/ticket.route";
 import supportTemplateRouter from "./routes/support-template.route";
+import notificationRouter from "./routes/notification.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
 import { auth } from "./lib/auth";
+import { registerNotificationEventHandlers } from "./events/notification-event-handlers";
 import {
   startWatchesForConnectedAccounts,
   scheduleWatchRenewal,
@@ -84,6 +86,7 @@ app.use("/api/v1/attendance", attendanceRouter);
 app.use("/api/v1/chat", chatRouter);
 app.use("/api/v1/tickets", ticketRouter);
 app.use("/api/v1/support/templates", supportTemplateRouter);
+app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/public/drive", publicDriveRouter);
 app.use("/api/v1/public/attendance", publicAttendanceRouter);
@@ -99,6 +102,7 @@ app.use((req: Request, res: Response) => {
 
 export async function initializeServices(): Promise<void> {
   await connectDB();
+  registerNotificationEventHandlers();
 
   try {
     await startWatchesForConnectedAccounts();

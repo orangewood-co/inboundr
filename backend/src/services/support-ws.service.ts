@@ -446,7 +446,17 @@ async function handleSocketMessage(ws: SupportSocket, raw: WebSocket.RawData) {
 }
 
 export function attachSupportWebSocketServer(server: HttpServer): void {
-  supportWss = new WebSocketServer({ server, path: "/api/v1/support/ws" });
+  supportWss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const host = req.headers.host ?? "localhost";
+    const url = new URL(req.url ?? "", `http://${host}`);
+    if (url.pathname !== "/api/v1/support/ws") return;
+
+    supportWss?.handleUpgrade(req, socket, head, (ws) => {
+      supportWss?.emit("connection", ws, req);
+    });
+  });
 
   supportWss.on("connection", async (socket: SupportSocket, req) => {
     try {
