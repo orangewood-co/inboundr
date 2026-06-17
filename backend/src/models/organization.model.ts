@@ -26,10 +26,18 @@ export interface IOrganizationPreferences {
   defaultTerms: string;
   defaultUpiId: string;
   paymentTerms: IOrganizationPaymentTerm[];
+  deliveryTerms: IOrganizationDeliveryTerm[];
   paymentReminders: IOrganizationPaymentReminders;
 }
 
 export interface IOrganizationPaymentTerm {
+  id: string;
+  name: string;
+  text: string;
+  isDefault: boolean;
+}
+
+export interface IOrganizationDeliveryTerm {
   id: string;
   name: string;
   text: string;
@@ -93,6 +101,17 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     defaultTerms: { type: String, default: "" },
     defaultUpiId: { type: String, default: "", trim: true },
     paymentTerms: {
+      type: [
+        {
+          id: { type: String, required: true, trim: true },
+          name: { type: String, required: true, trim: true },
+          text: { type: String, required: true, trim: true },
+          isDefault: { type: Boolean, default: false },
+        },
+      ],
+      default: [],
+    },
+    deliveryTerms: {
       type: [
         {
           id: { type: String, required: true, trim: true },

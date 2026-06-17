@@ -66,18 +66,21 @@ import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
 const PRODUCTS_API_BASE = `${API_ORIGIN}/api/v1/products`
 
-interface PaymentTermTemplate {
+interface TermTemplate {
   id: string
   name: string
   text: string
   isDefault: boolean
 }
 
-const normalizePaymentTermTemplates = (
-  paymentTerms: PaymentTermTemplate[] | undefined,
+type PaymentTermTemplate = TermTemplate
+type DeliveryTermTemplate = TermTemplate
+
+const normalizeTermTemplates = (
+  terms: TermTemplate[] | undefined,
   defaultTerms: string,
-): PaymentTermTemplate[] => {
-  const validTerms = (paymentTerms ?? [])
+): TermTemplate[] => {
+  const validTerms = (terms ?? [])
     .map((term) => ({
       id: term.id,
       name: term.name ?? "",
@@ -98,6 +101,15 @@ const normalizePaymentTermTemplates = (
     ? [{ id: "default", name: "Default", text: defaultTerms.trim(), isDefault: true }]
     : []
 }
+
+const normalizePaymentTermTemplates = (
+  paymentTerms: PaymentTermTemplate[] | undefined,
+  defaultTerms: string,
+): PaymentTermTemplate[] => normalizeTermTemplates(paymentTerms, defaultTerms)
+
+const normalizeDeliveryTermTemplates = (
+  deliveryTerms: DeliveryTermTemplate[] | undefined,
+): DeliveryTermTemplate[] => normalizeTermTemplates(deliveryTerms, "")
 
 interface RFQEmail {
   _id: string
@@ -176,6 +188,9 @@ interface RFQSummary {
   paymentTermTemplateId?: string | null
   paymentTermName?: string | null
   paymentTerms?: string | null
+  deliveryTermTemplateId?: string | null
+  deliveryTermName?: string | null
+  deliveryTerms?: string | null
   quoteNotes?: string | null
   quoteNumber?: string | null
   draftSavedAt?: string | null
@@ -210,6 +225,9 @@ interface RFQReply {
   paymentTermTemplateId: string | null
   paymentTermName: string | null
   paymentTerms: string
+  deliveryTermTemplateId?: string | null
+  deliveryTermName?: string | null
+  deliveryTerms?: string | null
   subject: string
   body: string
   to: string
@@ -527,6 +545,10 @@ export function DashboardPage() {
   const [selectedPaymentTermId, setSelectedPaymentTermId] = useState<string>("")
   const [paymentTermName, setPaymentTermName] = useState<string>("")
   const [paymentTermsText, setPaymentTermsText] = useState<string>("")
+  const [deliveryTermTemplates, setDeliveryTermTemplates] = useState<DeliveryTermTemplate[]>([])
+  const [selectedDeliveryTermId, setSelectedDeliveryTermId] = useState<string>("")
+  const [deliveryTermName, setDeliveryTermName] = useState<string>("")
+  const [deliveryTermsText, setDeliveryTermsText] = useState<string>("")
   const [quoteNotes, setQuoteNotes] = useState<string>("")
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
   const [archivingRfq, setArchivingRfq] = useState(false)
@@ -582,9 +604,11 @@ export function DashboardPage() {
       setPaymentTermTemplates(
         normalizePaymentTermTemplates(preferences?.paymentTerms, preferences?.defaultTerms ?? ""),
       )
+      setDeliveryTermTemplates(normalizeDeliveryTermTemplates(preferences?.deliveryTerms))
     } catch (err) {
-      console.error("Failed to load payment terms:", err)
+      console.error("Failed to load organization terms:", err)
       setPaymentTermTemplates([])
+      setDeliveryTermTemplates([])
     }
   }, [])
 
@@ -670,6 +694,9 @@ export function DashboardPage() {
       setSelectedPaymentTermId("")
       setPaymentTermName("")
       setPaymentTermsText("")
+      setSelectedDeliveryTermId("")
+      setDeliveryTermName("")
+      setDeliveryTermsText("")
       setQuoteNotes("")
     }
   }, [selectedId, fetchDetail, fetchReply])
@@ -771,6 +798,22 @@ export function DashboardPage() {
     setPaymentTermName(defaultTemplate?.name ?? "")
     setPaymentTermsText(defaultTemplate?.text ?? "")
   }, [detail, paymentTermTemplates])
+
+  useEffect(() => {
+    if (!detail) return
+
+    if (detail.deliveryTerms) {
+      setSelectedDeliveryTermId(detail.deliveryTermTemplateId ?? "")
+      setDeliveryTermName(detail.deliveryTermName ?? "")
+      setDeliveryTermsText(detail.deliveryTerms)
+      return
+    }
+
+    const defaultTemplate = deliveryTermTemplates.find((term) => term.isDefault) ?? deliveryTermTemplates[0]
+    setSelectedDeliveryTermId(defaultTemplate?.id ?? "")
+    setDeliveryTermName(defaultTemplate?.name ?? "")
+    setDeliveryTermsText(defaultTemplate?.text ?? "")
+  }, [detail, deliveryTermTemplates])
 
   useEffect(() => {
     if (!detail) return
@@ -1103,6 +1146,10 @@ export function DashboardPage() {
       toast.error("Payment terms are required to generate a quote")
       return
     }
+    if (!deliveryTermsText.trim()) {
+      toast.error("Delivery terms are required to generate a quote")
+      return
+    }
     setGenerating(true)
     try {
       const res = await fetch(`${API_BASE}/${detail._id}/generate-quote`, {
@@ -1167,6 +1214,9 @@ export function DashboardPage() {
       paymentTermTemplateId: selectedPaymentTermId || null,
       paymentTermName: paymentTermName.trim() || null,
       paymentTerms: paymentTermsText.trim(),
+      deliveryTermTemplateId: selectedDeliveryTermId || null,
+      deliveryTermName: deliveryTermName.trim() || null,
+      deliveryTerms: deliveryTermsText.trim(),
       quoteNotes: quoteNotes.trim(),
     }
   }
@@ -1177,6 +1227,14 @@ export function DashboardPage() {
     setSelectedPaymentTermId(template.id)
     setPaymentTermName(template.name)
     setPaymentTermsText(template.text)
+  }
+
+  const handleSelectDeliveryTerm = (id: string) => {
+    const template = deliveryTermTemplates.find((term) => term.id === id)
+    if (!template) return
+    setSelectedDeliveryTermId(template.id)
+    setDeliveryTermName(template.name)
+    setDeliveryTermsText(template.text)
   }
 
   const handleSaveDraft = async () => {
@@ -1209,6 +1267,10 @@ export function DashboardPage() {
     if (!detail || !reply) return
     if (!paymentTermsText.trim() && !reply.paymentTerms?.trim()) {
       toast.error("Payment terms are required to send a quote")
+      return
+    }
+    if (!deliveryTermsText.trim() && !reply.deliveryTerms?.trim()) {
+      toast.error("Delivery terms are required to send a quote")
       return
     }
     setSendingQuote(true)
@@ -1262,6 +1324,7 @@ export function DashboardPage() {
     manualProducts.length > 0 ||
     Object.keys(regrettedLines).length > 0
   const hasPaymentTerms = paymentTermsText.trim().length > 0
+  const hasDeliveryTerms = deliveryTermsText.trim().length > 0
 
   const renderManualProductEditor = (product: ManualProduct) => {
     const effectivePrice = product.price.trim() !== "" ? Number(product.price) : null
@@ -2375,6 +2438,45 @@ export function DashboardPage() {
                     </div>
 
                     <div className="mt-5 rounded-xl border bg-muted/15 p-4">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold">Delivery Terms</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Pick an organization template, then edit the final wording for this RFQ.
+                          </p>
+                        </div>
+                        <Select
+                          value={selectedDeliveryTermId || undefined}
+                          onValueChange={handleSelectDeliveryTerm}
+                          disabled={deliveryTermTemplates.length === 0}
+                        >
+                          <SelectTrigger className="h-8 w-full text-xs sm:w-56">
+                            <SelectValue placeholder="Select delivery term" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {deliveryTermTemplates.map((term) => (
+                              <SelectItem key={term.id} value={term.id}>
+                                {term.name}{term.isDefault ? " (default)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={deliveryTermsText}
+                        onChange={(event) => setDeliveryTermsText(event.target.value)}
+                        placeholder="Enter delivery terms for this quote..."
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      {!hasDeliveryTerms && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Delivery terms are required before generating or sending the quote.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border bg-muted/15 p-4">
                       <div className="mb-3">
                         <h3 className="text-sm font-semibold">Internal Quote Notes</h3>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -2407,7 +2509,7 @@ export function DashboardPage() {
                       </Button>
                       <Button
                         onClick={handleGenerateQuote}
-                        disabled={!hasSelections || !hasPaymentTerms || generating}
+                        disabled={!hasSelections || !hasPaymentTerms || !hasDeliveryTerms || generating}
                         className="gap-2"
                       >
                         {generating ? (
@@ -2425,6 +2527,11 @@ export function DashboardPage() {
                       {hasSelections && !hasPaymentTerms && (
                         <p className="text-xs text-muted-foreground">
                           Add payment terms to generate a quote
+                        </p>
+                      )}
+                      {hasSelections && hasPaymentTerms && !hasDeliveryTerms && (
+                        <p className="text-xs text-muted-foreground">
+                          Add delivery terms to generate a quote
                         </p>
                       )}
                     </div>
@@ -2483,7 +2590,8 @@ export function DashboardPage() {
                         disabled={
                           sendingQuote ||
                           reply.sendStatus === "sent" ||
-                          (!hasPaymentTerms && !reply.paymentTerms?.trim())
+                          (!hasPaymentTerms && !reply.paymentTerms?.trim()) ||
+                          (!hasDeliveryTerms && !reply.deliveryTerms?.trim())
                         }
                         className="gap-2"
                       >

@@ -150,9 +150,10 @@ export function createRFQQuotePdfDocument(options: {
   rfq: QuoteRFQ;
   reply: QuoteReply;
   organization: PdfOrganizationBranding;
-  terms?: string | null;
+  paymentTerms?: string | null;
+  deliveryTerms?: string | null;
 }): PDFKit.PDFDocument {
-  const { rfq, reply, organization, terms } = options;
+  const { rfq, reply, organization, paymentTerms, deliveryTerms } = options;
   const quoteNumber = rfq.quoteNumber || String(rfq._id);
   const doc = createBrandedPdfDocument({
     title: `Quote ${quoteNumber}`,
@@ -184,9 +185,14 @@ export function createRFQQuotePdfDocument(options: {
   y = drawQuoteItems(doc, reply.selectedProducts, y);
   y = drawTotals(doc, reply.selectedProducts, y);
 
-  if (terms) {
-    y = drawPdfSectionTitle(doc, "Terms", y);
-    y = drawPdfTextBlock(doc, terms, y, { color: PDF_COLORS.muted });
+  if (paymentTerms) {
+    y = drawPdfSectionTitle(doc, "Payment Terms", y);
+    y = drawPdfTextBlock(doc, paymentTerms, y, { color: PDF_COLORS.muted });
+  }
+
+  if (deliveryTerms) {
+    y = drawPdfSectionTitle(doc, "Delivery Terms", y);
+    y = drawPdfTextBlock(doc, deliveryTerms, y, { color: PDF_COLORS.muted });
   }
 
   drawPdfFooter(doc, `Quote ${quoteNumber}`);
@@ -197,7 +203,8 @@ export function renderRFQQuotePdfBuffer(options: {
   rfq: QuoteRFQ;
   reply: QuoteReply;
   organization: PdfOrganizationBranding;
-  terms?: string | null;
+  paymentTerms?: string | null;
+  deliveryTerms?: string | null;
 }): Promise<Buffer> {
   return renderPdfBuffer(createRFQQuotePdfDocument(options));
 }

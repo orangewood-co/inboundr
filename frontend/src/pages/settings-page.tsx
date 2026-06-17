@@ -62,24 +62,33 @@ import { toast } from "sonner"
 import { API_ORIGIN } from "@/lib/env"
 import { formatDate, formatDateTime } from "@/lib/format"
 
-const createPaymentTermId = () => {
+const createTermTemplateId = (prefix: string) => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID()
   }
-  return `payment-term-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-const normalizePaymentTermTemplates = (
-  paymentTerms: PaymentTermTemplate[] | undefined,
-  defaultTerms: string,
-): PaymentTermTemplate[] => {
-  const validTerms = (paymentTerms ?? [])
+const createPaymentTermId = () => {
+  return createTermTemplateId("payment-term")
+}
+
+const createDeliveryTermId = () => {
+  return createTermTemplateId("delivery-term")
+}
+
+const normalizeTermTemplates = <T extends TermTemplate>(
+  terms: T[] | undefined,
+  fallbackText: string,
+  createId: () => string,
+): T[] => {
+  const validTerms = (terms ?? [])
     .map((term) => ({
-      id: term.id || createPaymentTermId(),
+      id: term.id || createId(),
       name: term.name ?? "",
       text: term.text ?? "",
       isDefault: Boolean(term.isDefault),
-    }))
+    }) as T)
     .filter((term) => term.name.trim() && term.text.trim())
 
   if (validTerms.length > 0) {
@@ -90,17 +99,26 @@ const normalizePaymentTermTemplates = (
     }))
   }
 
-  return defaultTerms.trim()
+  return fallbackText.trim()
     ? [
         {
-          id: createPaymentTermId(),
+          id: createId(),
           name: "Default",
-          text: defaultTerms.trim(),
+          text: fallbackText.trim(),
           isDefault: true,
-        },
+        } as T,
       ]
     : []
 }
+
+const normalizePaymentTermTemplates = (
+  paymentTerms: PaymentTermTemplate[] | undefined,
+  defaultTerms: string,
+): PaymentTermTemplate[] => normalizeTermTemplates(paymentTerms, defaultTerms, createPaymentTermId)
+
+const normalizeDeliveryTermTemplates = (
+  deliveryTerms: DeliveryTermTemplate[] | undefined,
+): DeliveryTermTemplate[] => normalizeTermTemplates(deliveryTerms, "", createDeliveryTermId)
 
 interface GmailAccount {
   _id: string
@@ -132,6 +150,7 @@ interface Organization {
     defaultTerms: string
     defaultUpiId: string
     paymentTerms: PaymentTermTemplate[]
+    deliveryTerms: DeliveryTermTemplate[]
   }
   letterheads: OrganizationLetterhead[]
   activeLetterheadId: string
@@ -146,12 +165,15 @@ interface OrganizationLetterhead {
   createdAt: string
 }
 
-interface PaymentTermTemplate {
+interface TermTemplate {
   id: string
   name: string
   text: string
   isDefault: boolean
 }
+
+type PaymentTermTemplate = TermTemplate
+type DeliveryTermTemplate = TermTemplate
 
 type OrganizationFormState = Omit<Organization, "_id" | "letterheads" | "activeLetterheadId">
 
@@ -203,6 +225,7 @@ const emptyOrganizationForm: OrganizationFormState = {
     defaultTerms: "",
     defaultUpiId: "",
     paymentTerms: [],
+    deliveryTerms: [],
   },
 }
 
@@ -341,6 +364,7 @@ function OrganizationTab() {
       organization.preferences?.paymentTerms,
       organization.preferences?.defaultTerms ?? "",
     )
+    const deliveryTerms = normalizeDeliveryTermTemplates(organization.preferences?.deliveryTerms)
     const defaultPaymentTerm = paymentTerms.find((term) => term.isDefault)
     const preferences = {
       primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
@@ -350,6 +374,7 @@ function OrganizationTab() {
       defaultTerms: defaultPaymentTerm?.text ?? organization.preferences?.defaultTerms ?? "",
       defaultUpiId: organization.preferences?.defaultUpiId ?? "",
       paymentTerms,
+      deliveryTerms,
     }
 
     savedThemeRef.current = {
@@ -639,7 +664,7 @@ function OrganizationTab() {
   }
 
   const updatePreference = (
-    field: Exclude<keyof OrganizationFormState["preferences"], "paymentTerms">,
+    field: Exclude<keyof OrganizationFormState["preferences"], "paymentTerms" | "deliveryTerms">,
     value: string,
   ) => {
     setForm((current) => ({
@@ -701,6 +726,57 @@ function OrganizationTab() {
     updatePaymentTerms(form.preferences.paymentTerms.filter((item) => item.id !== id))
   }
 
+  const updateDeliveryTerms = (deliveryTerms: DeliveryTermTemplate[]) => {
+    setForm((current) => ({
+      ...current,
+      preferences: {
+        ...current.preferences,
+        deliveryTerms,
+      },
+    }))
+  }
+
+  const addDeliveryTerm = () => {
+    const nextTerm: DeliveryTermTemplate = {
+      id: createDeliveryTermId(),
+      name: "",
+      text: "",
+      isDefault: form.preferences.deliveryTerms.length === 0,
+    }
+    updateDeliveryTerms([...form.preferences.deliveryTerms, nextTerm])
+  }
+
+  const updateDeliveryTerm = (
+    id: string,
+    field: "name" | "text",
+    value: string,
+  ) => {
+    updateDeliveryTerms(
+      form.preferences.deliveryTerms.map((term) =>
+        term.id === id ? { ...term, [field]: value } : term,
+      ),
+    )
+  }
+
+  const setDefaultDeliveryTerm = (id: string) => {
+    updateDeliveryTerms(
+      form.preferences.deliveryTerms.map((term) => ({
+        ...term,
+        isDefault: term.id === id,
+      })),
+    )
+  }
+
+  const deleteDeliveryTerm = (id: string) => {
+    const term = form.preferences.deliveryTerms.find((item) => item.id === id)
+    if (!term) return
+    if (term.isDefault) {
+      toast.error("Choose another default delivery term before deleting this one")
+      return
+    }
+    updateDeliveryTerms(form.preferences.deliveryTerms.filter((item) => item.id !== id))
+  }
+
   const updateThemePreference = (value: OrganizationFormState["preferences"]["theme"]) => {
     updatePreference("theme", value)
     previewTheme(value)
@@ -717,6 +793,12 @@ function OrganizationTab() {
   )
   const hasPaymentTermsWithoutDefault =
     paymentTerms.length > 0 && !paymentTerms.some((term) => term.isDefault)
+  const deliveryTerms = form.preferences.deliveryTerms
+  const hasInvalidDeliveryTerms = deliveryTerms.some(
+    (term) => !term.name.trim() || !term.text.trim(),
+  )
+  const hasDeliveryTermsWithoutDefault =
+    deliveryTerms.length > 0 && !deliveryTerms.some((term) => term.isDefault)
 
   return (
     <div className="space-y-6">
@@ -1074,10 +1156,87 @@ function OrganizationTab() {
                 )}
               </div>
 
+              <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label>Delivery terms</Label>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      Save reusable delivery templates for RFQs. The default is preselected when a quote is created.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addDeliveryTerm} className="gap-2">
+                    <PlusIcon className="size-3.5" />
+                    Add Term
+                  </Button>
+                </div>
+
+                {deliveryTerms.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    Add a delivery term template to make it available in RFQs.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {deliveryTerms.map((term) => (
+                      <div key={term.id} className="rounded-lg border bg-card/70 p-3">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <Input
+                            value={term.name}
+                            onChange={(event) => updateDeliveryTerm(term.id, "name", event.target.value)}
+                            placeholder="Term name, e.g. Standard delivery"
+                            className="h-9 min-w-44 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant={term.isDefault ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => setDefaultDeliveryTerm(term.id)}
+                            className="gap-1.5"
+                          >
+                            {term.isDefault && <CheckCircle2Icon className="size-3.5" />}
+                            {term.isDefault ? "Default" : "Make default"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteDeliveryTerm(term.id)}
+                            disabled={term.isDefault}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2Icon className="size-4" />
+                          </Button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={term.text}
+                          onChange={(event) => updateDeliveryTerm(term.id, "text", event.target.value)}
+                          placeholder="Delivery will be completed within 2-3 weeks from order confirmation..."
+                          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {hasInvalidDeliveryTerms && (
+                  <p className="text-xs text-destructive">Each delivery term needs a name and text before saving.</p>
+                )}
+                {hasDeliveryTermsWithoutDefault && (
+                  <p className="text-xs text-destructive">Choose one delivery term as the default.</p>
+                )}
+              </div>
+
               <div className="flex">
                 <Button
                   onClick={saveOrganization}
-                  disabled={saving || !form.name.trim() || hasInvalidPaymentTerms || hasPaymentTermsWithoutDefault}
+                  disabled={
+                    saving ||
+                    !form.name.trim() ||
+                    hasInvalidPaymentTerms ||
+                    hasPaymentTermsWithoutDefault ||
+                    hasInvalidDeliveryTerms ||
+                    hasDeliveryTermsWithoutDefault
+                  }
                 >
                   {saving && <Spinner data-icon="inline-start" />}
                   Save Organization

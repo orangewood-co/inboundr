@@ -85,6 +85,45 @@ function normalizePaymentTerms(value: unknown, defaultTerms: string) {
   return terms.map(({ _index, ...term }) => term);
 }
 
+function normalizeDeliveryTerms(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seenNames = new Set<string>();
+  const terms = value.map((item, index) => {
+    const source = item as Record<string, unknown>;
+    const name = stringValue(source.name);
+    const text = stringValue(source.text);
+
+    if (!name) throw validationError("Delivery term name is required");
+    if (!text) throw validationError("Delivery term text is required");
+
+    const normalizedName = name.toLowerCase();
+    if (seenNames.has(normalizedName)) {
+      throw validationError(`Duplicate delivery term name: ${name}`);
+    }
+    seenNames.add(normalizedName);
+
+    return {
+      id: stringValue(source.id) || crypto.randomUUID(),
+      name,
+      text,
+      isDefault: Boolean(source.isDefault),
+      _index: index,
+    };
+  });
+
+  if (terms.length > 0) {
+    const defaultCount = terms.filter((term) => term.isDefault).length;
+    if (defaultCount !== 1) {
+      throw validationError("Exactly one delivery term must be marked as default");
+    }
+  }
+
+  return terms.map(({ _index, ...term }) => term);
+}
+
 async function resolveUsersByIds(userIds: string[]) {
   const db = mongoose.connection.db;
   if (!db || userIds.length === 0) {
@@ -205,6 +244,9 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
                   defaultTerms,
                   paymentTerms: normalizePaymentTerms(preferences.paymentTerms, defaultTerms),
                 }
+              : {}),
+            ...(preferences.deliveryTerms !== undefined
+              ? { deliveryTerms: normalizeDeliveryTerms(preferences.deliveryTerms) }
               : {}),
             ...(preferences.defaultUpiId !== undefined
               ? { defaultUpiId: normalizeUpiId(preferences.defaultUpiId) }
