@@ -157,6 +157,7 @@ async function searchRFQs(
     isRFQ: true,
     isArchived: { $ne: true },
     $or: [
+      { quoteNumber: regex },
       { reason: regex },
       { "customer.name": regex },
       { "customer.company": regex },
@@ -164,7 +165,7 @@ async function searchRFQs(
       { "queryProducts.name": regex },
     ],
   })
-    .select("customer queryProducts reason isProcessed errorMessage createdAt emailId")
+    .select("customer queryProducts reason isProcessed errorMessage createdAt emailId quoteNumber")
     .populate({
       path: "emailId",
       select: "subject from date snippet status",
@@ -186,8 +187,14 @@ async function searchRFQs(
       type: "rfq",
       id: rfq._id.toString(),
       title: email?.subject || rfq.customer?.company || "RFQ",
-      subtitle: compactSubtitle([rfq.customer?.company, rfq.customer?.email, productNames.slice(0, 2).join(", ")]),
+      subtitle: compactSubtitle([
+        rfq.quoteNumber ? `Quote ${rfq.quoteNumber}` : null,
+        rfq.customer?.company,
+        rfq.customer?.email,
+        productNames.slice(0, 2).join(", "),
+      ]),
       metadata: {
+        quoteNumber: rfq.quoteNumber ?? null,
         customerCompany: rfq.customer?.company ?? null,
         customerEmail: rfq.customer?.email ?? null,
         productCount: productNames.length,
