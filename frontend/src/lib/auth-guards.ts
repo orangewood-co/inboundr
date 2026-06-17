@@ -1,6 +1,7 @@
 import { redirect } from "@tanstack/react-router"
 
 import { getSession } from "@/lib/auth-client"
+import { clearOrganizationSessionStorage } from "@/lib/auth-storage"
 import { getAdminMe } from "@/lib/admin"
 import { API_ORIGIN } from "@/lib/env"
 import type { EmployeeAccessModule, FeatureKey } from "@/lib/entitlements"
@@ -21,6 +22,8 @@ export async function redirectIfAuthenticated() {
   if (session) {
     throw redirect({ to: "/" })
   }
+
+  clearOrganizationSessionStorage()
 }
 
 export async function requireSuperAdmin() {

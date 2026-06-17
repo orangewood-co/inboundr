@@ -5,7 +5,7 @@ import { API_ORIGIN } from "@/lib/env"
 
 const DEFAULT_PRIMARY_COLOR = "#f5b400"
 const BRANDING_CHANGED_EVENT = "btsa:organization-branding-changed"
-const BRANDING_CACHE_KEY = "organization-branding"
+export const BRANDING_CACHE_KEY = "organization-branding"
 
 type OrganizationTheme = "dark" | "light"
 
@@ -152,7 +152,7 @@ function writeCachedBranding(branding: OrganizationBranding) {
   }
 }
 
-function clearCachedBranding() {
+export function clearCachedBranding() {
   try {
     localStorage.removeItem(BRANDING_CACHE_KEY)
   } catch {

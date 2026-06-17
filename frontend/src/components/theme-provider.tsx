@@ -33,6 +33,8 @@ type ThemeProviderState = {
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)"
 const MODE_VALUES: Mode[] = ["dark", "light", "system"]
+export const THEME_MODE_STORAGE_KEY = "theme"
+export const USER_COLOR_THEME_STORAGE_KEY = "user-color-theme"
 const FONT_VARIABLE_MAP: Record<string, string> = {
   "--font-sans": "--app-font-sans",
   "--font-serif": "--app-font-serif",
@@ -122,8 +124,8 @@ function applyModeToDOM(
 export function ThemeProvider({
   children,
   defaultMode = "system",
-  modeStorageKey = "theme",
-  colorThemeStorageKey = "user-color-theme",
+  modeStorageKey = THEME_MODE_STORAGE_KEY,
+  colorThemeStorageKey = USER_COLOR_THEME_STORAGE_KEY,
   disableTransitionOnChange = true,
   ...props
 }: ThemeProviderProps) {

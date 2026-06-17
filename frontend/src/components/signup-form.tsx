@@ -11,6 +11,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { clearOrganizationSessionStorage } from "@/lib/auth-storage"
 import { signIn, signUp } from "@/lib/auth-client"
 
 function getInviteToken(): string | null {
@@ -105,6 +106,7 @@ export function SignupForm({
     setIsSubmitting(true)
 
     const callbackURL = `${window.location.origin}${getPostAuthPath()}`
+    clearOrganizationSessionStorage()
     const result = await signUp.email({ email, password, name, callbackURL })
 
     setIsSubmitting(false)
@@ -121,6 +123,7 @@ export function SignupForm({
 
   async function handleGoogleSignIn() {
     setError(null)
+    clearOrganizationSessionStorage()
     await signIn.social({
       provider: "google",
       callbackURL: `${window.location.origin}${getPostAuthPath()}`,

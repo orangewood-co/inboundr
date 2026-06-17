@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { clearOrganizationSessionStorage } from "@/lib/auth-storage"
 import { signOut } from "@/lib/auth-client"
 import { useNavigate } from "@tanstack/react-router"
 import {
@@ -43,6 +44,7 @@ export function NavUser({
 
   async function handleSignOut() {
     await signOut()
+    clearOrganizationSessionStorage()
     window.location.href = "/login"
   }
 
