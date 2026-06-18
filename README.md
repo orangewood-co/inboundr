@@ -372,6 +372,9 @@ For the detailed backend EC2 runbook, see [`docs/deployment/ec2-backend.md`](doc
 ## References
 - Invoice Design #1 - U.S. Graphics Company Template. [Tweet](https://x.com/usgraphics/status/2054047419755864442) and [source](https://github.com/usgraphics/usgc-invoice).
 
+## Resources
+- [TanStack Start Guide for Next.js Developers](https://www.adarsha.dev/blog/tanstack-mental-model-for-nextjs-developers)
+
 ## License
 
 Proprietary. All rights reserved.
