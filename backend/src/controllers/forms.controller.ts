@@ -394,6 +394,19 @@ function isUploadedFileMetadata(value: unknown): value is Record<string, unknown
   return Boolean(file.key && file.bucket && file.originalName && file.contentType && file.size);
 }
 
+function sanitizeUploadedFileMetadata(file: Record<string, unknown>) {
+  return {
+    key: String(file.key),
+    bucket: String(file.bucket),
+    originalName: String(file.originalName),
+    contentType: String(file.contentType).toLowerCase(),
+    size: Number(file.size),
+    uploadedAt: typeof file.uploadedAt === "string" && file.uploadedAt
+      ? file.uploadedAt
+      : new Date().toISOString(),
+  };
+}
+
 function validateSubmission(fields: IFormField[], values: Record<string, unknown>, form: { _id: unknown; organizationId: unknown }) {
   const errors: Record<string, string> = {};
   const sanitized: Record<string, unknown> = {};
@@ -454,9 +467,10 @@ function validateSubmission(fields: IFormField[], values: Record<string, unknown
         continue;
       }
       if (validFiles.length > 0) {
+        const sanitizedFiles = validFiles.map(sanitizeUploadedFileMetadata);
         sanitized[field.id] = field.multiple
-          ? validFiles.map((file) => ({ ...file, uploadedAt: file.uploadedAt ?? new Date().toISOString() }))
-          : { ...validFiles[0], uploadedAt: validFiles[0]?.uploadedAt ?? new Date().toISOString() };
+          ? sanitizedFiles
+          : sanitizedFiles[0];
       }
       continue;
     }

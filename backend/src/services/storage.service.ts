@@ -144,11 +144,33 @@ export async function createPresignedUpload(input: PresignUploadInput): Promise<
   };
 }
 
-export async function createPresignedViewUrl(key: string): Promise<{ url: string; expiresInSeconds: number }> {
+function sanitizeDownloadFileName(fileName: string): string {
+  const fallback = sanitizeFileName(fileName)
+    .replace(/["\\;]/g, "_")
+    .slice(0, 140);
+
+  return fallback || "download";
+}
+
+function attachmentDisposition(fileName: string): string {
+  const fallback = sanitizeDownloadFileName(fileName);
+  const encoded = encodeURIComponent(fileName.trim() || fallback).replace(/['()]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+export async function createPresignedViewUrl(
+  key: string,
+  options: { downloadFileName?: string } = {}
+): Promise<{ url: string; expiresInSeconds: number }> {
   const { bucket } = getStorageConfig();
   const command = new GetObjectCommand({
     Bucket: bucket,
     Key: key,
+    ...(options.downloadFileName
+      ? { ResponseContentDisposition: attachmentDisposition(options.downloadFileName) }
+      : {}),
   });
   const url = await getSignedUrl(getS3Client(), command, {
     expiresIn: VIEW_EXPIRES_IN_SECONDS,

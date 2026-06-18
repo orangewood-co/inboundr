@@ -53,6 +53,13 @@ import { AppLayout } from "@/components/app-layout"
 import { SiteHeader, type BreadcrumbSegment } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -149,6 +156,14 @@ type UploadedFileValue = {
   url?: string | null
 }
 
+type FormFilePreview = {
+  file: UploadedFileValue
+  viewUrl: string | null
+  downloadUrl: string | null
+  loading: boolean
+  error: string | null
+}
+
 type SelectedItem = "welcome" | "ending" | string
 
 const FIELD_TYPE_META: Record<FieldType, { label: string; icon: React.ReactNode }> = {
@@ -207,6 +222,43 @@ function isUploadedFileValue(value: unknown): value is UploadedFileValue {
   return Boolean(value && typeof value === "object" && "key" in value && "originalName" in value)
 }
 
+function fileContentType(file: UploadedFileValue) {
+  return (file.contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? ""
+}
+
+function isPreviewableFormFile(file: UploadedFileValue) {
+  const type = fileContentType(file)
+  return (
+    type === "application/pdf" ||
+    type.startsWith("image/") ||
+    type.startsWith("text/") ||
+    type.startsWith("video/") ||
+    type.startsWith("audio/")
+  )
+}
+
+function formatFileSize(size?: number) {
+  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) return "Unknown size"
+  const units = ["B", "KB", "MB", "GB"]
+  const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1)
+  return `${(size / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
+}
+
+async function resolveUploadedFileUrl(file: UploadedFileValue, download = false): Promise<string> {
+  const params = new URLSearchParams({ key: file.key })
+  if (download) {
+    params.set("download", "1")
+    params.set("filename", file.originalName)
+  }
+
+  const response = await fetch(`${UPLOADS_API_BASE}/view?${params.toString()}`, { credentials: "include" })
+  const payload: { url?: string; error?: string } = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.url) {
+    throw new Error(payload.error || "Failed to load file")
+  }
+  return payload.url
+}
+
 function formatResponseValue(value: unknown): string {
   if (Array.isArray(value)) {
     return value
@@ -223,25 +275,18 @@ function formatResponseValue(value: unknown): string {
   return String(value ?? "-")
 }
 
-function ResponseValue({ value }: { value: unknown }) {
+function ResponseValue({ value, onOpenFile }: { value: unknown; onOpenFile: (file: UploadedFileValue) => void }) {
   const files = Array.isArray(value)
     ? value.filter(isUploadedFileValue)
     : isUploadedFileValue(value) ? [value] : []
-
-  async function openFile(file: UploadedFileValue) {
-    if (file.url) { window.open(file.url, "_blank", "noopener,noreferrer"); return }
-    const response = await fetch(`${UPLOADS_API_BASE}/view?key=${encodeURIComponent(file.key)}`, { credentials: "include" })
-    const payload = await response.json().catch(() => null)
-    if (!response.ok || !payload?.url) return
-    window.open(payload.url, "_blank", "noopener,noreferrer")
-  }
 
   if (files.length > 0) {
     return (
       <div className="mt-1 grid gap-1">
         {files.map((file) => (
-          <button key={file.key} type="button" onClick={() => void openFile(file)}
-            className="w-fit break-all text-left font-medium text-primary underline-offset-4 hover:underline" title={file.key}>
+          <button key={file.key} type="button" onClick={() => onOpenFile(file)}
+            className="inline-flex w-fit items-center gap-1.5 break-all text-left font-medium text-primary underline-offset-4 hover:underline" title={file.key}>
+            <EyeIcon className="size-3.5 shrink-0" />
             {file.originalName}
           </button>
         ))}
@@ -249,6 +294,105 @@ function ResponseValue({ value }: { value: unknown }) {
     )
   }
   return <p className="mt-1 break-words">{formatResponseValue(value)}</p>
+}
+
+function FormFilePreviewDialog({
+  preview,
+  onOpenChange,
+}: {
+  preview: FormFilePreview | null
+  onOpenChange: (open: boolean) => void
+}) {
+  const file = preview?.file
+  const type = file ? fileContentType(file) : ""
+  const canPreview = file ? isPreviewableFormFile(file) : false
+
+  return (
+    <Dialog open={Boolean(preview)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[min(86vh,860px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        {file && (
+          <>
+            <DialogHeader className="border-b border-border/60 px-5 py-4 pr-16">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <DialogTitle className="truncate text-sm">{file.originalName}</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    {(file.contentType || "Unknown type")} - {formatFileSize(file.size)}
+                  </DialogDescription>
+                </div>
+                {preview.downloadUrl ? (
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={preview.downloadUrl} target="_blank" rel="noopener noreferrer" download={file.originalName}>
+                      <DownloadIcon className="size-3.5" data-icon="inline-start" />
+                      Download
+                    </a>
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" disabled>
+                    <DownloadIcon className="size-3.5" data-icon="inline-start" />
+                    Download
+                  </Button>
+                )}
+              </div>
+            </DialogHeader>
+
+            <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/30">
+              {preview.loading ? (
+                <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+                  <Spinner className="size-5" />
+                  Preparing preview...
+                </div>
+              ) : preview.error ? (
+                <div className="flex max-w-sm flex-col items-center gap-3 p-8 text-center">
+                  <div className="rounded-2xl border bg-background p-5">
+                    <FileUpIcon className="size-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Preview failed</p>
+                    <p className="text-xs text-muted-foreground">{preview.error}</p>
+                  </div>
+                </div>
+              ) : preview.viewUrl && canPreview && type === "application/pdf" ? (
+                <iframe title={file.originalName} src={preview.viewUrl} className="size-full border-0 bg-white" />
+              ) : preview.viewUrl && canPreview && type.startsWith("image/") ? (
+                <div className="size-full overflow-auto p-6 text-center">
+                  <img src={preview.viewUrl} alt={file.originalName} className="mx-auto max-h-full max-w-full rounded-lg object-contain shadow-lg" />
+                </div>
+              ) : preview.viewUrl && canPreview && type.startsWith("video/") ? (
+                <video src={preview.viewUrl} controls className="max-h-full max-w-full" />
+              ) : preview.viewUrl && canPreview && type.startsWith("audio/") ? (
+                <div className="w-full max-w-xl rounded-2xl border bg-background p-6 shadow-sm">
+                  <audio src={preview.viewUrl} controls className="w-full" />
+                </div>
+              ) : preview.viewUrl && canPreview && type.startsWith("text/") ? (
+                <iframe title={file.originalName} src={preview.viewUrl} className="size-full border-0 bg-background" />
+              ) : (
+                <div className="flex max-w-sm flex-col items-center gap-4 p-10 text-center">
+                  <div className="rounded-2xl border bg-background p-5">
+                    <FileUpIcon className="size-8 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Preview not available</p>
+                    <p className="text-xs text-muted-foreground">
+                      This file type is available to download, but it is not shown inline for safety.
+                    </p>
+                  </div>
+                  {preview.downloadUrl && (
+                    <Button asChild>
+                      <a href={preview.downloadUrl} target="_blank" rel="noopener noreferrer" download={file.originalName}>
+                        <DownloadIcon className="size-4" data-icon="inline-start" />
+                        Download File
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function SortableFieldItem({ field, index, isSelected, onSelect }: {
@@ -294,6 +438,7 @@ export default function FormEditorPage() {
   const [sortKey, setSortKey] = useState<string>("createdAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [filePreview, setFilePreview] = useState<FormFilePreview | null>(null)
 
   const fetchForm = useCallback(async () => {
     setLoading(true)
@@ -423,6 +568,30 @@ export default function FormEditorPage() {
       method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
     })
     if (response.ok) setSubmissions((cur) => cur.map((s) => (s._id === submissionId ? { ...s, status } : s)))
+  }
+
+  async function openSubmissionFile(file: UploadedFileValue) {
+    setFilePreview({ file, viewUrl: null, downloadUrl: null, loading: true, error: null })
+    try {
+      const [viewUrl, downloadUrl] = await Promise.all([
+        resolveUploadedFileUrl(file),
+        resolveUploadedFileUrl(file, true),
+      ])
+      setFilePreview((current) =>
+        current?.file.key === file.key
+          ? { file, viewUrl, downloadUrl, loading: false, error: null }
+          : current
+      )
+    } catch (err) {
+      const error = err instanceof Error ? err.message : "Failed to load file"
+      setFilePreview((current) =>
+        current?.file.key === file.key
+          ? { file, viewUrl: null, downloadUrl: null, loading: false, error }
+          : current
+      )
+      setMessage(error)
+      setTimeout(() => setMessage(null), 2500)
+    }
   }
 
   async function createCustomerFromSubmission(sub: FormSubmission) {
@@ -1022,7 +1191,7 @@ export default function FormEditorPage() {
                       {fields.map((field) => (
                         <div key={field.id} className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
                           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{field.label}</p>
-                          <ResponseValue value={detailSubmission.values[field.id]} />
+                          <ResponseValue value={detailSubmission.values[field.id]} onOpenFile={openSubmissionFile} />
                         </div>
                       ))}
                     </div>
@@ -1044,6 +1213,8 @@ export default function FormEditorPage() {
           </TabsContent>
         </div>
       </Tabs>
+
+      <FormFilePreviewDialog preview={filePreview} onOpenChange={(open) => { if (!open) setFilePreview(null) }} />
     </AppLayout>
   )
 }

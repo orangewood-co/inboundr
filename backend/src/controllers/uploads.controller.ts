@@ -164,7 +164,9 @@ export async function createAuthenticatedViewUrl(req: Request, res: Response): P
       return;
     }
 
-    res.json(await createPresignedViewUrl(key));
+    const download = req.query.download === "1" || req.query.download === "true";
+    const fileName = String(req.query.filename ?? "").trim() || key.split("/").pop() || "download";
+    res.json(await createPresignedViewUrl(key, download ? { downloadFileName: fileName } : {}));
   } catch (err) {
     console.error("Error creating file view URL:", err);
     res.status(500).json({ error: "Failed to create file view URL" });
