@@ -7,6 +7,7 @@ import {
   getForm,
   listForms,
   listSubmissions,
+  saveSubmissionFileToDrive,
   updateForm,
   updateSubmissionStatus,
 } from "../controllers/forms.controller";
@@ -33,6 +34,12 @@ router.post("/:id/duplicate", requireOrganizationRole(["owner", "admin"]), dupli
 router.delete("/:id", requireOrganizationRole(["owner", "admin"]), archiveForm);
 router.get("/:id/submissions", listSubmissions);
 router.get("/:id/submissions/export", exportSubmissionsCsv);
+router.post(
+  "/:id/submissions/:submissionId/save-to-drive",
+  requireFeature("drive"),
+  requireEmployeeModule("drive"),
+  saveSubmissionFileToDrive
+);
 router.put(
   "/:id/submissions/:submissionId",
   requireOrganizationRole(["owner", "admin"]),

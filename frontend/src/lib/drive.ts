@@ -210,6 +210,26 @@ export async function getDriveFileUrl(id: string, download = false) {
   )
 }
 
+export async function saveFormSubmissionFileToDrive(input: {
+  formId: string
+  submissionId: string
+  key: string
+  parentId: string | null
+  name?: string
+}) {
+  return api<{ node: DriveNode; sourceKey: string; storageKey: string }>(
+    `/api/v1/forms/${encodeURIComponent(input.formId)}/submissions/${encodeURIComponent(input.submissionId)}/save-to-drive`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        key: input.key,
+        parentId: input.parentId,
+        name: input.name,
+      }),
+    }
+  )
+}
+
 export async function uploadDriveFile(file: File, parentId: string | null, onProgress: (progress: number) => void) {
   const initiated = await api<{
     node: DriveNode

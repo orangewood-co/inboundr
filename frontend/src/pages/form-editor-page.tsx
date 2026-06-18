@@ -32,6 +32,7 @@ import {
   FileUpIcon,
   GripVerticalIcon,
   HashIcon,
+  HardDriveIcon,
   InboxIcon,
   LinkIcon,
   Link2Icon,
@@ -48,8 +49,10 @@ import {
   Trash2Icon,
   TypeIcon,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
+import { DriveFolderPickerDialog } from "@/components/drive/drive-folder-picker-dialog"
 import { SiteHeader, type BreadcrumbSegment } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -71,6 +74,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { formatDateTime } from "@/lib/format"
+import { saveFormSubmissionFileToDrive } from "@/lib/drive"
 import { cn } from "@/lib/utils"
 
 const API_BASE = `${API_ORIGIN}/api/v1/forms`
@@ -299,9 +303,13 @@ function ResponseValue({ value, onOpenFile }: { value: unknown; onOpenFile: (fil
 function FormFilePreviewDialog({
   preview,
   onOpenChange,
+  onSaveToDrive,
+  savingToDrive = false,
 }: {
   preview: FormFilePreview | null
   onOpenChange: (open: boolean) => void
+  onSaveToDrive?: (file: UploadedFileValue) => void
+  savingToDrive?: boolean
 }) {
   const file = preview?.file
   const type = file ? fileContentType(file) : ""
@@ -320,19 +328,31 @@ function FormFilePreviewDialog({
                     {(file.contentType || "Unknown type")} - {formatFileSize(file.size)}
                   </DialogDescription>
                 </div>
-                {preview.downloadUrl ? (
-                  <Button size="sm" variant="outline" asChild>
-                    <a href={preview.downloadUrl} target="_blank" rel="noopener noreferrer" download={file.originalName}>
+                <div className="flex items-center gap-2">
+                  {onSaveToDrive && (
+                    <Button size="sm" variant="outline" onClick={() => onSaveToDrive(file)} disabled={savingToDrive}>
+                      {savingToDrive ? (
+                        <Spinner className="size-3.5" data-icon="inline-start" />
+                      ) : (
+                        <HardDriveIcon className="size-3.5" data-icon="inline-start" />
+                      )}
+                      Save to Drive
+                    </Button>
+                  )}
+                  {preview.downloadUrl ? (
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={preview.downloadUrl} target="_blank" rel="noopener noreferrer" download={file.originalName}>
+                        <DownloadIcon className="size-3.5" data-icon="inline-start" />
+                        Download
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" disabled>
                       <DownloadIcon className="size-3.5" data-icon="inline-start" />
                       Download
-                    </a>
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="outline" disabled>
-                    <DownloadIcon className="size-3.5" data-icon="inline-start" />
-                    Download
-                  </Button>
-                )}
+                    </Button>
+                  )}
+                </div>
               </div>
             </DialogHeader>
 
@@ -439,6 +459,8 @@ export default function FormEditorPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [detailId, setDetailId] = useState<string | null>(null)
   const [filePreview, setFilePreview] = useState<FormFilePreview | null>(null)
+  const [driveSaveTarget, setDriveSaveTarget] = useState<UploadedFileValue | null>(null)
+  const [savingToDrive, setSavingToDrive] = useState(false)
 
   const fetchForm = useCallback(async () => {
     setLoading(true)
@@ -591,6 +613,32 @@ export default function FormEditorPage() {
       )
       setMessage(error)
       setTimeout(() => setMessage(null), 2500)
+    }
+  }
+
+  function openDriveSavePicker(file: UploadedFileValue) {
+    setDriveSaveTarget(file)
+  }
+
+  async function saveFileToDrive(folder: { id: string | null; name: string }) {
+    if (!form || !detailSubmission || !driveSaveTarget) return
+    setSavingToDrive(true)
+    try {
+      const { node } = await saveFormSubmissionFileToDrive({
+        formId: form._id,
+        submissionId: detailSubmission._id,
+        key: driveSaveTarget.key,
+        parentId: folder.id,
+        name: driveSaveTarget.originalName,
+      })
+      setDriveSaveTarget(null)
+      toast.success("Saved to Drive", {
+        description: `${node.name} saved in ${folder.name}.`,
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save file to Drive")
+    } finally {
+      setSavingToDrive(false)
     }
   }
 
@@ -1214,7 +1262,19 @@ export default function FormEditorPage() {
         </div>
       </Tabs>
 
-      <FormFilePreviewDialog preview={filePreview} onOpenChange={(open) => { if (!open) setFilePreview(null) }} />
+      <FormFilePreviewDialog
+        preview={filePreview}
+        onOpenChange={(open) => { if (!open) setFilePreview(null) }}
+        onSaveToDrive={openDriveSavePicker}
+        savingToDrive={savingToDrive}
+      />
+      <DriveFolderPickerDialog
+        open={Boolean(driveSaveTarget)}
+        onOpenChange={(open) => { if (!open && !savingToDrive) setDriveSaveTarget(null) }}
+        onSelectFolder={saveFileToDrive}
+        confirmLabel="Save file here"
+        busy={savingToDrive}
+      />
     </AppLayout>
   )
 }

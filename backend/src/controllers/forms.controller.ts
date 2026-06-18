@@ -6,8 +6,11 @@ import type { IResult } from "ua-parser-js";
 const UAParser: (ua: string) => IResult = require("ua-parser-js");
 import { Form, type FormFieldType, type IFormField } from "../models/form.model";
 import { FormSubmission } from "../models/form-submission.model";
+import type { IDriveNode } from "../models/drive-node.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { keyBelongsToPrefix } from "../services/storage.service";
+import { assertDriveAccess, getEffectiveDriveRole, requireDriveNode } from "../services/drive-access.service";
+import { importExistingObjectToDrive } from "../services/drive-import.service";
 
 const FIELD_TYPES: FormFieldType[] = [
   "short_text",
@@ -119,6 +122,60 @@ function serializeForm(form: any) {
     ...form,
     submissionCount: form.submissionCount ?? 0,
   };
+}
+
+function stringValue(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function objectId(value: unknown): mongoose.Types.ObjectId | null {
+  const raw = stringValue(value);
+  return raw && mongoose.Types.ObjectId.isValid(raw) ? new mongoose.Types.ObjectId(raw) : null;
+}
+
+async function serializeDriveNodeForUser(node: IDriveNode, req: OrganizationRequest) {
+  const role = await getEffectiveDriveRole({
+    node,
+    userId: req.user.id,
+    organizationRole: req.organizationMembership.role,
+  });
+
+  return {
+    _id: String(node._id),
+    organizationId: String(node.organizationId),
+    parentId: node.parentId ? String(node.parentId) : null,
+    type: node.type,
+    name: node.name,
+    storageKey: node.storageKey,
+    contentType: node.contentType,
+    size: node.size,
+    ownerUserId: node.ownerUserId,
+    createdByUserId: node.createdByUserId,
+    status: node.status,
+    trashedAt: node.trashedAt,
+    scanStatus: node.scanStatus,
+    upload: node.upload,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    role,
+  };
+}
+
+async function validateDriveDestinationAccess(req: OrganizationRequest, parentId: mongoose.Types.ObjectId | null) {
+  if (!parentId) return;
+  const parent = await requireDriveNode({
+    organizationId: req.organization._id,
+    nodeId: String(parentId),
+  });
+  if (parent.type !== "folder") {
+    throw new Error("Destination must be a Drive folder");
+  }
+  await assertDriveAccess({
+    node: parent,
+    userId: req.user.id,
+    organizationRole: req.organizationMembership.role,
+    minimumRole: "editor",
+  });
 }
 
 export async function listForms(req: Request, res: Response): Promise<void> {
@@ -330,6 +387,99 @@ export async function updateSubmissionStatus(req: Request, res: Response): Promi
   }
 }
 
+export async function saveSubmissionFileToDrive(req: Request, res: Response): Promise<void> {
+  try {
+    const formId = String(req.params.id ?? "");
+    const submissionId = String(req.params.submissionId ?? "");
+    if (!mongoose.Types.ObjectId.isValid(formId) || !mongoose.Types.ObjectId.isValid(submissionId)) {
+      res.status(400).json({ error: "Invalid form or submission id" });
+      return;
+    }
+
+    const orgReq = req as OrganizationRequest;
+    const key = stringValue(req.body?.key);
+    if (!key) {
+      res.status(400).json({ error: "File key is required" });
+      return;
+    }
+
+    const rawParentId = stringValue(req.body?.parentId);
+    const parentId = rawParentId ? objectId(rawParentId) : null;
+    if (rawParentId && !parentId) {
+      res.status(400).json({ error: "Invalid destination folder id" });
+      return;
+    }
+
+    const [form, submission] = await Promise.all([
+      Form.findOne({ _id: formId, organizationId: orgReq.organization._id }).lean(),
+      FormSubmission.findOne({
+        _id: submissionId,
+        formId,
+        organizationId: orgReq.organization._id,
+      }).lean(),
+    ]);
+    if (!form) {
+      res.status(404).json({ error: "Form not found" });
+      return;
+    }
+    if (!submission) {
+      res.status(404).json({ error: "Submission not found" });
+      return;
+    }
+
+    const file = findSubmissionFileMetadata({ fields: form.fields, values: submission.values ?? {}, key });
+    if (!file) {
+      res.status(404).json({ error: "File not found in this submission" });
+      return;
+    }
+
+    if (!keyBelongsToPrefix(file.key, ["form", String(orgReq.organization._id), formId, file.fieldId])) {
+      res.status(400).json({ error: "File is not valid for this form" });
+      return;
+    }
+
+    await validateDriveDestinationAccess(orgReq, parentId);
+
+    const node = await importExistingObjectToDrive({
+      organizationId: orgReq.organization._id,
+      userId: orgReq.user.id,
+      sourceKey: file.key,
+      parentId,
+      fileName: stringValue(req.body?.name) || file.originalName,
+      contentType: file.contentType || "application/octet-stream",
+      size: file.size,
+      auditMetadata: {
+        source: "form",
+        formId,
+        submissionId,
+        fieldId: file.fieldId,
+      },
+    });
+
+    res.status(201).json({
+      node: await serializeDriveNodeForUser(node, orgReq),
+      sourceKey: file.key,
+      storageKey: node.storageKey,
+    });
+  } catch (err: any) {
+    const message = err.message || "Failed to save file to Drive";
+    if (message.includes("quota")) {
+      res.status(413).json({ error: message });
+      return;
+    }
+    if (message.includes("access denied")) {
+      res.status(403).json({ error: message });
+      return;
+    }
+    if (message.includes("not found")) {
+      res.status(404).json({ error: message });
+      return;
+    }
+    console.error("Error saving form file to Drive:", err);
+    res.status(500).json({ error: message });
+  }
+}
+
 export async function exportSubmissionsCsv(req: Request, res: Response): Promise<void> {
   try {
     const id = String(req.params.id ?? "");
@@ -392,6 +542,38 @@ function isUploadedFileMetadata(value: unknown): value is Record<string, unknown
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const file = value as Record<string, unknown>;
   return Boolean(file.key && file.bucket && file.originalName && file.contentType && file.size);
+}
+
+type SubmissionFileMetadata = {
+  key: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+  fieldId: string;
+};
+
+function findSubmissionFileMetadata(input: {
+  fields: IFormField[];
+  values: Record<string, unknown>;
+  key: string;
+}): SubmissionFileMetadata | null {
+  for (const field of input.fields) {
+    if (field.type !== "file") continue;
+    const value = input.values[field.id];
+    const files = Array.isArray(value) ? value : [value];
+    for (const file of files) {
+      if (!isUploadedFileMetadata(file)) continue;
+      if (String(file.key) !== input.key) continue;
+      return {
+        key: String(file.key),
+        originalName: String(file.originalName),
+        contentType: String(file.contentType).toLowerCase(),
+        size: Number(file.size),
+        fieldId: field.id,
+      };
+    }
+  }
+  return null;
 }
 
 function sanitizeUploadedFileMetadata(file: Record<string, unknown>) {

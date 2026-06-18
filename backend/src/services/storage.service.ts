@@ -2,6 +2,7 @@ import crypto from "crypto";
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
+  CopyObjectCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
@@ -259,6 +260,27 @@ export async function deleteObject(key: string): Promise<void> {
     new DeleteObjectCommand({
       Bucket: bucket,
       Key: key,
+    })
+  );
+}
+
+export async function copyObject(input: {
+  sourceKey: string;
+  destinationKey: string;
+  contentType?: string;
+}): Promise<void> {
+  const { bucket } = getStorageConfig();
+  await getS3Client().send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: input.destinationKey,
+      CopySource: `${bucket}/${encodeURIComponent(input.sourceKey).replace(/%2F/g, "/")}`,
+      ...(input.contentType
+        ? {
+            ContentType: input.contentType,
+            MetadataDirective: "REPLACE",
+          }
+        : {}),
     })
   );
 }

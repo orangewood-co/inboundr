@@ -3,6 +3,7 @@ import mongoose, { Schema, type Document, type Types } from "mongoose";
 export type DriveAuditAction =
   | "upload_initiated"
   | "upload_completed"
+  | "file_imported"
   | "folder_created"
   | "renamed"
   | "moved"
