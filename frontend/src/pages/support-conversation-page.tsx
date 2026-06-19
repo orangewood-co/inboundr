@@ -24,6 +24,10 @@ import { cn } from "@/lib/utils"
 
 const route = getRouteApi("/support/$ticketId")
 
+// The /support list route validates required search params, so navigations
+// back to it must supply defaults.
+const LIST_SEARCH = { status: "open" as const, q: "", page: 1 }
+
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true
@@ -62,7 +66,7 @@ export default function SupportConversationPage() {
   // The ticket id was invalid or not visible to this org: send the agent back.
   useEffect(() => {
     if (sawLoading.current && !loadingDetail && !selectedTicket) {
-      void navigate({ to: "/support" })
+      void navigate({ to: "/support", search: LIST_SEARCH })
     }
   }, [loadingDetail, navigate, selectedTicket])
 
@@ -82,7 +86,7 @@ export default function SupportConversationPage() {
     if (ok) {
       toast.success("Conversation deleted")
       setDeleteOpen(false)
-      void navigate({ to: "/support" })
+      void navigate({ to: "/support", search: LIST_SEARCH })
     }
   }
 
@@ -107,7 +111,7 @@ export default function SupportConversationPage() {
               {inbox.socketReady ? "Realtime" : "Connecting"}
             </Badge>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/support">
+              <Link to="/support" search={LIST_SEARCH}>
                 <ArrowLeftIcon />
                 Back to Tickets
               </Link>
