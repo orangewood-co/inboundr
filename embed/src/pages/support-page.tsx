@@ -286,6 +286,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [feedbackComment, setFeedbackComment] = useState("")
   const [endingChat, setEndingChat] = useState(false)
   const [endPersisted, setEndPersisted] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
 
   const { muted, toggleMuted, playConnected, playReceived } = useSupportSounds()
   const { theme, toggleTheme } = useTheme()
@@ -568,6 +569,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     setFeedbackComment("")
     setEndingChat(false)
     setEndPersisted(false)
+    setFeedbackSubmitted(false)
     setMenuOpen(false)
     setIssue("")
     setEmailCopy(false)
@@ -616,6 +618,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     try {
       await persistSupportEnd({ rating, feedbackComment: feedbackComment.trim() })
       setEndPersisted(true)
+      setFeedbackSubmitted(true)
       window.localStorage.removeItem(sessionStorageKey(organizationId))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save feedback")
@@ -1203,7 +1206,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
               <div className="mt-6">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
-                  How was your experience?
+                  {feedbackSubmitted ? "Your rating" : "How was your experience?"}
                 </p>
                 <div className="mt-2 flex items-center justify-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => {
@@ -1213,11 +1216,12 @@ export default function SupportPage({ organizationId }: { organizationId: string
                       <button
                         key={star}
                         type="button"
-                        onMouseEnter={() => setHoverRating(star)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        onClick={() => setRating(star)}
+                        disabled={feedbackSubmitted}
+                        onMouseEnter={() => !feedbackSubmitted && setHoverRating(star)}
+                        onMouseLeave={() => !feedbackSubmitted && setHoverRating(0)}
+                        onClick={() => !feedbackSubmitted && setRating(star)}
                         aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
-                        className="p-1 transition-transform hover:scale-110"
+                        className="p-1 transition-transform enabled:hover:scale-110 disabled:cursor-default"
                       >
                         <StarIcon
                           className="size-7"
@@ -1227,31 +1231,42 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     )
                   })}
                 </div>
-                <textarea
-                  value={feedbackComment}
-                  onChange={(event) => setFeedbackComment(event.target.value)}
-                  rows={3}
-                  maxLength={2000}
-                  placeholder="Anything else you'd like us to know?"
-                  className="mt-3 w-full max-w-xs resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-stone-400 focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500"
-                />
-                <Button
-                  type="button"
-                  onClick={() => void submitFeedback()}
-                  disabled={endingChat || (!rating && !feedbackComment.trim())}
-                  className="mt-3 h-10 w-full max-w-xs"
-                >
-                  {endingChat && <LoaderIcon className="size-4 animate-spin" />}
-                  Save Feedback
-                </Button>
-                {endPersisted && (rating > 0 || feedbackComment.trim()) && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-2 text-xs text-stone-500 dark:text-stone-400"
-                  >
-                    Thanks for your feedback!
-                  </motion.p>
+
+                {feedbackSubmitted ? (
+                  <>
+                    {feedbackComment.trim() && (
+                      <p className="mt-3 w-full max-w-xs whitespace-pre-wrap rounded-xl bg-stone-100 px-3 py-2 text-left text-sm text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+                        {feedbackComment.trim()}
+                      </p>
+                    )}
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="mt-3 text-sm text-stone-500 dark:text-stone-400"
+                    >
+                      Thanks for your feedback!
+                    </motion.p>
+                  </>
+                ) : (
+                  <>
+                    <textarea
+                      value={feedbackComment}
+                      onChange={(event) => setFeedbackComment(event.target.value)}
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="Anything else you'd like us to know?"
+                      className="mt-3 w-full max-w-xs resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-stone-400 focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void submitFeedback()}
+                      disabled={endingChat || (!rating && !feedbackComment.trim())}
+                      className="mt-3 h-10 w-full max-w-xs"
+                    >
+                      {endingChat && <LoaderIcon className="size-4 animate-spin" />}
+                      Save Feedback
+                    </Button>
+                  </>
                 )}
               </div>
 
