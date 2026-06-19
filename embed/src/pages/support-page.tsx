@@ -99,6 +99,23 @@ function TypingDots() {
   )
 }
 
+function ErrorNotice({ message, className }: { message: string; className?: string }) {
+  return (
+    <motion.div
+      role="alert"
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+      className={`flex items-start gap-2.5 rounded-2xl border border-red-200/80 bg-red-50/90 px-3.5 py-3 text-sm leading-relaxed text-red-700 shadow-sm shadow-red-900/5 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:shadow-none ${className ?? ""}`}
+    >
+      <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300">
+        <AlertCircleIcon className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">{message}</span>
+    </motion.div>
+  )
+}
+
 function supportWsUrl(sessionToken: string) {
   const url = new URL(API_ORIGIN)
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
@@ -901,11 +918,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 </span>
               </button>
 
-              {error && (
-                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-                  {error}
-                </p>
-              )}
+              {error && <ErrorNotice message={error} />}
 
               <Button
                 type="submit"
@@ -1061,11 +1074,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 </div>
               )}
 
-              {error && (
-                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-                  {error}
-                </p>
-              )}
+              {error && <ErrorNotice message={error} />}
               <div ref={bottomRef} />
             </div>
 
@@ -1190,11 +1199,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     : "We still need to save your transcript request."
                   : "We hope we were able to help."}
               </p>
-              {error && (
-                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-                  {error}
-                </p>
-              )}
+              {error && <ErrorNotice message={error} className="mt-3 max-w-xs text-left" />}
 
               <div className="mt-6">
                 <p className="text-xs font-medium uppercase tracking-wide text-stone-400 dark:text-stone-500">
