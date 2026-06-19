@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 
 import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { getActiveOrganizationId, setActiveOrganizationId } from "@/lib/organization-context"
@@ -10,6 +19,8 @@ import type {
   TicketFilter,
   TicketMessage,
 } from "./types"
+
+const DEFAULT_PAGE_SIZE = 25
 
 function wsUrl() {
   const url = new URL(API_ORIGIN)
@@ -32,9 +43,35 @@ export type SendMessageInput = {
   isInternal?: boolean
 }
 
-export function useSupportInbox() {
-  const [filter, setFilterState] = useState<TicketFilter>("open")
+export type SupportListQuery = {
+  status: TicketFilter
+  search: string
+  page: number
+  limit: number
+}
+
+export type SupportPagination = {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+const DEFAULT_QUERY: SupportListQuery = {
+  status: "open",
+  search: "",
+  page: 1,
+  limit: DEFAULT_PAGE_SIZE,
+}
+
+function useSupportInboxValue() {
   const [tickets, setTickets] = useState<Ticket[]>([])
+  const [pagination, setPagination] = useState<SupportPagination>({
+    page: 1,
+    limit: DEFAULT_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  })
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [messages, setMessages] = useState<TicketMessage[]>([])
@@ -51,6 +88,7 @@ export function useSupportInbox() {
   const selectedTicketIdRef = useRef<string | null>(null)
   const typingTimeoutRef = useRef<number | null>(null)
   const agentTypingRef = useRef(false)
+  const queryRef = useRef<SupportListQuery>(DEFAULT_QUERY)
 
   const apiBase = `${API_ORIGIN}/api/v1/tickets`
 
@@ -88,22 +126,38 @@ export function useSupportInbox() {
         new Date(latestAgentMessage.createdAt).getTime()
   )
 
-  const loadTickets = useCallback(async () => {
-    setLoadingTickets(true)
-    setError(null)
-    try {
-      const response = await fetch(`${apiBase}?status=${filter}`, { credentials: "include" })
-      const body = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(body?.error ?? "Failed to load support tickets")
-      const nextTickets: Ticket[] = body?.tickets ?? []
-      setTickets(nextTickets)
-      setSelectedTicketId((current) => current ?? nextTickets[0]?.id ?? null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load support tickets")
-    } finally {
-      setLoadingTickets(false)
-    }
-  }, [apiBase, filter])
+  const loadTickets = useCallback(
+    async (query: SupportListQuery) => {
+      queryRef.current = query
+      setLoadingTickets(true)
+      setError(null)
+      try {
+        const params = new URLSearchParams({
+          status: query.status,
+          page: String(query.page),
+          limit: String(query.limit),
+        })
+        if (query.search.trim()) params.set("search", query.search.trim())
+        const response = await fetch(`${apiBase}?${params.toString()}`, { credentials: "include" })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to load support tickets")
+        setTickets(body?.tickets ?? [])
+        setPagination({
+          page: body?.page ?? query.page,
+          limit: body?.limit ?? query.limit,
+          total: body?.total ?? 0,
+          totalPages: body?.totalPages ?? 1,
+        })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load support tickets")
+      } finally {
+        setLoadingTickets(false)
+      }
+    },
+    [apiBase]
+  )
+
+  const refresh = useCallback(() => loadTickets(queryRef.current), [loadTickets])
 
   const loadTicketDetail = useCallback(
     async (ticketId: string) => {
@@ -147,10 +201,6 @@ export function useSupportInbox() {
   }, [organizationId])
 
   useEffect(() => {
-    void loadTickets()
-  }, [loadTickets])
-
-  useEffect(() => {
     selectedTicketIdRef.current = selectedTicketId
     if (selectedTicketId) {
       void loadTicketDetail(selectedTicketId)
@@ -180,19 +230,23 @@ export function useSupportInbox() {
       socket.addEventListener("message", (event) => {
         const payload = JSON.parse(String(event.data)) as SocketEvent
         if (payload.type === "ticket.updated") {
+          const filter = queryRef.current.status
           setTickets((current) => {
             const existing = current.find((ticket) => ticket.id === payload.ticket.id)
+            // Only patch rows already visible on the current page; never inject
+            // tickets that belong to a different page (the list is paginated).
+            if (!existing) return current
             const without = current.filter((ticket) => ticket.id !== payload.ticket.id)
             if (!ticketMatchesFilter(payload.ticket, filter)) return without
             // ticket.updated is serialized without the list-only preview fields,
             // so preserve whatever the list already knows.
             const merged: Ticket = {
               ...payload.ticket,
-              lastMessagePreview: payload.ticket.lastMessagePreview ?? existing?.lastMessagePreview ?? null,
+              lastMessagePreview: payload.ticket.lastMessagePreview ?? existing.lastMessagePreview ?? null,
               lastMessageAuthorType:
-                payload.ticket.lastMessageAuthorType ?? existing?.lastMessageAuthorType ?? null,
+                payload.ticket.lastMessageAuthorType ?? existing.lastMessageAuthorType ?? null,
               lastMessageIsInternal:
-                payload.ticket.lastMessageIsInternal ?? existing?.lastMessageIsInternal ?? false,
+                payload.ticket.lastMessageIsInternal ?? existing.lastMessageIsInternal ?? false,
             }
             return [merged, ...without].sort(byRecency)
           })
@@ -245,7 +299,7 @@ export function useSupportInbox() {
       if (reconnectRef.current) window.clearTimeout(reconnectRef.current)
       socketRef.current?.close()
     }
-  }, [filter])
+  }, [])
 
   useEffect(() => {
     if (!selectedTicketId || !latestVisitorMessage || !socketReady) return
@@ -347,33 +401,29 @@ export function useSupportInbox() {
     )
   }, [])
 
-  const setFilter = useCallback((next: TicketFilter) => {
-    setFilterState(next)
-    setSelectedTicketId(null)
-  }, [])
-
-  const selectTicket = useCallback((ticketId: string) => {
+  const selectTicket = useCallback((ticketId: string | null) => {
     setSelectedTicketId(ticketId)
   }, [])
 
   const unreadCount = useMemo(
-    () => tickets.filter((ticket) => {
-      if (!ticket.lastVisitorMessageAt) return false
-      if (!ticket.lastAgentReadAt) return true
-      return new Date(ticket.lastVisitorMessageAt) > new Date(ticket.lastAgentReadAt)
-    }).length,
+    () =>
+      tickets.filter((ticket) => {
+        if (!ticket.lastVisitorMessageAt) return false
+        if (!ticket.lastAgentReadAt) return true
+        return new Date(ticket.lastVisitorMessageAt) > new Date(ticket.lastAgentReadAt)
+      }).length,
     [tickets]
   )
 
   return {
-    filter,
-    setFilter,
     tickets,
+    pagination,
     loadingTickets,
     unreadCount,
+    loadTickets,
+    refresh,
     selectedTicketId,
     selectTicket,
-    refresh: loadTickets,
     selectedTicket,
     messages: selectedMessages,
     loadingDetail,
@@ -395,4 +445,17 @@ export function useSupportInbox() {
   }
 }
 
-export type SupportInbox = ReturnType<typeof useSupportInbox>
+export type SupportInbox = ReturnType<typeof useSupportInboxValue>
+
+const SupportContext = createContext<SupportInbox | null>(null)
+
+export function SupportProvider({ children }: { children: ReactNode }) {
+  const value = useSupportInboxValue()
+  return <SupportContext.Provider value={value}>{children}</SupportContext.Provider>
+}
+
+export function useSupport(): SupportInbox {
+  const context = useContext(SupportContext)
+  if (!context) throw new Error("useSupport must be used within a SupportProvider")
+  return context
+}

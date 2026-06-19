@@ -4,7 +4,7 @@ import { MessagesSquareIcon } from "lucide-react"
 import { Composer } from "./composer"
 import { ConversationHeader } from "./conversation-header"
 import { MessageTimeline } from "./message-timeline"
-import type { SupportInbox } from "./use-support-inbox"
+import type { SupportInbox } from "./support-provider"
 
 export function ConversationView({
   inbox,

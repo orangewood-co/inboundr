@@ -32,9 +32,11 @@ import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
@@ -168,6 +170,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SupportIndexRoute = SupportIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SupportRoute,
+} as any)
 const LinksIndexRoute = LinksIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -182,6 +189,11 @@ const FormsIndexRoute = FormsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => FormsRoute,
+} as any)
+const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
+  id: '/$ticketId',
+  path: '/$ticketId',
+  getParentRoute: () => SupportRoute,
 } as any)
 const ProjectsNewRoute = ProjectsNewRouteImport.update({
   id: '/projects_/new',
@@ -292,7 +304,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
-  '/support': typeof SupportRoute
+  '/support': typeof SupportRouteWithChildren
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -307,9 +319,11 @@ export interface FileRoutesByFullPath {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
+  '/support/': typeof SupportIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -334,7 +348,6 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
-  '/support': typeof SupportRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -349,9 +362,11 @@ export interface FileRoutesByTo {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
+  '/support': typeof SupportIndexRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -380,7 +395,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
-  '/support': typeof SupportRoute
+  '/support': typeof SupportRouteWithChildren
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
@@ -395,9 +410,11 @@ export interface FileRoutesById {
   '/products_/import': typeof ProductsImportRoute
   '/projects_/$id': typeof ProjectsIdRoute
   '/projects_/new': typeof ProjectsNewRoute
+  '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
+  '/support/': typeof SupportIndexRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees_/attendance_/logs': typeof EmployeesAttendanceLogsRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -442,9 +459,11 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/support/$ticketId'
     | '/forms/'
     | '/invoices/'
     | '/links/'
+    | '/support/'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
@@ -469,7 +488,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
-    | '/support'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -484,9 +502,11 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/support/$ticketId'
     | '/forms'
     | '/invoices'
     | '/links'
+    | '/support'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
@@ -529,9 +549,11 @@ export interface FileRouteTypes {
     | '/products_/import'
     | '/projects_/$id'
     | '/projects_/new'
+    | '/support/$ticketId'
     | '/forms/'
     | '/invoices/'
     | '/links/'
+    | '/support/'
     | '/admin_/organizations/$id'
     | '/employees_/attendance_/logs'
     | '/projects_/$id_/tasks/$taskId'
@@ -560,7 +582,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
-  SupportRoute: typeof SupportRoute
+  SupportRoute: typeof SupportRouteWithChildren
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
@@ -738,6 +760,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/support/': {
+      id: '/support/'
+      path: '/'
+      fullPath: '/support/'
+      preLoaderRoute: typeof SupportIndexRouteImport
+      parentRoute: typeof SupportRoute
+    }
     '/links/': {
       id: '/links/'
       path: '/'
@@ -758,6 +787,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/forms/'
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
+    }
+    '/support/$ticketId': {
+      id: '/support/$ticketId'
+      path: '/$ticketId'
+      fullPath: '/support/$ticketId'
+      preLoaderRoute: typeof SupportTicketIdRouteImport
+      parentRoute: typeof SupportRoute
     }
     '/projects_/new': {
       id: '/projects_/new'
@@ -923,6 +959,19 @@ const LinksRouteChildren: LinksRouteChildren = {
 
 const LinksRouteWithChildren = LinksRoute._addFileChildren(LinksRouteChildren)
 
+interface SupportRouteChildren {
+  SupportTicketIdRoute: typeof SupportTicketIdRoute
+  SupportIndexRoute: typeof SupportIndexRoute
+}
+
+const SupportRouteChildren: SupportRouteChildren = {
+  SupportTicketIdRoute: SupportTicketIdRoute,
+  SupportIndexRoute: SupportIndexRoute,
+}
+
+const SupportRouteWithChildren =
+  SupportRoute._addFileChildren(SupportRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -946,7 +995,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
-  SupportRoute: SupportRoute,
+  SupportRoute: SupportRouteWithChildren,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,

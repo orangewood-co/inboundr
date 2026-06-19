@@ -1,9 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Outlet } from "@tanstack/react-router"
 
+import { SupportProvider } from "@/components/support/support-provider"
 import { requireFeatureAndModuleAccess } from "@/lib/auth-guards"
-import SupportPage from "@/pages/support-page"
 
 export const Route = createFileRoute("/support")({
   beforeLoad: () => requireFeatureAndModuleAccess("support", "support"),
-  component: SupportPage,
+  component: () => (
+    <SupportProvider>
+      <Outlet />
+    </SupportProvider>
+  ),
 })

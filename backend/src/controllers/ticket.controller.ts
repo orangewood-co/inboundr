@@ -17,11 +17,18 @@ import { broadcastTicketUpdate } from "../services/support-ws.service";
 export async function listSupportTickets(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
-    const tickets = await listTickets({
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const parsedPage = Number(req.query.page);
+    const parsedLimit = Number(req.query.limit);
+    const { tickets, total, page, limit } = await listTickets({
       organizationId: orgReq.organization._id,
       status: normalizeTicketListStatus(req.query.status),
+      search,
+      page: Number.isFinite(parsedPage) ? parsedPage : undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
-    res.json({ tickets });
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    res.json({ tickets, page, limit, total, totalPages });
   } catch (err) {
     console.error("Failed to list support tickets:", err);
     res.status(500).json({ error: "Failed to list support tickets" });

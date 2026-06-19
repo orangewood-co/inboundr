@@ -133,9 +133,19 @@ export async function serializeTicketMessage(message: ITicketMessage | any) {
   };
 }
 
+const DEFAULT_TICKET_PAGE_SIZE = 25;
+const MAX_TICKET_PAGE_SIZE = 100;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export async function listTickets(input: {
   organizationId: mongoose.Types.ObjectId;
   status: TicketListStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
 }) {
   const match: Record<string, unknown> = {
     organizationId: input.organizationId,
@@ -143,36 +153,69 @@ export async function listTickets(input: {
   };
   if (input.status !== "all") match.status = input.status;
 
-  const tickets = await Ticket.aggregate([
+  const search = String(input.search ?? "").trim();
+  if (search) {
+    const pattern = escapeRegExp(search);
+    const or: Record<string, unknown>[] = [
+      { subject: { $regex: pattern, $options: "i" } },
+      { "requester.name": { $regex: pattern, $options: "i" } },
+      { "requester.email": { $regex: pattern, $options: "i" } },
+    ];
+    const asNumber = Number(search.replace(/^#/, ""));
+    if (Number.isInteger(asNumber) && asNumber > 0) {
+      or.push({ ticketNumber: asNumber });
+    }
+    match.$or = or;
+  }
+
+  const limit = Math.min(
+    Math.max(Math.trunc(input.limit ?? DEFAULT_TICKET_PAGE_SIZE) || DEFAULT_TICKET_PAGE_SIZE, 1),
+    MAX_TICKET_PAGE_SIZE
+  );
+  const page = Math.max(Math.trunc(input.page ?? 1) || 1, 1);
+  const skip = (page - 1) * limit;
+
+  const [result] = await Ticket.aggregate([
     { $match: match },
-    { $sort: { lastMessageAt: -1, createdAt: -1 } },
-    { $limit: 100 },
     {
-      $lookup: {
-        from: TicketMessage.collection.name,
-        let: { ticketId: "$_id" },
-        pipeline: [
-          { $match: { $expr: { $eq: ["$ticketId", "$$ticketId"] } } },
-          { $sort: { createdAt: -1 } },
-          { $limit: 1 },
-          { $project: { bodyText: 1, authorType: 1, isInternal: 1, attachments: 1 } },
+      $facet: {
+        total: [{ $count: "value" }],
+        data: [
+          { $sort: { lastMessageAt: -1, createdAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: TicketMessage.collection.name,
+              let: { ticketId: "$_id" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$ticketId", "$$ticketId"] } } },
+                { $sort: { createdAt: -1 } },
+                { $limit: 1 },
+                { $project: { bodyText: 1, authorType: 1, isInternal: 1, attachments: 1 } },
+              ],
+              as: "lastMessage",
+            },
+          },
+          {
+            $lookup: {
+              from: Customer.collection.name,
+              localField: "customerId",
+              foreignField: "_id",
+              as: "customer",
+            },
+          },
+          { $addFields: { lastMessage: { $arrayElemAt: ["$lastMessage", 0] } } },
+          { $addFields: { customer: { $arrayElemAt: ["$customer", 0] } } },
         ],
-        as: "lastMessage",
       },
     },
-    {
-      $lookup: {
-        from: Customer.collection.name,
-        localField: "customerId",
-        foreignField: "_id",
-        as: "customer",
-      },
-    },
-    { $addFields: { lastMessage: { $arrayElemAt: ["$lastMessage", 0] } } },
-    { $addFields: { customer: { $arrayElemAt: ["$customer", 0] } } },
   ]);
 
-  return tickets.map((ticket) =>
+  const total: number = result?.total?.[0]?.value ?? 0;
+  const data: any[] = result?.data ?? [];
+
+  const tickets = data.map((ticket) =>
     serializeTicket({
       ...ticket,
       lastMessagePreview: previewFromMessage(ticket.lastMessage),
@@ -180,6 +223,8 @@ export async function listTickets(input: {
       lastMessageIsInternal: Boolean(ticket.lastMessage?.isInternal),
     })
   );
+
+  return { tickets, total, page, limit };
 }
 
 export async function getTicketWithMessages(input: {
