@@ -315,7 +315,7 @@ export const downloadInvoicePdf = async (req: Request, res: Response): Promise<v
 
     const branding = await resolveOrganizationPdfBranding(orgReq.organization);
     const assets = await buildInvoiceUpiAssets(invoice, orgReq.organization);
-    streamInvoicePdf(invoice, branding, res, { inline: req.query.inline === "1", assets });
+    await streamInvoicePdf(invoice, branding, res, { inline: req.query.inline === "1", assets });
   } catch (err) {
     console.error("Error rendering invoice PDF:", err);
     res.status(500).json({ error: "Failed to render invoice PDF" });

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="424" viewBox="0 0 300 424" role="img" aria-label="Classic invoice template preview">
+  <rect width="300" height="424" fill="#ffffff" stroke="#e5e7eb"/>
+  <rect x="110" y="28" width="80" height="22" rx="3" fill="#111111"/>
+  <text x="150" y="43" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" font-family="Arial, sans-serif">LOGO</text>
+  <text x="24" y="92" font-size="34" font-weight="bold" fill="#111111" font-family="Arial, sans-serif" letter-spacing="-1">INVOICE</text>
+  <text x="24" y="108" font-size="10" fill="#111111" font-family="Arial, sans-serif">Bright Supplies Co., Bengaluru</text>
+  <g font-family="Arial, sans-serif">
+    <text x="24" y="138" font-size="9" fill="#8a8f98">Date: <tspan font-weight="bold" fill="#111111">Jun 01, 2026</tspan></text>
+    <text x="24" y="151" font-size="9" fill="#8a8f98">Invoice No. <tspan font-weight="bold" fill="#111111">INV-2026-0007</tspan></text>
+    <text x="276" y="138" font-size="9" fill="#8a8f98" text-anchor="end">Prepared for <tspan font-weight="bold" fill="#111111">Acme Industries</tspan></text>
+    <text x="276" y="151" font-size="9" fill="#8a8f98" text-anchor="end">Reference <tspan font-weight="bold" fill="#111111">PO-44821</tspan></text>
+  </g>
+  <rect x="24" y="172" width="252" height="22" fill="#efefef"/>
+  <g font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#8a8f98">
+    <text x="32" y="186">DESCRIPTION</text>
+    <text x="190" y="186" text-anchor="end">QTY</text>
+    <text x="238" y="186" text-anchor="end">UNIT PRICE</text>
+    <text x="270" y="186" text-anchor="end">TOTAL</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="8.5" fill="#111111">
+    <text x="32" y="212">A4 Copier Paper</text><text x="190" y="212" text-anchor="end">20</text><text x="238" y="212" text-anchor="end">285.00</text><text x="270" y="212" text-anchor="end">6,064.80</text>
+    <line x1="24" y1="220" x2="276" y2="220" stroke="#e3e3e3"/>
+    <text x="32" y="236">Gel Ink Pens</text><text x="190" y="236" text-anchor="end">8</text><text x="238" y="236" text-anchor="end">540.00</text><text x="270" y="236" text-anchor="end">5,097.60</text>
+    <line x1="24" y1="244" x2="276" y2="244" stroke="#e3e3e3"/>
+  </g>
+  <g font-family="Arial, sans-serif">
+    <text x="216" y="266" font-size="9" font-weight="bold" fill="#8a8f98" text-anchor="end">TAX</text>
+    <text x="270" y="266" font-size="9" font-weight="bold" fill="#111111" text-anchor="end">1,427.40</text>
+    <text x="216" y="286" font-size="12" font-weight="bold" fill="#111111" text-anchor="end">TOTAL</text>
+    <text x="270" y="286" font-size="12" font-weight="bold" fill="#2563eb" text-anchor="end">11,162.40</text>
+  </g>
+  <g font-family="Arial, sans-serif">
+    <text x="24" y="340" font-size="8" font-weight="bold" fill="#8a8f98" letter-spacing="0.8">PAYMENT TERMS</text>
+    <text x="24" y="354" font-size="9" fill="#111111">Net 30</text>
+    <text x="160" y="340" font-size="8" font-weight="bold" fill="#8a8f98" letter-spacing="0.8">NOTES</text>
+    <text x="160" y="354" font-size="9" fill="#111111">Thank you for your business.</text>
+    <text x="24" y="388" font-size="8" font-weight="bold" fill="#8a8f98" letter-spacing="0.8">ADDRESS</text>
+    <text x="24" y="402" font-size="9" fill="#111111">Indiranagar, Bengaluru 560038</text>
+  </g>
+</svg>

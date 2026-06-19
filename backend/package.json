@@ -31,6 +31,7 @@
     "@langchain/core": "^1.1.39",
     "@langchain/langgraph": "^1.2.7",
     "@langchain/openai": "^1.4.2",
+    "@react-pdf/renderer": "^4.5.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/pdfkit": "^0.17.6",

@@ -47,6 +47,7 @@ import {
   CameraIcon,
   CheckCircle2Icon,
   CrownIcon,
+  CheckIcon,
   ImageIcon,
   KeyIcon,
   LogOutIcon,
@@ -131,6 +132,26 @@ interface GmailAccount {
   updatedAt: string
 }
 
+const INVOICE_TEMPLATE_OPTIONS = [
+  {
+    id: "standard",
+    label: "Standard",
+    description: "Branded layout with your accent color, summary, and totals.",
+  },
+  {
+    id: "minimal",
+    label: "Minimal",
+    description: "Monospace, typewriter-style layout. Clean and distraction-free.",
+  },
+  {
+    id: "classic",
+    label: "Classic",
+    description: "Bold centered header with a prominent logo and tidy summary.",
+  },
+] as const
+
+type InvoiceTemplateId = (typeof INVOICE_TEMPLATE_OPTIONS)[number]["id"]
+
 interface Organization {
   _id: string
   name: string
@@ -149,6 +170,7 @@ interface Organization {
     pricing: string
     defaultTerms: string
     defaultUpiId: string
+    defaultInvoiceTemplate: InvoiceTemplateId
     paymentTerms: PaymentTermTemplate[]
     deliveryTerms: DeliveryTermTemplate[]
   }
@@ -224,6 +246,7 @@ const emptyOrganizationForm: OrganizationFormState = {
     pricing: "INR",
     defaultTerms: "",
     defaultUpiId: "",
+    defaultInvoiceTemplate: "standard",
     paymentTerms: [],
     deliveryTerms: [],
   },
@@ -373,6 +396,7 @@ function OrganizationTab() {
       pricing: organization.preferences?.pricing ?? "INR",
       defaultTerms: defaultPaymentTerm?.text ?? organization.preferences?.defaultTerms ?? "",
       defaultUpiId: organization.preferences?.defaultUpiId ?? "",
+      defaultInvoiceTemplate: organization.preferences?.defaultInvoiceTemplate ?? "standard",
       paymentTerms,
       deliveryTerms,
     }
@@ -1072,6 +1096,47 @@ function OrganizationTab() {
                   placeholder="business@upi"
                   className="sm:max-w-xs"
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Invoice template</Label>
+                <p className="text-[13px] text-muted-foreground">
+                  The default design for new invoice PDFs. Can be overridden per invoice.
+                </p>
+                <div className="grid gap-3 pt-1 sm:grid-cols-3">
+                  {INVOICE_TEMPLATE_OPTIONS.map((template) => {
+                    const selected = form.preferences.defaultInvoiceTemplate === template.id
+                    return (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => updatePreference("defaultInvoiceTemplate", template.id)}
+                        aria-pressed={selected}
+                        className={`group flex flex-col overflow-hidden rounded-xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          selected
+                            ? "border-primary ring-2 ring-primary/40"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="aspect-[3/4] w-full overflow-hidden border-b bg-muted/30">
+                          <img
+                            src={`/invoice-templates/${template.id}.svg`}
+                            alt={`${template.label} invoice template preview`}
+                            className="h-full w-full object-cover object-top"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="space-y-1 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium">{template.label}</span>
+                            {selected ? <CheckIcon className="size-4 text-primary" /> : null}
+                          </div>
+                          <p className="text-xs leading-snug text-muted-foreground">{template.description}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               <div className="space-y-1.5">

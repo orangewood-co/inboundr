@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="424" viewBox="0 0 300 424" role="img" aria-label="Standard invoice template preview">
+  <rect width="300" height="424" fill="#ffffff" stroke="#e5e7eb"/>
+  <g font-family="Arial, sans-serif">
+    <text x="24" y="44" font-size="13" font-weight="bold" fill="#111827">Bright Supplies Co.</text>
+    <text x="24" y="57" font-size="8.5" fill="#6b7280">Indiranagar, Bengaluru 560038</text>
+    <text x="24" y="68" font-size="8.5" fill="#6b7280">billing@brightsupplies.example</text>
+    <text x="276" y="44" font-size="22" font-weight="bold" fill="#111827" text-anchor="end" letter-spacing="1">INVOICE</text>
+    <text x="276" y="58" font-size="9" fill="#6b7280" text-anchor="end">INV-2026-0007</text>
+    <rect x="232" y="64" width="44" height="14" rx="7" fill="#2563eb"/>
+    <text x="254" y="74" font-size="7" font-weight="bold" fill="#ffffff" text-anchor="middle">PAID</text>
+  </g>
+  <rect x="24" y="90" width="252" height="3" rx="1.5" fill="#2563eb"/>
+  <g font-family="Arial, sans-serif">
+    <text x="24" y="112" font-size="7.5" font-weight="bold" fill="#6b7280">BILL TO</text>
+    <text x="24" y="126" font-size="10" font-weight="bold" fill="#111827">Acme Industries Pvt Ltd</text>
+    <text x="24" y="139" font-size="8.5" fill="#6b7280">12 MG Road, Bengaluru</text>
+    <text x="276" y="112" font-size="8.5" fill="#6b7280" text-anchor="end">Issue date <tspan font-weight="bold" fill="#111827">Jun 01</tspan></text>
+    <text x="276" y="126" font-size="8.5" fill="#6b7280" text-anchor="end">Due date <tspan font-weight="bold" fill="#111827">Jun 30</tspan></text>
+    <text x="276" y="139" font-size="8.5" fill="#6b7280" text-anchor="end">Terms <tspan font-weight="bold" fill="#111827">Net 30</tspan></text>
+  </g>
+  <rect x="24" y="158" width="252" height="20" rx="4" fill="#2563eb"/>
+  <g font-family="Arial, sans-serif" font-size="7.5" font-weight="bold" fill="#ffffff">
+    <text x="32" y="171">Item</text>
+    <text x="180" y="171" text-anchor="end">Qty</text>
+    <text x="226" y="171" text-anchor="end">Rate</text>
+    <text x="270" y="171" text-anchor="end">Amount</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="8.5" fill="#111827">
+    <rect x="24" y="178" width="252" height="20" fill="#ffffff"/>
+    <text x="32" y="191">A4 Copier Paper</text><text x="180" y="191" text-anchor="end">20</text><text x="226" y="191" text-anchor="end">285.00</text><text x="270" y="191" text-anchor="end">6,064.80</text>
+    <rect x="24" y="198" width="252" height="20" fill="#f9fafb"/>
+    <text x="32" y="211">Gel Ink Pens</text><text x="180" y="211" text-anchor="end">8</text><text x="226" y="211" text-anchor="end">540.00</text><text x="270" y="211" text-anchor="end">5,097.60</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="8.5">
+    <text x="200" y="240" fill="#6b7280" text-anchor="end">Subtotal</text><text x="270" y="240" fill="#111827" font-weight="bold" text-anchor="end">INR 10,020.00</text>
+    <text x="200" y="254" fill="#6b7280" text-anchor="end">Tax (GST)</text><text x="270" y="254" fill="#111827" font-weight="bold" text-anchor="end">INR 1,427.40</text>
+    <line x1="160" y1="262" x2="276" y2="262" stroke="#e5e7eb"/>
+    <text x="200" y="276" fill="#111827" font-weight="bold" text-anchor="end">Grand total</text><text x="270" y="276" fill="#111827" font-weight="bold" text-anchor="end">INR 11,162.40</text>
+  </g>
+  <rect x="160" y="286" width="116" height="22" rx="5" fill="#2563eb"/>
+  <text x="168" y="301" font-size="9" font-weight="bold" fill="#ffffff">Balance due</text>
+  <text x="270" y="301" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="end">INR 6,162.40</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="24" y="330" width="252" height="40" rx="6" fill="none" stroke="#e5e7eb"/>
+    <text x="32" y="346" font-size="8.5" font-weight="bold" fill="#111827">Notes</text>
+    <text x="32" y="360" font-size="8" fill="#6b7280">Thank you for your business.</text>
+  </g>
+</svg>

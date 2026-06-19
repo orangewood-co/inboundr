@@ -1,5 +1,25 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
+export const INVOICE_TEMPLATE_IDS = ["minimal", "classic", "standard"] as const;
+export type InvoiceTemplateId = (typeof INVOICE_TEMPLATE_IDS)[number];
+export const DEFAULT_INVOICE_TEMPLATE: InvoiceTemplateId = "standard";
+
+// Legacy template names from before the template library; everything collapses
+// to the closest current design so old invoices still render and re-save cleanly.
+const LEGACY_INVOICE_TEMPLATE_MAP: Record<string, InvoiceTemplateId> = {
+  professional: "standard",
+  modern: "standard",
+  compact: "minimal",
+};
+
+export function normalizeInvoiceTemplateId(value: unknown): InvoiceTemplateId {
+  const raw = String(value ?? "").trim();
+  if ((INVOICE_TEMPLATE_IDS as readonly string[]).includes(raw)) {
+    return raw as InvoiceTemplateId;
+  }
+  return LEGACY_INVOICE_TEMPLATE_MAP[raw] ?? DEFAULT_INVOICE_TEMPLATE;
+}
+
 export type InvoiceStatus =
   | "draft"
   | "sent"
@@ -77,7 +97,7 @@ export interface IInvoice extends Document {
   organizationId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId | null;
   invoiceNumber: string;
-  template: "professional" | "compact" | "modern";
+  template: InvoiceTemplateId;
   status: InvoiceStatus;
   issueDate: Date;
   dueDate: Date | null;
@@ -202,8 +222,8 @@ const invoiceSchema = new Schema<IInvoice>(
     invoiceNumber: { type: String, required: true, trim: true },
     template: {
       type: String,
-      enum: ["professional", "compact", "modern"],
-      default: "professional",
+      enum: INVOICE_TEMPLATE_IDS,
+      default: DEFAULT_INVOICE_TEMPLATE,
     },
     status: {
       type: String,
@@ -258,6 +278,12 @@ const invoiceSchema = new Schema<IInvoice>(
   },
   { timestamps: true }
 );
+
+// Coerce legacy/unknown template values to a valid id before validation, so
+// saving an old invoice (e.g. recording a payment) never trips the enum check.
+invoiceSchema.pre("validate", function normalizeTemplateField() {
+  this.template = normalizeInvoiceTemplateId(this.template);
+});
 
 invoiceSchema.index({ organizationId: 1, invoiceNumber: 1 }, { unique: true });
 invoiceSchema.index({ organizationId: 1, status: 1, dueDate: 1 });

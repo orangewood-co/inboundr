@@ -11,6 +11,7 @@ import {
   type OrganizationRole,
 } from "../models/organization-member.model";
 import { Organization } from "../models/organization.model";
+import { normalizeInvoiceTemplateId } from "../models/invoice.model";
 import { sendEmail } from "../lib/email";
 import { normalizeTime, normalizeTimezone, sendHourUtcFromLocal } from "../lib/schedule";
 import { serializeEntitlements } from "../services/entitlement.service";
@@ -222,6 +223,9 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
               : {}),
             ...(preferences.defaultUpiId !== undefined
               ? { defaultUpiId: normalizeUpiId(preferences.defaultUpiId) }
+              : {}),
+            ...(preferences.defaultInvoiceTemplate !== undefined
+              ? { defaultInvoiceTemplate: normalizeInvoiceTemplateId(preferences.defaultInvoiceTemplate) }
               : {}),
             ...(preferences.paymentReminders !== undefined
               ? { paymentReminders: normalizePaymentReminders(preferences.paymentReminders) }

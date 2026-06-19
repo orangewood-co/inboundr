@@ -3,12 +3,15 @@ import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
 import {
   Invoice,
+  INVOICE_TEMPLATE_IDS,
+  normalizeInvoiceTemplateId,
   type IInvoice,
   type IInvoiceLineItem,
   type IInvoicePayment,
   type InvoicePaymentMethod,
   type InvoiceRecurringFrequency,
   type InvoiceStatus,
+  type InvoiceTemplateId,
 } from "../models/invoice.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 
@@ -29,7 +32,6 @@ const RECURRING_FREQUENCIES = new Set<InvoiceRecurringFrequency>([
   "quarterly",
   "yearly",
 ]);
-const TEMPLATES = new Set(["professional", "compact", "modern"]);
 
 export const INVOICE_SEARCH_FIELDS = [
   "invoiceNumber",
@@ -211,11 +213,30 @@ export function normalizePaymentMethod(value: unknown): InvoicePaymentMethod {
     : "bank_transfer";
 }
 
-export function normalizeTemplate(value: unknown): "professional" | "compact" | "modern" {
-  const template = String(value ?? "professional");
-  return TEMPLATES.has(template)
-    ? (template as "professional" | "compact" | "modern")
-    : "professional";
+export function normalizeTemplate(value: unknown): InvoiceTemplateId {
+  return normalizeInvoiceTemplateId(value);
+}
+
+/**
+ * Picks the template to render for an invoice. A valid per-invoice template
+ * wins; otherwise we fall back to the organization default, then the global
+ * default. Legacy template names are mapped to a current design.
+ */
+export function resolveInvoiceTemplate(
+  invoice: { template?: unknown } | null | undefined,
+  organization?: { preferences?: { defaultInvoiceTemplate?: unknown } | null } | null
+): InvoiceTemplateId {
+  const perInvoice = String(invoice?.template ?? "").trim();
+  if ((INVOICE_TEMPLATE_IDS as readonly string[]).includes(perInvoice)) {
+    return perInvoice as InvoiceTemplateId;
+  }
+
+  const orgDefault = String(organization?.preferences?.defaultInvoiceTemplate ?? "").trim();
+  if ((INVOICE_TEMPLATE_IDS as readonly string[]).includes(orgDefault)) {
+    return orgDefault as InvoiceTemplateId;
+  }
+
+  return normalizeInvoiceTemplateId(perInvoice);
 }
 
 function normalizePayments(payments: unknown): IInvoicePayment[] {
@@ -254,7 +275,10 @@ export async function createInvoiceRecord(
     organizationId: organization._id,
     invoiceNumber:
       String(body.invoiceNumber ?? "").trim() || (await nextInvoiceNumber(organization._id)),
-    template: normalizeTemplate(body.template),
+    template: resolveInvoiceTemplate(
+      { template: body.template },
+      organization as { preferences?: { defaultInvoiceTemplate?: unknown } }
+    ),
     status,
     issueDate: parseInvoiceDate(body.issueDate) ?? new Date(),
     dueDate: parseInvoiceDate(body.dueDate),

@@ -1,4 +1,9 @@
 import mongoose, { Schema, type Document } from "mongoose";
+import {
+  DEFAULT_INVOICE_TEMPLATE,
+  INVOICE_TEMPLATE_IDS,
+  type InvoiceTemplateId,
+} from "./invoice.model";
 
 export type OrganizationTheme = "dark" | "light";
 export type OrganizationStatus = "active" | "suspended";
@@ -25,6 +30,7 @@ export interface IOrganizationPreferences {
   pricing: string;
   defaultTerms: string;
   defaultUpiId: string;
+  defaultInvoiceTemplate: InvoiceTemplateId;
   paymentTerms: IOrganizationPaymentTerm[];
   deliveryTerms: IOrganizationDeliveryTerm[];
   paymentReminders: IOrganizationPaymentReminders;
@@ -100,6 +106,11 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     pricing: { type: String, default: "INR" },
     defaultTerms: { type: String, default: "" },
     defaultUpiId: { type: String, default: "", trim: true },
+    defaultInvoiceTemplate: {
+      type: String,
+      enum: INVOICE_TEMPLATE_IDS,
+      default: DEFAULT_INVOICE_TEMPLATE,
+    },
     paymentTerms: {
       type: [
         {

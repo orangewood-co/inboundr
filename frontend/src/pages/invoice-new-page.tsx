@@ -75,7 +75,7 @@ type InvoiceFormState = {
   notes: string
   termsAndConditions: string
   upiId: string
-  template: "professional" | "compact" | "modern"
+  template: "minimal" | "classic" | "standard"
   recurringEnabled: boolean
   recurringFrequency: "monthly" | "quarterly" | "yearly"
   recurringStartDate: string
@@ -118,7 +118,7 @@ function emptyForm(): InvoiceFormState {
     notes: "Thank you for your business.",
     termsAndConditions: "",
     upiId: "",
-    template: "professional",
+    template: "standard",
     recurringEnabled: false,
     recurringFrequency: "monthly",
     recurringStartDate: today(),
@@ -190,13 +190,20 @@ export default function InvoiceNewPage() {
     void fetch(`${API_ORIGIN}/api/v1/organization/me`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled) setOrgDefaultUpiId(data?.organization?.preferences?.defaultUpiId ?? "")
+        if (cancelled) return
+        setOrgDefaultUpiId(data?.organization?.preferences?.defaultUpiId ?? "")
+        // Seed new invoices with the organization's default template. Editing an
+        // existing invoice keeps its own saved template.
+        const orgTemplate = data?.organization?.preferences?.defaultInvoiceTemplate
+        if (!editId && (orgTemplate === "minimal" || orgTemplate === "classic" || orgTemplate === "standard")) {
+          setForm((c) => ({ ...c, template: orgTemplate }))
+        }
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [editId])
 
   const fetchCustomers = useCallback(async (query: string, signal: AbortSignal) => {
     const params = new URLSearchParams({ limit: "20" })
@@ -238,7 +245,7 @@ export default function InvoiceNewPage() {
         notes: invoice.notes || "",
         termsAndConditions: invoice.termsAndConditions || "",
         upiId: invoice.upiId || "",
-        template: invoice.template || "professional",
+        template: invoice.template || "standard",
         recurringEnabled: invoice.recurring?.enabled || false,
         recurringFrequency: invoice.recurring?.frequency || "monthly",
         recurringStartDate: invoice.recurring?.startDate?.slice(0, 10) || today(),
@@ -453,9 +460,9 @@ export default function InvoiceNewPage() {
                 <Select value={form.template} onValueChange={(v) => setForm((c) => ({ ...c, template: v as InvoiceFormState["template"] }))}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="compact">Compact</SelectItem>
-                    <SelectItem value="modern">Modern</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="minimal">Minimal</SelectItem>
+                    <SelectItem value="classic">Classic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
