@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import {
   createAndLinkTicketCustomer,
+  deleteTicket as deleteTicketRecord,
   getTicketWithMessages,
   linkTicketCustomer,
   listCustomerCandidates,
@@ -11,8 +12,9 @@ import {
   normalizeTicketListStatus,
   reopenTicket as reopenTicketRecord,
   resolveTicket as resolveTicketRecord,
+  setTicketArchived,
 } from "../services/ticket.service";
-import { broadcastTicketUpdate } from "../services/support-ws.service";
+import { broadcastTicketDeleted, broadcastTicketUpdate } from "../services/support-ws.service";
 
 export async function listSupportTickets(req: Request, res: Response): Promise<void> {
   try {
@@ -169,5 +171,65 @@ export async function reopenSupportTicket(req: Request, res: Response): Promise<
   } catch (err) {
     console.error("Failed to reopen support ticket:", err);
     res.status(500).json({ error: "Failed to reopen support ticket" });
+  }
+}
+
+export async function archiveSupportTicket(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const ticket = await setTicketArchived({
+      organizationId: orgReq.organization._id,
+      ticketId: String(req.params.id ?? ""),
+      archived: true,
+    });
+    if (!ticket) {
+      res.status(404).json({ error: "Ticket not found" });
+      return;
+    }
+    broadcastTicketUpdate(orgReq.organization._id.toString(), ticket);
+    res.json({ ticket });
+  } catch (err) {
+    console.error("Failed to archive support ticket:", err);
+    res.status(500).json({ error: "Failed to archive support ticket" });
+  }
+}
+
+export async function unarchiveSupportTicket(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const ticket = await setTicketArchived({
+      organizationId: orgReq.organization._id,
+      ticketId: String(req.params.id ?? ""),
+      archived: false,
+    });
+    if (!ticket) {
+      res.status(404).json({ error: "Ticket not found" });
+      return;
+    }
+    broadcastTicketUpdate(orgReq.organization._id.toString(), ticket);
+    res.json({ ticket });
+  } catch (err) {
+    console.error("Failed to unarchive support ticket:", err);
+    res.status(500).json({ error: "Failed to unarchive support ticket" });
+  }
+}
+
+export async function deleteSupportTicket(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const ticketId = String(req.params.id ?? "");
+    const deleted = await deleteTicketRecord({
+      organizationId: orgReq.organization._id,
+      ticketId,
+    });
+    if (!deleted) {
+      res.status(404).json({ error: "Ticket not found" });
+      return;
+    }
+    broadcastTicketDeleted(orgReq.organization._id.toString(), ticketId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete support ticket:", err);
+    res.status(500).json({ error: "Failed to delete support ticket" });
   }
 }

@@ -65,6 +65,8 @@ export function fileSize(bytes: number) {
 }
 
 export function ticketMatchesFilter(ticket: Ticket, filter: TicketFilter) {
+  if (filter === "archived") return ticket.isArchived === true
+  if (ticket.isArchived) return false
   return filter === "all" || ticket.status === filter
 }
 

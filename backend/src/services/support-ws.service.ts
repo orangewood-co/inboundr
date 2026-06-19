@@ -72,6 +72,13 @@ export function broadcastTicketUpdate(organizationId: string, ticket: unknown): 
   );
 }
 
+export function broadcastTicketDeleted(organizationId: string, ticketId: string): void {
+  broadcast(
+    (context) => context.organizationId === organizationId,
+    { type: "ticket.deleted", ticketId }
+  );
+}
+
 async function broadcastTicketById(ticketId: string): Promise<void> {
   const ticket = await Ticket.findById(ticketId).populate("customerId").lean();
   if (!ticket) return;

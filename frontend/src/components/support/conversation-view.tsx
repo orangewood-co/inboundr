@@ -10,10 +10,14 @@ export function ConversationView({
   inbox,
   detailsOpen,
   onToggleDetails,
+  onArchiveToggle,
+  onDelete,
 }: {
   inbox: SupportInbox
   detailsOpen: boolean
   onToggleDetails: () => void
+  onArchiveToggle: () => void
+  onDelete: () => void
 }) {
   const ticket = inbox.selectedTicket
   const notesCount = useMemo(
@@ -44,6 +48,8 @@ export function ConversationView({
         detailsOpen={detailsOpen}
         onToggleDetails={onToggleDetails}
         onResolveToggle={() => inbox.setStatus(ticket.status !== "resolved")}
+        onArchiveToggle={onArchiveToggle}
+        onDelete={onDelete}
       />
       <MessageTimeline
         ticket={ticket}

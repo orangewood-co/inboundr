@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { ArrowLeftIcon } from "lucide-react"
+import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
@@ -9,6 +10,15 @@ import { ConversationView } from "@/components/support/conversation-view"
 import { useSupport } from "@/components/support/support-provider"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +44,8 @@ export default function SupportConversationPage() {
   const { selectTicket, selectedTicket, loadingDetail } = inbox
 
   const [detailsOpen, setDetailsOpen] = useState(true)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const isDesktop = useIsDesktop()
   const sawLoading = useRef(false)
 
@@ -53,6 +65,26 @@ export default function SupportConversationPage() {
       void navigate({ to: "/support" })
     }
   }, [loadingDetail, navigate, selectedTicket])
+
+  const handleArchiveToggle = async () => {
+    if (!selectedTicket) return
+    const ok = selectedTicket.isArchived
+      ? await inbox.unarchiveTicket(selectedTicket.id)
+      : await inbox.archiveTicket(selectedTicket.id)
+    if (ok) toast.success(selectedTicket.isArchived ? "Conversation unarchived" : "Conversation archived")
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!selectedTicket) return
+    setDeleting(true)
+    const ok = await inbox.deleteTicket(selectedTicket.id)
+    setDeleting(false)
+    if (ok) {
+      toast.success("Conversation deleted")
+      setDeleteOpen(false)
+      void navigate({ to: "/support" })
+    }
+  }
 
   const showContext = detailsOpen && Boolean(selectedTicket)
 
@@ -102,6 +134,8 @@ export default function SupportConversationPage() {
                 inbox={inbox}
                 detailsOpen={detailsOpen}
                 onToggleDetails={() => setDetailsOpen((open) => !open)}
+                onArchiveToggle={() => void handleArchiveToggle()}
+                onDelete={() => setDeleteOpen(true)}
               />
             </div>
 
@@ -139,6 +173,29 @@ export default function SupportConversationPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => !open && setDeleteOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Conversation</DialogTitle>
+            <DialogDescription>
+              {selectedTicket
+                ? `This permanently deletes the chat with ${selectedTicket.requester.name} (#${selectedTicket.ticketNumber}), all its messages, and any uploaded files. This cannot be undone.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deleting}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button variant="destructive" disabled={deleting} onClick={() => void handleConfirmDelete()}>
+              {deleting ? "Deleting..." : "Delete Conversation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

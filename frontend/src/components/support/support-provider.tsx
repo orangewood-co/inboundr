@@ -247,11 +247,19 @@ function useSupportInboxValue() {
                 payload.ticket.lastMessageAuthorType ?? existing.lastMessageAuthorType ?? null,
               lastMessageIsInternal:
                 payload.ticket.lastMessageIsInternal ?? existing.lastMessageIsInternal ?? false,
+              agents: payload.ticket.agents ?? existing.agents ?? null,
             }
             return [merged, ...without].sort(byRecency)
           })
           if (payload.ticket.id === selectedTicketIdRef.current) {
             setSelectedTicket((current) => ({ ...current, ...payload.ticket }))
+          }
+        }
+        if (payload.type === "ticket.deleted") {
+          setTickets((current) => current.filter((ticket) => ticket.id !== payload.ticketId))
+          if (payload.ticketId === selectedTicketIdRef.current) {
+            setSelectedTicket(null)
+            setMessages([])
           }
         }
         if (payload.type === "message.created") {
@@ -401,6 +409,54 @@ function useSupportInboxValue() {
     )
   }, [])
 
+  const setArchived = useCallback(
+    async (ticketId: string, archived: boolean): Promise<boolean> => {
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}/${archived ? "archive" : "unarchive"}`, {
+          method: "PATCH",
+          credentials: "include",
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to update conversation")
+        // Drop the row locally if it no longer belongs to the current view;
+        // the WebSocket broadcast keeps other agents in sync.
+        setTickets((current) => current.filter((ticket) => ticket.id !== ticketId))
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update conversation")
+        return false
+      }
+    },
+    [apiBase]
+  )
+
+  const archiveTicket = useCallback((ticketId: string) => setArchived(ticketId, true), [setArchived])
+  const unarchiveTicket = useCallback(
+    (ticketId: string) => setArchived(ticketId, false),
+    [setArchived]
+  )
+
+  const deleteTicket = useCallback(
+    async (ticketId: string): Promise<boolean> => {
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}`, {
+          method: "DELETE",
+          credentials: "include",
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to delete conversation")
+        setTickets((current) => current.filter((ticket) => ticket.id !== ticketId))
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete conversation")
+        return false
+      }
+    },
+    [apiBase]
+  )
+
   const selectTicket = useCallback((ticketId: string | null) => {
     setSelectedTicketId(ticketId)
   }, [])
@@ -435,6 +491,9 @@ function useSupportInboxValue() {
     supportChatLink,
     sendMessage,
     setStatus,
+    archiveTicket,
+    unarchiveTicket,
+    deleteTicket,
     notifyTyping,
     handleDraftChange,
     uploadAttachment,

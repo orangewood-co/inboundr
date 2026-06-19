@@ -1,11 +1,14 @@
 import {
   AlertCircleIcon,
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   CheckCircle2Icon,
   CopyIcon,
   MailIcon,
   MoreVerticalIcon,
   PanelRightIcon,
   RotateCcwIcon,
+  Trash2Icon,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -30,6 +33,8 @@ export function ConversationHeader({
   detailsOpen,
   onToggleDetails,
   onResolveToggle,
+  onArchiveToggle,
+  onDelete,
 }: {
   ticket: Ticket
   notesCount: number
@@ -37,6 +42,8 @@ export function ConversationHeader({
   detailsOpen: boolean
   onToggleDetails: () => void
   onResolveToggle: () => void
+  onArchiveToggle: () => void
+  onDelete: () => void
 }) {
   const avatar = getAvatarColor(ticket.requester.name)
   const resolved = ticket.status === "resolved"
@@ -139,6 +146,15 @@ export function ConversationHeader({
             <DropdownMenuItem onSelect={onResolveToggle} disabled={!socketReady}>
               {resolved ? <RotateCcwIcon /> : <CheckCircle2Icon />}
               {resolved ? "Reopen Conversation" : "Mark as Resolved"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onArchiveToggle}>
+              {ticket.isArchived ? <ArchiveRestoreIcon /> : <ArchiveIcon />}
+              {ticket.isArchived ? "Unarchive Conversation" : "Archive Conversation"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+              <Trash2Icon />
+              Delete Conversation
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -7,10 +7,17 @@ import {
   type ITicketMessage,
   type ITicketMessageAttachment,
 } from "../models/ticket-message.model";
-import { createPresignedViewUrl } from "./storage.service";
+import { createPresignedViewUrl, deleteObject } from "./storage.service";
 import { sendSupportResolvedEmail } from "./support-email.service";
+import { resolveUsersByIds } from "./user-lookup.service";
 
-export type TicketListStatus = TicketStatus | "all";
+export type TicketListStatus = TicketStatus | "all" | "archived";
+
+export interface TicketAgent {
+  userId: string;
+  name: string;
+  image: string | null;
+}
 
 export function serializeCustomer(customer: any) {
   if (!customer) return null;
@@ -40,7 +47,8 @@ export function normalizeTicketListStatus(value: unknown): TicketListStatus {
     value === "open" ||
     value === "pending" ||
     value === "resolved" ||
-    value === "closed"
+    value === "closed" ||
+    value === "archived"
     ? value
     : "open";
 }
@@ -93,10 +101,13 @@ export function serializeTicket(ticket: ITicket | any) {
     transcriptEmailSentAt: ticket.transcriptEmailSentAt ?? null,
     resolvedEmailSentAt: ticket.resolvedEmailSentAt ?? null,
     resolvedAt: ticket.resolvedAt,
+    isArchived: Boolean(ticket.isArchived),
+    archivedAt: ticket.archivedAt ?? null,
     // Optional list-only fields, populated by listTickets' aggregation.
     lastMessagePreview: ticket.lastMessagePreview ?? null,
     lastMessageAuthorType: ticket.lastMessageAuthorType ?? null,
     lastMessageIsInternal: Boolean(ticket.lastMessageIsInternal),
+    agents: ticket.agents ?? null,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
   };
@@ -151,7 +162,12 @@ export async function listTickets(input: {
     organizationId: input.organizationId,
     channel: "chat",
   };
-  if (input.status !== "all") match.status = input.status;
+  if (input.status === "archived") {
+    match.isArchived = true;
+  } else {
+    match.isArchived = { $ne: true };
+    if (input.status !== "all") match.status = input.status;
+  }
 
   const search = String(input.search ?? "").trim();
   if (search) {
@@ -199,6 +215,28 @@ export async function listTickets(input: {
           },
           {
             $lookup: {
+              from: TicketMessage.collection.name,
+              let: { ticketId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$ticketId", "$$ticketId"] },
+                        { $eq: ["$authorType", "agent"] },
+                        { $ne: ["$authorUserId", null] },
+                      ],
+                    },
+                  },
+                },
+                { $group: { _id: "$authorUserId", firstAt: { $min: "$createdAt" } } },
+                { $sort: { firstAt: 1 } },
+              ],
+              as: "agentIds",
+            },
+          },
+          {
+            $lookup: {
               from: Customer.collection.name,
               localField: "customerId",
               foreignField: "_id",
@@ -215,14 +253,33 @@ export async function listTickets(input: {
   const total: number = result?.total?.[0]?.value ?? 0;
   const data: any[] = result?.data ?? [];
 
-  const tickets = data.map((ticket) =>
-    serializeTicket({
+  const allAgentIds = data.flatMap((ticket: any) =>
+    Array.isArray(ticket.agentIds)
+      ? ticket.agentIds.map((entry: any) => String(entry._id)).filter(Boolean)
+      : []
+  );
+  const userMap = await resolveUsersByIds(allAgentIds);
+
+  const tickets = data.map((ticket: any) => {
+    const agents: TicketAgent[] = (Array.isArray(ticket.agentIds) ? ticket.agentIds : [])
+      .map((entry: any) => {
+        const userId = String(entry._id);
+        const user = userMap.get(userId);
+        return {
+          userId,
+          name: user?.name ?? user?.email ?? "Agent",
+          image: user?.image ?? null,
+        };
+      });
+
+    return serializeTicket({
       ...ticket,
       lastMessagePreview: previewFromMessage(ticket.lastMessage),
       lastMessageAuthorType: ticket.lastMessage?.authorType ?? null,
       lastMessageIsInternal: Boolean(ticket.lastMessage?.isInternal),
-    })
-  );
+      agents,
+    });
+  });
 
   return { tickets, total, page, limit };
 }
@@ -425,4 +482,63 @@ export async function reopenTicket(input: {
   if (!ticket) return null;
   const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
   return fresh ? serializeTicket(fresh) : serializeTicket(ticket);
+}
+
+export async function setTicketArchived(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+  archived: boolean;
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+  const ticket = await Ticket.findOneAndUpdate(
+    { _id: input.ticketId, organizationId: input.organizationId },
+    { isArchived: input.archived, archivedAt: input.archived ? new Date() : null },
+    { new: true }
+  )
+    .populate("customerId")
+    .lean();
+  return ticket ? serializeTicket(ticket) : null;
+}
+
+export async function deleteTicket(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+}): Promise<boolean | null> {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+
+  const ticket = await Ticket.findOne({
+    _id: input.ticketId,
+    organizationId: input.organizationId,
+  }).lean();
+  if (!ticket) return null;
+
+  const messages = await TicketMessage.find({
+    ticketId: ticket._id,
+    organizationId: input.organizationId,
+  })
+    .select("attachments")
+    .lean();
+
+  const keys = [
+    ...new Set(
+      messages.flatMap((message) =>
+        (message.attachments ?? []).map((attachment) => attachment.key).filter(Boolean)
+      )
+    ),
+  ];
+
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        await deleteObject(key);
+      } catch (err) {
+        console.error(`Failed to delete support attachment ${key}:`, err);
+      }
+    })
+  );
+
+  await TicketMessage.deleteMany({ ticketId: ticket._id, organizationId: input.organizationId });
+  await Ticket.deleteOne({ _id: ticket._id, organizationId: input.organizationId });
+
+  return true;
 }

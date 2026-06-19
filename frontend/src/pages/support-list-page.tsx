@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { getRouteApi } from "@tanstack/react-router"
 import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
   CopyIcon,
   ExternalLinkIcon,
   InboxIcon,
   LinkIcon,
+  MoreHorizontalIcon,
   RefreshCcwIcon,
   SearchIcon,
+  Trash2Icon,
 } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
@@ -17,9 +21,25 @@ import { STATUS_STYLES } from "@/components/support/context-panel"
 import { useSupport } from "@/components/support/support-provider"
 import { formatFullTime, formatRelativeTime, initialsFromName, isUnread } from "@/components/support/support-utils"
 import type { Ticket, TicketFilter } from "@/components/support/types"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
@@ -32,6 +52,7 @@ import {
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn, copyToClipboard, getAvatarColor } from "@/lib/utils"
+import { toast } from "sonner"
 
 const PAGE_SIZE = 25
 
@@ -39,7 +60,10 @@ const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "resolved", label: "Resolved" },
   { value: "all", label: "All" },
+  { value: "archived", label: "Archived" },
 ]
+
+const MAX_VISIBLE_AGENTS = 3
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -99,14 +123,58 @@ function paginationRange(current: number, total: number): (number | "ellipsis")[
   return pages
 }
 
-function TicketRow({ ticket, onOpen }: { ticket: Ticket; onOpen: (id: string) => void }) {
+function AgentAvatars({ agents }: { agents: Ticket["agents"] }) {
+  if (!agents || agents.length === 0) {
+    return <span className="text-sm text-muted-foreground/60">-</span>
+  }
+  const visible = agents.slice(0, MAX_VISIBLE_AGENTS)
+  const overflow = agents.length - visible.length
+
+  return (
+    <AvatarGroup>
+      {visible.map((agent) => {
+        const color = getAvatarColor(agent.name)
+        return (
+          <Tooltip key={agent.userId}>
+            <TooltipTrigger asChild>
+              <Avatar className="size-8">
+                {agent.image && <AvatarImage src={agent.image} alt={agent.name} />}
+                <AvatarFallback className={cn("text-xs font-medium", color.bg, color.text)}>
+                  {initialsFromName(agent.name)}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent>{agent.name}</TooltipContent>
+          </Tooltip>
+        )
+      })}
+      {overflow > 0 && (
+        <AvatarGroupCount className="text-xs font-medium tabular-nums">
+          +{overflow}
+        </AvatarGroupCount>
+      )}
+    </AvatarGroup>
+  )
+}
+
+function TicketRow({
+  ticket,
+  onOpen,
+  onArchiveToggle,
+  onRequestDelete,
+}: {
+  ticket: Ticket
+  onOpen: (id: string) => void
+  onArchiveToggle: (ticket: Ticket) => void
+  onRequestDelete: (ticket: Ticket) => void
+}) {
   const unread = isUnread(ticket)
   const avatar = getAvatarColor(ticket.requester.name)
   const preview = ticket.lastMessagePreview?.trim()
 
   return (
     <TableRow
-      className={cn("cursor-pointer transition-colors", unread && "bg-primary/[0.035]")}
+      className={cn("group/row cursor-pointer transition-colors", unread && "bg-primary/[0.035]")}
       onClick={() => onOpen(ticket.id)}
     >
       <TableCell>
@@ -144,6 +212,9 @@ function TicketRow({ ticket, onOpen }: { ticket: Ticket; onOpen: (id: string) =>
           </div>
         </div>
       </TableCell>
+      <TableCell>
+        <AgentAvatars agents={ticket.agents} />
+      </TableCell>
       <TableCell className="text-right text-muted-foreground tabular-nums">
         <Tooltip>
           <TooltipTrigger asChild>
@@ -151,6 +222,34 @@ function TicketRow({ ticket, onOpen }: { ticket: Ticket; onOpen: (id: string) =>
           </TooltipTrigger>
           <TooltipContent>{formatFullTime(ticket.lastMessageAt)}</TooltipContent>
         </Tooltip>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 opacity-0 transition-opacity group-hover/row:opacity-100 data-[state=open]:opacity-100"
+              aria-label="Conversation actions"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <MoreHorizontalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuItem
+              onSelect={() => onArchiveToggle(ticket)}
+            >
+              {ticket.isArchived ? <ArchiveRestoreIcon /> : <ArchiveIcon />}
+              {ticket.isArchived ? "Unarchive" : "Archive"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => onRequestDelete(ticket)}>
+              <Trash2Icon />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   )
@@ -199,6 +298,27 @@ export default function SupportListPage() {
   )
 
   const openTicket = (id: string) => void navigate({ to: "/support/$ticketId", params: { ticketId: id } })
+
+  const [pendingDelete, setPendingDelete] = useState<Ticket | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleArchiveToggle = async (ticket: Ticket) => {
+    const ok = ticket.isArchived
+      ? await inbox.unarchiveTicket(ticket.id)
+      : await inbox.archiveTicket(ticket.id)
+    if (ok) toast.success(ticket.isArchived ? "Conversation unarchived" : "Conversation archived")
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    const ok = await inbox.deleteTicket(pendingDelete.id)
+    setDeleting(false)
+    if (ok) {
+      toast.success("Conversation deleted")
+      setPendingDelete(null)
+    }
+  }
 
   const description =
     pagination.total === 1 ? "1 conversation" : `${pagination.total} conversations`
@@ -284,7 +404,7 @@ export default function SupportListPage() {
               onRetry={() => void inbox.refresh()}
             />
           ) : loadingTickets ? (
-            <ListSkeleton rows={8} columns={5} className="mt-6 rounded-xl border" />
+            <ListSkeleton rows={8} columns={6} className="mt-6 rounded-xl border" />
           ) : tickets.length === 0 ? (
             <EmptyState
               className="mt-6 rounded-xl border border-dashed"
@@ -305,12 +425,20 @@ export default function SupportListPage() {
                     <TableHead className="w-20">ID</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead className="w-64">Requester</TableHead>
+                    <TableHead className="w-28">Agents</TableHead>
                     <TableHead className="w-24 text-right">Last Activity</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tickets.map((ticket) => (
-                    <TicketRow key={ticket.id} ticket={ticket} onOpen={openTicket} />
+                    <TicketRow
+                      key={ticket.id}
+                      ticket={ticket}
+                      onOpen={openTicket}
+                      onArchiveToggle={(t) => void handleArchiveToggle(t)}
+                      onRequestDelete={setPendingDelete}
+                    />
                   ))}
                 </TableBody>
               </Table>
@@ -361,6 +489,33 @@ export default function SupportListPage() {
           )}
         </div>
       </main>
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Conversation</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? `This permanently deletes the chat with ${pendingDelete.requester.name} (#${pendingDelete.ticketNumber}), all its messages, and any uploaded files. This cannot be undone.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deleting}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void handleConfirmDelete()}
+            >
+              {deleting ? "Deleting..." : "Delete Conversation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   )
 }

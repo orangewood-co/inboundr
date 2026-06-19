@@ -16,6 +16,7 @@ import { normalizeTime, normalizeTimezone, sendHourUtcFromLocal } from "../lib/s
 import { serializeEntitlements } from "../services/entitlement.service";
 import { getEmployeeAccessState } from "../services/employee-access.service";
 import { keyBelongsToPrefix } from "../services/storage.service";
+import { resolveUsersByIds } from "../services/user-lookup.service";
 
 const LETTERHEAD_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 const LETTERHEAD_MAX_FILE_SIZE = 2 * 1024 * 1024;
@@ -122,35 +123,6 @@ function normalizeDeliveryTerms(value: unknown) {
   }
 
   return terms.map(({ _index, ...term }) => term);
-}
-
-async function resolveUsersByIds(userIds: string[]) {
-  const db = mongoose.connection.db;
-  if (!db || userIds.length === 0) {
-    return new Map<string, { name?: string; email?: string; lastSignInAt?: Date; image?: string }>();
-  }
-
-  const objectIds = userIds
-    .filter((id) => mongoose.Types.ObjectId.isValid(id))
-    .map((id) => new mongoose.Types.ObjectId(id));
-
-  const users = await db
-    .collection("user")
-    .find({
-      $or: [
-        { id: { $in: userIds } },
-        ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : []),
-      ],
-    })
-    .project({ id: 1, name: 1, email: 1, lastSignInAt: 1, image: 1 })
-    .toArray();
-
-  const map = new Map<string, { name?: string; email?: string; lastSignInAt?: Date; image?: string }>();
-  for (const user of users) {
-    map.set(user.id as string, user);
-    map.set(String(user._id), user);
-  }
-  return map;
 }
 
 const MAX_REMINDER_OFFSET_DAYS = 365;

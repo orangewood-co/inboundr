@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import SupportListPage from "@/pages/support-list-page"
 import type { TicketFilter } from "@/components/support/types"
 
-const VALID_STATUSES: TicketFilter[] = ["open", "resolved", "all"]
+const VALID_STATUSES: TicketFilter[] = ["open", "resolved", "all", "archived"]
 
 export type SupportListSearch = {
   status: TicketFilter

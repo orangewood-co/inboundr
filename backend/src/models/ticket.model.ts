@@ -39,6 +39,8 @@ export interface ITicket extends Document {
   transcriptEmailSentAt: Date | null;
   resolvedEmailSentAt: Date | null;
   resolvedAt: Date | null;
+  isArchived: boolean;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -108,6 +110,8 @@ const ticketSchema = new Schema<ITicket>(
     transcriptEmailSentAt: { type: Date, default: null },
     resolvedEmailSentAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },
+    isArchived: { type: Boolean, default: false },
+    archivedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -119,5 +123,6 @@ ticketSchema.index(
 );
 ticketSchema.index({ organizationId: 1, status: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, customerId: 1, lastMessageAt: -1 });
+ticketSchema.index({ organizationId: 1, isArchived: 1, lastMessageAt: -1 });
 
 export const Ticket = mongoose.model<ITicket>("Ticket", ticketSchema);

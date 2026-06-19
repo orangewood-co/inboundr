@@ -1,6 +1,12 @@
 export type TicketStatus = "open" | "pending" | "resolved" | "closed"
-export type TicketFilter = TicketStatus | "all"
+export type TicketFilter = TicketStatus | "all" | "archived"
 export type MessageAuthorType = "visitor" | "bot" | "agent" | "system"
+
+export type TicketAgent = {
+  userId: string
+  name: string
+  image: string | null
+}
 
 export type Ticket = {
   id: string
@@ -29,9 +35,12 @@ export type Ticket = {
   transcriptEmailSentAt: string | null
   resolvedEmailSentAt: string | null
   resolvedAt: string | null
+  isArchived: boolean
+  archivedAt: string | null
   lastMessagePreview?: string | null
   lastMessageAuthorType?: MessageAuthorType | null
   lastMessageIsInternal?: boolean
+  agents?: TicketAgent[] | null
   createdAt: string
   updatedAt: string
 }
@@ -69,6 +78,7 @@ export type TicketMessage = {
 export type SocketEvent =
   | { type: "connected" }
   | { type: "ticket.updated"; ticket: Ticket }
+  | { type: "ticket.deleted"; ticketId: string }
   | { type: "message.created"; message: TicketMessage }
   | { type: "typing"; ticketId: string; actor: "agent" | "visitor"; isTyping: boolean }
   | { type: "error"; error: string }
