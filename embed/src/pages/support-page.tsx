@@ -67,10 +67,17 @@ type SocketEvent =
 
 type SupportTicket = {
   id: string
+  status: "open" | "pending" | "resolved" | "closed"
   lastVisitorMessageAt: string | null
   lastAgentMessageAt: string | null
   lastVisitorReadAt: string | null
   lastAgentReadAt: string | null
+  resolvedAt: string | null
+  visitorFeedback?: {
+    rating: number | null
+    comment: string
+    submittedAt: string | null
+  }
 }
 
 type Phase = "loading" | "unavailable" | "prechat" | "chat" | "ended"
@@ -306,6 +313,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       ticket?.lastAgentReadAt &&
       new Date(ticket.lastAgentReadAt).getTime() >= new Date(latestVisitorMessage.createdAt).getTime()
   )
+  const isResolved = ticket?.status === "resolved" || Boolean(ticket?.resolvedAt)
 
   useEffect(() => {
     let cancelled = false
@@ -362,7 +370,28 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages, streamingText, agentTyping, phase])
+  }, [messages, streamingText, agentTyping, phase, isResolved])
+
+  useEffect(() => {
+    if (!isResolved) return
+    setAgentTyping(false)
+    setStreamingText(null)
+    setSending(false)
+    setDraft("")
+    setFiles((current) => {
+      current.forEach((item) => item.audioUrl && URL.revokeObjectURL(item.audioUrl))
+      return []
+    })
+  }, [isResolved])
+
+  useEffect(() => {
+    const feedback = ticket?.visitorFeedback
+    if (!feedback?.submittedAt) return
+    setRating(feedback.rating ?? 0)
+    setFeedbackComment(feedback.comment ?? "")
+    setFeedbackSubmitted(true)
+    setEndPersisted(true)
+  }, [ticket?.visitorFeedback?.submittedAt])
 
   useEffect(() => {
     const element = composerRef.current
@@ -471,7 +500,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   async function sendMessage(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()
     const text = draft.trim()
-    if ((!text && files.length === 0) || sending || !sessionToken) return
+    if (isResolved || (!text && files.length === 0) || sending || !sessionToken) return
 
     setDraft("")
     setSending(true)
@@ -657,7 +686,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   }
 
   function addFiles(fileList: FileList | null) {
-    if (!fileList) return
+    if (!fileList || isResolved) return
     const next = Array.from(fileList)
       .slice(0, Math.max(0, 5 - files.length))
       .map((file) => ({ id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`, file }))
@@ -665,6 +694,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   }
 
   function addVoice(file: File) {
+    if (isResolved) return
     setFiles((current) => {
       if (current.length >= 5) return current
       return [...current, { id: crypto.randomUUID(), file, audioUrl: URL.createObjectURL(file) }]
@@ -680,13 +710,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
   }
 
   function sendTyping(isTyping: boolean) {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
+    if (isResolved || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
     if (visitorTypingRef.current === isTyping) return
     visitorTypingRef.current = isTyping
     socketRef.current.send(JSON.stringify({ type: "typing", isTyping }))
   }
 
   function handleDraftChange(value: string) {
+    if (isResolved) return
     setDraft(value)
     sendTyping(Boolean(value.trim()))
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current)
@@ -696,6 +727,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   function handleComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
+      if (isResolved) return
       void sendMessage()
     }
   }
@@ -826,8 +858,12 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   const connectionStatus = (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span className={`size-1.5 shrink-0 rounded-full ${socketReady ? "bg-emerald-500" : "bg-amber-500"}`} />
-      <span className="truncate">{socketReady ? "Online" : "Connecting…"}</span>
+      <span
+        className={`size-1.5 shrink-0 rounded-full ${
+          isResolved ? "bg-stone-400" : socketReady ? "bg-emerald-500" : "bg-amber-500"
+        }`}
+      />
+      <span className="truncate">{isResolved ? "Resolved" : socketReady ? "Online" : "Connecting…"}</span>
     </span>
   )
 
@@ -838,7 +874,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     </span>
   )
 
-  const canSend = !sending && (draft.trim().length > 0 || files.length > 0)
+  const canSend = !isResolved && !sending && (draft.trim().length > 0 || files.length > 0)
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] dark:bg-[#0a0908] sm:p-6">
@@ -938,7 +974,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
         {phase === "chat" && (
           <>
-            {renderHeader(connectionStatus, true)}
+            {renderHeader(connectionStatus, !isResolved)}
 
             <div
               className="thread-scroll flex-1 space-y-2 overflow-y-auto bg-white px-4 py-5 dark:bg-stone-900"
@@ -1059,7 +1095,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 )
               })}
 
-              {streamingText !== null && (
+              {streamingText !== null && !isResolved && (
                 <div className="flex items-end gap-2">
                   {supportAvatar}
                   <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-2.5 text-sm leading-relaxed text-stone-800 dark:bg-stone-800 dark:text-stone-100">
@@ -1068,7 +1104,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 </div>
               )}
 
-              {agentTyping && (
+              {agentTyping && !isResolved && (
                 <div className="flex items-end gap-2">
                   {supportAvatar}
                   <div className="rounded-2xl rounded-bl-md bg-stone-100 px-3.5 py-3 dark:bg-stone-800">
@@ -1077,104 +1113,192 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 </div>
               )}
 
+              {isResolved && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="mx-auto mt-4 max-w-[21rem] rounded-3xl border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-center shadow-sm shadow-emerald-900/5 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:shadow-none"
+                >
+                  <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <CircleCheckIcon className="size-5" />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-stone-900 dark:text-stone-100">
+                    Conversation resolved
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+                    This conversation has been marked resolved by the support team.
+                  </p>
+
+                  <div className="mt-4 border-t border-emerald-200/70 pt-4 dark:border-emerald-900/50">
+                    <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                      {feedbackSubmitted ? "Your rating" : "How was your experience?"}
+                    </p>
+                    <div className="mt-2 flex items-center justify-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        const active = star <= (hoverRating || rating)
+                        const inactiveColor = theme === "dark" ? "#57534e" : "#d6d3d1"
+                        return (
+                          <button
+                            key={star}
+                            type="button"
+                            disabled={feedbackSubmitted}
+                            onMouseEnter={() => !feedbackSubmitted && setHoverRating(star)}
+                            onMouseLeave={() => !feedbackSubmitted && setHoverRating(0)}
+                            onClick={() => !feedbackSubmitted && setRating(star)}
+                            aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                            className="p-1 transition-transform enabled:hover:scale-110 disabled:cursor-default"
+                          >
+                            <StarIcon
+                              className="size-6"
+                              style={{ color: active ? accent : inactiveColor, fill: active ? accent : "none" }}
+                            />
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {feedbackSubmitted ? (
+                      <p className="mt-3 text-sm text-stone-600 dark:text-stone-300">
+                        Thanks for your feedback!
+                      </p>
+                    ) : (
+                      <>
+                        <textarea
+                          value={feedbackComment}
+                          onChange={(event) => setFeedbackComment(event.target.value)}
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Anything else you'd like us to know?"
+                          className="mt-3 w-full resize-none rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition placeholder:text-stone-400 focus:border-stone-400 focus:ring-4 focus:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => void submitFeedback()}
+                          disabled={endingChat || (!rating && !feedbackComment.trim())}
+                          className="mt-3 h-10 w-full"
+                        >
+                          {endingChat && <LoaderIcon className="size-4 animate-spin" />}
+                          Save Feedback
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
               {error && <ErrorNotice message={error} />}
               <div ref={bottomRef} />
             </div>
 
-            <form
-              onSubmit={sendMessage}
-              className="border-t border-stone-200 bg-white px-3 pt-3 dark:border-stone-800 dark:bg-stone-900"
-              style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-            >
-              {files.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {files.map((item) =>
-                    item.audioUrl ? (
-                      <span
-                        key={item.id}
-                        className="inline-flex max-w-full items-center gap-2 rounded-xl bg-stone-100 px-2.5 py-1.5 dark:bg-stone-800"
-                      >
-                        <AudioPlayer src={item.audioUrl} surface="neutral" accent={accent} onAccent={onAccent} />
-                        <button
-                          type="button"
-                          aria-label="Remove voice message"
-                          className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
-                          onClick={() => removeFile(item.id)}
-                        >
-                          <XIcon className="size-3" />
-                        </button>
-                      </span>
-                    ) : (
-                      <span
-                        key={item.id}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
-                      >
-                        <PaperclipIcon className="size-3 shrink-0" />
-                        <span className="truncate">{item.file.name}</span>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.file.name}`}
-                          className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
-                          onClick={() => removeFile(item.id)}
-                        >
-                          <XIcon className="size-3" />
-                        </button>
-                      </span>
-                    )
-                  )}
-                </div>
-              )}
-              <div className="rounded-2xl border border-stone-200 bg-white transition focus-within:border-stone-400 focus-within:ring-4 focus-within:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800/40 dark:focus-within:border-stone-500 dark:focus-within:ring-white/5">
-                <textarea
-                  id="support-message-input"
-                  ref={composerRef}
-                  value={draft}
-                  onChange={(event) => handleDraftChange(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder="Type your message…"
-                  maxLength={MESSAGE_MAX_LENGTH}
-                  disabled={sending}
-                  rows={1}
-                  className="block max-h-32 min-h-[40px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base leading-relaxed text-stone-900 outline-none placeholder:text-stone-400 disabled:opacity-60 sm:text-sm dark:text-stone-100 dark:placeholder:text-stone-500"
-                />
-                <div className="flex items-center justify-between px-2.5 pb-2">
-                  <div className="flex items-center gap-0.5">
-                    <label className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700/60 dark:hover:text-stone-300">
-                      <PaperclipIcon className="size-[18px]" />
-                      <input
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        onChange={(event) => {
-                          addFiles(event.target.files)
-                          event.target.value = ""
-                        }}
-                      />
-                    </label>
-                    <VoiceRecorder
-                      onRecorded={addVoice}
-                      disabled={sending || files.length >= 5}
-                      accent={accent}
-                      onAccent={onAccent}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={!canSend}
-                    title="Send"
-                    aria-label="Send"
-                    className={`flex size-8 items-center justify-center rounded-lg transition ${
-                      canSend
-                        ? "hover:brightness-95 active:scale-95"
-                        : "cursor-not-allowed bg-stone-200 text-stone-400 dark:bg-stone-700 dark:text-stone-500"
-                    }`}
-                    style={canSend ? { backgroundColor: accent, color: onAccent } : undefined}
-                  >
-                    {sending ? <LoaderIcon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
-                  </button>
-                </div>
+            {isResolved ? (
+              <div
+                className="border-t border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900"
+                style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+              >
+                <p className="text-center text-xs text-stone-500 dark:text-stone-400">
+                  This conversation is closed. Start a new chat if you need more help.
+                </p>
+                <Button type="button" onClick={startNewChat} className="mt-3 h-10 w-full">
+                  Start new chat
+                </Button>
               </div>
-            </form>
+            ) : (
+              <form
+                onSubmit={sendMessage}
+                className="border-t border-stone-200 bg-white px-3 pt-3 dark:border-stone-800 dark:bg-stone-900"
+                style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+              >
+                {files.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {files.map((item) =>
+                      item.audioUrl ? (
+                        <span
+                          key={item.id}
+                          className="inline-flex max-w-full items-center gap-2 rounded-xl bg-stone-100 px-2.5 py-1.5 dark:bg-stone-800"
+                        >
+                          <AudioPlayer src={item.audioUrl} surface="neutral" accent={accent} onAccent={onAccent} />
+                          <button
+                            type="button"
+                            aria-label="Remove voice message"
+                            className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
+                            onClick={() => removeFile(item.id)}
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </span>
+                      ) : (
+                        <span
+                          key={item.id}
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300"
+                        >
+                          <PaperclipIcon className="size-3 shrink-0" />
+                          <span className="truncate">{item.file.name}</span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.file.name}`}
+                            className="shrink-0 text-stone-400 transition hover:text-stone-700 dark:hover:text-stone-200"
+                            onClick={() => removeFile(item.id)}
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
+                <div className="rounded-2xl border border-stone-200 bg-white transition focus-within:border-stone-400 focus-within:ring-4 focus-within:ring-stone-900/5 dark:border-stone-700 dark:bg-stone-800/40 dark:focus-within:border-stone-500 dark:focus-within:ring-white/5">
+                  <textarea
+                    id="support-message-input"
+                    ref={composerRef}
+                    value={draft}
+                    onChange={(event) => handleDraftChange(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="Type your message…"
+                    maxLength={MESSAGE_MAX_LENGTH}
+                    disabled={sending}
+                    rows={1}
+                    className="block max-h-32 min-h-[40px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base leading-relaxed text-stone-900 outline-none placeholder:text-stone-400 disabled:opacity-60 sm:text-sm dark:text-stone-100 dark:placeholder:text-stone-500"
+                  />
+                  <div className="flex items-center justify-between px-2.5 pb-2">
+                    <div className="flex items-center gap-0.5">
+                      <label className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700/60 dark:hover:text-stone-300">
+                        <PaperclipIcon className="size-[18px]" />
+                        <input
+                          type="file"
+                          className="sr-only"
+                          multiple
+                          onChange={(event) => {
+                            addFiles(event.target.files)
+                            event.target.value = ""
+                          }}
+                        />
+                      </label>
+                      <VoiceRecorder
+                        onRecorded={addVoice}
+                        disabled={sending || files.length >= 5}
+                        accent={accent}
+                        onAccent={onAccent}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!canSend}
+                      title="Send"
+                      aria-label="Send"
+                      className={`flex size-8 items-center justify-center rounded-lg transition ${
+                        canSend
+                          ? "hover:brightness-95 active:scale-95"
+                          : "cursor-not-allowed bg-stone-200 text-stone-400 dark:bg-stone-700 dark:text-stone-500"
+                      }`}
+                      style={canSend ? { backgroundColor: accent, color: onAccent } : undefined}
+                    >
+                      {sending ? <LoaderIcon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
           </>
         )}
 
