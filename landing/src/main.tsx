@@ -13,6 +13,8 @@ const FollowUps = lazy(() => import("./pages/FollowUps"))
 const Calls = lazy(() => import("./pages/Calls"))
 const About = lazy(() => import("./pages/About"))
 const Blog = lazy(() => import("./pages/Blog"))
+const Press = lazy(() => import("./pages/Press"))
+const PressRelease = lazy(() => import("./pages/PressRelease"))
 const Careers = lazy(() => import("./pages/Careers"))
 const Contact = lazy(() => import("./pages/Contact"))
 const Privacy = lazy(() => import("./pages/Privacy"))
@@ -41,6 +43,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="product/calls" element={<Calls />} />
             <Route path="about" element={<About />} />
             <Route path="blog" element={<Blog />} />
+            <Route path="press" element={<Press />} />
+            <Route path="press/:slug" element={<PressRelease />} />
             <Route path="careers" element={<Careers />} />
             <Route path="contact" element={<Contact />} />
             <Route path="privacy" element={<Privacy />} />

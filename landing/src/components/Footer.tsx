@@ -17,6 +17,7 @@ const footerLinks = [
     items: [
       { label: "About", to: "/about" },
       { label: "Blog", to: "/blog" },
+      { label: "Press", to: "/press" },
       { label: "Careers", to: "/careers" },
       { label: "Contact", to: "/contact" },
     ],
