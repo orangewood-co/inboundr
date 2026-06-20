@@ -327,22 +327,39 @@ export default function SupportListPage() {
     <AppLayout>
       <SiteHeader
         breadcrumbs={[{ label: "Support" }]}
-        actions={
-          <>
-            <Badge variant={inbox.socketReady ? "secondary" : "outline"} className="gap-1.5">
+        leadingActions={
+          <Tooltip>
+            <TooltipTrigger asChild>
               <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  inbox.socketReady ? "bg-emerald-500" : "animate-pulse bg-amber-500"
-                )}
-              />
-              {inbox.socketReady ? "Realtime" : "Connecting"}
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => void inbox.refresh()}>
-              <RefreshCcwIcon />
-              Refresh
-            </Button>
-          </>
+                role="status"
+                aria-label={inbox.socketReady ? "Realtime connected" : "Connecting"}
+                className="flex size-7 items-center justify-center"
+              >
+                <span
+                  className={cn(
+                    "size-2 rounded-full",
+                    inbox.socketReady ? "bg-emerald-500" : "animate-pulse bg-amber-500"
+                  )}
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{inbox.socketReady ? "Realtime" : "Connecting..."}</TooltipContent>
+          </Tooltip>
+        }
+        actions={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Refresh conversations"
+                onClick={() => void inbox.refresh()}
+              >
+                <RefreshCcwIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh</TooltipContent>
+          </Tooltip>
         }
       />
 

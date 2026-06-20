@@ -68,9 +68,11 @@ function useIsLateNight() {
 export function SiteHeader({
   breadcrumbs,
   actions,
+  leadingActions,
 }: {
   breadcrumbs?: BreadcrumbSegment[]
   actions?: React.ReactNode
+  leadingActions?: React.ReactNode
 } = {}) {
   const { toggleSidebar } = useSidebar()
   const { pathname } = useLocation()
@@ -130,11 +132,13 @@ export function SiteHeader({
         )}
         {actions ? (
           <div className="ml-auto flex items-center gap-2">
+            {leadingActions}
             <NotificationBell />
             {actions}
           </div>
         ) : (
           <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
+            {leadingActions}
             <NotificationBell />
             <SearchForm className="w-full sm:w-auto" />
           </div>
