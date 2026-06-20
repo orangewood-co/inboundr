@@ -403,12 +403,12 @@ export default function SupportListPage() {
               })}
             </div>
 
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-48">
               <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search by subject, name, email, or #"
+                placeholder="Search"
                 className="pl-8"
               />
             </div>
