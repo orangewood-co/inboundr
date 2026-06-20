@@ -1,6 +1,7 @@
 import { useMemo } from "react"
-import { MessagesSquareIcon } from "lucide-react"
+import { MessagesSquareIcon, SparklesIcon } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Composer } from "./composer"
 import { ConversationHeader } from "./conversation-header"
 import { MessageTimeline } from "./message-timeline"
@@ -48,6 +49,7 @@ export function ConversationView({
         detailsOpen={detailsOpen}
         onToggleDetails={onToggleDetails}
         onResolveToggle={() => inbox.setStatus(ticket.status !== "resolved")}
+        onAiModeChange={inbox.setAiMode}
         onArchiveToggle={onArchiveToggle}
         onDelete={onDelete}
       />
@@ -60,7 +62,27 @@ export function ConversationView({
         latestVisitorMessage={inbox.latestVisitorMessage}
         latestAgentSeenByVisitor={inbox.latestAgentSeenByVisitor}
         latestVisitorSeenByAgent={inbox.latestVisitorSeenByAgent}
+        aiDrafts={inbox.aiDrafts}
+        approvingDraft={inbox.sending}
+        onApproveDraft={inbox.approveAiDraft}
+        onRejectDraft={inbox.rejectAiDraft}
       />
+      {ticket.aiMode === "review" && (
+        <div className="flex items-center justify-between gap-3 border-t bg-accent/30 px-4 py-2 text-xs text-muted-foreground">
+          <span>Human review mode is on. Generate an AI suggestion when you want help drafting.</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => void inbox.generateAiDraft()}
+            disabled={inbox.sending || inbox.aiDrafts.length > 0}
+          >
+            <SparklesIcon className="size-3.5" />
+            Generate AI Reply
+          </Button>
+        </div>
+      )}
       <Composer
         ticket={ticket}
         sending={inbox.sending}

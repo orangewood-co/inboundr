@@ -23,6 +23,13 @@ export interface IOrganizationPaymentReminders {
   sendHourUtc: number;
 }
 
+export interface IOrganizationSupportAi {
+  enabled: boolean;
+  instructions: string;
+  updatedBy: string | null;
+  updatedAt: Date | null;
+}
+
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
@@ -34,6 +41,7 @@ export interface IOrganizationPreferences {
   paymentTerms: IOrganizationPaymentTerm[];
   deliveryTerms: IOrganizationDeliveryTerm[];
   paymentReminders: IOrganizationPaymentReminders;
+  supportAi: IOrganizationSupportAi;
 }
 
 export interface IOrganizationPaymentTerm {
@@ -98,6 +106,16 @@ const organizationPaymentRemindersSchema = new Schema<IOrganizationPaymentRemind
   { _id: false }
 );
 
+const organizationSupportAiSchema = new Schema<IOrganizationSupportAi>(
+  {
+    enabled: { type: Boolean, default: true },
+    instructions: { type: String, default: "", trim: true, maxlength: 8000 },
+    updatedBy: { type: String, default: null },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   {
     primaryColor: { type: String, default: "#f5b400" },
@@ -134,6 +152,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
       default: [],
     },
     paymentReminders: { type: organizationPaymentRemindersSchema, default: () => ({}) },
+    supportAi: { type: organizationSupportAiSchema, default: () => ({}) },
   },
   { _id: false }
 );

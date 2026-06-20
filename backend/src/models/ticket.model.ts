@@ -3,6 +3,7 @@ import mongoose, { Schema, type Document } from "mongoose";
 export type TicketStatus = "open" | "pending" | "resolved" | "closed";
 export type TicketPriority = "low" | "normal" | "high" | "urgent";
 export type TicketChannel = "chat" | "email" | "form";
+export type TicketAiMode = "autonomous" | "review" | "paused";
 
 export interface ITicketRequester {
   name: string;
@@ -29,6 +30,7 @@ export interface ITicket extends Document {
   sessionToken: string | null;
   emailTranscriptRequested: boolean;
   botEnabled: boolean;
+  aiMode: TicketAiMode;
   lastMessageAt: Date;
   lastVisitorMessageAt: Date | null;
   lastAgentMessageAt: Date | null;
@@ -100,6 +102,12 @@ const ticketSchema = new Schema<ITicket>(
     sessionToken: { type: String, default: null },
     emailTranscriptRequested: { type: Boolean, default: false },
     botEnabled: { type: Boolean, default: true },
+    aiMode: {
+      type: String,
+      enum: ["autonomous", "review", "paused"],
+      default: "autonomous",
+      index: true,
+    },
     lastMessageAt: { type: Date, default: Date.now },
     lastVisitorMessageAt: { type: Date, default: null },
     lastAgentMessageAt: { type: Date, default: null },

@@ -14,6 +14,7 @@ import { getActiveOrganizationId, setActiveOrganizationId } from "@/lib/organiza
 import { previewFromMessage, ticketMatchesFilter } from "./support-utils"
 import type {
   SocketEvent,
+  SupportAiDraft,
   Ticket,
   TicketAttachment,
   TicketFilter,
@@ -75,6 +76,7 @@ function useSupportInboxValue() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [messages, setMessages] = useState<TicketMessage[]>([])
+  const [aiDrafts, setAiDrafts] = useState<SupportAiDraft[]>([])
   const [loadingTickets, setLoadingTickets] = useState(true)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [sending, setSending] = useState(false)
@@ -100,6 +102,10 @@ function useSupportInboxValue() {
   const selectedMessages = useMemo(
     () => messages.filter((message) => message.ticketId === selectedTicketId),
     [messages, selectedTicketId]
+  )
+  const selectedAiDrafts = useMemo(
+    () => aiDrafts.filter((draft) => draft.ticketId === selectedTicketId && draft.status === "pending"),
+    [aiDrafts, selectedTicketId]
   )
 
   const latestVisitorMessage = useMemo(
@@ -169,6 +175,7 @@ function useSupportInboxValue() {
         if (!response.ok) throw new Error(body?.error ?? "Failed to load ticket")
         setSelectedTicket(body.ticket)
         setMessages(body.messages ?? [])
+        setAiDrafts(body.aiDrafts ?? [])
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load ticket")
       } finally {
@@ -210,6 +217,7 @@ function useSupportInboxValue() {
     } else {
       setSelectedTicket(null)
       setMessages([])
+      setAiDrafts([])
     }
   }, [loadTicketDetail, selectedTicketId])
 
@@ -260,6 +268,7 @@ function useSupportInboxValue() {
           if (payload.ticketId === selectedTicketIdRef.current) {
             setSelectedTicket(null)
             setMessages([])
+            setAiDrafts([])
           }
         }
         if (payload.type === "message.created") {
@@ -286,6 +295,20 @@ function useSupportInboxValue() {
           if (message.ticketId === selectedTicketIdRef.current && message.authorType === "visitor") {
             socket.send(JSON.stringify({ type: "mark_read", ticketId: message.ticketId }))
           }
+        }
+        if (payload.type === "ai_draft.created") {
+          const draft = payload.draft
+          setAiDrafts((current) => {
+            if (current.some((existing) => existing.id === draft.id)) return current
+            return [...current, draft]
+          })
+        }
+        if (payload.type === "ai_draft.updated") {
+          const draft = payload.draft
+          setAiDrafts((current) => {
+            const without = current.filter((existing) => existing.id !== draft.id)
+            return draft.status === "pending" ? [...without, draft] : without
+          })
         }
         if (payload.type === "typing" && payload.actor === "visitor") {
           if (payload.ticketId === selectedTicketIdRef.current) setVisitorTyping(payload.isTyping)
@@ -409,6 +432,113 @@ function useSupportInboxValue() {
     )
   }, [])
 
+  const setAiMode = useCallback(
+    async (aiMode: Ticket["aiMode"]): Promise<boolean> => {
+      const ticketId = selectedTicketIdRef.current
+      if (!ticketId) return false
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}/ai-mode`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aiMode }),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to update AI mode")
+        if (body?.ticket) {
+          setSelectedTicket((current) => (current?.id === body.ticket.id ? body.ticket : current))
+          setTickets((current) =>
+            current.map((ticket) => (ticket.id === body.ticket.id ? { ...ticket, ...body.ticket } : ticket))
+          )
+        }
+        if (aiMode !== "review") setAiDrafts((current) => current.filter((draft) => draft.ticketId !== ticketId))
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update AI mode")
+        return false
+      }
+    },
+    [apiBase]
+  )
+
+  const generateAiDraft = useCallback(async (): Promise<boolean> => {
+    const ticketId = selectedTicketIdRef.current
+    if (!ticketId) return false
+    setSending(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/${ticketId}/ai-drafts`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to generate AI draft")
+      if (body?.draft) {
+        setAiDrafts((current) => {
+          if (current.some((draft) => draft.id === body.draft.id)) return current
+          return [...current, body.draft]
+        })
+      }
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate AI draft")
+      return false
+    } finally {
+      setSending(false)
+    }
+  }, [apiBase])
+
+  const approveAiDraft = useCallback(
+    async (draftId: string, bodyText: string): Promise<boolean> => {
+      const ticketId = selectedTicketIdRef.current
+      const trimmed = bodyText.trim()
+      if (!ticketId || !trimmed) return false
+      setSending(true)
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}/ai-drafts/${draftId}/approve`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bodyText: trimmed }),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to approve AI draft")
+        setAiDrafts((current) => current.filter((draft) => draft.id !== draftId))
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to approve AI draft")
+        return false
+      } finally {
+        setSending(false)
+      }
+    },
+    [apiBase]
+  )
+
+  const rejectAiDraft = useCallback(
+    async (draftId: string): Promise<boolean> => {
+      const ticketId = selectedTicketIdRef.current
+      if (!ticketId) return false
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}/ai-drafts/${draftId}/reject`, {
+          method: "PATCH",
+          credentials: "include",
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to reject AI draft")
+        setAiDrafts((current) => current.filter((draft) => draft.id !== draftId))
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to reject AI draft")
+        return false
+      }
+    },
+    [apiBase]
+  )
+
   const setArchived = useCallback(
     async (ticketId: string, archived: boolean): Promise<boolean> => {
       setError(null)
@@ -482,6 +612,7 @@ function useSupportInboxValue() {
     selectTicket,
     selectedTicket,
     messages: selectedMessages,
+    aiDrafts: selectedAiDrafts,
     loadingDetail,
     socketReady,
     sending,
@@ -491,6 +622,10 @@ function useSupportInboxValue() {
     supportChatLink,
     sendMessage,
     setStatus,
+    setAiMode,
+    generateAiDraft,
+    approveAiDraft,
+    rejectAiDraft,
     archiveTicket,
     unarchiveTicket,
     deleteTicket,

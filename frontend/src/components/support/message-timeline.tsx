@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react"
-import { FileIcon, HeadphonesIcon, LoaderIcon, LockIcon } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { CheckIcon, FileIcon, HeadphonesIcon, LoaderIcon, LockIcon, SparklesIcon, XIcon } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { cn, getAvatarColor } from "@/lib/utils"
 import { AudioMessage } from "./audio-message"
 import {
@@ -15,7 +16,7 @@ import {
   isAudioAttachment,
   isImageAttachment,
 } from "./support-utils"
-import type { Ticket, TicketAttachment, TicketMessage } from "./types"
+import type { SupportAiDraft, Ticket, TicketAttachment, TicketMessage } from "./types"
 
 type RenderItem =
   | { kind: "divider"; key: string; label: string }
@@ -238,6 +239,71 @@ function TypingIndicator({ name }: { name: string }) {
   )
 }
 
+function AiDraftCard({
+  draft,
+  approving,
+  onApprove,
+  onReject,
+}: {
+  draft: SupportAiDraft
+  approving: boolean
+  onApprove: (draftId: string, bodyText: string) => Promise<boolean>
+  onReject: (draftId: string) => Promise<boolean>
+}) {
+  const [bodyText, setBodyText] = useState(draft.bodyText)
+  const overLimit = bodyText.length > 4000
+  return (
+    <div className="flex justify-center">
+      <div className="w-full max-w-2xl rounded-2xl border border-primary/25 bg-primary/[0.06] p-4">
+        <div className="mb-2 flex items-center gap-2 text-xs font-medium text-primary">
+          <SparklesIcon className="size-3.5" />
+          Pending AI draft
+          <span className="font-normal text-muted-foreground">
+            Edit before approving. Customers cannot see this yet.
+          </span>
+        </div>
+        <textarea
+          value={bodyText}
+          onChange={(event) => setBodyText(event.target.value)}
+          rows={4}
+          className={cn(
+            "min-h-24 w-full resize-y rounded-xl border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40",
+            overLimit && "border-destructive focus-visible:border-destructive"
+          )}
+        />
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className={cn("text-[11px] tabular-nums", overLimit ? "text-destructive" : "text-muted-foreground")}>
+            {bodyText.length}/4000
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void onReject(draft.id)}
+              disabled={approving}
+              className="gap-1.5"
+            >
+              <XIcon className="size-3.5" />
+              Reject
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void onApprove(draft.id, bodyText)}
+              disabled={approving || overLimit || !bodyText.trim()}
+              className="gap-1.5"
+            >
+              {approving ? <LoaderIcon className="size-3.5 animate-spin" /> : <CheckIcon className="size-3.5" />}
+              Approve & Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MessageTimeline({
   ticket,
   messages,
@@ -247,6 +313,10 @@ export function MessageTimeline({
   latestVisitorMessage,
   latestAgentSeenByVisitor,
   latestVisitorSeenByAgent,
+  aiDrafts,
+  approvingDraft,
+  onApproveDraft,
+  onRejectDraft,
 }: {
   ticket: Ticket
   messages: TicketMessage[]
@@ -256,12 +326,16 @@ export function MessageTimeline({
   latestVisitorMessage: TicketMessage | null
   latestAgentSeenByVisitor: boolean
   latestVisitorSeenByAgent: boolean
+  aiDrafts: SupportAiDraft[]
+  approvingDraft: boolean
+  onApproveDraft: (draftId: string, bodyText: string) => Promise<boolean>
+  onRejectDraft: (draftId: string) => Promise<boolean>
 }) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages.length, visitorTyping, ticket.id])
+  }, [messages.length, visitorTyping, ticket.id, aiDrafts.length])
 
   if (loading) {
     return (
@@ -304,6 +378,15 @@ export function MessageTimeline({
           )
         )}
         {visitorTyping && <TypingIndicator name={ticket.requester.name} />}
+        {aiDrafts.map((draft) => (
+          <AiDraftCard
+            key={draft.id}
+            draft={draft}
+            approving={approvingDraft}
+            onApprove={onApproveDraft}
+            onReject={onRejectDraft}
+          />
+        ))}
         <div ref={bottomRef} />
       </div>
     </div>

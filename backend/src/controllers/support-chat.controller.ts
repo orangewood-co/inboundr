@@ -2,6 +2,7 @@ import type { Request, Response as ExpressResponse } from "express";
 import { Readable } from "node:stream";
 
 import { Ticket } from "../models/ticket.model";
+import { TicketMessage } from "../models/ticket-message.model";
 import {
   appendVisitorMessage,
   countSessionMessages,
@@ -226,13 +227,25 @@ export async function postSupportSessionMessage(
       broadcastTicketUpdate(String(updatedTicket.organizationId), serializeTicket(updatedTicket));
     }
 
-    if (!ticket.botEnabled) {
+    if (!ticket.botEnabled || (ticket.aiMode && ticket.aiMode !== "autonomous")) {
       res.type("text/plain").send("");
       return;
     }
 
     const webResponse = await streamSupportReply(ticket);
     await pipeWebResponse(webResponse, res);
+    const latestBotMessage = await TicketMessage.findOne({
+      ticketId: ticket._id,
+      organizationId: ticket.organizationId,
+      authorType: "bot",
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+    if (latestBotMessage) await broadcastMessageCreated(latestBotMessage);
+    const freshTicket = await Ticket.findById(ticket._id).lean();
+    if (freshTicket) {
+      broadcastTicketUpdate(String(freshTicket.organizationId), serializeTicket(freshTicket));
+    }
   } catch (err) {
     console.error("Failed to handle support message:", err);
     if (!res.headersSent) {

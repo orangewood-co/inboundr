@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 import { Customer } from "../models/customer.model";
 import { Ticket, type ITicket, type TicketStatus } from "../models/ticket.model";
+import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft.model";
 import {
   TicketMessage,
   type ITicketMessage,
@@ -17,6 +18,16 @@ export interface TicketAgent {
   userId: string;
   name: string;
   image: string | null;
+}
+
+export function normalizeTicketAiMode(ticket: Pick<any, "aiMode" | "botEnabled">) {
+  return ticket.aiMode === "autonomous" ||
+    ticket.aiMode === "review" ||
+    ticket.aiMode === "paused"
+    ? ticket.aiMode
+    : ticket.botEnabled
+      ? "autonomous"
+      : "paused";
 }
 
 export function serializeCustomer(customer: any) {
@@ -74,6 +85,7 @@ async function resolveAttachmentUrl(attachment: ITicketMessageAttachment): Promi
 }
 
 export function serializeTicket(ticket: ITicket | any) {
+  const aiMode = normalizeTicketAiMode(ticket);
   return {
     id: String(ticket._id),
     ticketNumber: ticket.ticketNumber,
@@ -86,7 +98,8 @@ export function serializeTicket(ticket: ITicket | any) {
     customer: serializeCustomer(customerFromTicket(ticket)),
     initialIssue: ticket.initialIssue ?? "",
     emailTranscriptRequested: Boolean(ticket.emailTranscriptRequested),
-    botEnabled: ticket.botEnabled,
+    botEnabled: aiMode === "autonomous",
+    aiMode,
     lastMessageAt: ticket.lastMessageAt,
     lastVisitorMessageAt: ticket.lastVisitorMessageAt,
     lastAgentMessageAt: ticket.lastAgentMessageAt,
@@ -141,6 +154,25 @@ export async function serializeTicketMessage(message: ITicketMessage | any) {
     isInternal: Boolean(message.isInternal),
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
+  };
+}
+
+export function serializeSupportAiDraft(draft: ISupportAiDraft | any) {
+  return {
+    id: String(draft._id),
+    ticketId: String(draft.ticketId),
+    organizationId: String(draft.organizationId),
+    bodyText: draft.bodyText,
+    status: draft.status,
+    requestedByUserId: draft.requestedByUserId ?? null,
+    approvedByUserId: draft.approvedByUserId ?? null,
+    rejectedByUserId: draft.rejectedByUserId ?? null,
+    sourceArticleIds: (draft.sourceArticleIds ?? []).map((id: unknown) => String(id)),
+    sourceTemplateIds: (draft.sourceTemplateIds ?? []).map((id: unknown) => String(id)),
+    model: draft.modelName ?? draft.model ?? "",
+    escalationReason: draft.escalationReason ?? "",
+    createdAt: draft.createdAt,
+    updatedAt: draft.updatedAt,
   };
 }
 
@@ -304,10 +336,18 @@ export async function getTicketWithMessages(input: {
   })
     .sort({ createdAt: 1 })
     .lean();
+  const drafts = await SupportAiDraft.find({
+    ticketId: ticket._id,
+    organizationId: input.organizationId,
+    status: "pending",
+  })
+    .sort({ createdAt: 1 })
+    .lean();
 
   return {
     ticket: serializeTicket(ticket),
     messages: await Promise.all(messages.map(serializeTicketMessage)),
+    aiDrafts: drafts.map(serializeSupportAiDraft),
   };
 }
 
@@ -455,7 +495,13 @@ export async function resolveTicket(input: {
   const now = new Date();
   const ticket = await Ticket.findOneAndUpdate(
     { _id: input.ticketId, organizationId: input.organizationId },
-    { status: "resolved", resolvedAt: now, botEnabled: false, lastMessageAt: now },
+    {
+      status: "resolved",
+      resolvedAt: now,
+      botEnabled: false,
+      aiMode: "paused",
+      lastMessageAt: now,
+    },
     { new: true }
   ).lean();
   if (!ticket) return null;
@@ -538,6 +584,7 @@ export async function deleteTicket(input: {
   );
 
   await TicketMessage.deleteMany({ ticketId: ticket._id, organizationId: input.organizationId });
+  await SupportAiDraft.deleteMany({ ticketId: ticket._id, organizationId: input.organizationId });
   await Ticket.deleteOne({ _id: ticket._id, organizationId: input.organizationId });
 
   return true;

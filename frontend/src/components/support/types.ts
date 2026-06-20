@@ -1,6 +1,7 @@
 export type TicketStatus = "open" | "pending" | "resolved" | "closed"
 export type TicketFilter = TicketStatus | "all" | "archived"
 export type MessageAuthorType = "visitor" | "bot" | "agent" | "system"
+export type TicketAiMode = "autonomous" | "review" | "paused"
 
 export type TicketAgent = {
   userId: string
@@ -21,6 +22,7 @@ export type Ticket = {
   initialIssue: string
   emailTranscriptRequested: boolean
   botEnabled: boolean
+  aiMode: TicketAiMode
   lastMessageAt: string
   lastVisitorMessageAt: string | null
   lastAgentMessageAt: string | null
@@ -75,11 +77,30 @@ export type TicketMessage = {
   updatedAt: string
 }
 
+export type SupportAiDraft = {
+  id: string
+  ticketId: string
+  organizationId: string
+  bodyText: string
+  status: "pending" | "approved" | "rejected"
+  requestedByUserId: string | null
+  approvedByUserId: string | null
+  rejectedByUserId: string | null
+  sourceArticleIds: string[]
+  sourceTemplateIds: string[]
+  model: string
+  escalationReason: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type SocketEvent =
   | { type: "connected" }
   | { type: "ticket.updated"; ticket: Ticket }
   | { type: "ticket.deleted"; ticketId: string }
   | { type: "message.created"; message: TicketMessage }
+  | { type: "ai_draft.created"; draft: SupportAiDraft }
+  | { type: "ai_draft.updated"; draft: SupportAiDraft }
   | { type: "typing"; ticketId: string; actor: "agent" | "visitor"; isTyping: boolean }
   | { type: "error"; error: string }
   | { type: "ticket.subscribed"; ticketId: string }

@@ -20,7 +20,7 @@ import {
   type SupportMessageAttachmentInput,
 } from "./support-chat.service";
 import { sendSupportResolvedEmail } from "./support-email.service";
-import { serializeTicket, serializeTicketMessage } from "./ticket.service";
+import { serializeSupportAiDraft, serializeTicket, serializeTicketMessage } from "./ticket.service";
 import { keyBelongsToPrefix } from "./storage.service";
 
 type SupportSocketKind = "agent" | "visitor";
@@ -76,6 +76,21 @@ export function broadcastTicketDeleted(organizationId: string, ticketId: string)
   broadcast(
     (context) => context.organizationId === organizationId,
     { type: "ticket.deleted", ticketId }
+  );
+}
+
+export function broadcastSupportAiDraftUpdate(
+  organizationId: string,
+  draft: unknown,
+  action: "created" | "updated"
+): void {
+  const serialized = serializeSupportAiDraft(draft);
+  broadcast(
+    (context) =>
+      context.kind === "agent" &&
+      context.organizationId === organizationId &&
+      ticketTopic(serialized.ticketId, context),
+    { type: action === "created" ? "ai_draft.created" : "ai_draft.updated", draft: serialized }
   );
 }
 
@@ -263,7 +278,6 @@ async function handleAgentMessage(ws: SupportSocket, payload: Record<string, unk
   await Ticket.updateOne(
     { _id: ticket._id },
     {
-      botEnabled: false,
       status: ticket.status === "closed" ? "open" : ticket.status,
       lastMessageAt: now,
       lastAgentMessageAt: now,
@@ -311,7 +325,12 @@ async function handleVisitorMessage(ws: SupportSocket, payload: Record<string, u
   await broadcastTicketById(String(ticket._id));
 
   const freshTicket = await findSessionTicket(ws.context.sessionToken);
-  if (!freshTicket?.botEnabled) return;
+  if (
+    !freshTicket?.botEnabled ||
+    (freshTicket.aiMode && freshTicket.aiMode !== "autonomous")
+  ) {
+    return;
+  }
 
   try {
     const botMessage = await generateSupportBotMessage(freshTicket);
@@ -332,7 +351,13 @@ async function handleResolve(ws: SupportSocket, payload: Record<string, unknown>
   const ticket = await Ticket.findOneAndUpdate(
     { _id: ticketId, organizationId: ws.context.organizationId },
     resolved
-      ? { status: "resolved", resolvedAt: now, botEnabled: false, lastMessageAt: now }
+      ? {
+          status: "resolved",
+          resolvedAt: now,
+          botEnabled: false,
+          aiMode: "paused",
+          lastMessageAt: now,
+        }
       : { status: "open", resolvedAt: null, lastMessageAt: now },
     { new: true }
   ).lean();

@@ -12,6 +12,12 @@ import {
   unarchiveSupportTicket,
   updateTicketCustomer,
 } from "../controllers/ticket.controller";
+import {
+  approveTicketAiDraft as approveSupportAiDraft,
+  createTicketAiDraft as createSupportAiDraft,
+  rejectTicketAiDraft as rejectSupportAiDraft,
+  updateTicketAiMode as updateSupportTicketAiMode,
+} from "../controllers/support-ai.controller";
 import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -27,6 +33,10 @@ router.get("/:id/related", getRelatedTickets);
 router.get("/:id/customer-candidates", getCustomerCandidates);
 router.patch("/:id/customer", updateTicketCustomer);
 router.post("/:id/customer", createTicketCustomer);
+router.patch("/:id/ai-mode", updateSupportTicketAiMode);
+router.post("/:id/ai-drafts", createSupportAiDraft);
+router.patch("/:id/ai-drafts/:draftId/approve", approveSupportAiDraft);
+router.patch("/:id/ai-drafts/:draftId/reject", rejectSupportAiDraft);
 router.patch("/:id/resolve", resolveSupportTicket);
 router.patch("/:id/reopen", reopenSupportTicket);
 router.patch("/:id/archive", archiveSupportTicket);

@@ -2,6 +2,7 @@ import {
   AlertCircleIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
+  BotIcon,
   CheckCircle2Icon,
   CopyIcon,
   MailIcon,
@@ -33,6 +34,7 @@ export function ConversationHeader({
   detailsOpen,
   onToggleDetails,
   onResolveToggle,
+  onAiModeChange,
   onArchiveToggle,
   onDelete,
 }: {
@@ -42,11 +44,18 @@ export function ConversationHeader({
   detailsOpen: boolean
   onToggleDetails: () => void
   onResolveToggle: () => void
+  onAiModeChange: (mode: Ticket["aiMode"]) => Promise<boolean>
   onArchiveToggle: () => void
   onDelete: () => void
 }) {
   const avatar = getAvatarColor(ticket.requester.name)
   const resolved = ticket.status === "resolved"
+  const aiModeLabel =
+    ticket.aiMode === "autonomous"
+      ? "AI Active"
+      : ticket.aiMode === "review"
+        ? "Human Review"
+        : "AI Paused"
 
   return (
     <div className="border-b">
@@ -83,6 +92,9 @@ export function ConversationHeader({
                 {ticket.customer.company || ticket.customer.name}
               </span>
             )}
+            <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-accent px-2 text-[11px] font-medium text-accent-foreground">
+              {aiModeLabel}
+            </span>
           </div>
           <p className="truncate text-xs text-muted-foreground">
             <span className="tabular-nums">#{ticket.ticketNumber}</span>
@@ -103,6 +115,20 @@ export function ConversationHeader({
           </TooltipTrigger>
           <TooltipContent>Email customer</TooltipContent>
         </Tooltip>
+
+        <Button
+          type="button"
+          variant={ticket.aiMode === "autonomous" ? "secondary" : "outline"}
+          size="sm"
+          onClick={() =>
+            void onAiModeChange(ticket.aiMode === "autonomous" ? "review" : "autonomous")
+          }
+          disabled={!socketReady || resolved}
+          className="gap-1.5"
+        >
+          <BotIcon />
+          {ticket.aiMode === "autonomous" ? "Take Over" : "Resume AI"}
+        </Button>
 
         <Button
           type="button"
@@ -147,6 +173,24 @@ export function ConversationHeader({
               {resolved ? <RotateCcwIcon /> : <CheckCircle2Icon />}
               {resolved ? "Reopen Conversation" : "Mark as Resolved"}
             </DropdownMenuItem>
+            {ticket.aiMode !== "paused" && (
+              <DropdownMenuItem
+                onSelect={() => void onAiModeChange("paused")}
+                disabled={!socketReady || resolved}
+              >
+                <BotIcon />
+                Pause AI
+              </DropdownMenuItem>
+            )}
+            {ticket.aiMode !== "review" && (
+              <DropdownMenuItem
+                onSelect={() => void onAiModeChange("review")}
+                disabled={!socketReady || resolved}
+              >
+                <BotIcon />
+                Take Over
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={onArchiveToggle}>
               {ticket.isArchived ? <ArchiveRestoreIcon /> : <ArchiveIcon />}
               {ticket.isArchived ? "Unarchive Conversation" : "Archive Conversation"}

@@ -2084,7 +2084,7 @@ function MembersTab() {
   )
 }
 
-// ─── Reply Templates Tab ─────────────────────────────────────
+// ─── Support Tab ──────────────────────────────────────────────
 
 interface ReplyTemplate {
   id: string
@@ -2095,10 +2095,44 @@ interface ReplyTemplate {
   updatedAt: string
 }
 
+interface SupportAiSettings {
+  enabled: boolean
+  instructions: string
+  updatedBy: string | null
+  updatedAt: string | null
+}
+
+interface SupportKnowledgeArticle {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 const TEMPLATE_TEXTAREA_CLASS =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 
-function SupportTemplatesTab() {
+function SupportTab() {
+  const [settings, setSettings] = useState<SupportAiSettings>({
+    enabled: true,
+    instructions: "",
+    updatedBy: null,
+    updatedAt: null,
+  })
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [articles, setArticles] = useState<SupportKnowledgeArticle[]>([])
+  const [articlesLoading, setArticlesLoading] = useState(true)
+  const [articleEditingId, setArticleEditingId] = useState<string | null>(null)
+  const [articleTitle, setArticleTitle] = useState("")
+  const [articleBody, setArticleBody] = useState("")
+  const [articleTags, setArticleTags] = useState("")
+  const [articleEnabled, setArticleEnabled] = useState(true)
+  const [articleSaving, setArticleSaving] = useState(false)
+  const [articleDeletingId, setArticleDeletingId] = useState<string | null>(null)
   const [templates, setTemplates] = useState<ReplyTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -2108,6 +2142,57 @@ function SupportTemplatesTab() {
   const [shortcut, setShortcut] = useState("")
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const fetchSettings = useCallback(async () => {
+    setSettingsLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/ai/settings`, { credentials: "include" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load AI agent settings")
+      setSettings(data.settings ?? { enabled: true, instructions: "", updatedBy: null, updatedAt: null })
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load AI agent settings")
+    } finally {
+      setSettingsLoading(false)
+    }
+  }, [])
+
+  const saveSettings = async () => {
+    setSettingsSaving(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/ai/settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: settings.enabled,
+          instructions: settings.instructions,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save AI agent settings")
+      setSettings(data.settings)
+      toast.success("AI agent settings saved")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save AI agent settings")
+    } finally {
+      setSettingsSaving(false)
+    }
+  }
+
+  const fetchArticles = useCallback(async () => {
+    setArticlesLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/knowledge`, { credentials: "include" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load knowledge base")
+      setArticles(data.articles ?? [])
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load knowledge base")
+    } finally {
+      setArticlesLoading(false)
+    }
+  }, [])
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
@@ -2125,8 +2210,96 @@ function SupportTemplatesTab() {
   }, [])
 
   useEffect(() => {
+    void fetchSettings()
+    void fetchArticles()
     void fetchTemplates()
-  }, [fetchTemplates])
+  }, [fetchArticles, fetchSettings, fetchTemplates])
+
+  const resetArticleForm = () => {
+    setArticleEditingId(null)
+    setArticleTitle("")
+    setArticleBody("")
+    setArticleTags("")
+    setArticleEnabled(true)
+  }
+
+  const startArticleEdit = (article: SupportKnowledgeArticle) => {
+    setArticleEditingId(article.id)
+    setArticleTitle(article.title)
+    setArticleBody(article.body)
+    setArticleTags(article.tags.join(", "))
+    setArticleEnabled(article.enabled)
+  }
+
+  const saveArticle = async () => {
+    if (!articleTitle.trim() || !articleBody.trim()) return
+    setArticleSaving(true)
+    try {
+      const url = articleEditingId
+        ? `${API_ORIGIN}/api/v1/support/knowledge/${articleEditingId}`
+        : `${API_ORIGIN}/api/v1/support/knowledge`
+      const res = await fetch(url, {
+        method: articleEditingId ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: articleTitle.trim(),
+          body: articleBody.trim(),
+          tags: articleTags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          enabled: articleEnabled,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save knowledge article")
+      toast.success(articleEditingId ? "Knowledge article updated" : "Knowledge article created")
+      resetArticleForm()
+      await fetchArticles()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save knowledge article")
+    } finally {
+      setArticleSaving(false)
+    }
+  }
+
+  const toggleArticle = async (article: SupportKnowledgeArticle) => {
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/knowledge/${article.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !article.enabled }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to update article")
+      setArticles((current) =>
+        current.map((item) => (item.id === article.id ? data.article : item))
+      )
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update article")
+    }
+  }
+
+  const removeArticle = async (id: string) => {
+    setArticleDeletingId(id)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/knowledge/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to delete article")
+      toast.success("Knowledge article deleted")
+      if (articleEditingId === id) resetArticleForm()
+      await fetchArticles()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete article")
+    } finally {
+      setArticleDeletingId(null)
+    }
+  }
 
   const resetForm = () => {
     setEditingId(null)
@@ -2191,9 +2364,184 @@ function SupportTemplatesTab() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Reply Templates"
-        description="Saved responses your team can insert into support replies."
+        title="Support"
+        description="Configure the AI agent, knowledge base, and saved replies your team uses in support."
       />
+
+      <SettingsCard
+        title="AI Agent"
+        description="Copilot handles new support chats automatically until a teammate takes over."
+      >
+        <div className="space-y-5 p-5">
+          {settingsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading AI agent settings...</div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <Label htmlFor="supportAiEnabled" className="text-sm font-medium">
+                    Enable Copilot for new chats
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    When enabled, new support chats start in autonomous AI mode. Agents can pause,
+                    resume, or take over each conversation.
+                  </p>
+                </div>
+                <Switch
+                  id="supportAiEnabled"
+                  checked={settings.enabled}
+                  onCheckedChange={(enabled) => setSettings((current) => ({ ...current, enabled }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="supportAiInstructions">Instructions</Label>
+                <textarea
+                  id="supportAiInstructions"
+                  rows={7}
+                  value={settings.instructions}
+                  onChange={(event) =>
+                    setSettings((current) => ({ ...current, instructions: event.target.value }))
+                  }
+                  placeholder="Tell the agent how to answer, what tone to use, what policies to follow, and when to escalate to your team."
+                  className={TEMPLATE_TEXTAREA_CLASS}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The AI can use these Instructions, enabled knowledge articles, reply templates,
+                  and the conversation history. It cannot access private orders, billing, or
+                  account data unless you add those tools later.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Button onClick={saveSettings} disabled={settingsSaving}>
+                  {settingsSaving && <Spinner data-icon="inline-start" />}
+                  Save AI Agent
+                </Button>
+                {settings.updatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last saved {formatDateTime(settings.updatedAt)}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title={articleEditingId ? "Edit Knowledge Article" : "New Knowledge Article"}
+        description="Manual articles give the AI reliable business context for support replies."
+      >
+        <div className="space-y-4 p-5">
+          <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+            <div className="space-y-1.5">
+              <Label htmlFor="knowledgeTitle">Title</Label>
+              <Input
+                id="knowledgeTitle"
+                value={articleTitle}
+                onChange={(event) => setArticleTitle(event.target.value)}
+                placeholder="e.g. Return policy"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="knowledgeTags">Tags</Label>
+              <Input
+                id="knowledgeTags"
+                value={articleTags}
+                onChange={(event) => setArticleTags(event.target.value)}
+                placeholder="returns, shipping"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="knowledgeBody">Content</Label>
+            <textarea
+              id="knowledgeBody"
+              rows={6}
+              value={articleBody}
+              onChange={(event) => setArticleBody(event.target.value)}
+              placeholder="Write the exact policy, answer, or process the AI should rely on."
+              className={TEMPLATE_TEXTAREA_CLASS}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={articleEnabled} onCheckedChange={setArticleEnabled} />
+              Enabled for AI replies
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={saveArticle}
+                disabled={articleSaving || !articleTitle.trim() || !articleBody.trim()}
+              >
+                {articleSaving && <Spinner data-icon="inline-start" />}
+                {articleEditingId ? "Save Article" : "Create Article"}
+              </Button>
+              {articleEditingId && (
+                <Button variant="outline" onClick={resetArticleForm} disabled={articleSaving}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Knowledge Base"
+        description={`${articles.length} ${articles.length === 1 ? "article" : "articles"} available for the support AI agent.`}
+      >
+        <div className="divide-y">
+          {articlesLoading ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">Loading knowledge base...</div>
+          ) : articles.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+              No knowledge articles yet. Create the first one above.
+            </div>
+          ) : (
+            articles.map((article) => (
+              <div key={article.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{article.title}</p>
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {article.enabled ? "Enabled" : "Disabled"}
+                    </span>
+                    {article.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                    {article.body}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => toggleArticle(article)}>
+                    {article.enabled ? "Disable" : "Enable"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => startArticleEdit(article)}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeArticle(article.id)}
+                    disabled={articleDeletingId === article.id}
+                    aria-label="Delete knowledge article"
+                  >
+                    {articleDeletingId === article.id ? <Spinner /> : <Trash2Icon className="size-4" />}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </SettingsCard>
 
       <SettingsCard
         title={editingId ? "Edit Template" : "New Template"}
@@ -2333,7 +2681,7 @@ export function SettingsPage() {
                 </TabsTrigger>
                 <TabsTrigger value="support" className="gap-1.5">
                   <MessageSquareTextIcon className="size-3.5" />
-                  Reply Templates
+                  Support
                 </TabsTrigger>
                 <TabsTrigger value="notifications" className="gap-1.5">
                   <MailIcon className="size-3.5" />
@@ -2353,7 +2701,7 @@ export function SettingsPage() {
                 <MembersTab />
               </TabsContent>
               <TabsContent value="support" className="mt-0">
-                <SupportTemplatesTab />
+                <SupportTab />
               </TabsContent>
               <TabsContent value="notifications" className="mt-0">
                 <NotificationsTab />
