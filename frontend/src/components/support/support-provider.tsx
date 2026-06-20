@@ -38,6 +38,40 @@ function byRecency(a: Ticket, b: Ticket) {
   return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
 }
 
+function ticketMatchesSearchQuery(ticket: Ticket, search: string) {
+  const term = search.trim().toLowerCase()
+  if (!term) return true
+  const ticketNumber = term.replace(/^#/, "")
+  return [
+    ticket.subject,
+    ticket.initialIssue,
+    ticket.requester.name,
+    ticket.requester.email,
+    ticket.lastMessagePreview ?? "",
+    `#${ticket.ticketNumber}`,
+    String(ticket.ticketNumber),
+  ].some((value) => value.toLowerCase().includes(ticketNumber || term))
+}
+
+function ticketWithPreviewFallback(ticket: Ticket, existing?: Ticket): Ticket {
+  const fallbackPreview =
+    ticket.lastMessagePreview ||
+    existing?.lastMessagePreview ||
+    ticket.initialIssue.trim() ||
+    ticket.subject.trim() ||
+    "New support chat"
+  return {
+    ...ticket,
+    lastMessagePreview: fallbackPreview,
+    lastMessageAuthorType:
+      ticket.lastMessageAuthorType ??
+      existing?.lastMessageAuthorType ??
+      (ticket.lastVisitorMessageAt ? "visitor" : ticket.lastMessageAuthorType ?? null),
+    lastMessageIsInternal: ticket.lastMessageIsInternal ?? existing?.lastMessageIsInternal ?? false,
+    agents: ticket.agents ?? existing?.agents ?? null,
+  }
+}
+
 export type SendMessageInput = {
   text: string
   files?: File[]
@@ -91,6 +125,8 @@ function useSupportInboxValue() {
   const typingTimeoutRef = useRef<number | null>(null)
   const agentTypingRef = useRef(false)
   const queryRef = useRef<SupportListQuery>(DEFAULT_QUERY)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const lastNewChatSoundAtRef = useRef(0)
 
   const apiBase = `${API_ORIGIN}/api/v1/tickets`
 
@@ -98,6 +134,33 @@ function useSupportInboxValue() {
     () => (organizationId ? `${getEmbedOrigin()}/support/${organizationId}` : ""),
     [organizationId]
   )
+
+  function playNewChatSound() {
+    if (document.visibilityState !== "visible") return
+    const now = Date.now()
+    if (now - lastNewChatSoundAtRef.current < 700) return
+    lastNewChatSoundAtRef.current = now
+    try {
+      const AudioContextCtor = window.AudioContext ?? (window as any).webkitAudioContext
+      if (!AudioContextCtor) return
+      const context = audioContextRef.current ?? new AudioContextCtor()
+      audioContextRef.current = context
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(660, context.currentTime)
+      oscillator.frequency.setValueAtTime(880, context.currentTime + 0.08)
+      gain.gain.setValueAtTime(0.0001, context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.22)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.start()
+      oscillator.stop(context.currentTime + 0.24)
+    } catch {
+      // Browsers can block audio before user interaction.
+    }
+  }
 
   const selectedMessages = useMemo(
     () => messages.filter((message) => message.ticketId === selectedTicketId),
@@ -238,27 +301,35 @@ function useSupportInboxValue() {
       socket.addEventListener("message", (event) => {
         const payload = JSON.parse(String(event.data)) as SocketEvent
         if (payload.type === "ticket.updated") {
-          const filter = queryRef.current.status
+          const query = queryRef.current
+          const filter = query.status
+          let insertedNewTicket = false
           setTickets((current) => {
             const existing = current.find((ticket) => ticket.id === payload.ticket.id)
-            // Only patch rows already visible on the current page; never inject
-            // tickets that belong to a different page (the list is paginated).
-            if (!existing) return current
+            if (!existing) {
+              if (
+                query.page !== 1 ||
+                !ticketMatchesFilter(payload.ticket, filter) ||
+                !ticketMatchesSearchQuery(payload.ticket, query.search)
+              ) {
+                return current
+              }
+              insertedNewTicket = true
+              const inserted = ticketWithPreviewFallback(payload.ticket)
+              const next = [inserted, ...current].sort(byRecency).slice(0, query.limit)
+              setPagination((pagination) => ({
+                ...pagination,
+                total: pagination.total + 1,
+                totalPages: Math.max(Math.ceil((pagination.total + 1) / pagination.limit), 1),
+              }))
+              return next
+            }
             const without = current.filter((ticket) => ticket.id !== payload.ticket.id)
             if (!ticketMatchesFilter(payload.ticket, filter)) return without
-            // ticket.updated is serialized without the list-only preview fields,
-            // so preserve whatever the list already knows.
-            const merged: Ticket = {
-              ...payload.ticket,
-              lastMessagePreview: payload.ticket.lastMessagePreview ?? existing.lastMessagePreview ?? null,
-              lastMessageAuthorType:
-                payload.ticket.lastMessageAuthorType ?? existing.lastMessageAuthorType ?? null,
-              lastMessageIsInternal:
-                payload.ticket.lastMessageIsInternal ?? existing.lastMessageIsInternal ?? false,
-              agents: payload.ticket.agents ?? existing.agents ?? null,
-            }
+            const merged = ticketWithPreviewFallback(payload.ticket, existing)
             return [merged, ...without].sort(byRecency)
           })
+          if (insertedNewTicket) playNewChatSound()
           if (payload.ticket.id === selectedTicketIdRef.current) {
             setSelectedTicket((current) => ({ ...current, ...payload.ticket }))
           }

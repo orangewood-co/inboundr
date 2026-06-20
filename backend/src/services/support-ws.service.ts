@@ -65,9 +65,18 @@ function ticketTopic(ticketId: string, context: SupportSocketContext): boolean {
   return context.ticketIds.has(ticketId);
 }
 
+function ticketIdFromPayload(ticket: unknown): string {
+  if (!ticket || typeof ticket !== "object") return "";
+  const value = (ticket as { id?: unknown; _id?: unknown }).id ?? (ticket as { _id?: unknown })._id;
+  return value ? String(value) : "";
+}
+
 export function broadcastTicketUpdate(organizationId: string, ticket: unknown): void {
+  const ticketId = ticketIdFromPayload(ticket);
   broadcast(
-    (context) => context.organizationId === organizationId,
+    (context) =>
+      context.organizationId === organizationId &&
+      (context.kind === "agent" || (ticketId ? ticketTopic(ticketId, context) : false)),
     { type: "ticket.updated", ticket }
   );
 }

@@ -1,7 +1,8 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { Readable } from "node:stream";
 
-import { Ticket } from "../models/ticket.model";
+import { OrganizationMember } from "../models/organization-member.model";
+import { Ticket, type ITicket } from "../models/ticket.model";
 import { TicketMessage } from "../models/ticket-message.model";
 import {
   appendVisitorMessage,
@@ -18,6 +19,7 @@ import { broadcastMessageCreated, broadcastTicketUpdate } from "../services/supp
 import { sendSupportTranscriptEmail } from "../services/support-email.service";
 import { createPresignedUpload } from "../services/storage.service";
 import { serializeTicket } from "../services/ticket.service";
+import { createNotificationForRecipient } from "../services/notification.service";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUPPORT_ALLOWED_MIME_TYPES = [
@@ -61,6 +63,55 @@ setInterval(() => {
 
 function clientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+function supportNotificationBody(input: { name: string; email: string; subject: string }): string {
+  const subject = input.subject.replace(/\s+/g, " ").trim();
+  const requester = `${input.name} (${input.email})`;
+  return subject ? `${requester}: ${subject.slice(0, 160)}` : requester;
+}
+
+async function notifyOwnersAndAdminsOfNewChat(ticket: ITicket): Promise<void> {
+  const recipients = await OrganizationMember.find({
+    organizationId: ticket.organizationId,
+    role: { $in: ["owner", "admin"] },
+  })
+    .select("userId")
+    .lean();
+
+  const ticketId = String(ticket._id);
+  const body = supportNotificationBody({
+    name: ticket.requester.name,
+    email: ticket.requester.email,
+    subject: ticket.initialIssue || ticket.subject,
+  });
+
+  const results = await Promise.allSettled(
+    recipients.map((recipient) =>
+      createNotificationForRecipient({
+        organizationId: ticket.organizationId,
+        recipientUserId: recipient.userId,
+        type: "support.new_chat",
+        title: "New support chat",
+        body,
+        actionUrl: `/support/${ticketId}`,
+        entityType: "support_ticket",
+        entityId: ticketId,
+        metadata: {
+          ticketNumber: ticket.ticketNumber,
+          requesterName: ticket.requester.name,
+          requesterEmail: ticket.requester.email,
+        },
+        dedupeKey: `support.new_chat:${ticketId}:${recipient.userId}`,
+      })
+    )
+  );
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error(`Failed to create new support chat notification for ticket ${ticketId}:`, result.reason);
+    }
+  }
 }
 
 async function ensureTicketSupportAvailable(
@@ -145,10 +196,21 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
       { name, email },
       { initialIssue: subject, emailTranscriptRequested }
     );
+    const serializedTicket = serializeTicket(ticket);
+    broadcastTicketUpdate(String(ticket.organizationId), {
+      ...serializedTicket,
+      lastMessagePreview: subject || "New support chat",
+      lastMessageAuthorType: subject ? "visitor" : "bot",
+      lastMessageIsInternal: false,
+      agents: [],
+    });
+    void notifyOwnersAndAdminsOfNewChat(ticket).catch((err) => {
+      console.error(`Failed to notify owners/admins for support ticket ${ticket._id}:`, err);
+    });
     res.status(201).json({
       sessionToken: ticket.sessionToken,
       organization,
-      ticket: serializeTicket(ticket),
+      ticket: serializedTicket,
       requester: ticket.requester,
       messages: await listSessionMessages(ticket),
     });
