@@ -9,6 +9,10 @@ import {
   updateSupportAiSettings,
 } from "../controllers/support-ai.controller";
 import {
+  getSupportSettings,
+  updateSupportSettings,
+} from "../controllers/support-settings.controller";
+import {
   requireAuth,
   requireEmployeeModule,
   requireFeature,
@@ -22,6 +26,8 @@ router.use(requireOrganization);
 router.use(requireFeature("support"));
 router.use(requireEmployeeModule("support"));
 
+router.get("/settings", getSupportSettings);
+router.patch("/settings", updateSupportSettings);
 router.get("/ai/settings", getSupportAiSettings);
 router.patch("/ai/settings", updateSupportAiSettings);
 router.get("/knowledge", listKnowledgeArticles);

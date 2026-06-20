@@ -30,6 +30,12 @@ export interface IOrganizationSupportAi {
   updatedAt: Date | null;
 }
 
+export interface IOrganizationSupportChat {
+  emailTranscriptEnabled: boolean;
+  updatedBy: string | null;
+  updatedAt: Date | null;
+}
+
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
@@ -42,6 +48,7 @@ export interface IOrganizationPreferences {
   deliveryTerms: IOrganizationDeliveryTerm[];
   paymentReminders: IOrganizationPaymentReminders;
   supportAi: IOrganizationSupportAi;
+  supportChat: IOrganizationSupportChat;
 }
 
 export interface IOrganizationPaymentTerm {
@@ -116,6 +123,15 @@ const organizationSupportAiSchema = new Schema<IOrganizationSupportAi>(
   { _id: false }
 );
 
+const organizationSupportChatSchema = new Schema<IOrganizationSupportChat>(
+  {
+    emailTranscriptEnabled: { type: Boolean, default: true },
+    updatedBy: { type: String, default: null },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   {
     primaryColor: { type: String, default: "#f5b400" },
@@ -153,6 +169,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     },
     paymentReminders: { type: organizationPaymentRemindersSchema, default: () => ({}) },
     supportAi: { type: organizationSupportAiSchema, default: () => ({}) },
+    supportChat: { type: organizationSupportChatSchema, default: () => ({}) },
   },
   { _id: false }
 );

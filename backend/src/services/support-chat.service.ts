@@ -42,6 +42,7 @@ export type SupportOrganizationBranding = {
   logoUrl: string;
   primaryColor: string;
   supportAiEnabled: boolean;
+  emailTranscriptEnabled: boolean;
 };
 
 type PromptArticle = {
@@ -85,7 +86,7 @@ export async function getSupportOrganization(
     status: "active",
   })
     .select(
-      "name logoUrl preferences.primaryColor preferences.supportAi planSlug enabledFeatures disabledFeatures"
+      "name logoUrl preferences.primaryColor preferences.supportAi preferences.supportChat planSlug enabledFeatures disabledFeatures"
     )
     .lean();
   if (!organization) return null;
@@ -105,6 +106,7 @@ async function serializeBranding(
     logoUrl: await resolveLogoUrl(organization.logoUrl),
     primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
     supportAiEnabled: organization.preferences?.supportAi?.enabled !== false,
+    emailTranscriptEnabled: organization.preferences?.supportChat?.emailTranscriptEnabled !== false,
   };
 }
 
@@ -150,7 +152,8 @@ export async function createSupportSession(
         channel: "chat",
         requester,
         sessionToken,
-        emailTranscriptRequested: Boolean(options.emailTranscriptRequested),
+        emailTranscriptRequested:
+          organization.emailTranscriptEnabled && Boolean(options.emailTranscriptRequested),
         botEnabled: organization.supportAiEnabled,
         aiMode: organization.supportAiEnabled ? "autonomous" : "paused",
         lastMessageAt: new Date(),

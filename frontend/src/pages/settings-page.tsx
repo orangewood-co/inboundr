@@ -2102,6 +2102,12 @@ interface SupportAiSettings {
   updatedAt: string | null
 }
 
+interface SupportChatSettings {
+  emailTranscriptEnabled: boolean
+  updatedBy: string | null
+  updatedAt: string | null
+}
+
 interface SupportKnowledgeArticle {
   id: string
   title: string
@@ -2124,6 +2130,13 @@ function SupportTab() {
   })
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [chatSettings, setChatSettings] = useState<SupportChatSettings>({
+    emailTranscriptEnabled: true,
+    updatedBy: null,
+    updatedAt: null,
+  })
+  const [chatSettingsLoading, setChatSettingsLoading] = useState(true)
+  const [chatSettingsSaving, setChatSettingsSaving] = useState(false)
   const [articles, setArticles] = useState<SupportKnowledgeArticle[]>([])
   const [articlesLoading, setArticlesLoading] = useState(true)
   const [articleEditingId, setArticleEditingId] = useState<string | null>(null)
@@ -2180,6 +2193,44 @@ function SupportTab() {
     }
   }
 
+  const fetchChatSettings = useCallback(async () => {
+    setChatSettingsLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/settings`, { credentials: "include" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load chat widget settings")
+      setChatSettings(
+        data.settings ?? { emailTranscriptEnabled: true, updatedBy: null, updatedAt: null }
+      )
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load chat widget settings")
+    } finally {
+      setChatSettingsLoading(false)
+    }
+  }, [])
+
+  const saveChatSettings = async () => {
+    setChatSettingsSaving(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          emailTranscriptEnabled: chatSettings.emailTranscriptEnabled,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save chat widget settings")
+      setChatSettings(data.settings)
+      toast.success("Chat widget settings saved")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save chat widget settings")
+    } finally {
+      setChatSettingsSaving(false)
+    }
+  }
+
   const fetchArticles = useCallback(async () => {
     setArticlesLoading(true)
     try {
@@ -2211,9 +2262,10 @@ function SupportTab() {
 
   useEffect(() => {
     void fetchSettings()
+    void fetchChatSettings()
     void fetchArticles()
     void fetchTemplates()
-  }, [fetchArticles, fetchSettings, fetchTemplates])
+  }, [fetchArticles, fetchChatSettings, fetchSettings, fetchTemplates])
 
   const resetArticleForm = () => {
     setArticleEditingId(null)
@@ -2419,6 +2471,49 @@ function SupportTab() {
                 {settings.updatedAt && (
                   <p className="text-xs text-muted-foreground">
                     Last saved {formatDateTime(settings.updatedAt)}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Chat Widget"
+        description="Control what visitors see in your embedded support chat."
+      >
+        <div className="space-y-5 p-5">
+          {chatSettingsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading chat widget settings...</div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <Label htmlFor="supportEmailTranscript" className="text-sm font-medium">
+                    Offer to email a copy of the conversation
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    When enabled, visitors can tick a box on the pre-chat form to get the full
+                    transcript emailed to them after the chat ends.
+                  </p>
+                </div>
+                <Switch
+                  id="supportEmailTranscript"
+                  checked={chatSettings.emailTranscriptEnabled}
+                  onCheckedChange={(emailTranscriptEnabled) =>
+                    setChatSettings((current) => ({ ...current, emailTranscriptEnabled }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <Button onClick={saveChatSettings} disabled={chatSettingsSaving}>
+                  {chatSettingsSaving && <Spinner data-icon="inline-start" />}
+                  Save Chat Widget
+                </Button>
+                {chatSettings.updatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last saved {formatDateTime(chatSettings.updatedAt)}
                   </p>
                 )}
               </div>

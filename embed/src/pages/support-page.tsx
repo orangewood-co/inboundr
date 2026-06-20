@@ -33,6 +33,7 @@ type SupportOrganization = {
   name: string
   logoUrl: string
   primaryColor: string
+  emailTranscriptEnabled: boolean
 }
 
 type SupportMessage = {
@@ -938,24 +939,26 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setEmailCopy((value) => !value)}
-                aria-pressed={emailCopy}
-                className="flex items-center gap-3 rounded-xl border border-stone-200 px-3.5 py-3 text-left transition hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800/50"
-              >
-                <span
-                  className={`flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border transition ${
-                    emailCopy ? "" : "border-stone-300 dark:border-stone-600"
-                  }`}
-                  style={emailCopy ? { backgroundColor: accent, borderColor: accent, color: onAccent } : undefined}
+              {organization.emailTranscriptEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setEmailCopy((value) => !value)}
+                  aria-pressed={emailCopy}
+                  className="flex items-center gap-3 rounded-xl border border-stone-200 px-3.5 py-3 text-left transition hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800/50"
                 >
-                  {emailCopy && <CheckIcon className="size-3" strokeWidth={3.5} />}
-                </span>
-                <span className="text-sm text-stone-600 dark:text-stone-300">
-                  Email me a copy of this conversation
-                </span>
-              </button>
+                  <span
+                    className={`flex size-[18px] shrink-0 items-center justify-center rounded-[5px] border transition ${
+                      emailCopy ? "" : "border-stone-300 dark:border-stone-600"
+                    }`}
+                    style={emailCopy ? { backgroundColor: accent, borderColor: accent, color: onAccent } : undefined}
+                  >
+                    {emailCopy && <CheckIcon className="size-3" strokeWidth={3.5} />}
+                  </span>
+                  <span className="text-sm text-stone-600 dark:text-stone-300">
+                    Email me a copy of this conversation
+                  </span>
+                </button>
+              )}
 
               {error && <ErrorNotice message={error} />}
 
