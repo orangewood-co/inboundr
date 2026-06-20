@@ -3,10 +3,10 @@ import { getRouteApi } from "@tanstack/react-router"
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  ArrowDownIcon,
   CopyIcon,
   ExternalLinkIcon,
   InboxIcon,
-  LinkIcon,
   MoreHorizontalIcon,
   RefreshCcwIcon,
   SearchIcon,
@@ -63,7 +63,7 @@ const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
   { value: "archived", label: "Archived" },
 ]
 
-const MAX_VISIBLE_AGENTS = 3
+const MAX_VISIBLE_AGENTS = 4
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -78,9 +78,9 @@ function ChatWidgetLink({ link }: { link: string }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
-          <LinkIcon />
-          Get Chat Widget Link
+        <Button variant="outline" size="sm" className="gap-2">
+          <ArrowDownIcon />
+          Chat Link
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80">
