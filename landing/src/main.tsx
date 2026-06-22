@@ -28,6 +28,7 @@ const Drive = lazy(() => import("./pages/Drive"))
 const Employees = lazy(() => import("./pages/Employees"))
 const Invoices = lazy(() => import("./pages/Invoices"))
 const Support = lazy(() => import("./pages/Support"))
+const NotFound = lazy(() => import("./pages/NotFound"))
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -58,6 +59,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="features/employees" element={<Employees />} />
             <Route path="features/invoices" element={<Invoices />} />
             <Route path="features/support" element={<Support />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </Suspense>
