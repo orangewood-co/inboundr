@@ -7,6 +7,7 @@ import { frontendOrigin } from "../config/origins.config";
 import type { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { isPlatformAdmin } from "../middleware/auth.middleware";
 import { emitDomainEvent } from "../events/domain-events";
+import { auth } from "../lib/auth";
 import { sendEmail } from "../lib/email";
 import { OrganizationInvitation } from "../models/organization-invitation.model";
 import {
@@ -580,6 +581,111 @@ export async function inviteAdminOrganizationMember(req: Request, res: Response)
   } catch (err) {
     console.error("Error inviting admin organization member:", err);
     res.status(500).json({ error: "Failed to invite organization member" });
+  }
+}
+
+export async function createAdminOrganizationUser(req: Request, res: Response): Promise<void> {
+  try {
+    const id = stringValue(req.params.id);
+    const name = stringValue(req.body?.name);
+    const email = stringValue(req.body?.email).toLowerCase();
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const role = normalizeRole(req.body?.role);
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid organization id" });
+      return;
+    }
+    if (!name) {
+      res.status(400).json({ error: "Name is required" });
+      return;
+    }
+    if (!email || !email.includes("@")) {
+      res.status(400).json({ error: "A valid email is required" });
+      return;
+    }
+    if (!password) {
+      res.status(400).json({ error: "Password is required" });
+      return;
+    }
+
+    const organization = await Organization.findById(id);
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    // An owner can only be created while the org still has the pending-owner
+    // placeholder; an existing owner must be replaced via transfer ownership.
+    const ownerSlotAvailable = organization.ownerUserId.startsWith("pending-owner:");
+    if (role === "owner" && !ownerSlotAvailable) {
+      res.status(409).json({
+        error: "This organization already has an owner. Transfer ownership instead.",
+      });
+      return;
+    }
+
+    const ctx = await auth.$context;
+
+    const minPasswordLength = ctx.password.config.minPasswordLength;
+    if (password.length < minPasswordLength) {
+      res.status(400).json({ error: `Password must be at least ${minPasswordLength} characters` });
+      return;
+    }
+
+    const existing = await ctx.internalAdapter.findUserByEmail(email);
+    if (existing) {
+      res.status(409).json({
+        error: "An account with this email already exists. Use Add to organization instead.",
+      });
+      return;
+    }
+
+    // Create a pre-verified account without triggering the verification email,
+    // mirroring Better Auth's own signup flow (emailVerified set to true).
+    const hashedPassword = await ctx.password.hash(password);
+    const createdUser = await ctx.internalAdapter.createUser({
+      name,
+      email,
+      emailVerified: true,
+    });
+    await ctx.internalAdapter.linkAccount({
+      userId: createdUser.id,
+      providerId: "credential",
+      accountId: createdUser.id,
+      password: hashedPassword,
+    });
+
+    let member;
+    try {
+      member = await OrganizationMember.create({
+        organizationId: organization._id,
+        userId: createdUser.id,
+        role,
+      });
+    } catch (membershipErr: any) {
+      console.error("Error attaching admin-created user to organization:", membershipErr);
+      res.status(membershipErr?.code === 11000 ? 409 : 500).json({
+        error:
+          "The account was created but could not be added to the organization. Add the user to the organization manually.",
+      });
+      return;
+    }
+
+    if (role === "owner") {
+      organization.ownerUserId = createdUser.id;
+      await organization.save();
+    }
+
+    res.status(201).json({
+      user: serializeAdminUser(createdUser, [
+        serializeUserMembership(member.toObject(), organization),
+      ]),
+      member: serializeMember(member.toObject(), createdUser),
+    });
+  } catch (err) {
+    console.error("Error creating admin organization user:", err);
+    res.status(500).json({ error: "Failed to create user account" });
   }
 }
 

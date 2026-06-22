@@ -3,6 +3,7 @@ import {
   cancelAdminOrganizationInvitation,
   addAdminUserMembership,
   createAdminOrganization,
+  createAdminOrganizationUser,
   getAdminMe,
   getAdminOrganization,
   getAdminPlans,
@@ -29,6 +30,7 @@ router.get("/users", listAdminUsers);
 router.post("/notifications/sample", sendAdminSampleNotification);
 router.post("/users/:userId/memberships", addAdminUserMembership);
 router.post("/organizations", createAdminOrganization);
+router.post("/organizations/:id/users", createAdminOrganizationUser);
 router.get("/organizations/:id", getAdminOrganization);
 router.patch("/organizations/:id", updateAdminOrganization);
 router.post("/organizations/:id/invitations", inviteAdminOrganizationMember);

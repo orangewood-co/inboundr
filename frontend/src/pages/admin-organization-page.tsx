@@ -5,6 +5,8 @@ import {
   BanIcon,
   Building2Icon,
   CrownIcon,
+  EyeIcon,
+  EyeOffIcon,
   MailPlusIcon,
   MoreVerticalIcon,
   RotateCcwIcon,
@@ -12,6 +14,7 @@ import {
   ShieldAlertIcon,
   Trash2Icon,
   UserMinusIcon,
+  UserPlusIcon,
   UsersIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -181,6 +184,12 @@ export default function AdminOrganizationPage() {
   const [moving, setMoving] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState("member")
+  const [createName, setCreateName] = useState("")
+  const [createEmail, setCreateEmail] = useState("")
+  const [createPassword, setCreatePassword] = useState("")
+  const [createRole, setCreateRole] = useState("member")
+  const [showCreatePassword, setShowCreatePassword] = useState(false)
+  const [creatingUser, setCreatingUser] = useState(false)
   const [loading, setLoading] = useState(true)
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.slug === organization?.entitlements.planSlug),
@@ -284,6 +293,39 @@ export default function AdminOrganizationPage() {
       await load()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+    }
+  }
+
+  async function createUser(event: React.FormEvent) {
+    event.preventDefault()
+    setCreatingUser(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${id}/users`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: createName,
+          email: createEmail,
+          password: createPassword,
+          role: createRole,
+        }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to create account")
+      }
+      setCreateName("")
+      setCreateEmail("")
+      setCreatePassword("")
+      setCreateRole("member")
+      setShowCreatePassword(false)
+      toast.success("Account created")
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create account")
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -653,6 +695,77 @@ export default function AdminOrganizationPage() {
                 ))}
               </TableBody>
             </Table>
+          </SectionCard>
+
+          <SectionCard
+            title="Create User Account"
+            description="Provision a ready-to-use account for this organization. The user is created with a verified email and can sign in immediately with the password you set. No email is sent, so share the password with them directly."
+          >
+            <form onSubmit={createUser} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-user-name">Full name</Label>
+                  <Input
+                    id="create-user-name"
+                    value={createName}
+                    onChange={(event) => setCreateName(event.target.value)}
+                    placeholder="Jane Doe"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-user-email">Email</Label>
+                  <Input
+                    id="create-user-email"
+                    type="email"
+                    value={createEmail}
+                    onChange={(event) => setCreateEmail(event.target.value)}
+                    placeholder="jane@company.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-user-password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="create-user-password"
+                      type={showCreatePassword ? "text" : "password"}
+                      value={createPassword}
+                      onChange={(event) => setCreatePassword(event.target.value)}
+                      placeholder="At least 8 characters"
+                      minLength={8}
+                      required
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCreatePassword((value) => !value)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      aria-label={showCreatePassword ? "Hide password" : "Show password"}
+                    >
+                      {showCreatePassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-user-role">Role</Label>
+                  <Select value={createRole} onValueChange={setCreateRole}>
+                    <SelectTrigger id="create-user-role" className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="owner" disabled={members.some((member) => member.role === "owner")}>Owner</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={creatingUser}>
+                  {creatingUser ? <Spinner className="mr-2 size-4" /> : <UserPlusIcon className="mr-2 size-4" />}
+                  Create Account
+                </Button>
+              </div>
+            </form>
           </SectionCard>
 
           <SectionCard title="Invitations" description="Invite users and cancel pending invitations before they are accepted.">
