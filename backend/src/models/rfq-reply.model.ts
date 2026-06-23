@@ -3,7 +3,7 @@ import mongoose, { Schema, type Document, type Types } from "mongoose";
 export interface IRFQReplyProduct {
   queryName: string;
   quantity: number;
-  productId: number;
+  productId: string;
   brand: string | null;
   description: string | null;
   code: string | null;
@@ -42,7 +42,7 @@ const rfqReplyProductSchema = new Schema<IRFQReplyProduct>(
   {
     queryName: { type: String, required: true },
     quantity: { type: Number, required: true },
-    productId: { type: Number, required: true },
+    productId: { type: String, required: true },
     brand: { type: String, default: null },
     description: { type: String, default: null },
     code: { type: String, default: null },

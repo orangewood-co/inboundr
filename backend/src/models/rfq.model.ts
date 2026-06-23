@@ -14,7 +14,7 @@ export interface IRFQProduct {
 }
 
 export interface IRFQSearchMatch {
-  id: number;
+  id: string;
   brand: string | null;
   description: string | null;
   code: string | null;
@@ -41,7 +41,7 @@ export interface IRFQSavedQuoteProduct {
   searchResultIndex: number | null;
   queryName: string;
   quantity: number;
-  productId: number;
+  productId: string;
   brand: string | null;
   description: string | null;
   code: string | null;
@@ -87,7 +87,7 @@ export interface IRFQ extends Document {
 
 const rfqSearchMatchSchema = new Schema<IRFQSearchMatch>(
   {
-    id: { type: Number, required: true },
+    id: { type: String, required: true },
     brand: { type: String, default: null },
     description: { type: String, default: null },
     code: { type: String, default: null },
@@ -127,7 +127,7 @@ const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
     searchResultIndex: { type: Number, default: null },
     queryName: { type: String, required: true },
     quantity: { type: Number, required: true },
-    productId: { type: Number, required: true },
+    productId: { type: String, required: true },
     brand: { type: String, default: null },
     description: { type: String, default: null },
     code: { type: String, default: null },

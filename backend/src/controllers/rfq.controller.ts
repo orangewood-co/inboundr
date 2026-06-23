@@ -112,6 +112,12 @@ function nullableNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function nullableProductId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
 function discountPercent(value: unknown): number {
   const number = nullableNumber(value);
   if (number == null) return 0;
@@ -291,7 +297,7 @@ function resolveManualProduct(product: ManualQuoteProduct, previous?: IRFQ["save
     searchResultIndex: indexNumber(product.searchResultIndex),
     queryName,
     quantity,
-    productId: nullableNumber(product.productId) ?? 0,
+    productId: nullableProductId(product.productId) ?? "0",
     brand: nullableString(product.brand),
     description,
     code,
@@ -380,7 +386,7 @@ function resolveSelectedProducts(
       searchResultIndex,
       queryName,
       quantity,
-      productId: 0,
+      productId: "0",
       brand: null,
       description: null,
       code: null,
@@ -403,7 +409,7 @@ function resolveSelectedProducts(
         (saved) =>
           saved.lineStatus !== "regretted" &&
           saved.searchResultIndex === indexNumber(product.searchResultIndex) &&
-          saved.productId === (nullableNumber(product.productId) ?? 0) &&
+          saved.productId === (nullableProductId(product.productId) ?? "0") &&
           saved.queryName === nullableString(product.queryName)
       );
 

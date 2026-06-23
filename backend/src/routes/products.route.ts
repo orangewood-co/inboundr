@@ -4,6 +4,7 @@ import {
   getProduct,
   getProductStats,
   importProducts,
+  listProductMatches,
   listProducts,
   updateProduct,
 } from "../controllers/products.controller";
@@ -23,6 +24,7 @@ router.use(requireFeature("products"));
 router.use(requireEmployeeModule("products"));
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
+router.get("/matches", listProductMatches);
 router.post("/import", requireOrganizationRole(["owner", "admin"]), importProducts);
 router.get("/:id", getProduct);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createProduct);

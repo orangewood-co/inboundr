@@ -118,7 +118,7 @@ interface SearchQueryParts {
 const TEXT_SEARCH_SQL = `
   WITH candidate_products AS (
     SELECT
-      p.id,
+      p.id::text AS id,
       p.brand,
       p.productdescription,
       p.productcode,
@@ -198,6 +198,7 @@ const TEXT_SEARCH_SQL = `
     FROM products p
     WHERE
       p.organization_id = $11
+      AND (NOT $14::boolean OR COALESCE(p.is_top_seller, false))
       AND
       (
         cardinality($13::text[]) = 0
@@ -311,7 +312,8 @@ export class TextProductSearcher {
   async searchProduct(
     query: { name: string; quantity: number },
     organizationId: string,
-    limit: number = 5
+    limit: number = 5,
+    options: { topSellerOnly?: boolean } = {}
   ): Promise<ProductSearchGroup> {
     const parts = this.buildSearchQuery(query.name);
 
@@ -343,6 +345,7 @@ export class TextProductSearcher {
         organizationId,
         parts.textTokens,
         parts.requiredAnchorTokens,
+        Boolean(options.topSellerOnly),
       ]);
 
       const matches = result.rows.map((row) => ({

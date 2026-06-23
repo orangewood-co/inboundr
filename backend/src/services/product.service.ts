@@ -156,6 +156,7 @@ export async function searchProductRecords(input: {
   organizationId: string;
   query: string;
   limit?: number;
+  topSellerOnly?: boolean;
 }): Promise<ProductSearchGroup> {
   const searcher = new TextProductSearcher(getDatabaseConfigFromEnv());
 
@@ -163,7 +164,8 @@ export async function searchProductRecords(input: {
     return await searcher.searchProduct(
       { name: input.query, quantity: 1 },
       input.organizationId,
-      input.limit
+      input.limit,
+      { topSellerOnly: input.topSellerOnly }
     );
   } finally {
     await searcher.close();

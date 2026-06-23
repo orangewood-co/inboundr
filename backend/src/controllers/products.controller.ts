@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import type { Request, Response } from "express";
 import type { DatabaseConfig, Product } from "../types";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
+import { searchProductRecords } from "../services/product.service";
 
 type ProductInput = Omit<
   Product,
@@ -204,6 +205,34 @@ export const listProducts = async (
   } catch (err) {
     console.error("Error listing products:", err);
     res.status(500).json({ error: "Failed to fetch products" });
+  }
+};
+
+export const listProductMatches = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+    const search = String(req.query.search ?? "").trim();
+    const limit = parsePositiveInt(req.query.limit, 8, 20);
+
+    if (!search) {
+      res.status(400).json({ error: "Search query is required" });
+      return;
+    }
+
+    const result = await searchProductRecords({
+      organizationId,
+      query: search,
+      limit,
+      topSellerOnly: parseBoolean(req.query.topSellerOnly),
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Error listing product matches:", err);
+    res.status(500).json({ error: "Failed to fetch product matches" });
   }
 };
 

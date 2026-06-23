@@ -162,7 +162,7 @@ interface RFQProduct {
 }
 
 interface RFQSearchMatch {
-  id: number
+  id: string
   brand: string | null
   description: string | null
   code: string | null
@@ -186,7 +186,7 @@ interface RFQSavedQuoteProduct {
   searchResultIndex: number | null
   queryName: string
   quantity: number
-  productId: number
+  productId: string
   brand: string | null
   description: string | null
   code: string | null
@@ -240,7 +240,7 @@ interface RFQReply {
   selectedProducts: {
     queryName: string
     quantity: number
-    productId: number
+    productId: string
     brand: string | null
     description: string | null
     code: string | null
@@ -267,7 +267,7 @@ interface RFQReply {
 }
 
 interface CatalogProduct {
-  id: number
+  id: string
   brand: string | null
   productdescription: string | null
   productcode: string | null
@@ -282,12 +282,16 @@ interface ProductsResponse {
   products: CatalogProduct[]
 }
 
+interface ProductMatchesResponse {
+  matches: RFQSearchMatch[]
+}
+
 interface ManualProduct {
   id: string
   searchResultIndex: number | null
   queryName: string
   quantity: string
-  productId: number
+  productId: string
   brand: string
   description: string
   code: string
@@ -318,6 +322,14 @@ interface RegrettedLine {
   queryName: string
   quantity: number
   regretReason: string
+}
+
+type TopSellerPickerState = {
+  open: boolean
+  loading: boolean
+  searched: boolean
+  error: string | null
+  results: RFQSearchMatch[]
 }
 
 type ManualProductField = keyof Pick<
@@ -599,6 +611,30 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
   }
 }
 
+function searchMatchToManual(
+  match: RFQSearchMatch,
+  query: RFQSearchResult["query"],
+  searchResultIndex: number
+): ManualProduct {
+  return {
+    id: `top-seller-${match.id}-${Date.now()}`,
+    searchResultIndex,
+    queryName: query.name,
+    quantity: String(query.quantity),
+    productId: match.id,
+    brand: match.brand ?? "",
+    description: match.description ?? "",
+    code: match.code ?? "",
+    price: numberInputValue(match.price),
+    discountPercent: "",
+    hsnCode: match.hsnCode ?? "",
+    gstRate: numberInputValue(match.gstRate),
+    calibrationCharges: numberInputValue(match.calibrationCharges),
+    deliveryTimeline: "",
+    source: "catalog",
+  }
+}
+
 type ProcessingStatus = "analyzing" | "ready" | "draft" | "processed" | "failed"
 type RFQStatusFilter = "all" | ProcessingStatus
 type RFQSortOption = "created_desc" | "created_asc" | "updated_desc" | "updated_asc"
@@ -773,12 +809,13 @@ export function DashboardPage() {
   const [productResults, setProductResults] = useState<CatalogProduct[]>([])
   const [productSearchLoading, setProductSearchLoading] = useState(false)
   const [productSearchError, setProductSearchError] = useState<string | null>(null)
+  const [topSellerPickers, setTopSellerPickers] = useState<Record<number, TopSellerPickerState>>({})
   const [customProduct, setCustomProduct] = useState<ManualProduct>({
     id: "custom-draft",
     searchResultIndex: null,
     queryName: "",
     quantity: "1",
-    productId: 0,
+    productId: "0",
     brand: "",
     description: "",
     code: "",
@@ -960,6 +997,7 @@ export function DashboardPage() {
       setProductSearch("")
       setProductResults([])
       setProductSearchError(null)
+      setTopSellerPickers({})
       setSourceEmailOpen(false)
       setSelectedSourceAttachment(null)
       setSelectedPaymentTermId("")
@@ -1004,7 +1042,7 @@ export function DashboardPage() {
         if (!searchResult) continue
         const matchIndex = searchResult.matches.findIndex((match) => match.id === product.productId)
 
-        if (matchIndex >= 0 && product.productId !== 0) {
+        if (matchIndex >= 0 && product.productId !== "0") {
           const overrideKey = `${searchResultIndex}-${matchIndex}`
           nextSelectedProducts[searchResultIndex] = [
             ...(nextSelectedProducts[searchResultIndex] ?? []),
@@ -1043,7 +1081,7 @@ export function DashboardPage() {
           gstRate: product.gstRate != null ? String(product.gstRate) : "",
           calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
           deliveryTimeline: product.deliveryTimeline ?? "",
-          source: product.productId ? "catalog" : "custom",
+          source: product.productId !== "0" ? "catalog" : "custom",
         })
       }
     })
@@ -1297,6 +1335,104 @@ export function DashboardPage() {
     ])
   }
 
+  const handleSearchTopSellers = async (searchResultIndex: number) => {
+    const query = detail?.searchResults[searchResultIndex]?.query
+    if (!query) return
+
+    setTopSellerPickers((prev) => ({
+      ...prev,
+      [searchResultIndex]: {
+        open: true,
+        loading: true,
+        searched: true,
+        error: null,
+        results: prev[searchResultIndex]?.results ?? [],
+      },
+    }))
+
+    try {
+      const params = new URLSearchParams({
+        search: query.name,
+        limit: "6",
+        topSellerOnly: "true",
+      })
+      const res = await fetch(`${PRODUCTS_API_BASE}/matches?${params.toString()}`, {
+        credentials: "include",
+      })
+      const data = (await res.json().catch(() => null)) as ProductMatchesResponse | { error?: string } | null
+      if (!res.ok) {
+        throw new Error(data && "error" in data && data.error ? data.error : `HTTP ${res.status}`)
+      }
+
+      setTopSellerPickers((prev) => ({
+        ...prev,
+        [searchResultIndex]: {
+          open: true,
+          loading: false,
+          searched: true,
+          error: null,
+          results: (data as ProductMatchesResponse | null)?.matches ?? [],
+        },
+      }))
+    } catch (err) {
+      setTopSellerPickers((prev) => ({
+        ...prev,
+        [searchResultIndex]: {
+          open: true,
+          loading: false,
+          searched: true,
+          error: err instanceof Error ? err.message : "Failed to search top sellers",
+          results: [],
+        },
+      }))
+    }
+  }
+
+  const handleToggleTopSellerPicker = (searchResultIndex: number) => {
+    const current = topSellerPickers[searchResultIndex]
+    if (current?.open) {
+      setTopSellerPickers((prev) => ({
+        ...prev,
+        [searchResultIndex]: { ...current, open: false },
+      }))
+      return
+    }
+
+    if (current?.searched) {
+      setTopSellerPickers((prev) => ({
+        ...prev,
+        [searchResultIndex]: { ...current, open: true },
+      }))
+      return
+    }
+
+    void handleSearchTopSellers(searchResultIndex)
+  }
+
+  const handleAddTopSellerProduct = (
+    searchResultIndex: number,
+    match: RFQSearchMatch,
+    query: RFQSearchResult["query"]
+  ) => {
+    setManualProducts((prev) => [
+      ...prev,
+      searchMatchToManual(match, query, searchResultIndex),
+    ])
+    setTopSellerPickers((prev) => ({
+      ...prev,
+      [searchResultIndex]: {
+        ...(prev[searchResultIndex] ?? {
+          loading: false,
+          searched: true,
+          error: null,
+          results: [],
+        }),
+        open: false,
+      },
+    }))
+    toast.success("Top seller added to this item")
+  }
+
   const handleManualProductChange = (
     id: string,
     field: ManualProductField,
@@ -1326,7 +1462,7 @@ export function DashboardPage() {
         id: `custom-${Date.now()}`,
         searchResultIndex: activeManualProductQueryIndex,
         source: "custom",
-        productId: 0,
+        productId: "0",
       },
     ])
     setCustomProduct({
@@ -1334,7 +1470,7 @@ export function DashboardPage() {
       searchResultIndex: activeManualProductQueryIndex,
       queryName: "",
       quantity: "1",
-      productId: 0,
+      productId: "0",
       brand: "",
       description: "",
       code: "",
@@ -1359,7 +1495,7 @@ export function DashboardPage() {
       searchResultIndex: activeManualProductQueryIndex,
       queryName: "",
       quantity: "1",
-      productId: 0,
+      productId: "0",
       brand: "",
       description: "",
       code: "",
@@ -1751,6 +1887,91 @@ export function DashboardPage() {
             />
           </div>
         </div>
+      </div>
+    )
+  }
+
+  const renderTopSellerPicker = (searchResultIndex: number, query: RFQSearchResult["query"]) => {
+    const state = topSellerPickers[searchResultIndex]
+    if (!state?.open) return null
+
+    return (
+      <div className="mt-2 rounded-xl border border-primary/15 bg-primary/[0.03] p-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold">Top Sellers Ranked for This Item</p>
+            <p className="truncate text-[11px] text-muted-foreground">{query.name}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            disabled={state.loading}
+            onClick={() => handleSearchTopSellers(searchResultIndex)}
+          >
+            {state.loading ? <Spinner data-icon="inline-start" /> : <RefreshCwIcon className="size-3" />}
+            Refresh
+          </Button>
+        </div>
+
+        {state.loading ? (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed bg-background/60 px-3 py-4 text-xs text-muted-foreground">
+            <Spinner data-icon="inline-start" />
+            Searching top sellers...
+          </div>
+        ) : state.error ? (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+            {state.error}
+          </div>
+        ) : state.results.length === 0 ? (
+          <div className="rounded-lg border border-dashed bg-background/60 px-3 py-4 text-center text-xs text-muted-foreground">
+            No top-seller products matched this requested item.
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {state.results.map((match) => (
+              <div
+                key={match.id}
+                className="flex items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold">{match.description || match.code || "Top seller product"}</p>
+                    <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                      Top seller
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                    {match.brand && <span>{match.brand}</span>}
+                    {match.brand && match.code && <span>·</span>}
+                    {match.code && <span className="font-mono">{match.code}</span>}
+                    {(match.brand || match.code) && match.hsnCode && <span>·</span>}
+                    {match.hsnCode && <span>HSN: {match.hsnCode}</span>}
+                    {match.gstRate != null && <span>· GST: {match.gstRate}%</span>}
+                    <span>· Score: {Math.round(match.score)}</span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {match.price != null ? (
+                    <p className="text-sm font-bold tabular-nums">{formatMoney(match.price)}</p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">No price</p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    onClick={() => handleAddTopSellerProduct(searchResultIndex, match, query)}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -2667,10 +2888,26 @@ export function DashboardPage() {
                             </div>
                           ) : null}
                           {!regrettedLine && (
-                            <div className="mt-2 flex items-center justify-end">
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1.5 px-2 text-[11px]"
+                                disabled={topSellerPickers[i]?.loading}
+                                onClick={() => handleToggleTopSellerPicker(i)}
+                              >
+                                {topSellerPickers[i]?.loading ? (
+                                  <Spinner data-icon="inline-start" />
+                                ) : (
+                                  <SparklesIcon className="size-3" />
+                                )}
+                                Pick from Top Sellers
+                              </Button>
                               {renderManualProductPopover(i, sr.query)}
                             </div>
                           )}
+                          {!regrettedLine && renderTopSellerPicker(i, sr.query)}
                           {!regrettedLine && manualProducts.some((product) => product.searchResultIndex === i) && (
                             <div className="mt-3 space-y-2 rounded-xl border border-dashed bg-muted/10 p-3">
                               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
