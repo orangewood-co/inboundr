@@ -76,7 +76,7 @@ export async function processHistoryUpdate(
     let pageToken: string | undefined = undefined;
 
     do {
-      const res = await gmail.users.history.list({
+      const res: { data: gmail_v1.Schema$ListHistoryResponse } = await gmail.users.history.list({
         userId: "me",
         startHistoryId: storedHistoryId,
         historyTypes: ["messageAdded"],

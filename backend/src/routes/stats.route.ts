@@ -6,8 +6,8 @@ const router = Router();
 
 router.use(requireAuth);
 router.use(requireOrganization);
-router.use(requireFeature("stats"));
-router.use(requireEmployeeModule("stats"));
+router.use(requireFeature("rfq"));
+router.use(requireEmployeeModule("rfq"));
 router.get("/overview", getStatsOverview);
 
 export default router;

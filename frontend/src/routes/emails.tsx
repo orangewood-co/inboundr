@@ -8,7 +8,7 @@ type EmailsRouteSearch = {
 }
 
 export const Route = createFileRoute("/emails")({
-  beforeLoad: () => requireFeatureAndModuleAccess("inbox", "inbox"),
+  beforeLoad: () => requireFeatureAndModuleAccess("rfq", "rfq"),
   validateSearch: (search: Record<string, unknown>): EmailsRouteSearch => ({
     email: typeof search.email === "string" && search.email.trim() ? search.email : undefined,
   }),

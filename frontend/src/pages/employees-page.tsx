@@ -530,30 +530,37 @@ export default function EmployeesPage() {
               </Button>
             </div>
             <div className="grid gap-3">
-              {teams.map((team) => (
-                <div key={team._id} className="rounded-2xl border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold">{team.name}</h3>
-                      <p className="text-sm text-muted-foreground">{team.description || "No description"} · {team.employeeCount ?? 0} employees</p>
+              {teams.map((team) => {
+                const visibleDefaultModules = team.defaultModules.flatMap((module) => {
+                  const match = modules.find((item) => item.key === module)
+                  return match ? [match] : []
+                })
+
+                return (
+                  <div key={team._id} className="rounded-2xl border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">{team.name}</h3>
+                        <p className="text-sm text-muted-foreground">{team.description || "No description"} · {team.employeeCount ?? 0} employees</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn((team.employeeCount ?? 0) > 0 && "opacity-50")}
+                        onClick={() => archiveTeam(team._id)}
+                        disabled={saving || (team.employeeCount ?? 0) > 0}
+                      >
+                        Archive
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn((team.employeeCount ?? 0) > 0 && "opacity-50")}
-                      onClick={() => archiveTeam(team._id)}
-                      disabled={saving || (team.employeeCount ?? 0) > 0}
-                    >
-                      Archive
-                    </Button>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {visibleDefaultModules.length > 0 ? visibleDefaultModules.map((module) => (
+                        <Badge key={module.key} variant="secondary">{module.label}</Badge>
+                      )) : <span className="text-sm text-muted-foreground">No default module access</span>}
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {team.defaultModules.length > 0 ? team.defaultModules.map((module) => (
-                      <Badge key={module} variant="secondary">{modules.find((item) => item.key === module)?.label ?? module}</Badge>
-                    )) : <span className="text-sm text-muted-foreground">No default module access</span>}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
           <DialogFooter>

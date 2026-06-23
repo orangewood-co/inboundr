@@ -566,6 +566,13 @@ export default function EmployeeDetailPage() {
       .filter((module) => !(employee.platformAccess.restrictedModules ?? []).includes(module))
   }, [employee])
 
+  const visibleEffectiveModules = useMemo(() => {
+    return effectiveModules.flatMap((module) => {
+      const match = modules.find((item) => item.key === module)
+      return match ? [match] : []
+    })
+  }, [effectiveModules, modules])
+
   const currentDocuments = useMemo(() => {
     const byType = new Map<EmployeeDocument["type"], EmployeeDocument>()
     for (const document of documents) {
@@ -974,10 +981,10 @@ export default function EmployeeDetailPage() {
                         Effective modules from team defaults and employee overrides.
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {effectiveModules.length > 0 ? (
-                          effectiveModules.map((module) => (
-                            <Badge key={module} variant="secondary">
-                              {modules.find((item) => item.key === module)?.label ?? module}
+                        {visibleEffectiveModules.length > 0 ? (
+                          visibleEffectiveModules.map((module) => (
+                            <Badge key={module.key} variant="secondary">
+                              {module.label}
                             </Badge>
                           ))
                         ) : (

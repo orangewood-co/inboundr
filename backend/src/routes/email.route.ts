@@ -12,25 +12,25 @@ import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization
 const router = Router();
 
 router.post("/webhook", emailWebhookController);
-router.get("/", requireAuth, requireOrganization, requireFeature("inbox"), requireEmployeeModule("inbox"), listEmails);
+router.get("/", requireAuth, requireOrganization, requireFeature("rfq"), requireEmployeeModule("rfq"), listEmails);
 router.get(
   "/:id/attachments/:attachmentId",
   requireAuth,
   requireOrganization,
-  requireFeature("inbox"),
-  requireEmployeeModule("inbox"),
+  requireFeature("rfq"),
+  requireEmployeeModule("rfq"),
   getEmailAttachment
 );
 router.get(
   "/:id/attachments/:attachmentId/download",
   requireAuth,
   requireOrganization,
-  requireFeature("inbox"),
-  requireEmployeeModule("inbox"),
+  requireFeature("rfq"),
+  requireEmployeeModule("rfq"),
   getEmailAttachment
 );
-router.get("/:id/pdf", requireAuth, requireOrganization, requireFeature("inbox"), requireEmployeeModule("inbox"), downloadEmailPdf);
-router.post("/:id/reprocess", requireAuth, requireOrganization, requireFeature("inbox"), requireEmployeeModule("inbox"), requireFeature("rfq"), reprocessEmail);
-router.get("/:id", requireAuth, requireOrganization, requireFeature("inbox"), requireEmployeeModule("inbox"), getEmail);
+router.get("/:id/pdf", requireAuth, requireOrganization, requireFeature("rfq"), requireEmployeeModule("rfq"), downloadEmailPdf);
+router.post("/:id/reprocess", requireAuth, requireOrganization, requireFeature("rfq"), requireEmployeeModule("rfq"), reprocessEmail);
+router.get("/:id", requireAuth, requireOrganization, requireFeature("rfq"), requireEmployeeModule("rfq"), getEmail);
 
 export default router;

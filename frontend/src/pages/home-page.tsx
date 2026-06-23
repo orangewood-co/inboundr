@@ -39,7 +39,7 @@ type ModuleTile = {
 
 const moduleTiles: ModuleTile[] = [
   { title: "RFQ", url: "/rfq", icon: FileTextIcon, feature: "rfq", module: "rfq" },
-  { title: "Inbox", url: "/emails", icon: InboxIcon, feature: "inbox", module: "inbox" },
+  { title: "Inbox", url: "/emails", icon: InboxIcon, feature: "rfq", module: "rfq" },
   { title: "Orders", url: "/orders", icon: ShoppingCartIcon, feature: "rfq", module: "rfq" },
   { title: "Products", url: "/products", icon: PackageIcon, feature: "products", module: "products" },
   { title: "Invoices", url: "/invoices", icon: ReceiptTextIcon, feature: "invoices", module: "invoices" },
@@ -75,23 +75,36 @@ function DashboardSkeleton() {
 
 export function HomePage() {
   const { data: session } = useSession()
-  const { hasFeature, hasModuleAccess } = useEntitlements()
+  const { hasFeature, hasModuleAccess, loading: entitlementsLoading } = useEntitlements()
   const [stats, setStats] = useState<StatsOverview | null>(null)
   const [loading, setLoading] = useState(true)
+  const canAccessQuotation = hasFeature("rfq") && hasModuleAccess("rfq")
 
   const fetchData = useCallback(async () => {
+    if (!canAccessQuotation) {
+      setStats(null)
+      return
+    }
+
     const res = await fetch(`${API_ORIGIN}/api/v1/stats/overview?range=7d`, {
       credentials: "include",
     })
     if (res.ok) {
       setStats(await res.json())
     }
-  }, [])
+  }, [canAccessQuotation])
 
   useEffect(() => {
+    if (entitlementsLoading) return
+    if (!canAccessQuotation) {
+      setStats(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     fetchData().finally(() => setLoading(false))
-  }, [fetchData])
+  }, [canAccessQuotation, entitlementsLoading, fetchData])
 
   const userName = session?.user?.name?.split(" ")[0] ?? "there"
 
@@ -125,21 +138,22 @@ export function HomePage() {
               </h1>
             </section>
 
-            {/* Slim stat row */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard
-                label="RFQs this week"
-                value={stats?.totals.rfqs ?? 0}
-                hint={`${stats?.totals.emails ?? 0} emails processed`}
-                delay="80ms"
-              />
-              <StatCard
-                label="Products Requested"
-                value={stats?.totals.products ?? 0}
-                hint="Line items from RFQs"
-                delay="140ms"
-              />
-            </div>
+            {canAccessQuotation ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <StatCard
+                  label="RFQs this week"
+                  value={stats?.totals.rfqs ?? 0}
+                  hint={`${stats?.totals.emails ?? 0} emails processed`}
+                  delay="80ms"
+                />
+                <StatCard
+                  label="Products Requested"
+                  value={stats?.totals.products ?? 0}
+                  hint="Line items from RFQs"
+                  delay="140ms"
+                />
+              </div>
+            ) : null}
 
             {/* Module launcher */}
             <section>

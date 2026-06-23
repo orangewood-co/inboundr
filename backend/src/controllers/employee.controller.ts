@@ -30,6 +30,9 @@ import { generateVCardQrPng, loadPngBuffer } from "../services/pdf-image.service
 
 const SEARCH_FIELDS = ["fullName", "email", "phone", "title", "employeeCode"] as const;
 const EMPLOYEE_STATUSES: EmployeeStatus[] = ["active", "inactive", "terminated", "archived"];
+const VISIBLE_EMPLOYEE_ACCESS_MODULES = EMPLOYEE_ACCESS_MODULES.filter(
+  (module) => module !== "inbox" && module !== "stats"
+);
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -250,9 +253,9 @@ function publicInvitation(invitation: any) {
 
 export async function listEmployeeModules(_req: Request, res: Response): Promise<void> {
   res.json({
-    modules: EMPLOYEE_ACCESS_MODULES.map((key) => ({
+    modules: VISIBLE_EMPLOYEE_ACCESS_MODULES.map((key) => ({
       key,
-      label: key === "rfq" ? "RFQ" : key.charAt(0).toUpperCase() + key.slice(1),
+      label: key === "rfq" ? "Quotation" : key.charAt(0).toUpperCase() + key.slice(1),
     })),
   });
 }
