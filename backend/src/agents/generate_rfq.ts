@@ -35,7 +35,7 @@ const queryProduct = z.object({
 });
 
 const searchMatch = z.object({
-  id: z.number(),
+  id: z.string(),
   brand: z.string().nullable(),
   description: z.string().nullable(),
   code: z.string().nullable(),
@@ -69,7 +69,7 @@ const aiSearchExpansion = z.object({
 const aiRerankResult = z.object({
   rankedMatches: z.array(
     z.object({
-      id: z.number(),
+      id: z.string(),
       confidence: z.number().min(0).max(1),
       reason: z.string(),
     })
@@ -316,7 +316,7 @@ function filterSearchResultByAnchor(
 }
 
 function mergeSearchResults(query: QueryProduct, groups: ProductSearchGroup[]): ProductSearchGroup {
-  const matchesById = new Map<number, ProductSearchMatch>();
+  const matchesById = new Map<string, ProductSearchMatch>();
   const searchTokens = uniqueStrings(groups.flatMap((group) => group.searchTokens));
   const primaryNormalizedQuery = groups[0]?.normalizedQuery ?? "";
 
@@ -408,8 +408,8 @@ If several candidates are close variants, keep them ranked but use lower confide
     ]);
 
     const candidatesById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-    const usedIds = new Set<number>();
-    const confidenceById = new Map<number, number>();
+    const usedIds = new Set<string>();
+    const confidenceById = new Map<string, number>();
     const rerankedMatches: ProductSearchMatch[] = [];
 
     for (const rankedMatch of response.rankedMatches) {
@@ -447,7 +447,7 @@ If several candidates are close variants, keep them ranked but use lower confide
 
 function resolveAiMatchStatus(
   matches: ProductSearchMatch[],
-  confidenceById: Map<number, number>
+  confidenceById: Map<string, number>
 ): "matched" | "ambiguous" | "no_match" {
   if (matches.length === 0) {
     return "no_match";

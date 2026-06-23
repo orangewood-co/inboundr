@@ -21,7 +21,7 @@ export type ProductInput = Omit<
 };
 
 export const PRODUCT_COLUMNS = [
-  "id",
+  "id::text AS id",
   "organization_id",
   "brand",
   "maxdiscount",

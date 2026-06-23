@@ -31,7 +31,7 @@ type ProductImportResult = {
 };
 
 const PRODUCT_COLUMNS = [
-  "id",
+  "id::text AS id",
   "organization_id",
   "brand",
   "maxdiscount",
@@ -91,13 +91,13 @@ function parsePositiveInt(value: unknown, fallback: number, max?: number): numbe
   return max ? Math.min(max, normalized) : normalized;
 }
 
-function parseProductId(value: unknown): number | null {
+function parseProductId(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
 
-  const parsed = parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
+  const normalized = value.trim();
+  return /^\d+$/.test(normalized) ? normalized : null;
 }
 
 function normalizeProductInput(body: Record<string, unknown>): ProductInput {
@@ -334,8 +334,8 @@ export const importProducts = async (
           throw new Error(validationError);
         }
 
-        const existing = await client.query<{ id: number }>(
-          `SELECT id
+        const existing = await client.query<{ id: string }>(
+          `SELECT id::text AS id
            FROM products
            WHERE organization_id = $1 AND productcode = $2
            LIMIT 1`,

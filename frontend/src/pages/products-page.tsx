@@ -50,7 +50,7 @@ function getInitialListSearch(): string {
 }
 
 interface Product {
-  id: number
+  id: string
   brand: string | null
   maxdiscount: number | string | null
   productdescription: string | null

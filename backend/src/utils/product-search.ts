@@ -61,7 +61,7 @@ const NON_BRAND_TOKENS = new Set([
 export type ProductMatchStatus = "matched" | "ambiguous" | "no_match";
 
 export interface ProductSearchMatch {
-  id: number;
+  id: string;
   brand: string | null;
   description: string | null;
   code: string | null;
@@ -88,7 +88,7 @@ export interface ProductSearchGroup {
 }
 
 interface RankedProductRow {
-  id: number;
+  id: string;
   brand: string | null;
   productdescription: string | null;
   productcode: string | null;

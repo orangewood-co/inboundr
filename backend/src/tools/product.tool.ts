@@ -60,7 +60,7 @@ function ensureProductManager(context: ProductToolContext): void {
 }
 
 function serializeProduct(product: {
-  id: number;
+  id: string;
   brand: string | null;
   productdescription: string | null;
   productcode: string | null;

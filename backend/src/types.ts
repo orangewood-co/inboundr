@@ -1,5 +1,5 @@
 export interface Product {
-  id: number;
+  id: string;
   organization_id: string;
   brand: string;
   maxdiscount: number;
@@ -22,7 +22,7 @@ export interface Product {
 }
 
 export interface SearchResult {
-  id: number;
+  id: string;
   brand: string;
   description: string;
   code: string;

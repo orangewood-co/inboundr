@@ -234,7 +234,7 @@ export class GeminiProductEmbedder {
    * Update embedding for a single product
    */
   async updateProductEmbedding(
-    productId: number,
+    productId: string,
     taskType: TaskType = 'RETRIEVAL_DOCUMENT'
   ): Promise<void> {
     const client = await this.pool.connect();
