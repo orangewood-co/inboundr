@@ -39,6 +39,7 @@ import {
   CircleCheckIcon,
   CircleIcon,
   SparklesIcon,
+  StarIcon,
   SendIcon,
   PlusIcon,
   Trash2Icon,
@@ -3077,7 +3078,7 @@ export function DashboardPage() {
                                 {topSellerPickers[i]?.loading ? (
                                   <Spinner data-icon="inline-start" />
                                 ) : (
-                                  <SparklesIcon className="size-3" />
+                                  <StarIcon className="size-3" />
                                 )}
                                 Pick from Top Sellers
                               </Button>
