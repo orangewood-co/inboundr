@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { ArrowRight } from "lucide-react"
 import { TetrisBoard } from "@/components/TetrisBoard"
+import { useBoardLayout } from "@/hooks/useBoardLayout"
 import { useTetris } from "@/hooks/useTetris"
 import { PIECE_COLORS, pieceCells, type PieceType } from "@/lib/tetris"
 
@@ -134,7 +135,8 @@ function TouchButton({
 export default function NotFound() {
   const location = useLocation()
   const reduceMotion = useReducedMotion() ?? false
-  const game = useTetris()
+  const layout = useBoardLayout()
+  const game = useTetris(layout.cols)
 
   const rawPath = location.pathname
   const path = rawPath.length > 28 ? rawPath.slice(0, 27) + "\u2026" : rawPath
@@ -240,6 +242,7 @@ export default function NotFound() {
             ghostY={game.ghostY}
             clearing={game.clearing}
             reduceMotion={reduceMotion}
+            layout={layout}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-base" />
 

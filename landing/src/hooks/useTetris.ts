@@ -33,8 +33,8 @@ interface GameState {
 }
 
 type Action =
-  | { type: "START" }
-  | { type: "RESTART" }
+  | { type: "START"; cols: number }
+  | { type: "RESTART"; cols: number }
   | { type: "TICK" }
   | { type: "MOVE"; dir: -1 | 1 }
   | { type: "SOFT_DROP" }
@@ -43,9 +43,9 @@ type Action =
   | { type: "PAUSE_TOGGLE" }
   | { type: "COLLAPSE" }
 
-function initialState(): GameState {
+function initialState(cols?: number): GameState {
   return {
-    board: createBoard(),
+    board: createBoard(cols),
     active: null,
     queue: [],
     next: null,
@@ -61,7 +61,7 @@ function spawnNext(state: GameState): GameState {
   let queue = state.queue.slice()
   if (queue.length < 8) queue = [...queue, ...createBag()]
   const type = queue.shift() as PieceType
-  const piece = spawnPiece(type)
+  const piece = spawnPiece(type, state.board[0].length)
   const next = queue[0] ?? null
   if (collides(state.board, piece)) {
     return { ...state, active: null, queue, next, status: "over" }
@@ -84,9 +84,9 @@ function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case "START":
       if (state.status !== "ready") return state
-      return spawnNext({ ...initialState(), status: "playing" })
+      return spawnNext({ ...initialState(action.cols), status: "playing" })
     case "RESTART":
-      return spawnNext({ ...initialState(), status: "playing" })
+      return spawnNext({ ...initialState(action.cols), status: "playing" })
     case "TICK": {
       if (state.status !== "playing" || !state.active) return state
       const moved = { ...state.active, y: state.active.y + 1 }
@@ -157,8 +157,8 @@ export interface TetrisGame extends GameState {
   actions: TetrisActions
 }
 
-export function useTetris(): TetrisGame {
-  const [state, dispatch] = useReducer(reducer, undefined, initialState)
+export function useTetris(cols: number): TetrisGame {
+  const [state, dispatch] = useReducer(reducer, cols, initialState)
   const reduceMotion = useReducedMotion()
 
   const statusRef = useRef(state.status)
@@ -166,9 +166,16 @@ export function useTetris(): TetrisGame {
     statusRef.current = state.status
   }, [state.status])
 
+  // Latest viewport-derived column count, read when a game (re)starts so the
+  // board is rebuilt at the right width without disturbing a running game.
+  const colsRef = useRef(cols)
+  useEffect(() => {
+    colsRef.current = cols
+  }, [cols])
+
   // Auto-start a little after mount so the entrance animation reads first.
   useEffect(() => {
-    const id = window.setTimeout(() => dispatch({ type: "START" }), 450)
+    const id = window.setTimeout(() => dispatch({ type: "START", cols: colsRef.current }), 450)
     return () => window.clearTimeout(id)
   }, [])
 
@@ -227,7 +234,7 @@ export function useTetris(): TetrisGame {
           break
         case "r":
         case "R":
-          dispatch({ type: "RESTART" })
+          dispatch({ type: "RESTART", cols: colsRef.current })
           break
         default:
           break
@@ -244,7 +251,7 @@ export function useTetris(): TetrisGame {
       rotate: () => dispatch({ type: "ROTATE", dir: 1 }),
       softDrop: () => dispatch({ type: "SOFT_DROP" }),
       hardDrop: () => dispatch({ type: "HARD_DROP" }),
-      restart: () => dispatch({ type: "RESTART" }),
+      restart: () => dispatch({ type: "RESTART", cols: colsRef.current }),
       togglePause: () => dispatch({ type: "PAUSE_TOGGLE" }),
     }),
     [],
