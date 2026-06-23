@@ -72,23 +72,28 @@ export async function processHistoryUpdate(
   const gmail = await getGmailClientForAccount(account);
 
   try {
-    const res = await gmail.users.history.list({
-      userId: "me",
-      startHistoryId: storedHistoryId,
-      historyTypes: ["messageAdded"],
-      labelId: "INBOX",
-    });
-
-    const histories = res.data.history ?? [];
     const messageIds = new Set<string>();
+    let pageToken: string | undefined = undefined;
 
-    for (const history of histories) {
-      for (const added of history.messagesAdded ?? []) {
-        if (added.message?.id) {
-          messageIds.add(added.message.id);
+    do {
+      const res = await gmail.users.history.list({
+        userId: "me",
+        startHistoryId: storedHistoryId,
+        historyTypes: ["messageAdded"],
+        labelId: "INBOX",
+        pageToken,
+      });
+
+      for (const history of res.data.history ?? []) {
+        for (const added of history.messagesAdded ?? []) {
+          if (added.message?.id) {
+            messageIds.add(added.message.id);
+          }
         }
       }
-    }
+
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
 
     for (const messageId of messageIds) {
       const exists = await Email.exists({
