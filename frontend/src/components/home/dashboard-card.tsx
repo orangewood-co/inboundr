@@ -26,7 +26,7 @@ export function DashboardCard({
   title: string
   icon?: IconType
   to?: string
-  search?: Record<string, string>
+  search?: Record<string, string | number | boolean | null | undefined>
   viewAllLabel?: string
   headerAction?: ReactNode
   children: ReactNode

@@ -29,6 +29,8 @@ interface SupportListResponse {
   total: number
 }
 
+const SUPPORT_LIST_SEARCH = { status: "open" as const, q: "", page: 1 }
+
 function TicketRow({ ticket }: { ticket: SupportTicketRow }) {
   const requester = ticket.requester?.name || ticket.requester?.email || "Unknown"
   return (
@@ -79,10 +81,12 @@ export function SupportActiveCard() {
       title="Open Tickets"
       icon={HeadsetIcon}
       to="/support"
+      search={SUPPORT_LIST_SEARCH}
       headerAction={
         openCount > 0 ? (
           <Link
             to="/support"
+            search={SUPPORT_LIST_SEARCH}
             className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
           >
             {openCount} open
