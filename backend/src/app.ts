@@ -20,6 +20,7 @@ import driveRouter from "./routes/drive.route";
 import publicDriveRouter from "./routes/public-drive.route";
 import statsRouter from "./routes/stats.route";
 import digestRouter from "./routes/digest.route";
+import dashboardLayoutRouter from "./routes/dashboard-layout.route";
 import searchRouter from "./routes/search.route";
 import invoiceRouter from "./routes/invoice.route";
 import adminRouter from "./routes/admin.route";
@@ -96,6 +97,7 @@ app.use("/api/v1/public/support", publicSupportRouter);
 app.use("/l", publicLinksRouter);
 app.use("/api/v1/stats", statsRouter);
 app.use("/api/v1/digest", digestRouter);
+app.use("/api/v1/dashboard-layout", dashboardLayoutRouter);
 app.use("/api/v1/search", searchRouter);
 
 app.use((req: Request, res: Response) => {
