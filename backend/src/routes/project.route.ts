@@ -10,6 +10,7 @@ import {
   createProjectTimeEntry,
   getProject,
   getProjectsReferenceData,
+  listMyTasks,
   listProjectActivity,
   listProjects,
   moveProjectTask,
@@ -35,6 +36,7 @@ router.use(requireEmployeeModule("projects"));
 
 router.get("/", listProjects);
 router.get("/reference-data", getProjectsReferenceData);
+router.get("/tasks/mine", listMyTasks);
 router.post("/", requireOrganizationRole(["owner", "admin"]), createProject);
 router.get("/:id", getProject);
 router.put("/:id", updateProject);

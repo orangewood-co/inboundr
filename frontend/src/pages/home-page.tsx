@@ -1,50 +1,14 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react"
-import { Link } from "@tanstack/react-router"
-import {
-  ArrowUpRightIcon,
-  FileTextIcon,
-  InboxIcon,
-  PackageIcon,
-  ReceiptTextIcon,
-  ShoppingCartIcon,
-  UsersIcon,
-} from "lucide-react"
+import type { CSSProperties } from "react"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
-import { Skeleton } from "@/components/ui/skeleton"
+import {
+  DEFAULT_DASHBOARD_LAYOUT,
+  WIDGET_SIZE_CLASS,
+} from "@/components/home/widget-registry"
 import { useSession } from "@/lib/auth-client"
-import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
-
-import { API_ORIGIN } from "@/lib/env"
-import { formatNumber } from "@/lib/format"
-
-interface StatsOverview {
-  totals: {
-    emails: number
-    rfqs: number
-    nonRfqs: number
-    products: number
-    failed: number
-  }
-}
-
-type ModuleTile = {
-  title: string
-  url: string
-  icon: typeof FileTextIcon
-  feature?: FeatureKey
-  module?: EmployeeAccessModule
-}
-
-const moduleTiles: ModuleTile[] = [
-  { title: "RFQ", url: "/rfq", icon: FileTextIcon, feature: "rfq", module: "rfq" },
-  { title: "Inbox", url: "/emails", icon: InboxIcon, feature: "rfq", module: "rfq" },
-  { title: "Orders", url: "/orders", icon: ShoppingCartIcon, feature: "rfq", module: "rfq" },
-  { title: "Products", url: "/products", icon: PackageIcon, feature: "products", module: "products" },
-  { title: "Invoices", url: "/invoices", icon: ReceiptTextIcon, feature: "invoices", module: "invoices" },
-  { title: "Customers", url: "/customers", icon: UsersIcon, feature: "customers", module: "customers" },
-]
+import { useEntitlements } from "@/lib/entitlements"
+import { cn } from "@/lib/utils"
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -53,70 +17,20 @@ function getGreeting() {
   return "Good evening"
 }
 
-function DashboardSkeleton() {
-  return (
-    <div className="grid gap-6">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-9 w-72" />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Skeleton className="h-24 rounded-2xl" />
-        <Skeleton className="h-24 rounded-2xl" />
-      </div>
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 rounded-2xl" />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export function HomePage() {
   const { data: session } = useSession()
-  const { hasFeature, hasModuleAccess, loading: entitlementsLoading } = useEntitlements()
-  const [stats, setStats] = useState<StatsOverview | null>(null)
-  const [loading, setLoading] = useState(true)
-  const canAccessQuotation = hasFeature("rfq") && hasModuleAccess("rfq")
-
-  const fetchData = useCallback(async () => {
-    if (!canAccessQuotation) {
-      setStats(null)
-      return
-    }
-
-    const res = await fetch(`${API_ORIGIN}/api/v1/stats/overview?range=7d`, {
-      credentials: "include",
-    })
-    if (res.ok) {
-      setStats(await res.json())
-    }
-  }, [canAccessQuotation])
-
-  useEffect(() => {
-    if (entitlementsLoading) return
-    if (!canAccessQuotation) {
-      setStats(null)
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    fetchData().finally(() => setLoading(false))
-  }, [canAccessQuotation, entitlementsLoading, fetchData])
+  const { hasFeature, hasModuleAccess } = useEntitlements()
 
   const userName = session?.user?.name?.split(" ")[0] ?? "there"
-
   const todayFormatted = new Date().toLocaleDateString([], {
     weekday: "long",
     month: "long",
     day: "numeric",
   })
 
-  const visibleTiles = moduleTiles.filter((tile) => {
-    if (tile.feature && !hasFeature(tile.feature)) return false
-    if (tile.module && !hasModuleAccess(tile.module)) return false
+  const widgets = DEFAULT_DASHBOARD_LAYOUT.filter((widget) => {
+    if (widget.feature && !hasFeature(widget.feature)) return false
+    if (widget.module && !hasModuleAccess(widget.module)) return false
     return true
   })
 
@@ -124,94 +38,36 @@ export function HomePage() {
     <AppLayout>
       <SiteHeader />
       <main className="flex flex-1 flex-col gap-6 overflow-auto p-4 lg:px-6 lg:py-6">
-        {loading ? (
-          <DashboardSkeleton />
-        ) : (
-          <>
-            {/* Header */}
-            <section className="animate-in fade-in-0 slide-in-from-bottom-1 duration-400">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {todayFormatted}
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight lg:text-3xl">
-                {getGreeting()}, {userName}
-              </h1>
-            </section>
+        <section className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {todayFormatted}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight lg:text-3xl">
+            {getGreeting()}, {userName}
+          </h1>
+        </section>
 
-            {canAccessQuotation ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <StatCard
-                  label="RFQs this week"
-                  value={stats?.totals.rfqs ?? 0}
-                  hint={`${stats?.totals.emails ?? 0} emails processed`}
-                  delay="80ms"
-                />
-                <StatCard
-                  label="Products Requested"
-                  value={stats?.totals.products ?? 0}
-                  hint="Line items from RFQs"
-                  delay="140ms"
-                />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {widgets.map((widget, i) => {
+            const Widget = widget.Component
+            return (
+              <div
+                key={widget.id}
+                className={cn(
+                  "animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out motion-reduce:animate-none",
+                  WIDGET_SIZE_CLASS[widget.size]
+                )}
+                style={
+                  { animationDelay: `${80 + i * 60}ms`, animationFillMode: "backwards" } as CSSProperties
+                }
+              >
+                <Widget />
               </div>
-            ) : null}
-
-            {/* Module launcher */}
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-muted-foreground">Modules</h2>
-              </div>
-              <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
-                {visibleTiles.map((tile, i) => (
-                  <ModuleCard key={tile.url} tile={tile} delay={`${200 + i * 60}ms`} />
-                ))}
-              </div>
-            </section>
-          </>
-        )}
+            )
+          })}
+        </div>
       </main>
     </AppLayout>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  delay,
-}: {
-  label: string
-  value: number
-  hint: string
-  delay: string
-}) {
-  return (
-    <div
-      className="rounded-2xl border bg-card p-5 animate-in fade-in-0 slide-in-from-bottom-2 duration-400"
-      style={{ animationDelay: delay, animationFillMode: "backwards" } as CSSProperties}
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">
-        {formatNumber(value)}
-      </p>
-      <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
-    </div>
-  )
-}
-
-function ModuleCard({ tile, delay }: { tile: ModuleTile; delay: string }) {
-  const Icon = tile.icon
-  return (
-    <Link
-      to={tile.url}
-      className="group relative flex flex-col items-center justify-center gap-3 rounded-2xl border bg-card px-6 py-8 text-center transition-all duration-300 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md animate-in fade-in-0 slide-in-from-bottom-2 duration-400"
-      style={{ animationDelay: delay, animationFillMode: "backwards" } as CSSProperties}
-    >
-      <ArrowUpRightIcon className="absolute right-3 top-3 size-3.5 text-muted-foreground/0 transition-all duration-200 group-hover:text-muted-foreground/60" />
-      <div className="flex size-12 items-center justify-center rounded-xl bg-muted/70 transition-colors group-hover:bg-muted">
-        <Icon className="size-6 text-muted-foreground transition-colors group-hover:text-foreground" />
-      </div>
-      <span className="text-sm font-medium">{tile.title}</span>
-    </Link>
   )
 }
 

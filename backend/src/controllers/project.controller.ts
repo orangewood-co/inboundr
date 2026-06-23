@@ -325,6 +325,72 @@ export const listProjects = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+export const listMyTasks = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const limit = parsePositiveInt(req.query.limit, 6, 20);
+    const employee = await getCurrentProjectEmployee(orgReq);
+    if (!employee) {
+      res.json({ tasks: [] });
+      return;
+    }
+
+    const readableFilter = readableProjectFilter(orgReq, employee);
+    const readableProjects = await Project.find(readableFilter).select("_id title").lean();
+    if (readableProjects.length === 0) {
+      res.json({ tasks: [] });
+      return;
+    }
+
+    const projectTitles = new Map(
+      readableProjects.map((project) => [project._id.toString(), project.title])
+    );
+
+    const tasks = await ProjectTask.find({
+      organizationId: orgReq.organization._id,
+      projectId: { $in: readableProjects.map((project) => project._id) },
+      assigneeIds: employee._id,
+      isArchived: { $ne: true },
+    })
+      .sort({ dueDate: 1, updatedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const stageIds = [...new Set(tasks.map((task) => task.stageId.toString()))];
+    const stages = await ProjectStage.find({ _id: { $in: stageIds } })
+      .select("_id name color")
+      .lean();
+    const stageMap = new Map(stages.map((stage) => [stage._id.toString(), stage]));
+
+    // dueDate ascending puts tasks without a due date first; surface dated tasks
+    // first so "what's due" reads top-to-bottom, then undated ones after.
+    const sorted = [...tasks].sort((a, b) => {
+      const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      return aDue - bDue;
+    });
+
+    res.json({
+      tasks: sorted.map((task) => {
+        const stage = stageMap.get(task.stageId.toString());
+        return {
+          _id: task._id.toString(),
+          title: task.title,
+          dueDate: task.dueDate,
+          projectId: task.projectId.toString(),
+          projectTitle: projectTitles.get(task.projectId.toString()) ?? "Project",
+          stageId: task.stageId.toString(),
+          stageName: stage?.name ?? "",
+          stageColor: stage?.color ?? null,
+        };
+      }),
+    });
+  } catch (err) {
+    console.error("Error listing assigned tasks:", err);
+    res.status(statusCode(err)).json({ error: errorMessage(err, "Failed to fetch assigned tasks") });
+  }
+};
+
 export const createProject = async (req: Request, res: Response): Promise<void> => {
   try {
     const orgReq = req as OrganizationRequest;

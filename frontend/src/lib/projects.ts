@@ -65,6 +65,17 @@ export interface ProjectTask {
   updatedAt: string
 }
 
+export interface MyTask {
+  _id: string
+  title: string
+  dueDate: string | null
+  projectId: string
+  projectTitle: string
+  stageId: string
+  stageName: string
+  stageColor: string | null
+}
+
 export interface ProjectTimeEntry {
   _id: string
   projectId: string
@@ -169,6 +180,10 @@ export function listProjects(params: { search?: string; status?: string; page?: 
 
 export function getProjectReferenceData() {
   return api<ProjectReferenceData>("/reference-data")
+}
+
+export function getMyTasks(limit = 6) {
+  return api<{ tasks: MyTask[] }>(`/tasks/mine?limit=${limit}`)
 }
 
 export function getProject(id: string) {
