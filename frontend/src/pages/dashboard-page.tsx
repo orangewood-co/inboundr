@@ -332,6 +332,13 @@ type TopSellerPickerState = {
   results: RFQSearchMatch[]
 }
 
+type ManualFallbackState = {
+  search: string
+  loading: boolean
+  error: string | null
+  results: CatalogProduct[]
+}
+
 type ManualProductField = keyof Pick<
   ManualProduct,
   "queryName" | "quantity" | "brand" | "description" | "code" | "price" | "discountPercent" | "hsnCode" | "gstRate" | "calibrationCharges" | "deliveryTimeline"
@@ -810,6 +817,7 @@ export function DashboardPage() {
   const [productSearchLoading, setProductSearchLoading] = useState(false)
   const [productSearchError, setProductSearchError] = useState<string | null>(null)
   const [topSellerPickers, setTopSellerPickers] = useState<Record<number, TopSellerPickerState>>({})
+  const [manualFallbacks, setManualFallbacks] = useState<Record<number, ManualFallbackState>>({})
   const [customProduct, setCustomProduct] = useState<ManualProduct>({
     id: "custom-draft",
     searchResultIndex: null,
@@ -998,6 +1006,7 @@ export function DashboardPage() {
       setProductResults([])
       setProductSearchError(null)
       setTopSellerPickers({})
+      setManualFallbacks({})
       setSourceEmailOpen(false)
       setSelectedSourceAttachment(null)
       setSelectedPaymentTermId("")
@@ -1275,6 +1284,19 @@ export function DashboardPage() {
     }))
   }
 
+  const searchCatalogProducts = async (search: string): Promise<CatalogProduct[]> => {
+    if (!search) {
+      return []
+    }
+
+    const res = await fetch(`${PRODUCTS_API_BASE}?page=1&limit=8&search=${encodeURIComponent(search)}`, {
+      credentials: "include",
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data: ProductsResponse = await res.json()
+    return data.products
+  }
+
   const handleSearchProducts = async () => {
     const search = productSearch.trim()
     if (!search) {
@@ -1285,12 +1307,7 @@ export function DashboardPage() {
     setProductSearchLoading(true)
     setProductSearchError(null)
     try {
-      const res = await fetch(`${PRODUCTS_API_BASE}?page=1&limit=8&search=${encodeURIComponent(search)}`, {
-        credentials: "include",
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data: ProductsResponse = await res.json()
-      setProductResults(data.products)
+      setProductResults(await searchCatalogProducts(search))
     } catch (err: any) {
       setProductSearchError(err.message || "Failed to search products")
       setProductResults([])
@@ -1333,6 +1350,90 @@ export function DashboardPage() {
         searchResultIndex: activeManualProductQueryIndex,
       },
     ])
+  }
+
+  const handleManualFallbackSearchChange = (
+    searchResultIndex: number,
+    value: string
+  ) => {
+    setManualFallbacks((prev) => ({
+      ...prev,
+      [searchResultIndex]: {
+        search: value,
+        loading: prev[searchResultIndex]?.loading ?? false,
+        error: null,
+        results: prev[searchResultIndex]?.results ?? [],
+      },
+    }))
+  }
+
+  const handleSearchManualFallback = async (
+    searchResultIndex: number,
+    query: RFQSearchResult["query"]
+  ) => {
+    const current = manualFallbacks[searchResultIndex]
+    const search = (current?.search ?? query.name).trim()
+
+    if (!search) {
+      setManualFallbacks((prev) => ({
+        ...prev,
+        [searchResultIndex]: {
+          search: "",
+          loading: false,
+          error: null,
+          results: [],
+        },
+      }))
+      return
+    }
+
+    setManualFallbacks((prev) => ({
+      ...prev,
+      [searchResultIndex]: {
+        search,
+        loading: true,
+        error: null,
+        results: prev[searchResultIndex]?.results ?? [],
+      },
+    }))
+
+    try {
+      const results = await searchCatalogProducts(search)
+      setManualFallbacks((prev) => ({
+        ...prev,
+        [searchResultIndex]: {
+          search,
+          loading: false,
+          error: null,
+          results,
+        },
+      }))
+    } catch (err) {
+      setManualFallbacks((prev) => ({
+        ...prev,
+        [searchResultIndex]: {
+          search,
+          loading: false,
+          error: err instanceof Error ? err.message : "Failed to search products",
+          results: [],
+        },
+      }))
+    }
+  }
+
+  const handleAddManualFallbackProduct = (
+    searchResultIndex: number,
+    product: CatalogProduct,
+    query: RFQSearchResult["query"]
+  ) => {
+    setManualProducts((prev) => [
+      ...prev,
+      {
+        ...catalogProductToManual(product, query),
+        searchResultIndex,
+      },
+    ])
+    toast.success("Product added to this item")
   }
 
   const handleSearchTopSellers = async (searchResultIndex: number) => {
@@ -1893,6 +1994,8 @@ export function DashboardPage() {
 
   const renderTopSellerPicker = (searchResultIndex: number, query: RFQSearchResult["query"]) => {
     const state = topSellerPickers[searchResultIndex]
+    const fallback = manualFallbacks[searchResultIndex]
+    const fallbackSearch = fallback?.search ?? query.name
     if (!state?.open) return null
 
     return (
@@ -1925,8 +2028,82 @@ export function DashboardPage() {
             {state.error}
           </div>
         ) : state.results.length === 0 ? (
-          <div className="rounded-lg border border-dashed bg-background/60 px-3 py-4 text-center text-xs text-muted-foreground">
-            No top-seller products matched this requested item.
+          <div className="rounded-lg border border-dashed bg-background/60 p-3">
+            <div className="text-center text-xs text-muted-foreground">
+              No top-seller products matched this requested item.
+            </div>
+            <div className="mt-3 rounded-lg border bg-muted/20 p-2.5 text-left">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Search Catalog Manually
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={fallbackSearch}
+                  onChange={(event) => handleManualFallbackSearchChange(searchResultIndex, event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault()
+                      void handleSearchManualFallback(searchResultIndex, query)
+                    }
+                  }}
+                  placeholder="Search product code, brand, HSN..."
+                  className="h-8 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={fallback?.loading}
+                  onClick={() => void handleSearchManualFallback(searchResultIndex, query)}
+                >
+                  {fallback?.loading && <Spinner data-icon="inline-start" />}
+                  Search
+                </Button>
+              </div>
+              {fallback?.error && (
+                <p className="mt-2 text-xs text-destructive">{fallback.error}</p>
+              )}
+              {fallback && !fallback.loading && !fallback.error && fallback.results.length === 0 && fallback.search.trim() !== "" && (
+                <p className="mt-2 text-xs text-muted-foreground">No catalog products matched that search.</p>
+              )}
+              {fallback?.results.length ? (
+                <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
+                  {fallback.results.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between gap-3 rounded-md border bg-card px-2.5 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {product.productdescription || product.productcode || "Catalog product"}
+                        </p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          {product.brand && <span>{product.brand}</span>}
+                          {product.productcode && (
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                              {product.productcode}
+                            </span>
+                          )}
+                          {product.hsncode && <span>HSN: {product.hsncode}</span>}
+                          {product.unitprice != null && (
+                            <span>{formatMoney(Number(product.unitprice))}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => handleAddManualFallbackProduct(searchResultIndex, product, query)}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : (
           <div className="space-y-1.5">
