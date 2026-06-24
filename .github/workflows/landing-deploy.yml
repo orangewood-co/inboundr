@@ -26,6 +26,7 @@ jobs:
   build:
     name: Typecheck and build
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout
@@ -41,6 +42,8 @@ jobs:
         run: bun run typecheck:landing
 
       - name: Build landing
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: bun run build:landing
 
       - name: Upload dist artifact
