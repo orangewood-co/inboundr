@@ -7,12 +7,14 @@ export const APP_TITLE = "Inboundr"
 export const ROUTE_LABELS: Record<string, string> = {
   "/": "Home",
   "/admin": "Super Admin",
+  "/admin/feedback": "Feedback",
   "/chat": "AI Chat",
   "/customers": "Customers",
   "/customers/import": "Import Customers",
   "/drive": "Drive",
   "/emails": "Inbox",
   "/employees": "Employees",
+  "/feedback": "Feedback",
   "/employees/attendance": "Attendance",
   "/employees/attendance/logs": "Attendance Logs",
   "/employees/new": "New Employee",
@@ -38,6 +40,7 @@ export const ROUTE_LABELS: Record<string, string> = {
 
 const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: string }> = [
   { match: (p) => p.startsWith("/admin/organizations/"), title: "Organization Admin" },
+  { match: (p) => p.startsWith("/admin/feedback/"), title: "Feedback Details" },
   { match: (p) => p.startsWith("/forms/"), title: "Form Editor" },
   { match: (p) => p.startsWith("/invoices/"), title: "Invoice Details" },
   { match: (p) => p.startsWith("/customers/"), title: "Customer Details" },

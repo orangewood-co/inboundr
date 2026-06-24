@@ -25,6 +25,7 @@ import { Route as LinksRouteImport } from './routes/links'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as FormsRouteImport } from './routes/forms'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as DriveRouteImport } from './routes/drive'
@@ -51,8 +52,10 @@ import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.att
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
+import { Route as AdminFeedbackRouteImport } from './routes/admin_.feedback'
 import { Route as EmployeesAttendanceLogsRouteImport } from './routes/employees_.attendance_.logs'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
+import { Route as AdminFeedbackIdRouteImport } from './routes/admin_.feedback.$id'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
 const SupportRoute = SupportRouteImport.update({
@@ -133,6 +136,11 @@ const FormsRoute = FormsRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeesRoute = EmployeesRouteImport.update({
@@ -265,6 +273,11 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/admin_/feedback',
+  path: '/admin/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmployeesAttendanceLogsRoute = EmployeesAttendanceLogsRouteImport.update({
   id: '/employees_/attendance_/logs',
   path: '/employees/attendance/logs',
@@ -274,6 +287,11 @@ const AdminOrganizationsIdRoute = AdminOrganizationsIdRouteImport.update({
   id: '/admin_/organizations/$id',
   path: '/admin/organizations/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminFeedbackIdRoute = AdminFeedbackIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminFeedbackRoute,
 } as any)
 const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
   id: '/projects_/$id_/tasks/$taskId',
@@ -289,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
+  '/feedback': typeof FeedbackRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
   '/invoices': typeof InvoicesRouteWithChildren
@@ -305,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
+  '/admin/feedback': typeof AdminFeedbackRouteWithChildren
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -324,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/support/': typeof SupportIndexRoute
+  '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -336,6 +357,7 @@ export interface FileRoutesByTo {
   '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
+  '/feedback': typeof FeedbackRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
@@ -348,6 +370,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/admin/feedback': typeof AdminFeedbackRouteWithChildren
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -367,6 +390,7 @@ export interface FileRoutesByTo {
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
   '/support': typeof SupportIndexRoute
+  '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -380,6 +404,7 @@ export interface FileRoutesById {
   '/drive': typeof DriveRoute
   '/emails': typeof EmailsRoute
   '/employees': typeof EmployeesRoute
+  '/feedback': typeof FeedbackRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/forms': typeof FormsRouteWithChildren
   '/invoices': typeof InvoicesRouteWithChildren
@@ -396,6 +421,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
+  '/admin_/feedback': typeof AdminFeedbackRouteWithChildren
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
@@ -415,6 +441,7 @@ export interface FileRoutesById {
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
   '/support/': typeof SupportIndexRoute
+  '/admin_/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees_/attendance_/logs': typeof EmployeesAttendanceLogsRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
@@ -429,6 +456,7 @@ export interface FileRouteTypes {
     | '/drive'
     | '/emails'
     | '/employees'
+    | '/feedback'
     | '/forgot-password'
     | '/forms'
     | '/invoices'
@@ -445,6 +473,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/support'
+    | '/admin/feedback'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -464,6 +493,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/support/'
+    | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
@@ -476,6 +506,7 @@ export interface FileRouteTypes {
     | '/drive'
     | '/emails'
     | '/employees'
+    | '/feedback'
     | '/forgot-password'
     | '/login'
     | '/orders'
@@ -488,6 +519,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/admin/feedback'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -507,6 +539,7 @@ export interface FileRouteTypes {
     | '/invoices'
     | '/links'
     | '/support'
+    | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
     | '/projects/$id/tasks/$taskId'
@@ -519,6 +552,7 @@ export interface FileRouteTypes {
     | '/drive'
     | '/emails'
     | '/employees'
+    | '/feedback'
     | '/forgot-password'
     | '/forms'
     | '/invoices'
@@ -535,6 +569,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/support'
+    | '/admin_/feedback'
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
@@ -554,6 +589,7 @@ export interface FileRouteTypes {
     | '/invoices/'
     | '/links/'
     | '/support/'
+    | '/admin_/feedback/$id'
     | '/admin_/organizations/$id'
     | '/employees_/attendance_/logs'
     | '/projects_/$id_/tasks/$taskId'
@@ -567,6 +603,7 @@ export interface RootRouteChildren {
   DriveRoute: typeof DriveRoute
   EmailsRoute: typeof EmailsRoute
   EmployeesRoute: typeof EmployeesRoute
+  FeedbackRoute: typeof FeedbackRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   FormsRoute: typeof FormsRouteWithChildren
   InvoicesRoute: typeof InvoicesRouteWithChildren
@@ -583,6 +620,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   SupportRoute: typeof SupportRouteWithChildren
+  AdminFeedbackRoute: typeof AdminFeedbackRouteWithChildren
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
@@ -709,6 +747,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employees': {
@@ -893,6 +938,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/feedback': {
+      id: '/admin_/feedback'
+      path: '/admin/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/employees_/attendance_/logs': {
       id: '/employees_/attendance_/logs'
       path: '/employees/attendance/logs'
@@ -906,6 +958,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/organizations/$id'
       preLoaderRoute: typeof AdminOrganizationsIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin_/feedback/$id': {
+      id: '/admin_/feedback/$id'
+      path: '/$id'
+      fullPath: '/admin/feedback/$id'
+      preLoaderRoute: typeof AdminFeedbackIdRouteImport
+      parentRoute: typeof AdminFeedbackRoute
     }
     '/projects_/$id_/tasks/$taskId': {
       id: '/projects_/$id_/tasks/$taskId'
@@ -972,6 +1031,18 @@ const SupportRouteChildren: SupportRouteChildren = {
 const SupportRouteWithChildren =
   SupportRoute._addFileChildren(SupportRouteChildren)
 
+interface AdminFeedbackRouteChildren {
+  AdminFeedbackIdRoute: typeof AdminFeedbackIdRoute
+}
+
+const AdminFeedbackRouteChildren: AdminFeedbackRouteChildren = {
+  AdminFeedbackIdRoute: AdminFeedbackIdRoute,
+}
+
+const AdminFeedbackRouteWithChildren = AdminFeedbackRoute._addFileChildren(
+  AdminFeedbackRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -980,6 +1051,7 @@ const rootRouteChildren: RootRouteChildren = {
   DriveRoute: DriveRoute,
   EmailsRoute: EmailsRoute,
   EmployeesRoute: EmployeesRoute,
+  FeedbackRoute: FeedbackRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   FormsRoute: FormsRouteWithChildren,
   InvoicesRoute: InvoicesRouteWithChildren,
@@ -996,6 +1068,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   SupportRoute: SupportRouteWithChildren,
+  AdminFeedbackRoute: AdminFeedbackRouteWithChildren,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,

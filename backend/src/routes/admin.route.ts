@@ -4,16 +4,20 @@ import {
   addAdminUserMembership,
   createAdminOrganization,
   createAdminOrganizationUser,
+  getAdminFeedback,
   getAdminMe,
   getAdminOrganization,
   getAdminPlans,
   inviteAdminOrganizationMember,
+  listAdminFeedback,
   listAdminOrganizations,
   listAdminUsers,
   moveAdminOrganizationMember,
   removeAdminOrganizationMember,
+  replyAdminFeedback,
   sendAdminSampleNotification,
   transferAdminOrganizationOwner,
+  updateAdminFeedback,
   updateAdminOrganizationMember,
   updateAdminOrganization,
 } from "../controllers/admin.controller";
@@ -28,6 +32,10 @@ router.get("/plans", getAdminPlans);
 router.get("/organizations", listAdminOrganizations);
 router.get("/users", listAdminUsers);
 router.post("/notifications/sample", sendAdminSampleNotification);
+router.get("/feedback", listAdminFeedback);
+router.get("/feedback/:id", getAdminFeedback);
+router.post("/feedback/:id/messages", replyAdminFeedback);
+router.patch("/feedback/:id", updateAdminFeedback);
 router.post("/users/:userId/memberships", addAdminUserMembership);
 router.post("/organizations", createAdminOrganization);
 router.post("/organizations/:id/users", createAdminOrganizationUser);

@@ -17,6 +17,14 @@ import {
 import { Organization } from "../models/organization.model";
 import { ensureNotificationRecipient } from "../services/notification.service";
 import {
+  addAdminMessage,
+  getFeedbackForAdmin,
+  listFeedbackForAdmin,
+  normalizeFeedbackStatus,
+  normalizeFeedbackType,
+  updateFeedbackStatus,
+} from "../services/feedback.service";
+import {
   FEATURE_CATALOG,
   PLAN_DEFINITIONS,
   getEffectiveFeatures,
@@ -970,6 +978,85 @@ export async function transferAdminOrganizationOwner(req: Request, res: Response
   } catch (err) {
     console.error("Error transferring admin organization owner:", err);
     res.status(500).json({ error: "Failed to transfer owner" });
+  }
+}
+
+export async function listAdminFeedback(req: Request, res: Response): Promise<void> {
+  try {
+    const { feedback, unreadCount } = await listFeedbackForAdmin({
+      type: normalizeFeedbackType(req.query.type),
+      status: normalizeFeedbackStatus(req.query.status),
+      unreadOnly: stringValue(req.query.unread) === "true",
+    });
+    res.json({ feedback, unreadCount });
+  } catch (err) {
+    console.error("Error listing admin feedback:", err);
+    res.status(500).json({ error: "Failed to list feedback" });
+  }
+}
+
+export async function getAdminFeedback(req: Request, res: Response): Promise<void> {
+  try {
+    const feedback = await getFeedbackForAdmin(stringValue(req.params.id), {
+      markRead: true,
+    });
+    if (!feedback) {
+      res.status(404).json({ error: "Feedback not found" });
+      return;
+    }
+    res.json({ feedback });
+  } catch (err) {
+    console.error("Error fetching admin feedback:", err);
+    res.status(500).json({ error: "Failed to load feedback" });
+  }
+}
+
+export async function replyAdminFeedback(req: Request, res: Response): Promise<void> {
+  try {
+    const message = stringValue(req.body?.message);
+    if (!message) {
+      res.status(400).json({ error: "Message is required" });
+      return;
+    }
+    if (message.length > 5000) {
+      res.status(400).json({ error: "Message is too long" });
+      return;
+    }
+
+    const authReq = req as AuthenticatedRequest;
+    const feedback = await addAdminMessage({
+      feedbackId: stringValue(req.params.id),
+      actor: { id: authReq.user.id, name: authReq.user.name, email: authReq.user.email },
+      body: message,
+    });
+    if (!feedback) {
+      res.status(404).json({ error: "Feedback not found" });
+      return;
+    }
+    res.status(201).json({ feedback });
+  } catch (err) {
+    console.error("Error replying to admin feedback:", err);
+    res.status(500).json({ error: "Failed to send reply" });
+  }
+}
+
+export async function updateAdminFeedback(req: Request, res: Response): Promise<void> {
+  try {
+    const status = normalizeFeedbackStatus(req.body?.status);
+    if (!status) {
+      res.status(400).json({ error: "A valid status is required" });
+      return;
+    }
+
+    const feedback = await updateFeedbackStatus(stringValue(req.params.id), status);
+    if (!feedback) {
+      res.status(404).json({ error: "Feedback not found" });
+      return;
+    }
+    res.json({ feedback });
+  } catch (err) {
+    console.error("Error updating admin feedback:", err);
+    res.status(500).json({ error: "Failed to update feedback" });
   }
 }
 

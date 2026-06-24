@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
-import { BellRingIcon, Building2Icon, CrownIcon, MailIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
+import { BellRingIcon, Building2Icon, CrownIcon, MailIcon, MessagesSquareIcon, PlusIcon, RefreshCwIcon, SearchIcon, SendIcon, ShieldAlertIcon, UsersIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
@@ -510,6 +510,12 @@ export default function AdminPage() {
             description="Create production organizations, invite owners, and assign feature access through plans and overrides."
             actions={
             <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link to="/admin/feedback">
+                  <MessagesSquareIcon className="mr-2 size-4" />
+                  Feedback
+                </Link>
+              </Button>
               <Button variant="outline" onClick={() => { void load(); void loadUsers() }}>
                 <RefreshCwIcon className="mr-2 size-4" />
                 Refresh
