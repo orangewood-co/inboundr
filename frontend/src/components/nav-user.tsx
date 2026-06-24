@@ -18,18 +18,15 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { clearOrganizationSessionStorage } from "@/lib/auth-storage"
 import { signOut } from "@/lib/auth-client"
 import { useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
 import {
   BadgeCheckIcon,
   BellIcon,
   ChevronsUpDownIcon,
+  LifeBuoyIcon,
   LogOutIcon,
-  MessageSquarePlusIcon,
-  MessagesSquareIcon,
   Settings2Icon,
 } from "lucide-react"
 
@@ -45,7 +42,6 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const navigate = useNavigate()
   const fallback = getInitials(user.name || user.email)
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   async function handleSignOut() {
     await signOut()
@@ -107,16 +103,10 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
-                <MessageSquarePlusIcon />
-                Send Feedback
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate({ to: "/feedback" })}>
-                <MessagesSquareIcon />
-                My Feedback
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => navigate({ to: "/feedback" })}>
+              <LifeBuoyIcon />
+              Feedback & Support
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOutIcon />
@@ -125,7 +115,6 @@ export function NavUser({
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </SidebarMenu>
   )
 }
