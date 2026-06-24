@@ -3361,6 +3361,22 @@ export function DashboardPage() {
                         Rerun processing
                       </Button>
                     )}
+                    {!detail.isProcessed && !detail.errorMessage && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                        disabled={retrying}
+                        onClick={() => handleRetry(detail._id)}
+                      >
+                        {retrying ? (
+                          <Spinner className="size-3" data-icon="inline-start" />
+                        ) : (
+                          <RotateCcwIcon className="size-3" />
+                        )}
+                        Cancel &amp; Rerun
+                      </Button>
+                    )}
                   </div>
                   <p className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
                     {detail.reason}
