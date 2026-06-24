@@ -4,7 +4,7 @@ import { ChatOpenRouter } from "@langchain/openrouter";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 const model = new ChatOpenRouter({
-  model: "openai/gpt-5.4-mini",
+  model: "deepseek/deepseek-v4-flash",
   temperature: 0.2,
 });
 

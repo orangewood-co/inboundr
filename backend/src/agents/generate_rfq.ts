@@ -17,7 +17,7 @@ import {
 import { Customer } from "../models/customer.model";
 
 const model = new ChatOpenRouter({
-  model: "openai/gpt-5.4-mini",
+  model: "deepseek/deepseek-v4-flash",
   temperature: 0,
 });
 
@@ -143,7 +143,7 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
 
 const identifyProducts: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Identify Products");
-  console.log("EMAIL BODY: ", state.emailBody);
+  // console.log("EMAIL BODY: ", state.emailBody);
 
   const extractedProducts = z.object({
     products: z.array(queryProduct),
