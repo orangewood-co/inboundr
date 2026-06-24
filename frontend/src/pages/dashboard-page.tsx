@@ -2822,13 +2822,13 @@ export function DashboardPage() {
                         return (
                         <div key={i}>
                           {/* Query header */}
-                          <div className="mb-2.5 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <PackageIcon className="size-4 text-muted-foreground" />
+                          <div className="mb-2.5 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <PackageIcon className="size-4 shrink-0 text-muted-foreground" />
                               <span className="text-sm font-semibold">
                                 {sr.query.name}
                               </span>
-                              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
+                              <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
                                 Qty: {sr.query.quantity}
                               </span>
                             </div>
