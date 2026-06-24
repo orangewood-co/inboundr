@@ -12,6 +12,10 @@ import { formatDate } from "@/lib/format"
 interface InvitationPreview {
   email: string
   role: "owner" | "admin" | "member"
+  accessGroups: {
+    _id: string
+    name: string
+  }[]
   status: "pending" | "accepted" | "cancelled" | "expired"
   expiresAt: string
   organization: {
@@ -30,6 +34,13 @@ function inviterLabel(invitation: InvitationPreview): string {
 
 function roleLabel(role: InvitationPreview["role"]): string {
   return role === "admin" ? "Admin" : role === "owner" ? "Owner" : "Member"
+}
+
+function invitationAccessLabel(invitation: InvitationPreview): string {
+  if (invitation.accessGroups?.length) {
+    return invitation.accessGroups.map((group) => group.name).join(", ")
+  }
+  return roleLabel(invitation.role)
 }
 
 export function InvitePage() {
@@ -129,7 +140,7 @@ export function InvitePage() {
                   Workspace Invitation
                 </span>
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground">
-                  {roleLabel(invitation.role)}
+                  {invitationAccessLabel(invitation)}
                 </span>
               </div>
               <div className="space-y-3">

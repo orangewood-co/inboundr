@@ -9,7 +9,7 @@ import {
   requireAuth,
   requireFeature,
   requireOrganization,
-  requireOrganizationRole,
+  requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -19,7 +19,7 @@ router.get(
   requireAuth,
   requireOrganization,
   requireFeature("rfq"),
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   connectGmail
 );
 router.get("/callback", gmailCallback);
@@ -29,7 +29,7 @@ router.delete(
   requireAuth,
   requireOrganization,
   requireFeature("rfq"),
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   disconnectGmailAccount
 );
 

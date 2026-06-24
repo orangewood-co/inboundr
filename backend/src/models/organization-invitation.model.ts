@@ -7,6 +7,7 @@ export interface IOrganizationInvitation extends Document {
   organizationId: Types.ObjectId;
   email: string;
   role: OrganizationRole;
+  accessGroupIds: Types.ObjectId[];
   tokenHash: string;
   invitedByUserId: string;
   invitedByName: string;
@@ -32,6 +33,10 @@ const organizationInvitationSchema = new Schema<IOrganizationInvitation>(
       type: String,
       enum: ["owner", "admin", "member"],
       default: "member",
+    },
+    accessGroupIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: "AccessGroup" }],
+      default: [],
     },
     tokenHash: { type: String, required: true, unique: true, index: true },
     invitedByUserId: { type: String, required: true, index: true },

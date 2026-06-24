@@ -38,6 +38,7 @@ interface EntitlementState {
     restricted: boolean
     enabled: boolean
     allowedModules: EmployeeAccessModule[]
+    canManageOrganization: boolean
   }
 }
 
@@ -45,6 +46,7 @@ interface EntitlementContextValue extends EntitlementState {
   loading: boolean
   hasFeature: (feature: FeatureKey) => boolean
   hasModuleAccess: (module: EmployeeAccessModule) => boolean
+  canManageOrganization: boolean
   refresh: () => Promise<void>
 }
 
@@ -69,6 +71,7 @@ const DEFAULT_ENTITLEMENTS: EntitlementState = {
     restricted: false,
     enabled: true,
     allowedModules: [],
+    canManageOrganization: true,
   },
 }
 
@@ -77,6 +80,7 @@ const EntitlementContext = createContext<EntitlementContextValue>({
   loading: true,
   hasFeature: () => true,
   hasModuleAccess: () => true,
+  canManageOrganization: true,
   refresh: async () => {},
 })
 
@@ -92,10 +96,15 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
       if (!response.ok) return
       const data = await response.json()
       if (data.entitlements?.effectiveFeatures) {
+        const employeeAccess = data.employeeAccess ?? DEFAULT_ENTITLEMENTS.employeeAccess
         setState({
           effectiveFeatures: data.entitlements.effectiveFeatures,
           planSlug: data.entitlements.planSlug ?? "all_features",
-          employeeAccess: data.employeeAccess ?? DEFAULT_ENTITLEMENTS.employeeAccess,
+          employeeAccess: {
+            ...DEFAULT_ENTITLEMENTS.employeeAccess,
+            ...employeeAccess,
+            canManageOrganization: Boolean(employeeAccess.canManageOrganization),
+          },
         })
       }
     } finally {
@@ -116,6 +125,7 @@ export function EntitlementProvider({ children }: { children: React.ReactNode })
         if (!state.employeeAccess.enabled) return false
         return !state.employeeAccess.restricted || state.employeeAccess.allowedModules.includes(module)
       },
+      canManageOrganization: state.employeeAccess.canManageOrganization,
       refresh,
     }),
     [loading, state]

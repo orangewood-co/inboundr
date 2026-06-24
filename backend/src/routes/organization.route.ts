@@ -2,21 +2,27 @@ import { Router } from "express";
 import {
   acceptOrganizationInvitation,
   addOrganizationLetterhead,
+  archiveOrganizationAccessGroup,
   cancelOrganizationInvitation,
+  createOrganizationAccessGroup,
   deleteOrganizationLetterhead,
   getMyOrganization,
   inviteOrganizationMember,
+  listOrganizationAccessGroups,
   listOrganizationInvitations,
   listOrganizationMembers,
   previewOrganizationInvitation,
   removeOrganizationMember,
   setActiveOrganizationLetterhead,
   transferOrganizationOwnership,
+  updateOrganizationAccessGroup,
+  updateOrganizationMemberAccessGroups,
   updateMyOrganization,
   updateOrganizationMemberRole,
 } from "../controllers/organization.controller";
 import {
   requireAuth,
+  requireOrganizationAdmin,
   requireOrganization,
   requireOrganizationRole,
 } from "../middleware/auth.middleware";
@@ -28,20 +34,24 @@ router.use(requireAuth);
 router.post("/invitations/accept", acceptOrganizationInvitation);
 router.use(requireOrganization);
 router.get("/me", getMyOrganization);
-router.put("/me", requireOrganizationRole(["owner", "admin"]), updateMyOrganization);
+router.put("/me", requireOrganizationAdmin(), updateMyOrganization);
+router.get("/access-groups", requireOrganizationAdmin(), listOrganizationAccessGroups);
+router.post("/access-groups", requireOrganizationAdmin(), createOrganizationAccessGroup);
+router.put("/access-groups/:id", requireOrganizationAdmin(), updateOrganizationAccessGroup);
+router.delete("/access-groups/:id", requireOrganizationAdmin(), archiveOrganizationAccessGroup);
 router.post(
   "/letterheads",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   addOrganizationLetterhead
 );
 router.patch(
   "/letterheads/:id/active",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   setActiveOrganizationLetterhead
 );
 router.delete(
   "/letterheads/:id",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   deleteOrganizationLetterhead
 );
 router.get("/members", listOrganizationMembers);
@@ -52,27 +62,32 @@ router.post(
 );
 router.patch(
   "/members/:id",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   updateOrganizationMemberRole
+);
+router.patch(
+  "/members/:id/access-groups",
+  requireOrganizationAdmin(),
+  updateOrganizationMemberAccessGroups
 );
 router.delete(
   "/members/:id",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   removeOrganizationMember
 );
 router.get(
   "/invitations",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   listOrganizationInvitations
 );
 router.post(
   "/invitations",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   inviteOrganizationMember
 );
 router.delete(
   "/invitations/:id",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   cancelOrganizationInvitation
 );
 

@@ -40,6 +40,36 @@ export function requireOrganizationRole(roles: OrganizationRole[]) {
   };
 }
 
+export function requireOrganizationAdmin() {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const orgReq = req as OrganizationRequest;
+      const membership = orgReq.organizationMembership;
+
+      if (!membership) {
+        res.status(401).json({ error: "Organization context is required" });
+        return;
+      }
+
+      const access = await getEmployeeAccessState({
+        organizationId: orgReq.organization._id,
+        organizationMemberId: membership._id,
+        role: membership.role,
+      });
+
+      if (!access.canManageOrganization) {
+        res.status(403).json({ error: "Insufficient organization permissions" });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      console.error("Organization admin validation failed:", err);
+      res.status(500).json({ error: "Failed to validate organization permissions" });
+    }
+  };
+}
+
 function superAdminEmailAllowlist(): string[] {
   return (process.env.SUPER_ADMIN_EMAILS ?? "")
     .split(",")

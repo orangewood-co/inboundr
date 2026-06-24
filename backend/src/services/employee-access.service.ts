@@ -1,6 +1,7 @@
 import type { Types } from "mongoose";
-import { Employee } from "../models/employee.model";
-import { EmployeeTeam, type EmployeeAccessModule } from "../models/employee-team.model";
+import { AccessGroup } from "../models/access-group.model";
+import type { EmployeeAccessModule } from "../models/employee-team.model";
+import { OrganizationMember } from "../models/organization-member.model";
 import type { OrganizationRole } from "../models/organization-member.model";
 
 export interface EmployeeAccessState {
@@ -8,6 +9,7 @@ export interface EmployeeAccessState {
   enabled: boolean;
   employeeId: string | null;
   allowedModules: EmployeeAccessModule[];
+  canManageOrganization: boolean;
 }
 
 export async function getEmployeeAccessState({
@@ -19,63 +21,80 @@ export async function getEmployeeAccessState({
   organizationMemberId?: Types.ObjectId | null;
   role: OrganizationRole;
 }): Promise<EmployeeAccessState> {
-  if (role === "owner" || !organizationMemberId) {
+  if (role === "owner") {
     return {
       restricted: false,
       enabled: true,
       employeeId: null,
       allowedModules: [],
+      canManageOrganization: true,
     };
   }
 
-  const employee = await Employee.findOne({
-    organizationId,
-    organizationMemberId,
-    status: { $ne: "archived" },
-  }).lean();
-
-  if (!employee) {
-    return {
-      restricted: false,
-      enabled: true,
-      employeeId: null,
-      allowedModules: [],
-    };
-  }
-
-  if (employee.status !== "active" || !employee.platformAccess?.enabled) {
+  if (!organizationMemberId) {
     return {
       restricted: true,
       enabled: false,
-      employeeId: String(employee._id),
+      employeeId: null,
       allowedModules: [],
+      canManageOrganization: false,
     };
   }
 
-  const modules = new Set<EmployeeAccessModule>();
-  if (employee.teamId) {
-    const team = await EmployeeTeam.findOne({
-      _id: employee.teamId,
-      organizationId,
-      status: "active",
-    }).lean();
-    for (const module of team?.defaultModules ?? []) {
-      modules.add(module);
-    }
+  const membership = await OrganizationMember.findOne({
+    _id: organizationMemberId,
+    organizationId,
+  })
+    .select("accessGroupIds")
+    .lean();
+
+  if (!membership) {
+    return {
+      restricted: true,
+      enabled: false,
+      employeeId: null,
+      allowedModules: [],
+      canManageOrganization: false,
+    };
   }
 
-  for (const module of employee.platformAccess.allowedModules ?? []) {
-    modules.add(module);
-  }
-  for (const module of employee.platformAccess.restrictedModules ?? []) {
-    modules.delete(module);
+  const accessGroupIds = membership.accessGroupIds ?? [];
+  if (accessGroupIds.length === 0) {
+    return {
+      restricted: true,
+      enabled: true,
+      employeeId: null,
+      allowedModules: [],
+      canManageOrganization: false,
+    };
   }
 
-  const allowedModules = [...modules];
+  const groups = await AccessGroup.find({
+    _id: { $in: accessGroupIds },
+    organizationId,
+    status: "active",
+  }).lean();
+
+  const canManageOrganization = groups.some((group) => group.canManageOrganization);
+  const allModules = groups.some((group) => group.allModules);
+  if (allModules) {
+    return {
+      restricted: false,
+      enabled: true,
+      employeeId: null,
+      allowedModules: [],
+      canManageOrganization,
+    };
+  }
+
+  const allowedModules = [
+    ...new Set(groups.flatMap((group) => group.moduleAccess ?? [])),
+  ];
   return {
-    restricted: allowedModules.length > 0,
+    restricted: true,
     enabled: true,
-    employeeId: String(employee._id),
+    employeeId: null,
     allowedModules,
+    canManageOrganization,
   };
 }

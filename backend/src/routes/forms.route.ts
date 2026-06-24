@@ -16,7 +16,7 @@ import {
   requireEmployeeModule,
   requireFeature,
   requireOrganization,
-  requireOrganizationRole,
+  requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -27,11 +27,11 @@ router.use(requireFeature("forms"));
 router.use(requireEmployeeModule("forms"));
 
 router.get("/", listForms);
-router.post("/", requireOrganizationRole(["owner", "admin"]), createForm);
+router.post("/", requireOrganizationAdmin(), createForm);
 router.get("/:id", getForm);
-router.put("/:id", requireOrganizationRole(["owner", "admin"]), updateForm);
-router.post("/:id/duplicate", requireOrganizationRole(["owner", "admin"]), duplicateForm);
-router.delete("/:id", requireOrganizationRole(["owner", "admin"]), archiveForm);
+router.put("/:id", requireOrganizationAdmin(), updateForm);
+router.post("/:id/duplicate", requireOrganizationAdmin(), duplicateForm);
+router.delete("/:id", requireOrganizationAdmin(), archiveForm);
 router.get("/:id/submissions", listSubmissions);
 router.get("/:id/submissions/export", exportSubmissionsCsv);
 router.post(
@@ -42,7 +42,7 @@ router.post(
 );
 router.put(
   "/:id/submissions/:submissionId",
-  requireOrganizationRole(["owner", "admin"]),
+  requireOrganizationAdmin(),
   updateSubmissionStatus
 );
 

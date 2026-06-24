@@ -5,6 +5,10 @@ import {
   type IOrganizationMember,
 } from "../models/organization-member.model";
 import { OrganizationInvitation } from "../models/organization-invitation.model";
+import {
+  defaultAccessGroupIdsForRole,
+  ensureDefaultAccessGroups,
+} from "./access-group.service";
 
 export interface OrganizationUser {
   id: string;
@@ -22,9 +26,13 @@ function isDuplicateOwnerError(err: unknown, userId: string): boolean {
 }
 
 async function ensureOwnerMembership(organization: IOrganization, userId: string): Promise<void> {
+  const defaultGroups = await ensureDefaultAccessGroups(organization._id);
   await OrganizationMember.updateOne(
     { organizationId: organization._id, userId },
-    { $setOnInsert: { role: "owner" } },
+    {
+      $setOnInsert: { role: "owner" },
+      $addToSet: { accessGroupIds: defaultGroups.admin._id },
+    },
     { upsert: true }
   );
 }
@@ -33,13 +41,24 @@ async function ensureInvitationMembership(
   invitation: {
     organizationId: mongoose.Types.ObjectId;
     role: IOrganizationMember["role"];
+    accessGroupIds?: mongoose.Types.ObjectId[];
   },
   organization: IOrganization,
   user: OrganizationUser
 ): Promise<void> {
+  const accessGroupIds =
+    invitation.accessGroupIds && invitation.accessGroupIds.length > 0
+      ? invitation.accessGroupIds
+      : await defaultAccessGroupIdsForRole(invitation.organizationId, invitation.role);
+  const memberRole: IOrganizationMember["role"] =
+    invitation.role === "owner" ? "owner" : "member";
+
   await OrganizationMember.updateOne(
     { organizationId: invitation.organizationId, userId: user.id },
-    { $setOnInsert: { role: invitation.role } },
+    {
+      $setOnInsert: { role: memberRole },
+      $addToSet: { accessGroupIds: { $each: accessGroupIds } },
+    },
     { upsert: true }
   );
 
@@ -51,7 +70,7 @@ async function ensureInvitationMembership(
 
 async function createPersonalOrganizationForUser(user: OrganizationUser): Promise<IOrganization> {
   try {
-    return await Organization.create({
+    const organization = await Organization.create({
       ownerUserId: user.id,
       name: user.name ? `${user.name}'s Organization` : "My Organization",
       defaultContact: {
@@ -60,6 +79,8 @@ async function createPersonalOrganizationForUser(user: OrganizationUser): Promis
         phoneNumber: "",
       },
     });
+    await ensureDefaultAccessGroups(organization._id);
+    return organization;
   } catch (err) {
     if (!isDuplicateOwnerError(err, user.id)) throw err;
 

@@ -4,8 +4,10 @@ import { useSearch } from "@tanstack/react-router"
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { AvatarCropDialog, type AvatarCropResult } from "@/components/avatar-crop-dialog"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -39,7 +41,7 @@ import { useTheme } from "@/components/theme-provider"
 import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organization-context"
-import { useEntitlements } from "@/lib/entitlements"
+import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -55,6 +57,7 @@ import {
   MessageSquareTextIcon,
   MoreVerticalIcon,
   PlusIcon,
+  ShieldCheckIcon,
   Trash2Icon,
   UsersIcon,
 } from "lucide-react"
@@ -201,6 +204,24 @@ type OrganizationFormState = Omit<Organization, "_id" | "letterheads" | "activeL
 
 type OrganizationRole = "owner" | "admin" | "member"
 
+interface AccessGroupSummary {
+  _id: string
+  name: string
+  allModules: boolean
+  canManageOrganization: boolean
+  isDefault: boolean
+  defaultKey: "admin" | "members" | null
+}
+
+interface AccessGroup extends AccessGroupSummary {
+  description: string | null
+  moduleAccess: EmployeeAccessModule[]
+  status: "active" | "archived"
+  memberCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 interface OrganizationMember {
   _id: string
   userId: string
@@ -208,6 +229,8 @@ interface OrganizationMember {
   userEmail: string | null
   userImage: string | null
   role: OrganizationRole
+  accessGroupIds: string[]
+  accessGroups: AccessGroupSummary[]
   createdAt: string
   lastSignInAt: string | null
 }
@@ -216,6 +239,8 @@ interface OrganizationInvitation {
   _id: string
   email: string
   role: OrganizationRole
+  accessGroupIds: string[]
+  accessGroups: AccessGroupSummary[]
   expiresAt: string
   createdAt: string
 }
@@ -312,6 +337,106 @@ function RoleBadge({ role }: { role: "Owner" | "Admin" | "Member" }) {
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[role]}`}>
       {role}
     </span>
+  )
+}
+
+const ACCESS_MODULE_OPTIONS: { value: EmployeeAccessModule; label: string }[] = [
+  { value: "rfq", label: "RFQ" },
+  { value: "inbox", label: "Inbox" },
+  { value: "products", label: "Products" },
+  { value: "customers", label: "Customers" },
+  { value: "invoices", label: "Invoices" },
+  { value: "forms", label: "Forms" },
+  { value: "links", label: "Links" },
+  { value: "drive", label: "Drive" },
+  { value: "stats", label: "Stats" },
+  { value: "employees", label: "Employees" },
+  { value: "projects", label: "Projects" },
+  { value: "chat", label: "Chat" },
+  { value: "support", label: "Support" },
+]
+
+function AccessGroupBadges({ groups }: { groups: AccessGroupSummary[] }) {
+  if (groups.length === 0) {
+    return <span className="text-xs text-muted-foreground">No groups</span>
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {groups.map((group) => (
+        <Badge key={group._id} variant={group.canManageOrganization ? "default" : "secondary"}>
+          {group.name}
+        </Badge>
+      ))}
+    </div>
+  )
+}
+
+function toggleId(ids: string[], id: string) {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]
+}
+
+function toggleAccessModule(modules: EmployeeAccessModule[], module: EmployeeAccessModule) {
+  return modules.includes(module)
+    ? modules.filter((item) => item !== module)
+    : [...modules, module]
+}
+
+function AccessGroupChecklist({
+  groups,
+  selectedIds,
+  onChange,
+  disabled,
+}: {
+  groups: AccessGroup[]
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="grid gap-2 rounded-xl border bg-muted/20 p-3">
+      {groups.map((group) => (
+        <label key={group._id} className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 hover:bg-muted/50">
+          <Checkbox
+            checked={selectedIds.includes(group._id)}
+            disabled={disabled}
+            onCheckedChange={() => onChange(toggleId(selectedIds, group._id))}
+          />
+          <span className="grid gap-0.5">
+            <span className="text-sm font-medium">{group.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {group.allModules ? "All modules" : `${group.moduleAccess.length} modules`}
+              {group.canManageOrganization ? " - Can manage organization" : ""}
+            </span>
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function ModuleAccessChecklist({
+  selectedModules,
+  onChange,
+  disabled,
+}: {
+  selectedModules: EmployeeAccessModule[]
+  onChange: (modules: EmployeeAccessModule[]) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="grid gap-2 rounded-xl border bg-muted/20 p-3 sm:grid-cols-2">
+      {ACCESS_MODULE_OPTIONS.map((module) => (
+        <label key={module.value} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 hover:bg-muted/50">
+          <Checkbox
+            checked={selectedModules.includes(module.value)}
+            disabled={disabled}
+            onCheckedChange={() => onChange(toggleAccessModule(selectedModules, module.value))}
+          />
+          <span className="text-sm">{module.label}</span>
+        </label>
+      ))}
+    </div>
   )
 }
 
@@ -1630,14 +1755,19 @@ function AccountTab() {
 
 function MembersTab() {
   const { data: session } = useSession()
+  const { canManageOrganization } = useEntitlements()
   const [members, setMembers] = useState<OrganizationMember[]>([])
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
+  const [accessGroups, setAccessGroups] = useState<AccessGroup[]>([])
   const [email, setEmail] = useState("")
-  const [role, setRole] = useState<OrganizationRole>("member")
+  const [selectedInviteGroupIds, setSelectedInviteGroupIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [accepting, setAccepting] = useState(false)
   const [transferTarget, setTransferTarget] = useState<OrganizationMember | null>(null)
+  const [groupEditTarget, setGroupEditTarget] = useState<OrganizationMember | null>(null)
+  const [groupEditIds, setGroupEditIds] = useState<string[]>([])
+  const [savingGroups, setSavingGroups] = useState(false)
   const [transferConfirmation, setTransferConfirmation] = useState("")
   const [transferringId, setTransferringId] = useState<string | null>(null)
   const [memberAvatars, setMemberAvatars] = useState<Record<string, string>>({})
@@ -1654,11 +1784,14 @@ function MembersTab() {
     setLoading(true)
     setError(null)
     try {
-      const [membersRes, invitationsRes] = await Promise.all([
+      const [membersRes, invitationsRes, groupsRes] = await Promise.all([
         fetch(`${API_ORIGIN}/api/v1/organization/members`, {
           credentials: "include",
         }),
         fetch(`${API_ORIGIN}/api/v1/organization/invitations`, {
+          credentials: "include",
+        }),
+        fetch(`${API_ORIGIN}/api/v1/organization/access-groups`, {
           credentials: "include",
         }),
       ])
@@ -1673,6 +1806,20 @@ function MembersTab() {
       } else if (invitationsRes.status !== 403) {
         const invitationsData = await invitationsRes.json().catch(() => null)
         throw new Error(invitationsData?.error || "Failed to load invitations")
+      }
+
+      if (groupsRes.ok) {
+        const groupsData = await groupsRes.json()
+        const loadedGroups = groupsData.accessGroups ?? []
+        setAccessGroups(loadedGroups)
+        setSelectedInviteGroupIds((current) => {
+          if (current.length > 0) return current
+          const membersGroup = loadedGroups.find((group: AccessGroup) => group.defaultKey === "members")
+          return membersGroup ? [membersGroup._id] : []
+        })
+      } else if (groupsRes.status !== 403) {
+        const groupsData = await groupsRes.json().catch(() => null)
+        throw new Error(groupsData?.error || "Failed to load access groups")
       }
     } catch (err: any) {
       setError(err.message || "Failed to load organization members")
@@ -1758,12 +1905,13 @@ function MembersTab() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, accessGroupIds: selectedInviteGroupIds }),
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to send invitation")
       setEmail("")
-      setRole("member")
+      const membersGroup = accessGroups.find((group) => group.defaultKey === "members")
+      setSelectedInviteGroupIds(membersGroup ? [membersGroup._id] : [])
       setMessage("Invitation sent")
       toast.success("Invitation sent")
       await fetchMembers()
@@ -1837,6 +1985,37 @@ function MembersTab() {
     setError(null)
   }
 
+  const openGroupDialog = (member: OrganizationMember) => {
+    setGroupEditTarget(member)
+    setGroupEditIds((member.accessGroupIds ?? []).map(String))
+    setError(null)
+  }
+
+  const saveMemberGroups = async () => {
+    if (!groupEditTarget) return
+    setSavingGroups(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/members/${groupEditTarget._id}/access-groups`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessGroupIds: groupEditIds }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to update member groups")
+      setGroupEditTarget(null)
+      setGroupEditIds([])
+      await fetchMembers()
+      toast.success("Member groups updated")
+    } catch (err: any) {
+      setError(err.message || "Failed to update member groups")
+      toast.error(err.message || "Failed to update member groups")
+    } finally {
+      setSavingGroups(false)
+    }
+  }
+
   const transferOwnership = async () => {
     if (!transferTarget || !transferConfirmationMatches) return
     setError(null)
@@ -1880,26 +2059,26 @@ function MembersTab() {
       )}
 
       <SettingsCard title="Invite Member" description="Send an email invitation to add a teammate to this organization.">
-        <div className="grid gap-3 p-5 sm:grid-cols-[1fr_140px_auto]">
+        <div className="grid gap-4 p-5">
           <Input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="teammate@example.com"
           />
-          <Select
-            value={role}
-            onValueChange={(value) => setRole(value as OrganizationRole)}
+          {canManageOrganization && accessGroups.length > 0 && (
+            <AccessGroupChecklist
+              groups={accessGroups}
+              selectedIds={selectedInviteGroupIds}
+              onChange={setSelectedInviteGroupIds}
+              disabled={submitting}
+            />
+          )}
+          <Button
+            className="w-fit gap-1.5"
+            onClick={inviteMember}
+            disabled={submitting || !email.trim() || !canManageOrganization}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button className="gap-1.5" onClick={inviteMember} disabled={submitting || !email.trim()}>
             {submitting ? (
               <Spinner data-icon="inline-start" />
             ) : (
@@ -1949,7 +2128,16 @@ function MembersTab() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <RoleBadge role={toRoleLabel(member.role)} />
+                <div className="hidden max-w-60 sm:block">
+                  {member.role === "owner" ? (
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <RoleBadge role="Owner" />
+                      <AccessGroupBadges groups={member.accessGroups ?? []} />
+                    </div>
+                  ) : (
+                    <AccessGroupBadges groups={member.accessGroups ?? []} />
+                  )}
+                </div>
                 {member.role !== "owner" && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1958,13 +2146,19 @@ function MembersTab() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
+                      {canManageOrganization && (
+                        <DropdownMenuItem onSelect={() => openGroupDialog(member)}>
+                          <ShieldCheckIcon />
+                          Edit Groups
+                        </DropdownMenuItem>
+                      )}
                       {isCurrentUserOwner && member.userId !== currentUserId && (
                         <>
+                          {canManageOrganization && <DropdownMenuSeparator />}
                           <DropdownMenuItem onSelect={() => openTransferDialog(member)}>
                             <CrownIcon />
                             Transfer Ownership
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                         </>
                       )}
                       {member.userId === currentUserId ? (
@@ -2011,7 +2205,7 @@ function MembersTab() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <RoleBadge role={toRoleLabel(invitation.role)} />
+                  <AccessGroupBadges groups={invitation.accessGroups ?? []} />
                   <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => cancelInvitation(invitation._id)}>
                     Cancel
                   </Button>
@@ -2022,6 +2216,45 @@ function MembersTab() {
         )}
       </SettingsCard>
     </div>
+    <Dialog
+      open={Boolean(groupEditTarget)}
+      onOpenChange={(open) => {
+        if (open || savingGroups) return
+        setGroupEditTarget(null)
+        setGroupEditIds([])
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Member Groups</DialogTitle>
+          <DialogDescription>
+            Choose which access groups apply to {groupEditTarget?.userName ?? groupEditTarget?.userEmail ?? "this member"}.
+          </DialogDescription>
+        </DialogHeader>
+        <AccessGroupChecklist
+          groups={accessGroups}
+          selectedIds={groupEditIds}
+          onChange={setGroupEditIds}
+          disabled={savingGroups}
+        />
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setGroupEditTarget(null)
+              setGroupEditIds([])
+            }}
+            disabled={savingGroups}
+          >
+            Cancel
+          </Button>
+          <Button onClick={() => void saveMemberGroups()} disabled={savingGroups}>
+            {savingGroups && <Spinner data-icon="inline-start" />}
+            Save Groups
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <Dialog
       open={Boolean(transferTarget)}
       onOpenChange={(open) => {
@@ -2081,6 +2314,258 @@ function MembersTab() {
       </DialogContent>
     </Dialog>
     </>
+  )
+}
+
+function AccessGroupsTab() {
+  const { canManageOrganization } = useEntitlements()
+  const [groups, setGroups] = useState<AccessGroup[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingGroup, setEditingGroup] = useState<AccessGroup | null>(null)
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [allModules, setAllModules] = useState(false)
+  const [canManage, setCanManage] = useState(false)
+  const [moduleAccess, setModuleAccess] = useState<EmployeeAccessModule[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const resetForm = () => {
+    setEditingGroup(null)
+    setName("")
+    setDescription("")
+    setAllModules(false)
+    setCanManage(false)
+    setModuleAccess([])
+  }
+
+  const loadGroups = useCallback(async () => {
+    if (!canManageOrganization) {
+      setGroups([])
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/access-groups`, {
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load access groups")
+      setGroups(data.accessGroups ?? [])
+    } catch (err: any) {
+      setError(err.message || "Failed to load access groups")
+    } finally {
+      setLoading(false)
+    }
+  }, [canManageOrganization])
+
+  useEffect(() => {
+    void loadGroups()
+  }, [loadGroups])
+
+  const startEdit = (group: AccessGroup) => {
+    setEditingGroup(group)
+    setName(group.name)
+    setDescription(group.description ?? "")
+    setAllModules(group.allModules)
+    setCanManage(group.canManageOrganization)
+    setModuleAccess(group.moduleAccess ?? [])
+    setError(null)
+  }
+
+  const saveGroup = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const url = editingGroup
+        ? `${API_ORIGIN}/api/v1/organization/access-groups/${editingGroup._id}`
+        : `${API_ORIGIN}/api/v1/organization/access-groups`
+      const res = await fetch(url, {
+        method: editingGroup ? "PUT" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description,
+          allModules,
+          canManageOrganization: canManage,
+          moduleAccess: allModules ? [] : moduleAccess,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save access group")
+      resetForm()
+      await loadGroups()
+      toast.success(editingGroup ? "Access group updated" : "Access group created")
+    } catch (err: any) {
+      setError(err.message || "Failed to save access group")
+      toast.error(err.message || "Failed to save access group")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteGroup = async (group: AccessGroup) => {
+    if (group.isDefault) return
+    const confirmed = window.confirm(`Delete ${group.name}? Members in this group will lose that access.`)
+    if (!confirmed) return
+
+    setDeletingId(group._id)
+    setError(null)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/organization/access-groups/${group._id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.error || "Failed to delete access group")
+      }
+      await loadGroups()
+      if (editingGroup?._id === group._id) resetForm()
+      toast.success("Access group deleted")
+    } catch (err: any) {
+      setError(err.message || "Failed to delete access group")
+      toast.error(err.message || "Failed to delete access group")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (!canManageOrganization) {
+    return (
+      <div className="space-y-6">
+        <SectionHeader
+          title="Access Groups"
+          description="Groups control module access and organization management permissions."
+        />
+        <SettingsCard title="Access Restricted" description="You do not have permission to manage access groups.">
+          <div className="px-5 py-5 text-sm text-muted-foreground">
+            Ask an organization admin to update your access.
+          </div>
+        </SettingsCard>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Access Groups"
+        description="Configure module access and management permissions for organization members."
+      />
+
+      {error && (
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <SettingsCard
+        title={editingGroup ? "Edit Access Group" : "Create Access Group"}
+        description="Choose modules and whether this group can manage organization settings."
+        action={editingGroup ? (
+          <Button variant="outline" size="sm" onClick={resetForm}>
+            New Group
+          </Button>
+        ) : null}
+      >
+        <div className="grid gap-4 p-5">
+          <div className="grid gap-2">
+            <Label htmlFor="access-group-name">Group name</Label>
+            <Input
+              id="access-group-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Sales Team"
+              disabled={saving || Boolean(editingGroup?.isDefault)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="access-group-description">Description</Label>
+            <Input
+              id="access-group-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Optional note for admins"
+              disabled={saving}
+            />
+          </div>
+          <div className="grid gap-3 rounded-xl border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">All Modules</p>
+                <p className="text-xs text-muted-foreground">Automatically include current and future modules.</p>
+              </div>
+              <Switch checked={allModules} onCheckedChange={setAllModules} disabled={saving} />
+            </div>
+            {!allModules && (
+              <ModuleAccessChecklist
+                selectedModules={moduleAccess}
+                onChange={setModuleAccess}
+                disabled={saving}
+              />
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+            <div>
+              <p className="text-sm font-semibold">Can Manage Organization</p>
+              <p className="text-xs text-muted-foreground">Allows managing members, groups, settings, and admin actions.</p>
+            </div>
+            <Switch checked={canManage} onCheckedChange={setCanManage} disabled={saving} />
+          </div>
+          <Button className="w-fit" onClick={() => void saveGroup()} disabled={saving || !name.trim()}>
+            {saving && <Spinner data-icon="inline-start" />}
+            {editingGroup ? "Save Group" : "Create Group"}
+          </Button>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard title="Access Groups" description={`${groups.length} active groups in this organization.`}>
+        <div className="divide-y">
+          {loading ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">Loading access groups...</div>
+          ) : groups.length === 0 ? (
+            <div className="px-5 py-5 text-sm text-muted-foreground">No access groups found.</div>
+          ) : groups.map((group) => (
+            <div key={group._id} className="flex items-center justify-between gap-4 px-5 py-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{group.name}</p>
+                  {group.isDefault && <Badge variant="secondary">Default</Badge>}
+                  {group.canManageOrganization && <Badge>Admin Powers</Badge>}
+                  {group.allModules && <Badge variant="outline">All Modules</Badge>}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {group.description || "No description"} - {group.memberCount} members
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => startEdit(group)}>
+                  Edit
+                </Button>
+                {!group.isDefault && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => void deleteGroup(group)}
+                    disabled={deletingId === group._id}
+                  >
+                    {deletingId === group._id ? <Spinner data-icon="inline-start" /> : <Trash2Icon className="size-4" />}
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </SettingsCard>
+    </div>
   )
 }
 
@@ -2774,6 +3259,10 @@ export function SettingsPage() {
                   <UsersIcon className="size-3.5" />
                   Members
                 </TabsTrigger>
+                <TabsTrigger value="access-groups" className="gap-1.5">
+                  <ShieldCheckIcon className="size-3.5" />
+                  Access Groups
+                </TabsTrigger>
                 <TabsTrigger value="support" className="gap-1.5">
                   <MessageSquareTextIcon className="size-3.5" />
                   Support
@@ -2794,6 +3283,9 @@ export function SettingsPage() {
               </TabsContent>
               <TabsContent value="members" className="mt-0">
                 <MembersTab />
+              </TabsContent>
+              <TabsContent value="access-groups" className="mt-0">
+                <AccessGroupsTab />
               </TabsContent>
               <TabsContent value="support" className="mt-0">
                 <SupportTab />

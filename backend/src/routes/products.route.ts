@@ -13,7 +13,7 @@ import {
   requireEmployeeModule,
   requireFeature,
   requireOrganization,
-  requireOrganizationRole,
+  requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -25,9 +25,9 @@ router.use(requireEmployeeModule("products"));
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
 router.get("/matches", listProductMatches);
-router.post("/import", requireOrganizationRole(["owner", "admin"]), importProducts);
+router.post("/import", requireOrganizationAdmin(), importProducts);
 router.get("/:id", getProduct);
-router.post("/", requireOrganizationRole(["owner", "admin"]), createProduct);
-router.put("/:id", requireOrganizationRole(["owner", "admin"]), updateProduct);
+router.post("/", requireOrganizationAdmin(), createProduct);
+router.put("/:id", requireOrganizationAdmin(), updateProduct);
 
 export default router;

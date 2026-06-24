@@ -20,6 +20,7 @@ import {
 } from "../models/organization-member.model";
 import { EmployeeDocument, type EmployeeDocumentType } from "../models/employee-document.model";
 import { sendEmail } from "../lib/email";
+import { resolveAccessGroupIdsForWrite } from "../services/access-group.service";
 import {
   EMPLOYEE_DOCUMENT_TYPES,
   ensureEmployeeDocuments,
@@ -523,6 +524,11 @@ export async function inviteEmployee(req: Request, res: Response): Promise<void>
 
     const email = stringValue(req.body?.email || employee.email).toLowerCase();
     const role = normalizeRole(req.body?.role);
+    const accessGroupIds = await resolveAccessGroupIdsForWrite({
+      organizationId: organization._id,
+      accessGroupIds: req.body?.accessGroupIds,
+      fallbackRole: role,
+    });
     if (!email || !email.includes("@")) {
       res.status(400).json({ error: "A valid email is required" });
       return;
@@ -546,7 +552,8 @@ export async function inviteEmployee(req: Request, res: Response): Promise<void>
     const invitation = await OrganizationInvitation.create({
       organizationId: organization._id,
       email,
-      role,
+      role: role === "owner" ? "owner" : "member",
+      accessGroupIds,
       tokenHash: tokenHash(rawToken),
       invitedByUserId: authReq.user.id,
       invitedByName: authReq.user.name ?? "",

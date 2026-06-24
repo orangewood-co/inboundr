@@ -6,6 +6,7 @@ export interface IOrganizationMember extends Document {
   organizationId: Types.ObjectId;
   userId: string;
   role: OrganizationRole;
+  accessGroupIds: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,12 +25,17 @@ const organizationMemberSchema = new Schema<IOrganizationMember>(
       enum: ["owner", "admin", "member"],
       default: "member",
     },
+    accessGroupIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: "AccessGroup" }],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
 organizationMemberSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 organizationMemberSchema.index({ userId: 1, organizationId: 1 });
+organizationMemberSchema.index({ organizationId: 1, accessGroupIds: 1 });
 
 export const OrganizationMember = mongoose.model<IOrganizationMember>(
   "OrganizationMember",

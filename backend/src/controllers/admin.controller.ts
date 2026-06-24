@@ -33,6 +33,10 @@ import {
   serializeEntitlements,
 } from "../services/entitlement.service";
 import { unlinkGmailAccountsForOrganization } from "../services/gmail-watcher.service";
+import {
+  defaultAccessGroupIdsForRole,
+  resolveAccessGroupIdsForWrite,
+} from "../services/access-group.service";
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
@@ -66,6 +70,7 @@ function publicInvitation(invitation: any) {
     organizationId: invitation.organizationId,
     email: invitation.email,
     role: invitation.role,
+    accessGroupIds: invitation.accessGroupIds ?? [],
     status: invitation.status,
     expiresAt: invitation.expiresAt,
     createdAt: invitation.createdAt,
@@ -202,11 +207,17 @@ async function createInvitation({
     { $set: { status: "cancelled", cancelledAt: new Date() } }
   );
 
+  const accessGroupIds = await resolveAccessGroupIdsForWrite({
+    organizationId: organization._id,
+    accessGroupIds: [],
+    fallbackRole: role,
+  });
   const rawToken = crypto.randomBytes(32).toString("base64url");
   const invitation = await OrganizationInvitation.create({
     organizationId: organization._id,
     email,
     role,
+    accessGroupIds,
     tokenHash: tokenHash(rawToken),
     invitedByUserId: inviter.id,
     invitedByName: inviter.name ?? "",
@@ -666,10 +677,12 @@ export async function createAdminOrganizationUser(req: Request, res: Response): 
 
     let member;
     try {
+      const accessGroupIds = await defaultAccessGroupIdsForRole(organization._id, role);
       member = await OrganizationMember.create({
         organizationId: organization._id,
         userId: createdUser.id,
         role,
+        accessGroupIds,
       });
     } catch (membershipErr: any) {
       console.error("Error attaching admin-created user to organization:", membershipErr);
@@ -735,10 +748,12 @@ export async function addAdminUserMembership(req: Request, res: Response): Promi
       return;
     }
 
+    const accessGroupIds = await defaultAccessGroupIdsForRole(organizationId, role);
     const member = await OrganizationMember.create({
       organizationId,
       userId: authUserId(user),
       role,
+      accessGroupIds,
     });
 
     res.status(201).json({
@@ -911,6 +926,7 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
 
       movedUserId = member.userId;
       movedOrganization = targetOrganization.toObject();
+      const accessGroupIds = await defaultAccessGroupIdsForRole(targetOrganization._id, role);
       await member.deleteOne({ session: mongoSession });
       const createdMembers = await OrganizationMember.create(
         [
@@ -918,6 +934,7 @@ export async function moveAdminOrganizationMember(req: Request, res: Response): 
             organizationId: targetOrganization._id,
             userId: movedUserId,
             role,
+            accessGroupIds,
           },
         ],
         { session: mongoSession }
@@ -969,7 +986,13 @@ export async function transferAdminOrganizationOwner(req: Request, res: Response
       { organizationId, role: "owner" },
       { $set: { role: "admin" } }
     );
+    const adminGroupIds = await defaultAccessGroupIdsForRole(organizationId, "owner");
     newOwner.role = "owner";
+    for (const groupId of adminGroupIds) {
+      if (!newOwner.accessGroupIds.some((existingGroupId) => existingGroupId.equals(groupId))) {
+        newOwner.accessGroupIds.push(groupId);
+      }
+    }
     await newOwner.save();
     organization.ownerUserId = newOwner.userId;
     await organization.save();

@@ -10,7 +10,7 @@ import {
   requireEmployeeModule,
   requireFeature,
   requireOrganization,
-  requireOrganizationRole,
+  requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -22,7 +22,7 @@ router.use(requireEmployeeModule("employees"));
 
 router.get("/", listAttendance);
 router.get("/range", listAttendanceRange);
-router.post("/manual", requireOrganizationRole(["owner", "admin"]), createManualAttendance);
-router.patch("/:id", requireOrganizationRole(["owner", "admin"]), updateAttendance);
+router.post("/manual", requireOrganizationAdmin(), createManualAttendance);
+router.patch("/:id", requireOrganizationAdmin(), updateAttendance);
 
 export default router;

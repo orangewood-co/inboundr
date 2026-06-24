@@ -6,6 +6,7 @@ import { OrganizationInvitationEmail } from "../emails/organization-invitation";
 import { frontendOrigin } from "../config/origins.config";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { OrganizationInvitation } from "../models/organization-invitation.model";
+import { AccessGroup } from "../models/access-group.model";
 import {
   OrganizationMember,
   type OrganizationRole,
@@ -16,6 +17,14 @@ import { sendEmail } from "../lib/email";
 import { normalizeTime, normalizeTimezone, sendHourUtcFromLocal } from "../lib/schedule";
 import { serializeEntitlements } from "../services/entitlement.service";
 import { getEmployeeAccessState } from "../services/employee-access.service";
+import {
+  defaultAccessGroupIdsForRole,
+  ensureDefaultAccessGroups,
+  normalizeAccessModules,
+  resolveAccessGroupIdsForWrite,
+  serializeAccessGroup,
+  serializeAccessGroupSummary,
+} from "../services/access-group.service";
 import { keyBelongsToPrefix } from "../services/storage.service";
 import { resolveUsersByIds } from "../services/user-lookup.service";
 
@@ -25,6 +34,11 @@ const MAX_ORGANIZATION_LETTERHEADS = 10;
 
 function stringValue(value: unknown): string {
   return String(value ?? "").trim();
+}
+
+function nullableString(value: unknown): string | null {
+  const normalized = stringValue(value);
+  return normalized || null;
 }
 
 function validationError(message: string): Error {
@@ -255,11 +269,38 @@ function publicInvitation(invitation: any) {
     organizationId: invitation.organizationId,
     email: invitation.email,
     role: invitation.role,
+    accessGroupIds: invitation.accessGroupIds ?? [],
+    accessGroups: invitation.accessGroups ?? [],
     status: invitation.status,
     expiresAt: invitation.expiresAt,
     createdAt: invitation.createdAt,
     updatedAt: invitation.updatedAt,
   };
+}
+
+async function accessGroupSummaryMap(organizationId: mongoose.Types.ObjectId) {
+  await ensureDefaultAccessGroups(organizationId);
+  const groups = await AccessGroup.find({
+    organizationId,
+    status: "active",
+  }).lean();
+
+  return new Map(
+    groups.map((group) => [
+      group._id.toString(),
+      serializeAccessGroupSummary(group),
+    ])
+  );
+}
+
+function accessGroupSummariesForIds(
+  ids: unknown,
+  groupsById: Map<string, ReturnType<typeof serializeAccessGroupSummary>>
+) {
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((id) => groupsById.get(String(id)))
+    .filter((group): group is ReturnType<typeof serializeAccessGroupSummary> => Boolean(group));
 }
 
 export async function getMyOrganization(
@@ -452,12 +493,16 @@ export async function listOrganizationMembers(
       .lean();
 
     const userIds = members.map((m) => m.userId);
-    const users = await resolveUsersByIds(userIds);
+    const [users, groupsById] = await Promise.all([
+      resolveUsersByIds(userIds),
+      accessGroupSummaryMap(organization._id),
+    ]);
 
     const enriched = members.map((member) => {
       const user = users.get(member.userId);
       return {
         ...member,
+        accessGroups: accessGroupSummariesForIds(member.accessGroupIds, groupsById),
         userName: user?.name ?? null,
         userEmail: user?.email ?? null,
         userImage: user?.image ?? null,
@@ -484,11 +529,247 @@ export async function listOrganizationInvitations(
     })
       .sort({ createdAt: -1 })
       .lean();
+    const groupsById = await accessGroupSummaryMap(organization._id);
 
-    res.json({ invitations: invitations.map(publicInvitation) });
+    res.json({
+      invitations: invitations.map((invitation) =>
+        publicInvitation({
+          ...invitation,
+          accessGroups: accessGroupSummariesForIds(invitation.accessGroupIds, groupsById),
+        })
+      ),
+    });
   } catch (err) {
     console.error("Error listing organization invitations:", err);
     res.status(500).json({ error: "Failed to list organization invitations" });
+  }
+}
+
+export async function listOrganizationAccessGroups(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    await ensureDefaultAccessGroups(organization._id);
+
+    const groups = await AccessGroup.find({
+      organizationId: organization._id,
+      status: "active",
+    })
+      .sort({ isDefault: -1, name: 1 })
+      .lean();
+
+    const groupIds = groups.map((group) => group._id);
+    const members = await OrganizationMember.find({
+      organizationId: organization._id,
+      accessGroupIds: { $in: groupIds },
+    })
+      .select("accessGroupIds")
+      .lean();
+
+    const memberCounts = new Map<string, number>();
+    for (const member of members) {
+      for (const groupId of member.accessGroupIds ?? []) {
+        const key = groupId.toString();
+        memberCounts.set(key, (memberCounts.get(key) ?? 0) + 1);
+      }
+    }
+
+    res.json({
+      accessGroups: groups.map((group) => ({
+        ...serializeAccessGroup(group),
+        memberCount: memberCounts.get(group._id.toString()) ?? 0,
+      })),
+    });
+  } catch (err) {
+    console.error("Error listing access groups:", err);
+    res.status(500).json({ error: "Failed to list access groups" });
+  }
+}
+
+export async function createOrganizationAccessGroup(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const name = stringValue(req.body?.name);
+    if (!name) {
+      res.status(400).json({ error: "Group name is required" });
+      return;
+    }
+
+    const group = await AccessGroup.create({
+      organizationId: organization._id,
+      name,
+      description: nullableString(req.body?.description),
+      moduleAccess: normalizeAccessModules(req.body?.moduleAccess),
+      allModules: Boolean(req.body?.allModules),
+      canManageOrganization: Boolean(req.body?.canManageOrganization),
+    });
+
+    res.status(201).json({ accessGroup: serializeAccessGroup(group) });
+  } catch (err: any) {
+    console.error("Error creating access group:", err);
+    res.status(err?.code === 11000 ? 409 : 500).json({
+      error: err?.code === 11000 ? "An active group with this name already exists" : "Failed to create access group",
+    });
+  }
+}
+
+export async function updateOrganizationAccessGroup(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const { id } = req.params;
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid access group id" });
+      return;
+    }
+
+    const group = await AccessGroup.findOne({
+      _id: id,
+      organizationId: organization._id,
+      status: "active",
+    });
+    if (!group) {
+      res.status(404).json({ error: "Access group not found" });
+      return;
+    }
+
+    const nextName = req.body?.name !== undefined ? stringValue(req.body.name) : group.name;
+    if (!nextName) {
+      res.status(400).json({ error: "Group name is required" });
+      return;
+    }
+    if (group.isDefault && nextName !== group.name) {
+      res.status(400).json({ error: "Default access groups cannot be renamed" });
+      return;
+    }
+
+    group.name = nextName;
+    if (req.body?.description !== undefined) {
+      group.description = nullableString(req.body.description);
+    }
+    if (req.body?.moduleAccess !== undefined) {
+      group.moduleAccess = normalizeAccessModules(req.body.moduleAccess);
+    }
+    if (req.body?.allModules !== undefined) {
+      group.allModules = Boolean(req.body.allModules);
+    }
+    if (req.body?.canManageOrganization !== undefined) {
+      group.canManageOrganization = Boolean(req.body.canManageOrganization);
+    }
+
+    await group.save();
+    res.json({ accessGroup: serializeAccessGroup(group) });
+  } catch (err: any) {
+    console.error("Error updating access group:", err);
+    res.status(err?.code === 11000 ? 409 : 500).json({
+      error: err?.code === 11000 ? "An active group with this name already exists" : "Failed to update access group",
+    });
+  }
+}
+
+export async function archiveOrganizationAccessGroup(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const { id } = req.params;
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid access group id" });
+      return;
+    }
+
+    const group = await AccessGroup.findOne({
+      _id: id,
+      organizationId: organization._id,
+      status: "active",
+    });
+    if (!group) {
+      res.status(404).json({ error: "Access group not found" });
+      return;
+    }
+    if (group.isDefault) {
+      res.status(400).json({ error: "Default access groups cannot be deleted" });
+      return;
+    }
+
+    group.status = "archived";
+    await group.save();
+    await Promise.all([
+      OrganizationMember.updateMany(
+        { organizationId: organization._id },
+        { $pull: { accessGroupIds: group._id } }
+      ),
+      OrganizationInvitation.updateMany(
+        { organizationId: organization._id, status: "pending" },
+        { $pull: { accessGroupIds: group._id } }
+      ),
+    ]);
+
+    res.status(204).send();
+  } catch (err) {
+    console.error("Error deleting access group:", err);
+    res.status(500).json({ error: "Failed to delete access group" });
+  }
+}
+
+export async function updateOrganizationMemberAccessGroups(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const { id } = req.params;
+    if (typeof id !== "string" || !mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid member id" });
+      return;
+    }
+
+    const member = await OrganizationMember.findOne({
+      _id: id,
+      organizationId: organization._id,
+    });
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    const accessGroupIds = await resolveAccessGroupIdsForWrite({
+      organizationId: organization._id,
+      accessGroupIds: req.body?.accessGroupIds,
+      allowEmpty: true,
+    });
+
+    if (member.role === "owner") {
+      const defaults = await ensureDefaultAccessGroups(organization._id);
+      if (!accessGroupIds.some((groupId) => groupId.equals(defaults.admin._id))) {
+        accessGroupIds.push(defaults.admin._id);
+      }
+    }
+
+    member.accessGroupIds = accessGroupIds;
+    await member.save();
+
+    const groupsById = await accessGroupSummaryMap(organization._id);
+    res.json({
+      member: {
+        ...member.toObject(),
+        accessGroups: accessGroupSummariesForIds(member.accessGroupIds, groupsById),
+      },
+    });
+  } catch (err: any) {
+    console.error("Error updating member access groups:", err);
+    const statusCode = err?.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 500 ? "Failed to update member access groups" : err.message,
+    });
   }
 }
 
@@ -500,7 +781,13 @@ export async function inviteOrganizationMember(
     const authReq = req as OrganizationRequest;
     const organization = authReq.organization;
     const email = stringValue(req.body?.email).toLowerCase();
-    const role = normalizeRole(req.body?.role);
+    const fallbackRole = normalizeRole(req.body?.role);
+    const role: OrganizationRole = "member";
+    const accessGroupIds = await resolveAccessGroupIdsForWrite({
+      organizationId: organization._id,
+      accessGroupIds: req.body?.accessGroupIds,
+      fallbackRole,
+    });
 
     if (!email || !email.includes("@")) {
       res.status(400).json({ error: "A valid email is required" });
@@ -526,6 +813,7 @@ export async function inviteOrganizationMember(
       organizationId: organization._id,
       email,
       role,
+      accessGroupIds,
       tokenHash: tokenHash(rawToken),
       invitedByUserId: authReq.user.id,
       invitedByName: authReq.user.name ?? "",
@@ -544,7 +832,13 @@ export async function inviteOrganizationMember(
       }),
     });
 
-    res.status(201).json({ invitation: publicInvitation(invitation) });
+    const groupsById = await accessGroupSummaryMap(organization._id);
+    res.status(201).json({
+      invitation: publicInvitation({
+        ...invitation.toObject(),
+        accessGroups: accessGroupSummariesForIds(invitation.accessGroupIds, groupsById),
+      }),
+    });
   } catch (err) {
     console.error("Error inviting organization member:", err);
     res.status(500).json({ error: "Failed to invite organization member" });
@@ -580,10 +874,17 @@ export async function previewOrganizationInvitation(
       return;
     }
 
+    const accessGroups = await AccessGroup.find({
+      _id: { $in: invitation.accessGroupIds ?? [] },
+      organizationId: invitation.organizationId,
+      status: "active",
+    }).lean();
+
     res.json({
       invitation: {
         email: invitation.email,
         role: invitation.role,
+        accessGroups: accessGroups.map(serializeAccessGroupSummary),
         status:
           invitation.status === "pending" && invitation.expiresAt.getTime() < Date.now()
             ? "expired"
@@ -632,9 +933,18 @@ export async function acceptOrganizationInvitation(
       return;
     }
 
+    const accessGroupIds =
+      invitation.accessGroupIds.length > 0
+        ? invitation.accessGroupIds
+        : await defaultAccessGroupIdsForRole(invitation.organizationId, invitation.role);
+    const memberRole: OrganizationRole = invitation.role === "owner" ? "owner" : "member";
+
     await OrganizationMember.updateOne(
       { organizationId: invitation.organizationId, userId: authReq.user.id },
-      { $setOnInsert: { role: invitation.role } },
+      {
+        $setOnInsert: { role: memberRole },
+        $addToSet: { accessGroupIds: { $each: accessGroupIds } },
+      },
       { upsert: true }
     );
 
@@ -776,6 +1086,10 @@ export async function transferOrganizationOwnership(
         throw httpError("This member already owns another organization", 409);
       }
 
+      const defaults = await ensureDefaultAccessGroups(organization._id, {
+        session: mongoSession,
+      });
+
       const ownerUpdate = await Organization.updateOne(
         { _id: organization._id, ownerUserId: currentOwnerUserId },
         { $set: { ownerUserId: targetMember.userId } },
@@ -791,6 +1105,9 @@ export async function transferOrganizationOwnership(
         { session: mongoSession }
       );
       targetMember.role = "owner";
+      if (!targetMember.accessGroupIds.some((groupId) => groupId.equals(defaults.admin._id))) {
+        targetMember.accessGroupIds.push(defaults.admin._id);
+      }
       await targetMember.save({ session: mongoSession });
       newOwnerUserId = targetMember.userId;
     });
