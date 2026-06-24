@@ -53,6 +53,7 @@ import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 import { Route as AdminFeedbackRouteImport } from './routes/admin_.feedback'
+import { Route as AdminFeedbackIndexRouteImport } from './routes/admin_.feedback.index'
 import { Route as EmployeesAttendanceLogsRouteImport } from './routes/employees_.attendance_.logs'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as AdminFeedbackIdRouteImport } from './routes/admin_.feedback.$id'
@@ -278,6 +279,11 @@ const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
   path: '/admin/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminFeedbackRoute,
+} as any)
 const EmployeesAttendanceLogsRoute = EmployeesAttendanceLogsRouteImport.update({
   id: '/employees_/attendance_/logs',
   path: '/employees/attendance/logs',
@@ -347,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
+  '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesByTo {
@@ -370,7 +377,6 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
-  '/admin/feedback': typeof AdminFeedbackRouteWithChildren
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -393,6 +399,7 @@ export interface FileRoutesByTo {
   '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
+  '/admin/feedback': typeof AdminFeedbackIndexRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRoutesById {
@@ -444,6 +451,7 @@ export interface FileRoutesById {
   '/admin_/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees_/attendance_/logs': typeof EmployeesAttendanceLogsRoute
+  '/admin_/feedback/': typeof AdminFeedbackIndexRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
 }
 export interface FileRouteTypes {
@@ -496,6 +504,7 @@ export interface FileRouteTypes {
     | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
+    | '/admin/feedback/'
     | '/projects/$id/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -519,7 +528,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
-    | '/admin/feedback'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -542,6 +550,7 @@ export interface FileRouteTypes {
     | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
+    | '/admin/feedback'
     | '/projects/$id/tasks/$taskId'
   id:
     | '__root__'
@@ -592,6 +601,7 @@ export interface FileRouteTypes {
     | '/admin_/feedback/$id'
     | '/admin_/organizations/$id'
     | '/employees_/attendance_/logs'
+    | '/admin_/feedback/'
     | '/projects_/$id_/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
@@ -945,6 +955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/feedback/': {
+      id: '/admin_/feedback/'
+      path: '/'
+      fullPath: '/admin/feedback/'
+      preLoaderRoute: typeof AdminFeedbackIndexRouteImport
+      parentRoute: typeof AdminFeedbackRoute
+    }
     '/employees_/attendance_/logs': {
       id: '/employees_/attendance_/logs'
       path: '/employees/attendance/logs'
@@ -1033,10 +1050,12 @@ const SupportRouteWithChildren =
 
 interface AdminFeedbackRouteChildren {
   AdminFeedbackIdRoute: typeof AdminFeedbackIdRoute
+  AdminFeedbackIndexRoute: typeof AdminFeedbackIndexRoute
 }
 
 const AdminFeedbackRouteChildren: AdminFeedbackRouteChildren = {
   AdminFeedbackIdRoute: AdminFeedbackIdRoute,
+  AdminFeedbackIndexRoute: AdminFeedbackIndexRoute,
 }
 
 const AdminFeedbackRouteWithChildren = AdminFeedbackRoute._addFileChildren(
