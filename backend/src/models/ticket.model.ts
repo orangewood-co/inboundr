@@ -38,6 +38,7 @@ export interface ITicket extends Document {
   lastAgentReadAt: Date | null;
   visitorEndedAt: Date | null;
   visitorFeedback: ITicketVisitorFeedback;
+  openedEmailSentAt: Date | null;
   transcriptEmailSentAt: Date | null;
   resolvedEmailSentAt: Date | null;
   resolvedAt: Date | null;
@@ -115,6 +116,7 @@ const ticketSchema = new Schema<ITicket>(
     lastAgentReadAt: { type: Date, default: null },
     visitorEndedAt: { type: Date, default: null },
     visitorFeedback: { type: ticketVisitorFeedbackSchema, default: () => ({}) },
+    openedEmailSentAt: { type: Date, default: null },
     transcriptEmailSentAt: { type: Date, default: null },
     resolvedEmailSentAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },

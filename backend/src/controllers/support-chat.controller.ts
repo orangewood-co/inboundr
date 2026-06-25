@@ -16,7 +16,7 @@ import {
   SUPPORT_MESSAGES_PER_SESSION,
 } from "../services/support-chat.service";
 import { broadcastMessageCreated, broadcastTicketUpdate } from "../services/support-ws.service";
-import { sendSupportTranscriptEmail } from "../services/support-email.service";
+import { sendSupportOpenedEmail, sendSupportTranscriptEmail } from "../services/support-email.service";
 import { createPresignedUpload } from "../services/storage.service";
 import { serializeTicket } from "../services/ticket.service";
 import { createNotificationForRecipient } from "../services/notification.service";
@@ -206,6 +206,9 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
     });
     void notifyOwnersAndAdminsOfNewChat(ticket).catch((err) => {
       console.error(`Failed to notify owners/admins for support ticket ${ticket._id}:`, err);
+    });
+    void sendSupportOpenedEmail(String(ticket._id)).catch((err) => {
+      console.error(`Failed to send support opened email for ticket ${ticket._id}:`, err);
     });
     res.status(201).json({
       sessionToken: ticket.sessionToken,

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   Body,
+  Button,
   Column,
   Container,
   Head,
@@ -32,8 +33,10 @@ export interface SupportTranscriptEmailProps {
   rating?: number | null;
   feedbackComment?: string;
   companyName?: string;
+  resumeUrl?: string;
 }
 
+export interface SupportOpenedEmailProps extends SupportTranscriptEmailProps {}
 export interface SupportResolvedEmailProps extends SupportTranscriptEmailProps {}
 
 function SupportEmailShell({
@@ -158,6 +161,63 @@ function TicketSummaryCard({
   );
 }
 
+function ResumeChatButton({
+  href,
+  children,
+}: {
+  href?: string;
+  children: ReactNode;
+}) {
+  if (!href) return null;
+
+  return (
+    <Section className="mt-8 mb-6 text-center">
+      <Button
+        href={href}
+        className="bg-fg font-16 text-fg-inverted inline-block rounded-lg px-7 py-4 text-center font-sans leading-6"
+      >
+        {children}
+      </Button>
+    </Section>
+  );
+}
+
+export function SupportOpenedEmail({
+  organizationName,
+  requesterName,
+  ticketNumber,
+  initialIssue,
+  companyName,
+  resumeUrl,
+}: SupportOpenedEmailProps) {
+  const greetingName = requesterName?.trim() || "there";
+
+  return (
+    <SupportEmailShell
+      companyName={companyName}
+      preview={`Your ${organizationName} support request is open`}
+    >
+      <SupportHero title="Support request opened">
+        <Text className="font-16 text-fg-2 mx-auto mt-0 mb-8 max-w-[420px] text-center font-sans">
+          Hi {greetingName}, we received your support request for{" "}
+          <strong>{organizationName}</strong>. The team can now follow up in this chat.
+        </Text>
+
+        <Section className="mx-auto mb-8 max-w-[440px] text-left">
+          <TicketSummaryCard ticketNumber={ticketNumber} initialIssue={initialIssue} />
+        </Section>
+
+        <ResumeChatButton href={resumeUrl}>Open support chat</ResumeChatButton>
+
+        <Text className="font-13 text-fg-3 mx-auto mt-8 mb-0 max-w-[400px] text-center font-sans">
+          Keep this email handy. The button opens your existing conversation so
+          you can continue from where you left off.
+        </Text>
+      </SupportHero>
+    </SupportEmailShell>
+  );
+}
+
 export function SupportTranscriptEmail({
   organizationName,
   requesterName,
@@ -226,6 +286,7 @@ export function SupportResolvedEmail({
   ticketNumber,
   initialIssue,
   companyName,
+  resumeUrl,
 }: SupportResolvedEmailProps) {
   const greetingName = requesterName?.trim() || "there";
 
@@ -244,9 +305,11 @@ export function SupportResolvedEmail({
           <TicketSummaryCard ticketNumber={ticketNumber} initialIssue={initialIssue} />
         </Section>
 
+        <ResumeChatButton href={resumeUrl}>Leave feedback or reopen chat</ResumeChatButton>
+
         <Text className="font-13 text-fg-3 mx-auto mt-8 mb-0 max-w-[400px] text-center font-sans">
-          If this still needs attention, reply to this email and the team can
-          follow up.
+          Please let us know how we did. If this still needs attention, use the
+          same link to send a new message and reopen the conversation.
         </Text>
       </SupportHero>
     </SupportEmailShell>
@@ -276,5 +339,15 @@ SupportResolvedEmail.PreviewProps = {
   ticketNumber: 42,
   initialIssue: "Need help with an order",
   messages: [],
+  resumeUrl: "https://forms.example.com/support/organization-id?session=session-token",
 } satisfies SupportResolvedEmailProps;
+
+SupportOpenedEmail.PreviewProps = {
+  organizationName: "Acme",
+  requesterName: "Tushar",
+  ticketNumber: 42,
+  initialIssue: "Need help with an order",
+  messages: [],
+  resumeUrl: "https://forms.example.com/support/organization-id?session=session-token",
+} satisfies SupportOpenedEmailProps;
 

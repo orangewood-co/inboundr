@@ -2,9 +2,11 @@ import { createElement } from "react";
 import mongoose from "mongoose";
 
 import {
+  SupportOpenedEmail,
   SupportResolvedEmail,
   SupportTranscriptEmail,
 } from "../emails/support-transcript";
+import { embedOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
 import { Organization } from "../models/organization.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
@@ -22,6 +24,14 @@ function messageAuthor(message: { authorType: string }, requesterName: string): 
   if (message.authorType === "bot") return "Assistant";
   if (message.authorType === "agent") return "Support team";
   return "System";
+}
+
+function supportResumeUrl(ticket: ITicket | any): string | undefined {
+  if (!ticket.sessionToken) return undefined;
+
+  const url = new URL(`/support/${String(ticket.organizationId)}`, embedOrigin);
+  url.searchParams.set("session", String(ticket.sessionToken));
+  return url.toString();
 }
 
 async function emailPayload(ticket: ITicket | any) {
@@ -53,8 +63,27 @@ async function emailPayload(ticket: ITicket | any) {
     })),
     rating: ticket.visitorFeedback?.rating ?? null,
     feedbackComment: ticket.visitorFeedback?.comment ?? "",
+    resumeUrl: supportResumeUrl(ticket),
     replyTo: organization.defaultContact?.email ? [organization.defaultContact.email] : undefined,
   };
+}
+
+export async function sendSupportOpenedEmail(ticketId: string): Promise<boolean> {
+  if (!mongoose.Types.ObjectId.isValid(ticketId)) return false;
+  const ticket = await Ticket.findById(ticketId);
+  if (!ticket || !ticket.sessionToken || ticket.openedEmailSentAt) return false;
+
+  const payload = await emailPayload(ticket);
+  await sendEmail({
+    to: ticket.requester.email,
+    subject: `Support request #${ticket.ticketNumber} opened`,
+    react: createElement(SupportOpenedEmail, payload),
+    replyTo: payload.replyTo,
+  });
+
+  ticket.openedEmailSentAt = new Date();
+  await ticket.save();
+  return true;
 }
 
 export async function sendSupportTranscriptEmail(ticketId: string): Promise<boolean> {
