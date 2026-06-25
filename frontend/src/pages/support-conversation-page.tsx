@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
+import { APP_TITLE, documentTitleForPath } from "@/lib/route-meta"
 import { cn } from "@/lib/utils"
 
 const route = getRouteApi("/support/$ticketId")
@@ -69,6 +70,16 @@ export default function SupportConversationPage() {
       void navigate({ to: "/support", search: LIST_SEARCH })
     }
   }, [loadingDetail, navigate, selectedTicket])
+
+  useEffect(() => {
+    if (!selectedTicket) {
+      document.title = documentTitleForPath(`/support/${ticketId}`)
+      return
+    }
+
+    const requester = selectedTicket.requester.name.trim() || selectedTicket.requester.email
+    document.title = `#${selectedTicket.ticketNumber} ${requester} - Support - ${APP_TITLE}`
+  }, [selectedTicket, ticketId])
 
   const handleArchiveToggle = async () => {
     if (!selectedTicket) return

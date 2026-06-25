@@ -36,6 +36,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/search": "Search",
   "/settings": "Settings",
   "/stats": "Stats",
+  "/support": "Support",
 }
 
 const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: string }> = [
@@ -48,6 +49,7 @@ const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: strin
   { match: (p) => p.includes("/tasks/"), title: "Task Details" },
   { match: (p) => p.startsWith("/projects/"), title: "Project Details" },
   { match: (p) => p.startsWith("/links/"), title: "Link Details" },
+  { match: (p) => p.startsWith("/support/"), title: "Support Ticket" },
   { match: (p) => p.startsWith("/invite/"), title: "Invitation" },
 ]
 
