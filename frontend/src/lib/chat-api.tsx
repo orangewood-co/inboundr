@@ -58,6 +58,47 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 
 export const chatApiUrl = CHAT_API
 
+function ChatHistoryAdapterProvider({ children }: PropsWithChildren) {
+  const aui = useAui()
+  const history = useMemo<ThreadHistoryAdapter>(
+    () => ({
+      async load() {
+        return { messages: [] }
+      },
+      async append() {},
+      withFormat: (format) => ({
+        async load() {
+          const { remoteId } = aui.threadListItem().getState()
+          if (!remoteId) return { messages: [] }
+
+          const rows = (await apiFetch(`/threads/${remoteId}/messages`).then((response) =>
+            response.json()
+          )) as ChatMessageRow[]
+
+          return {
+            messages: rows.map((row) => decodeStoredMessage(format, row)),
+          }
+        },
+        async append(item) {
+          const { remoteId } = await aui.threadListItem().initialize()
+          await apiFetch(`/threads/${remoteId}/messages`, {
+            method: "POST",
+            body: JSON.stringify({
+              id: format.getId(item.message),
+              parent_id: item.parentId,
+              format: format.format,
+              content: format.encode(item),
+            }),
+          })
+        },
+      }),
+    }),
+    [aui]
+  )
+
+  return <RuntimeAdapterProvider adapters={{ history }}>{children}</RuntimeAdapterProvider>
+}
+
 export const chatThreadListAdapter: RemoteThreadListAdapter = {
   async list() {
     const rows = (await apiFetch("/threads").then((response) => response.json())) as ChatThreadDto[]
@@ -121,44 +162,5 @@ export const chatThreadListAdapter: RemoteThreadListAdapter = {
       controller.appendText(title)
     })
   },
-  unstable_Provider({ children }: PropsWithChildren) {
-    const aui = useAui()
-    const history = useMemo<ThreadHistoryAdapter>(
-      () => ({
-        async load() {
-          return { messages: [] }
-        },
-        async append() {},
-        withFormat: (format) => ({
-          async load() {
-            const { remoteId } = aui.threadListItem().getState()
-            if (!remoteId) return { messages: [] }
-
-            const rows = (await apiFetch(`/threads/${remoteId}/messages`).then((response) =>
-              response.json()
-            )) as ChatMessageRow[]
-
-            return {
-              messages: rows.map((row) => decodeStoredMessage(format, row)),
-            }
-          },
-          async append(item) {
-            const { remoteId } = await aui.threadListItem().initialize()
-            await apiFetch(`/threads/${remoteId}/messages`, {
-              method: "POST",
-              body: JSON.stringify({
-                id: format.getId(item.message),
-                parent_id: item.parentId,
-                format: format.format,
-                content: format.encode(item),
-              }),
-            })
-          },
-        }),
-      }),
-      [aui]
-    )
-
-    return <RuntimeAdapterProvider adapters={{ history }}>{children}</RuntimeAdapterProvider>
-  },
+  unstable_Provider: ChatHistoryAdapterProvider,
 }

@@ -52,16 +52,18 @@ function makePieces(): ConfettiPiece[] {
  */
 export function AnniversaryCelebration({ startDate }: { startDate: string | null }) {
   const years = React.useMemo(() => anniversaryYears(startDate), [startDate])
-  const [pieces, setPieces] = React.useState<ConfettiPiece[] | null>(null)
+  if (!years) return null
+
+  return <AnniversaryCelebrationContent key={`${startDate}-${years}`} years={years} />
+}
+
+function AnniversaryCelebrationContent({ years }: { years: number }) {
+  const [pieces, setPieces] = React.useState<ConfettiPiece[] | null>(() => makePieces())
 
   React.useEffect(() => {
-    if (!years) return
-    setPieces(makePieces())
     const timeout = window.setTimeout(() => setPieces(null), CONFETTI_CLEANUP_MS)
     return () => window.clearTimeout(timeout)
-  }, [years])
-
-  if (!years) return null
+  }, [])
 
   return (
     <>

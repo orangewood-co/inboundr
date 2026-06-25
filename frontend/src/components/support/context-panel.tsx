@@ -92,7 +92,6 @@ function PastTickets({ ticket, onSelect }: { ticket: Ticket; onSelect: (id: stri
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     fetch(`${API_ORIGIN}/api/v1/tickets/${ticket.id}/related`, { credentials: "include" })
       .then((response) => response.json())
       .then((data) => {
@@ -162,7 +161,6 @@ function CustomerMapping({ ticket }: { ticket: Ticket }) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""
     fetch(`${API_ORIGIN}/api/v1/tickets/${ticket.id}/customer-candidates${query}`, {
       credentials: "include",
@@ -181,6 +179,11 @@ function CustomerMapping({ ticket }: { ticket: Ticket }) {
       cancelled = true
     }
   }, [search, ticket.id])
+
+  function handleSearchChange(value: string) {
+    setLoading(true)
+    setSearch(value)
+  }
 
   async function link(customerId: string | null) {
     setBusyId(customerId ?? "unlink")
@@ -238,7 +241,7 @@ function CustomerMapping({ ticket }: { ticket: Ticket }) {
     <div className="space-y-2">
       <input
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => handleSearchChange(event.target.value)}
         placeholder="Search customers..."
         className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       />
@@ -409,7 +412,7 @@ export function ContextPanel({
       </Section>
 
       <Section title="Customer match">
-        <CustomerMapping ticket={ticket} />
+        <CustomerMapping key={ticket.id} ticket={ticket} />
       </Section>
 
       <Section title="Internal notes" count={notes.length}>
@@ -448,7 +451,7 @@ export function ContextPanel({
       </Section>
 
       <Section title="Customer history">
-        <PastTickets ticket={ticket} onSelect={onSelectTicket} />
+        <PastTickets key={ticket.id} ticket={ticket} onSelect={onSelectTicket} />
       </Section>
     </div>
   )

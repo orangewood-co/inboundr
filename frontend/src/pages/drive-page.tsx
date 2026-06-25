@@ -2108,15 +2108,33 @@ function MoveDialog({
   onOpenChange: (open: boolean) => void
   onDone: () => Promise<void> | void
 }) {
+  return (
+    <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
+      {node ? (
+        <MoveDialogContent
+          key={node._id}
+          node={node}
+          onOpenChange={onOpenChange}
+          onDone={onDone}
+        />
+      ) : null}
+    </Dialog>
+  )
+}
+
+function MoveDialogContent({
+  node,
+  onOpenChange,
+  onDone,
+}: {
+  node: DriveNode
+  onOpenChange: (open: boolean) => void
+  onDone: () => Promise<void> | void
+}) {
   const [target, setTarget] = React.useState("")
   const [saving, setSaving] = React.useState(false)
 
-  React.useEffect(() => {
-    if (node) setTarget("")
-  }, [node])
-
   async function submit() {
-    if (!node) return
     setSaving(true)
     try {
       await moveDriveNode(node._id, target.trim() || null)
@@ -2131,35 +2149,33 @@ function MoveDialog({
   }
 
   return (
-    <Dialog open={Boolean(node)} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>Move {node?.name}</DialogTitle>
-          <DialogDescription>
-            Paste the destination folder ID, or leave it empty to move to the Drive root. Tip: you can also drag items
-            onto a folder.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-2">
-          <Label htmlFor="drive-move-target">Destination folder ID</Label>
-          <Input
-            id="drive-move-target"
-            value={target}
-            onChange={(event) => setTarget(event.target.value)}
-            placeholder="Leave empty for Drive root"
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void submit()} disabled={saving}>
-            {saving && <Spinner data-icon="inline-start" />}
-            Move
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <DialogContent showCloseButton={false}>
+      <DialogHeader>
+        <DialogTitle>Move {node.name}</DialogTitle>
+        <DialogDescription>
+          Paste the destination folder ID, or leave it empty to move to the Drive root. Tip: you can also drag items
+          onto a folder.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-2">
+        <Label htmlFor="drive-move-target">Destination folder ID</Label>
+        <Input
+          id="drive-move-target"
+          value={target}
+          onChange={(event) => setTarget(event.target.value)}
+          placeholder="Leave empty for Drive root"
+        />
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          Cancel
+        </Button>
+        <Button onClick={() => void submit()} disabled={saving}>
+          {saving && <Spinner data-icon="inline-start" />}
+          Move
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   )
 }
 

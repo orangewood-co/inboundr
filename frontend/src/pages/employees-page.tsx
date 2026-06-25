@@ -115,30 +115,29 @@ async function copyContact(value: string, label: string) {
 }
 
 function EmployeeAvatarImage({ source }: { source: string | null }) {
-  const [displayUrl, setDisplayUrl] = useState("")
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null)
+  const value = source?.trim() ?? ""
 
   useEffect(() => {
+    if (!value) return
     let cancelled = false
-    const value = source?.trim() ?? ""
-    if (!value) {
-      setDisplayUrl("")
-      return
-    }
 
     void resolveUploadedImageUrl(value)
       .then((url) => {
         if (!cancelled) setDisplayUrl(url)
       })
       .catch(() => {
-        if (!cancelled) setDisplayUrl("")
+        if (!cancelled) setDisplayUrl(null)
       })
 
     return () => {
       cancelled = true
     }
-  }, [source])
+  }, [value])
 
-  return <AvatarImage src={displayUrl || undefined} className="rounded-2xl" />
+  if (!displayUrl) return null
+
+  return <AvatarImage src={displayUrl} className="rounded-2xl" />
 }
 
 function toggleModule(
@@ -464,7 +463,10 @@ export default function EmployeesPage() {
                     </span>
                   )}
                   <Avatar className="size-16 rounded-2xl after:rounded-2xl">
-                    <EmployeeAvatarImage source={employee.profileImageUrl} />
+                    <EmployeeAvatarImage
+                      key={employee.profileImageUrl ?? "empty"}
+                      source={employee.profileImageUrl}
+                    />
                     <AvatarFallback className="rounded-2xl text-lg font-semibold">{initials(employee.fullName)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">

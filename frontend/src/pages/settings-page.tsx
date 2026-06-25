@@ -327,15 +327,15 @@ function SettingsCard({
   )
 }
 
-function RoleBadge({ role }: { role: "Owner" | "Admin" | "Member" }) {
+function RoleBadge({ label }: { label: "Owner" | "Admin" | "Member" }) {
   const styles = {
     Owner: "bg-primary/10 text-primary",
     Admin: "bg-warning/10 text-warning",
     Member: "bg-muted text-muted-foreground",
   }
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[role]}`}>
-      {role}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[label]}`}>
+      {label}
     </span>
   )
 }
@@ -2131,7 +2131,7 @@ function MembersTab() {
                 <div className="hidden max-w-60 sm:block">
                   {member.role === "owner" ? (
                     <div className="flex flex-wrap justify-end gap-1.5">
-                      <RoleBadge role="Owner" />
+                      <RoleBadge label="Owner" />
                       <AccessGroupBadges groups={member.accessGroups ?? []} />
                     </div>
                   ) : (
@@ -3622,7 +3622,7 @@ function NotificationsTab() {
                         <p className="truncate text-xs text-muted-foreground">{member.userEmail ?? "Email unavailable for this member"}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <RoleBadge role={toRoleLabel(member.role)} />
+                        <RoleBadge label={toRoleLabel(member.role)} />
                         <Switch
                           size="sm"
                           checked={selectedMemberSet.has(member.userId)}

@@ -287,12 +287,10 @@ function CustomerRow({
   onToggle: () => void
 }) {
   const [invoices, setInvoices] = useState<OpenInvoice[] | null>(null)
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!expanded || invoices !== null) return
     let cancelled = false
-    setLoading(true)
 
     const params = new URLSearchParams({ outstandingOnly: "1", limit: "50" })
     if (customer.customerId) params.set("customerId", customer.customerId)
@@ -306,9 +304,6 @@ function CustomerRow({
       })
       .catch(() => {
         if (!cancelled) setInvoices([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
       })
 
     return () => {
@@ -342,7 +337,7 @@ function CustomerRow({
       {expanded && (
         <tr className="border-b bg-muted/20">
           <td colSpan={7} className="px-5 py-3">
-            {loading ? (
+            {invoices === null ? (
               <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                 <Spinner className="size-3.5" />
                 Loading open invoices…
