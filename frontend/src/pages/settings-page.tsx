@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
@@ -3233,7 +3233,66 @@ function SupportTab() {
 
 export function SettingsPage() {
   const { tab } = useSearch({ from: "/settings" })
-  const activeTab = tab ?? "organization"
+  const {
+    canManageOrganization,
+    hasFeature,
+    hasModuleAccess,
+    loading: entitlementsLoading,
+  } = useEntitlements()
+  const canShowManagementTabs = !entitlementsLoading && canManageOrganization
+  const canShowSupportTab =
+    !entitlementsLoading && hasFeature("support") && hasModuleAccess("support")
+  const settingsTabs = useMemo(
+    () => [
+      {
+        value: "organization",
+        label: "Organization",
+        icon: Building2Icon,
+        isVisible: canShowManagementTabs,
+        content: <OrganizationTab />,
+      },
+      {
+        value: "account",
+        label: "Account",
+        icon: KeyIcon,
+        isVisible: true,
+        content: <AccountTab />,
+      },
+      {
+        value: "members",
+        label: "Members",
+        icon: UsersIcon,
+        isVisible: canShowManagementTabs,
+        content: <MembersTab />,
+      },
+      {
+        value: "access-groups",
+        label: "Access Groups",
+        icon: ShieldCheckIcon,
+        isVisible: canShowManagementTabs,
+        content: <AccessGroupsTab />,
+      },
+      {
+        value: "support",
+        label: "Support",
+        icon: MessageSquareTextIcon,
+        isVisible: canShowSupportTab,
+        content: <SupportTab />,
+      },
+      {
+        value: "notifications",
+        label: "Notifications",
+        icon: MailIcon,
+        isVisible: canShowManagementTabs,
+        content: <NotificationsTab />,
+      },
+    ],
+    [canShowManagementTabs, canShowSupportTab],
+  )
+  const visibleTabs = settingsTabs.filter((settingsTab) => settingsTab.isVisible)
+  const activeTab = visibleTabs.some((settingsTab) => settingsTab.value === tab)
+    ? tab
+    : visibleTabs[0]?.value
 
   return (
     <AppLayout>
@@ -3247,52 +3306,21 @@ export function SettingsPage() {
           <Tabs defaultValue={activeTab} key={activeTab}>
             <div className="mb-6 overflow-x-auto">
               <TabsList className="h-auto rounded-2xl bg-muted/60 p-1.5">
-                <TabsTrigger value="organization" className="gap-1.5">
-                  <Building2Icon className="size-3.5" />
-                  Organization
-                </TabsTrigger>
-                <TabsTrigger value="account" className="gap-1.5">
-                  <KeyIcon className="size-3.5" />
-                  Account
-                </TabsTrigger>
-                <TabsTrigger value="members" className="gap-1.5">
-                  <UsersIcon className="size-3.5" />
-                  Members
-                </TabsTrigger>
-                <TabsTrigger value="access-groups" className="gap-1.5">
-                  <ShieldCheckIcon className="size-3.5" />
-                  Access Groups
-                </TabsTrigger>
-                <TabsTrigger value="support" className="gap-1.5">
-                  <MessageSquareTextIcon className="size-3.5" />
-                  Support
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="gap-1.5">
-                  <MailIcon className="size-3.5" />
-                  Notifications
-                </TabsTrigger>
+                {visibleTabs.map(({ value, label, icon: Icon }) => (
+                  <TabsTrigger key={value} value={value} className="gap-1.5">
+                    <Icon className="size-3.5" />
+                    {label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </div>
 
             <div className="max-w-3xl">
-              <TabsContent value="organization" className="mt-0">
-                <OrganizationTab />
-              </TabsContent>
-              <TabsContent value="account" className="mt-0">
-                <AccountTab />
-              </TabsContent>
-              <TabsContent value="members" className="mt-0">
-                <MembersTab />
-              </TabsContent>
-              <TabsContent value="access-groups" className="mt-0">
-                <AccessGroupsTab />
-              </TabsContent>
-              <TabsContent value="support" className="mt-0">
-                <SupportTab />
-              </TabsContent>
-              <TabsContent value="notifications" className="mt-0">
-                <NotificationsTab />
-              </TabsContent>
+              {visibleTabs.map(({ value, content }) => (
+                <TabsContent key={value} value={value} className="mt-0">
+                  {content}
+                </TabsContent>
+              ))}
             </div>
           </Tabs>
         </div>
