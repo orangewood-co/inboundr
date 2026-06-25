@@ -37,6 +37,7 @@ import supportAiRouter from "./routes/support-ai.route";
 import supportTemplateRouter from "./routes/support-template.route";
 import notificationRouter from "./routes/notification.route";
 import { connectDB, disconnectDB } from "./config/database.config";
+import { ensureKnowledgeSchema } from "./db/knowledge-schema";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
 import { auth } from "./lib/auth";
 import { registerNotificationEventHandlers } from "./events/notification-event-handlers";
@@ -109,6 +110,14 @@ app.use((req: Request, res: Response) => {
 export async function initializeServices(): Promise<void> {
   await connectDB();
   registerNotificationEventHandlers();
+
+  try {
+    await ensureKnowledgeSchema();
+    console.log("Knowledge (RAG) schema ready");
+  } catch (err) {
+    console.error("Failed to provision knowledge schema:", err);
+    console.warn("Chat document retrieval will be unavailable until the database is reachable");
+  }
 
   try {
     await startWatchesForConnectedAccounts();

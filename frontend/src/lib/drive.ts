@@ -16,6 +16,10 @@ export interface DriveNode {
   createdByUserId: string
   status: DriveNodeStatus
   role?: DriveRole
+  chatContext?: {
+    enabled: boolean
+    enabledAt: string | null
+  }
   createdAt: string
   updatedAt: string
 }
@@ -189,6 +193,13 @@ export async function moveDriveNode(id: string, parentId: string | null) {
   return api<{ node: DriveNode }>(`/api/v1/drive/${encodeURIComponent(id)}/move`, {
     method: "POST",
     body: JSON.stringify({ parentId }),
+  })
+}
+
+export async function setDriveChatContext(id: string, enabled: boolean) {
+  return api<{ node: DriveNode }>(`/api/v1/drive/${encodeURIComponent(id)}/chat-context`, {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
   })
 }
 

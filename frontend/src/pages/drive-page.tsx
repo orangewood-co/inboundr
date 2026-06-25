@@ -138,6 +138,7 @@ import {
   renameDriveNode,
   restoreDriveNode,
   revokeDrivePublicLink,
+  setDriveChatContext,
   shareDriveNode,
   suggestDriveNodeName,
   trashDriveNode,
@@ -476,6 +477,21 @@ export default function DrivePage() {
     }
   }
 
+  async function toggleChatContext(node: DriveNode) {
+    const enabled = !node.chatContext?.enabled
+    try {
+      await setDriveChatContext(node._id, enabled)
+      toast.success(
+        enabled
+          ? "Folder will be used for chat context. Indexing its files now."
+          : "Folder removed from chat context."
+      )
+      await loadNodes()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update chat context")
+    }
+  }
+
   // --- Selection -----------------------------------------------------------
 
   const anySelected = selectedIds.size > 0
@@ -751,6 +767,14 @@ export default function DrivePage() {
                 <Share2Icon className="size-4" />
                 Share
               </DropdownMenuItem>
+              {node.type === "folder" && (
+                <DropdownMenuItem onClick={() => void toggleChatContext(node)}>
+                  <SparklesIcon className="size-4" />
+                  {node.chatContext?.enabled
+                    ? "Remove from Chat Context"
+                    : "Use for Chat Context"}
+                </DropdownMenuItem>
+              )}
             </>
           )}
           <DropdownMenuItem onClick={() => openDetails(node)}>
@@ -850,6 +874,14 @@ export default function DrivePage() {
                     <Share2Icon className="size-4" />
                     Share
                   </ContextMenuItem>
+                  {node.type === "folder" && (
+                    <ContextMenuItem onSelect={() => void toggleChatContext(node)}>
+                      <SparklesIcon className="size-4" />
+                      {node.chatContext?.enabled
+                        ? "Remove from Chat Context"
+                        : "Use for Chat Context"}
+                    </ContextMenuItem>
+                  )}
                 </>
               )}
               <ContextMenuItem onSelect={() => openDetails(node)}>
@@ -1389,6 +1421,17 @@ function DriveListRow({
         <div className="flex items-center gap-2.5 font-medium">
           <Icon className={cn("size-4 shrink-0", className)} />
           <span className="truncate">{node.name}</span>
+          {node.chatContext?.enabled && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  <SparklesIcon className="size-3" />
+                  Chat
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Used for chat context</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </td>
       <td className="px-5 py-3 align-middle text-muted-foreground">
@@ -1487,9 +1530,14 @@ function DriveGridCard({
         <Icon className={cn("size-9", className)} />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium" title={node.name}>
-          {node.name}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate text-sm font-medium" title={node.name}>
+            {node.name}
+          </p>
+          {node.chatContext?.enabled && (
+            <SparklesIcon className="size-3 shrink-0 text-primary" aria-label="Used for chat context" />
+          )}
+        </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {metadata}
           {" · "}

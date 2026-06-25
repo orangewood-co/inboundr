@@ -13,6 +13,7 @@ import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/au
 import { ChatMessage } from "../models/chat-message.model";
 import { ChatThread, type ChatThreadStatus } from "../models/chat-thread.model";
 import { createInvoiceTools } from "../tools/invoice.tool";
+import { createKnowledgeTools } from "../tools/knowledge.tool";
 import { createProductTools } from "../tools/product.tool";
 
 const openrouter = createOpenAI({
@@ -33,7 +34,12 @@ You can also help users with invoices:
 - Invoices you create are always drafts. Create the draft directly once the customer and line items are clear; only ask for confirmation when something is ambiguous or missing.
 - Only draft invoices can be edited. When updating line items, send the complete list of items the invoice should have.
 - You cannot send invoices. If the user asks to send one, use sendInvoice and relay its instructions; never claim an invoice was sent.
-- Amounts are in INR.`;
+- Amounts are in INR.
+
+You can answer questions from the user's documents:
+- Use searchKnowledgeBase to retrieve relevant snippets from folders the user marked "Use for chat context" in Drive.
+- Prefer searchKnowledgeBase whenever a question is about the user's own files, documents, manuals, policies, or uploaded content.
+- Base your answer on the retrieved snippets and always cite the source file names. If nothing relevant is found, say so instead of guessing.`;
 
 export type ChatStreamInput = {
   messages?: UIMessage[];
@@ -91,6 +97,7 @@ export async function createChatStreamResponse(
   const aiTools = {
     ...createProductTools(context),
     ...createInvoiceTools(context),
+    ...createKnowledgeTools(context),
     ...frontendTools((input.tools ?? {}) as Parameters<typeof frontendTools>[0]),
   };
   const result = streamText({

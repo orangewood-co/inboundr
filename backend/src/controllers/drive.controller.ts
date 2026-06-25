@@ -41,6 +41,13 @@ import {
   reserveDriveBytes,
 } from "../services/drive-quota.service";
 import { hashPassword, verifyPassword } from "../services/short-link.service";
+import {
+  indexFolderSubtree,
+  indexNode,
+  isNodeInChatContext,
+  removeFolderSubtree,
+  removeNode,
+} from "../services/drive-knowledge.service";
 
 const MAX_DRIVE_FILE_SIZE = 1024 * 1024 * 1024;
 const MULTIPART_PART_SIZE = 10 * 1024 * 1024;
@@ -150,10 +157,26 @@ function serializeNode(node: any, role?: string) {
     trashedAt: node.trashedAt,
     scanStatus: node.scanStatus,
     upload: node.upload,
+    chatContext: {
+      enabled: Boolean(node.chatContext?.enabled),
+      enabledAt: node.chatContext?.enabledAt ?? null,
+    },
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
     role,
   };
+}
+
+function removeNodesFromKnowledge(ids: Types.ObjectId[]): void {
+  void (async () => {
+    for (const id of ids) {
+      try {
+        await removeNode(String(id));
+      } catch (err) {
+        console.error(`Failed to remove node ${String(id)} from chat context:`, err);
+      }
+    }
+  })();
 }
 
 function serializePublicLink(link: any) {
@@ -531,6 +554,16 @@ export async function completeDriveUpload(req: Request, res: Response): Promise<
     await node.save();
     await commitReservedDriveBytes(orgReq.organization._id, node.size);
 
+    void (async () => {
+      try {
+        if (await isNodeInChatContext(node)) {
+          await indexNode(node);
+        }
+      } catch (err) {
+        console.error(`Background indexing failed for node ${String(node._id)}:`, err);
+      }
+    })();
+
     recordDriveAuditEvent({
       organizationId: orgReq.organization._id,
       nodeId: node._id,
@@ -757,6 +790,7 @@ export async function trashDriveNode(req: Request, res: Response): Promise<void>
       { _id: { $in: ids }, organizationId: orgReq.organization._id },
       { status: "trashed", trashedAt: new Date(), trashedByUserId: orgReq.user.id }
     );
+    removeNodesFromKnowledge(ids as Types.ObjectId[]);
     recordDriveAuditEvent({
       organizationId: orgReq.organization._id,
       nodeId: node._id,
@@ -795,6 +829,25 @@ export async function restoreDriveNode(req: Request, res: Response): Promise<voi
     if (node.parentId && !parent) {
       await DriveNode.updateOne({ _id: node._id }, { parentId: null });
     }
+    void (async () => {
+      try {
+        const refreshed = await DriveNode.findById(node._id);
+        if (!refreshed || refreshed.status !== "active") return;
+        const folderEnabled =
+          refreshed.type === "folder" && Boolean(refreshed.chatContext?.enabled);
+        if (!folderEnabled && !(await isNodeInChatContext(refreshed))) return;
+        if (refreshed.type === "file") {
+          await indexNode(refreshed);
+        } else {
+          await indexFolderSubtree(
+            orgReq.organization._id,
+            refreshed._id as Types.ObjectId
+          );
+        }
+      } catch (err) {
+        console.error("Failed to re-index restored Drive node:", err);
+      }
+    })();
     recordDriveAuditEvent({
       organizationId: orgReq.organization._id,
       nodeId: node._id,
@@ -841,6 +894,7 @@ export async function permanentlyDeleteDriveNode(req: Request, res: Response): P
       { organizationId: orgReq.organization._id, nodeId: { $in: ids } },
       { status: "revoked" }
     );
+    removeNodesFromKnowledge(ids as Types.ObjectId[]);
     recordDriveAuditEvent({
       organizationId: orgReq.organization._id,
       nodeId: node._id,
@@ -851,6 +905,59 @@ export async function permanentlyDeleteDriveNode(req: Request, res: Response): P
     res.json({ ok: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message || "Failed to permanently delete Drive item" });
+  }
+}
+
+export async function setDriveChatContext(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const node = await requireDriveNode({
+      organizationId: orgReq.organization._id,
+      nodeId: paramValue(req, "id"),
+    });
+    if (node.type !== "folder") {
+      res.status(400).json({ error: "Only folders can be used for chat context" });
+      return;
+    }
+    await assertDriveAccess({
+      node,
+      userId: orgReq.user.id,
+      organizationRole: orgReq.organizationMembership.role,
+      minimumRole: "editor",
+    });
+
+    const enabled = Boolean(req.body?.enabled);
+    node.chatContext = {
+      enabled,
+      enabledAt: enabled ? new Date() : null,
+      enabledByUserId: enabled ? orgReq.user.id : null,
+    };
+    node.updatedByUserId = orgReq.user.id;
+    await node.save();
+
+    const organizationId = orgReq.organization._id;
+    const folderId = node._id as Types.ObjectId;
+    if (enabled) {
+      void indexFolderSubtree(organizationId, folderId).catch((err) =>
+        console.error(`Failed to index folder ${String(folderId)} for chat context:`, err)
+      );
+    } else {
+      void removeFolderSubtree(organizationId, folderId).catch((err) =>
+        console.error(`Failed to remove folder ${String(folderId)} from chat context:`, err)
+      );
+    }
+
+    recordDriveAuditEvent({
+      organizationId,
+      nodeId: node._id,
+      actorUserId: orgReq.user.id,
+      action: enabled ? "chat_context_enabled" : "chat_context_disabled",
+      metadata: {},
+    });
+
+    res.json({ node: await serializeNodeForUser(node, orgReq) });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || "Failed to update chat context" });
   }
 }
 

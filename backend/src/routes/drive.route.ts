@@ -19,6 +19,7 @@ import {
   permanentlyDeleteDriveNode,
   restoreDriveNode,
   revokeDrivePublicLink,
+  setDriveChatContext,
   shareDriveNode,
   suggestDriveNodeName,
   trashDriveNode,
@@ -52,6 +53,7 @@ router.get("/:id", getDriveNode);
 router.patch("/:id", updateDriveNode);
 router.post("/:id/suggest-name", suggestDriveNodeName);
 router.post("/:id/move", moveDriveNode);
+router.patch("/:id/chat-context", setDriveChatContext);
 router.post("/:id/trash", trashDriveNode);
 router.post("/:id/restore", restoreDriveNode);
 router.delete("/:id", permanentlyDeleteDriveNode);

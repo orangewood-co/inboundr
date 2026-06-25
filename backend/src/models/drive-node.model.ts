@@ -30,6 +30,11 @@ export interface IDriveNode extends Document {
     partCount: number | null;
     completedAt: Date | null;
   };
+  chatContext: {
+    enabled: boolean;
+    enabledAt: Date | null;
+    enabledByUserId: string | null;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -104,6 +109,11 @@ const driveNodeSchema = new Schema<IDriveNode>(
       partSize: { type: Number, default: null, min: 1 },
       partCount: { type: Number, default: null, min: 1 },
       completedAt: { type: Date, default: null },
+    },
+    chatContext: {
+      enabled: { type: Boolean, default: false, index: true },
+      enabledAt: { type: Date, default: null },
+      enabledByUserId: { type: String, default: null },
     },
   },
   { timestamps: true }

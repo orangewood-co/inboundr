@@ -18,7 +18,9 @@ export type DriveAuditAction =
   | "public_link_accessed"
   | "downloaded"
   | "export_requested"
-  | "export_completed";
+  | "export_completed"
+  | "chat_context_enabled"
+  | "chat_context_disabled";
 
 export interface IDriveAuditEvent extends Document {
   organizationId: Types.ObjectId;

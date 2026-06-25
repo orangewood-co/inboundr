@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 
 import { InvoiceToolUIs } from "@/components/assistant-ui/invoice-tool-ui"
+import { KnowledgeToolUIs } from "@/components/assistant-ui/knowledge-tool-ui"
 import { Thread } from "@/components/assistant-ui/thread"
 import { ChatHeaderActions } from "@/components/assistant-ui/thread-list"
 import { WorkspaceToolUIs } from "@/components/assistant-ui/workspace-tool-ui"
@@ -407,6 +408,7 @@ export default function ChatPage() {
       <ChatRuntimeProvider>
         <InvoiceToolUIs />
         <WorkspaceToolUIs />
+        <KnowledgeToolUIs />
         <SiteHeader actions={<ChatHeaderActions />} />
         <ChatContent />
       </ChatRuntimeProvider>

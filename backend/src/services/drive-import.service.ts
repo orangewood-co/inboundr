@@ -2,6 +2,7 @@ import type { Types } from "mongoose";
 import { DriveNode, type IDriveNode } from "../models/drive-node.model";
 import { commitReservedDriveBytes, releaseReservedDriveBytes, reserveDriveBytes } from "./drive-quota.service";
 import { recordDriveAuditEvent } from "./drive-audit.service";
+import { indexNode, isNodeInChatContext } from "./drive-knowledge.service";
 import { copyObject, createUploadKey, deleteObject, storageBucket } from "./storage.service";
 
 const MAX_DRIVE_FILE_SIZE = 1024 * 1024 * 1024;
@@ -68,6 +69,21 @@ export async function importExistingObjectToDrive(input: {
     });
 
     await commitReservedDriveBytes(input.organizationId, input.size);
+
+    const importedNode = node;
+    void (async () => {
+      try {
+        if (await isNodeInChatContext(importedNode)) {
+          await indexNode(importedNode);
+        }
+      } catch (indexErr) {
+        console.error(
+          `Background indexing failed for imported node ${String(importedNode._id)}:`,
+          indexErr
+        );
+      }
+    })();
+
     recordDriveAuditEvent({
       organizationId: input.organizationId,
       nodeId: node._id,
