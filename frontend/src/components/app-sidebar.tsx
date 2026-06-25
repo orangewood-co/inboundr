@@ -16,7 +16,7 @@ import { getAdminMe } from "@/lib/admin"
 import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, CrownIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShoppingCartIcon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShieldCheckIcon, ShoppingCartIcon, UsersIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -218,7 +218,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       const superAdminItem: SidebarNavItem = {
         title: "Super Admin",
         url: "/admin",
-        icon: <CrownIcon />,
+        icon: <ShieldCheckIcon />,
       }
       if (adminCategory) {
         adminCategory.items.push(superAdminItem)
