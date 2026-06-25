@@ -49,7 +49,7 @@ export function ProjectUpdateEmail({
                 <Img
                   src="https://inboundr.co/logo-black.png"
                   alt={companyName}
-                  width={180}
+                  width={140}
                   className="block"
                 />
               </Section>

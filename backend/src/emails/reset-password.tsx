@@ -51,7 +51,7 @@ export function ResetPasswordEmail({
                           <Img
                             src={`https://inboundr.co/logo-black.png`}
                             alt=""
-                            width={200}
+                            width={140}
                             className="block"
                           />
                         </Column>
