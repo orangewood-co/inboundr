@@ -1,11 +1,9 @@
 import { createElement } from "react";
 import mongoose from "mongoose";
 
-import {
-  SupportOpenedEmail,
-  SupportResolvedEmail,
-  SupportTranscriptEmail,
-} from "../emails/support-transcript";
+import SupportOpenedEmail from "../emails/support-opened";
+import SupportResolvedEmail from "../emails/support-resolved";
+import SupportTranscriptEmail from "../emails/support-transcript";
 import { embedOrigin } from "../config/origins.config";
 import { sendEmail } from "../lib/email";
 import { Organization } from "../models/organization.model";
