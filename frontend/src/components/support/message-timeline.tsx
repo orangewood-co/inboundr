@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { CheckIcon, FileIcon, HeadphonesIcon, LoaderIcon, LockIcon, SparklesIcon, XIcon } from "lucide-react"
+import { CheckIcon, FileIcon, HeadphonesIcon, LoaderIcon, LockIcon, PhoneIcon, SparklesIcon, XIcon } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -222,6 +222,97 @@ function BubbleGroup({
   )
 }
 
+function CallTranscriptBanner() {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+      <PhoneIcon className="size-3.5" />
+      Phone call transcript
+    </div>
+  )
+}
+
+/**
+ * Renders a phone-call turn as a transcript line (single left-aligned column with
+ * a speaker label and a speaker-colored left rule) rather than chat bubbles, so a
+ * call reads clearly differently from a live chat.
+ */
+function TranscriptGroup({
+  group,
+  requesterName,
+}: {
+  group: Extract<RenderItem, { kind: "group" }>
+  requesterName: string
+}) {
+  const isBot = group.authorType === "bot"
+  const isAgent = group.authorType === "agent"
+  const isSystem = group.authorType === "system"
+  const first = group.messages[0]
+
+  if (isSystem) {
+    return (
+      <div className="flex justify-center">
+        <p className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+          {first.bodyText}
+        </p>
+      </div>
+    )
+  }
+
+  const isAgentSide = isBot || isAgent
+  const speaker = isBot ? "Agent" : isAgent ? "You" : requesterName
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 px-1">
+        <span
+          className={cn(
+            "flex size-5 items-center justify-center rounded-full",
+            isAgentSide ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+          )}
+        >
+          {isBot ? (
+            <PhoneIcon className="size-3" />
+          ) : isAgent ? (
+            <HeadphonesIcon className="size-3" />
+          ) : (
+            <span className="text-[9px] font-semibold">{initialsFromName(requesterName)}</span>
+          )}
+        </span>
+        <span className="text-xs font-medium text-foreground/80">{speaker}</span>
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+            isAgentSide ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+          )}
+        >
+          {isAgentSide ? "Agent" : "Caller"}
+        </span>
+        <span className="text-[11px] text-muted-foreground tabular-nums">
+          {formatTime(first.createdAt)}
+        </span>
+      </div>
+
+      <div
+        className={cn(
+          "ml-2 border-l-2 pl-3",
+          isAgentSide ? "border-primary/40" : "border-border"
+        )}
+      >
+        {group.messages.map((message) => (
+          <div key={message.id} title={formatFullTime(message.createdAt)} className="py-0.5">
+            {message.bodyText && (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                {message.bodyText}
+              </p>
+            )}
+            <MessageAttachments attachments={message.attachments} tone="neutral" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function TypingIndicator({ name }: { name: string }) {
   return (
     <div className="flex items-center gap-2 px-1">
@@ -346,10 +437,12 @@ export function MessageTimeline({
   }
 
   const items = buildRenderItems(messages)
+  const isPhone = ticket.channel === "phone"
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        {isPhone && <CallTranscriptBanner />}
         {items.map((item) =>
           item.kind === "divider" ? (
             <div key={item.key} className="flex items-center gap-3 py-1">
@@ -359,6 +452,12 @@ export function MessageTimeline({
             </div>
           ) : item.isNote ? (
             <NoteGroup key={item.key} message={item.messages[0]} />
+          ) : isPhone ? (
+            <TranscriptGroup
+              key={item.key}
+              group={item}
+              requesterName={ticket.requester.name}
+            />
           ) : (
             <BubbleGroup
               key={item.key}
