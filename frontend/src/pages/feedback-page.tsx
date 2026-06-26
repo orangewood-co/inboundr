@@ -89,10 +89,12 @@ export default function FeedbackPage() {
             title="Feedback"
             description="Send feedback, request features, or report bugs. Track your conversations with our team here."
             actions={
-              <Button onClick={() => setCreateOpen(true)}>
-                <MessageSquarePlusIcon className="mr-2 size-4" />
-                New Feedback
-              </Button>
+              feedback.length > 0 ? (
+                <Button onClick={() => setCreateOpen(true)}>
+                  <MessageSquarePlusIcon className="mr-2 size-4" />
+                  New Feedback
+                </Button>
+              ) : null
             }
           />
 
