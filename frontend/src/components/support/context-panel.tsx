@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CopyableText } from "@/components/copy-button"
 import { API_ORIGIN } from "@/lib/env"
 import { cn, getAvatarColor } from "@/lib/utils"
+import { ChannelBadge } from "./channel"
 import {
   fileSize,
   formatFullTime,
@@ -344,8 +345,19 @@ export function ContextPanel({
             <span className="capitalize">{ticket.priority}</span>
           </MetaRow>
           <MetaRow label="Channel">
-            <span className="capitalize">{ticket.channel}</span>
+            <ChannelBadge channel={ticket.channel} />
           </MetaRow>
+          {ticket.requester.phoneNumber && (
+            <MetaRow label="Phone">
+              <CopyableText
+                value={ticket.requester.phoneNumber}
+                label="Phone number copied"
+                className="font-medium"
+              >
+                <span className="truncate">{ticket.requester.phoneNumber}</span>
+              </CopyableText>
+            </MetaRow>
+          )}
           <MetaRow label="Created">{formatFullTime(ticket.createdAt)}</MetaRow>
           <MetaRow label="Last activity">{formatRelativeTime(ticket.lastMessageAt)}</MetaRow>
           {ticket.visitorEndedAt && <MetaRow label="Visitor ended">{formatFullTime(ticket.visitorEndedAt)}</MetaRow>}

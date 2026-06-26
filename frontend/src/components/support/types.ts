@@ -16,7 +16,7 @@ export type Ticket = {
   status: TicketStatus
   priority: string
   channel: string
-  requester: { name: string; email: string }
+  requester: { name: string; email: string; phoneNumber?: string | null }
   customerId: string | null
   customer: SupportCustomer | null
   initialIssue: string

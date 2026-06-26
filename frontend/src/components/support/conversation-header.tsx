@@ -8,6 +8,7 @@ import {
   MailIcon,
   MoreVerticalIcon,
   PanelRightIcon,
+  PhoneIcon,
   RotateCcwIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -24,6 +25,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ContactHoverCard } from "@/components/contact-hover-card"
 import { cn, copyToClipboard, getAvatarColor } from "@/lib/utils"
+import { ChannelIcon, getChannelMeta } from "./channel"
 import { initialsFromName } from "./support-utils"
 import type { Ticket } from "./types"
 
@@ -50,6 +52,10 @@ export function ConversationHeader({
 }) {
   const avatar = getAvatarColor(ticket.requester.name)
   const resolved = ticket.status === "resolved"
+  const isPhone = ticket.channel === "phone"
+  const phoneNumber = ticket.requester.phoneNumber ?? ""
+  const secondaryContact = ticket.requester.email || phoneNumber
+  const channelLabel = getChannelMeta(ticket.channel).label
   const aiModeLabel =
     ticket.aiMode === "autonomous"
       ? "AI Active"
@@ -74,6 +80,7 @@ export function ConversationHeader({
         </Avatar>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
+            <ChannelIcon channel={ticket.channel} />
             <ContactHoverCard
               contact={{ name: ticket.requester.name, email: ticket.requester.email }}
               side="bottom"
@@ -99,22 +106,37 @@ export function ConversationHeader({
           <p className="truncate text-xs text-muted-foreground">
             <span className="tabular-nums">#{ticket.ticketNumber}</span>
             <span className="px-1">·</span>
-            {ticket.requester.email}
+            {secondaryContact || channelLabel}
           </p>
         </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" asChild>
-              <a href={`mailto:${ticket.requester.email}`} aria-label="Email customer">
-                <MailIcon />
-              </a>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Email customer</TooltipContent>
-        </Tooltip>
+        {isPhone ? (
+          phoneNumber && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" asChild>
+                  <a href={`tel:${phoneNumber}`} aria-label="Call customer">
+                    <PhoneIcon />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Call customer</TooltipContent>
+            </Tooltip>
+          )
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-sm" asChild>
+                <a href={`mailto:${ticket.requester.email}`} aria-label="Email customer">
+                  <MailIcon />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Email customer</TooltipContent>
+          </Tooltip>
+        )}
 
         <Button
           type="button"
@@ -164,10 +186,22 @@ export function ConversationHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onSelect={() => copyToClipboard(ticket.requester.email, "Email copied")}>
-              <CopyIcon />
-              Copy Email Address
-            </DropdownMenuItem>
+            {isPhone ? (
+              <DropdownMenuItem
+                onSelect={() => copyToClipboard(phoneNumber, "Phone number copied")}
+                disabled={!phoneNumber}
+              >
+                <CopyIcon />
+                Copy Phone Number
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onSelect={() => copyToClipboard(ticket.requester.email, "Email copied")}
+              >
+                <CopyIcon />
+                Copy Email Address
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onResolveToggle} disabled={!socketReady}>
               {resolved ? <RotateCcwIcon /> : <CheckCircle2Icon />}

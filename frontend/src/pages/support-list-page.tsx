@@ -8,6 +8,7 @@ import {
   ExternalLinkIcon,
   InboxIcon,
   MoreHorizontalIcon,
+  PhoneIcon,
   RefreshCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -17,6 +18,7 @@ import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { PageHeader } from "@/components/page-header"
+import { ChannelIcon } from "@/components/support/channel"
 import { STATUS_STYLES } from "@/components/support/context-panel"
 import { useSupport } from "@/components/support/support-provider"
 import { formatFullTime, formatRelativeTime, initialsFromName, isUnread } from "@/components/support/support-utils"
@@ -51,6 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { API_ORIGIN } from "@/lib/env"
 import { cn, copyToClipboard, getAvatarColor } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -105,6 +108,96 @@ function ChatWidgetLink({ link }: { link: string }) {
               <ExternalLinkIcon />
             </a>
           </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+type AssignedPhoneNumber = {
+  id: string
+  phoneNumber: string
+  label: string
+  status: string
+}
+
+function useAssignedPhoneNumbers() {
+  const [numbers, setNumbers] = useState<AssignedPhoneNumber[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`${API_ORIGIN}/api/v1/support/call/settings`, {
+          credentials: "include",
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok || cancelled) return
+        const active = (data?.phoneNumbers ?? []).filter(
+          (number: AssignedPhoneNumber) => number.status === "active"
+        )
+        setNumbers(active)
+      } catch {
+        // Voice support is optional; quietly skip the button.
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return numbers
+}
+
+function PhoneNumberRow({ number }: { number: AssignedPhoneNumber }) {
+  return (
+    <div className="flex items-center gap-2">
+      <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 text-xs text-foreground">
+        {number.phoneNumber}
+        {number.label ? ` · ${number.label}` : ""}
+      </code>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        aria-label="Copy phone number"
+        onClick={() => copyToClipboard(number.phoneNumber, "Phone number copied")}
+      >
+        <CopyIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" asChild>
+        <a href={`tel:${number.phoneNumber}`} aria-label="Call number">
+          <PhoneIcon />
+        </a>
+      </Button>
+    </div>
+  )
+}
+
+function PhoneNumberButton({ numbers }: { numbers: AssignedPhoneNumber[] }) {
+  if (numbers.length === 0) return null
+  const label =
+    numbers.length === 1 ? numbers[0].phoneNumber : `${numbers.length} numbers`
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <PhoneIcon />
+          {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        <p className="text-sm font-medium">Voice Support Number</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {numbers.length === 1
+            ? "Customers reach your voice agent by calling this number."
+            : "Customers reach your voice agent by calling these numbers."}
+        </p>
+        <div className="mt-3 space-y-2">
+          {numbers.map((number) => (
+            <PhoneNumberRow key={number.id} number={number} />
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -191,6 +284,7 @@ function TicketRow({
           {unread && (
             <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-label="Unread" />
           )}
+          <ChannelIcon channel={ticket.channel} />
           <div className="min-w-0">
             <p className={cn("truncate", unread ? "font-semibold" : "font-medium")}>
               {ticket.subject || "New support chat"}
@@ -320,6 +414,8 @@ export default function SupportListPage() {
     }
   }
 
+  const assignedPhoneNumbers = useAssignedPhoneNumbers()
+
   const description =
     pagination.total === 1 ? "1 conversation" : `${pagination.total} conversations`
 
@@ -368,7 +464,12 @@ export default function SupportListPage() {
           <PageHeader
             title="Support"
             description={description}
-            actions={inbox.supportChatLink ? <ChatWidgetLink link={inbox.supportChatLink} /> : null}
+            actions={
+              <div className="flex items-center gap-2">
+                <PhoneNumberButton numbers={assignedPhoneNumbers} />
+                {inbox.supportChatLink ? <ChatWidgetLink link={inbox.supportChatLink} /> : null}
+              </div>
+            }
           />
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
