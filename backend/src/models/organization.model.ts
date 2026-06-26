@@ -36,6 +36,16 @@ export interface IOrganizationSupportChat {
   updatedAt: Date | null;
 }
 
+export interface IOrganizationSupportCall {
+  enabled: boolean;
+  voice: string;
+  greeting: string;
+  instructions: string;
+  recordingEnabled: boolean;
+  updatedBy: string | null;
+  updatedAt: Date | null;
+}
+
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
@@ -49,6 +59,7 @@ export interface IOrganizationPreferences {
   paymentReminders: IOrganizationPaymentReminders;
   supportAi: IOrganizationSupportAi;
   supportChat: IOrganizationSupportChat;
+  supportCall: IOrganizationSupportCall;
 }
 
 export interface IOrganizationPaymentTerm {
@@ -132,6 +143,19 @@ const organizationSupportChatSchema = new Schema<IOrganizationSupportChat>(
   { _id: false }
 );
 
+const organizationSupportCallSchema = new Schema<IOrganizationSupportCall>(
+  {
+    enabled: { type: Boolean, default: true },
+    voice: { type: String, default: "marin", trim: true },
+    greeting: { type: String, default: "", trim: true, maxlength: 1000 },
+    instructions: { type: String, default: "", trim: true, maxlength: 8000 },
+    recordingEnabled: { type: Boolean, default: true },
+    updatedBy: { type: String, default: null },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
   {
     primaryColor: { type: String, default: "#f5b400" },
@@ -170,6 +194,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     paymentReminders: { type: organizationPaymentRemindersSchema, default: () => ({}) },
     supportAi: { type: organizationSupportAiSchema, default: () => ({}) },
     supportChat: { type: organizationSupportChatSchema, default: () => ({}) },
+    supportCall: { type: organizationSupportCallSchema, default: () => ({}) },
   },
   { _id: false }
 );

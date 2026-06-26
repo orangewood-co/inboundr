@@ -192,7 +192,7 @@ export async function listTickets(input: {
 }) {
   const match: Record<string, unknown> = {
     organizationId: input.organizationId,
-    channel: "chat",
+    channel: { $in: ["chat", "phone"] },
   };
   if (input.status === "archived") {
     match.isArchived = true;
@@ -370,7 +370,7 @@ export async function listRelatedTickets(input: {
 
   const related = await Ticket.find({
     organizationId: input.organizationId,
-    channel: "chat",
+    channel: { $in: ["chat", "phone"] },
     _id: { $ne: ticket._id },
     "requester.email": email,
   })

@@ -9,7 +9,9 @@ import {
   updateSupportAiSettings,
 } from "../controllers/support-ai.controller";
 import {
+  getSupportCallSettings,
   getSupportSettings,
+  updateSupportCallSettings,
   updateSupportSettings,
 } from "../controllers/support-settings.controller";
 import {
@@ -28,6 +30,8 @@ router.use(requireEmployeeModule("support"));
 
 router.get("/settings", getSupportSettings);
 router.patch("/settings", updateSupportSettings);
+router.get("/call/settings", getSupportCallSettings);
+router.patch("/call/settings", updateSupportCallSettings);
 router.get("/ai/settings", getSupportAiSettings);
 router.patch("/ai/settings", updateSupportAiSettings);
 router.get("/knowledge", listKnowledgeArticles);

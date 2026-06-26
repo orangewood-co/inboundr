@@ -21,6 +21,12 @@ import {
   updateAdminOrganizationMember,
   updateAdminOrganization,
 } from "../controllers/admin.controller";
+import {
+  createAdminPhoneNumber,
+  deleteAdminPhoneNumber,
+  listAdminPhoneNumbers,
+  updateAdminPhoneNumber,
+} from "../controllers/admin-phone-number.controller";
 import { requireAuth, requireSuperAdmin } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -47,5 +53,9 @@ router.patch("/organizations/:id/members/:memberId", updateAdminOrganizationMemb
 router.delete("/organizations/:id/members/:memberId", removeAdminOrganizationMember);
 router.post("/organizations/:id/members/:memberId/move", moveAdminOrganizationMember);
 router.post("/organizations/:id/members/:memberId/transfer-owner", transferAdminOrganizationOwner);
+router.get("/phone-numbers", listAdminPhoneNumbers);
+router.post("/phone-numbers", createAdminPhoneNumber);
+router.patch("/phone-numbers/:id", updateAdminPhoneNumber);
+router.delete("/phone-numbers/:id", deleteAdminPhoneNumber);
 
 export default router;

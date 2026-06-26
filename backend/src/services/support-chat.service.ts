@@ -58,7 +58,7 @@ type PromptTemplate = {
   body: string;
 };
 
-type SupportPromptContext = {
+export type SupportPromptContext = {
   organizationName: string;
   instructions: string;
   articles: PromptArticle[];
@@ -266,22 +266,32 @@ function escalationReasonForVisitorMessage(message: any): string {
   return "";
 }
 
-async function loadPromptContext(ticket: ITicket, latestText = ""): Promise<SupportPromptContext> {
-  const organization = await Organization.findById(ticket.organizationId)
-    .select("name preferences.supportAi")
+/**
+ * Loads ranked knowledge + reply-template context for an organization given a
+ * free-text query. Shared by the chat bot and the voice support agent.
+ */
+export async function loadOrgPromptContext(
+  organizationId: mongoose.Types.ObjectId | string,
+  searchText = ""
+): Promise<SupportPromptContext> {
+  const orgId =
+    typeof organizationId === "string"
+      ? new mongoose.Types.ObjectId(organizationId)
+      : organizationId;
+  const organization = await Organization.findById(orgId)
+    .select("name preferences.supportAi preferences.supportCall")
     .lean();
-  const searchText = [latestText, ticket.subject, ticket.initialIssue].filter(Boolean).join(" ");
   const terms = words(searchText);
 
   const [articles, templates] = await Promise.all([
     SupportKnowledgeArticle.find({
-      organizationId: ticket.organizationId,
+      organizationId: orgId,
       enabled: true,
     })
       .sort({ updatedAt: -1 })
       .limit(50)
       .lean(),
-    SupportTemplate.find({ organizationId: ticket.organizationId })
+    SupportTemplate.find({ organizationId: orgId })
       .sort({ updatedAt: -1 })
       .limit(50)
       .lean(),
@@ -320,6 +330,11 @@ async function loadPromptContext(ticket: ITicket, latestText = ""): Promise<Supp
     articles: rankedArticles,
     templates: rankedTemplates,
   };
+}
+
+async function loadPromptContext(ticket: ITicket, latestText = ""): Promise<SupportPromptContext> {
+  const searchText = [latestText, ticket.subject, ticket.initialIssue].filter(Boolean).join(" ");
+  return loadOrgPromptContext(ticket.organizationId, searchText);
 }
 
 function buildSystemPrompt(

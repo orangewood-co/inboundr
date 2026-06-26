@@ -31,6 +31,7 @@ import projectRouter from "./routes/project.route";
 import attendanceRouter from "./routes/attendance.route";
 import publicAttendanceRouter from "./routes/public-attendance.route";
 import publicSupportRouter from "./routes/public-support.route";
+import telephonyRouter from "./routes/telephony.route";
 import chatRouter from "./routes/chat.route";
 import ticketRouter from "./routes/ticket.route";
 import supportAiRouter from "./routes/support-ai.route";
@@ -61,6 +62,10 @@ app.use(
 );
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
+
+// Telephony webhooks need the raw request body for signature verification, so
+// they are mounted before the global JSON body parser.
+app.use("/api/v1/telephony", telephonyRouter);
 
 app.use(express.json());
 

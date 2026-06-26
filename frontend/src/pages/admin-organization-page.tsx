@@ -9,6 +9,7 @@ import {
   EyeOffIcon,
   MailPlusIcon,
   MoreVerticalIcon,
+  PhoneIcon,
   RotateCcwIcon,
   SaveIcon,
   ShieldAlertIcon,
@@ -115,6 +116,14 @@ interface AdminOrganizationOption {
   owner: { name: string; email: string } | null
 }
 
+interface PhoneNumber {
+  id: string
+  phoneNumber: string
+  label: string
+  status: "active" | "disabled"
+  createdAt: string
+}
+
 type ConfirmAction =
   | { type: "remove-member"; member: OrganizationMember }
   | { type: "transfer-owner"; member: OrganizationMember }
@@ -190,6 +199,10 @@ export default function AdminOrganizationPage() {
   const [createRole, setCreateRole] = useState("member")
   const [showCreatePassword, setShowCreatePassword] = useState(false)
   const [creatingUser, setCreatingUser] = useState(false)
+  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([])
+  const [newPhoneNumber, setNewPhoneNumber] = useState("")
+  const [newPhoneLabel, setNewPhoneLabel] = useState("")
+  const [addingPhoneNumber, setAddingPhoneNumber] = useState(false)
   const [loading, setLoading] = useState(true)
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.slug === organization?.entitlements.planSlug),
@@ -207,10 +220,11 @@ export default function AdminOrganizationPage() {
   async function load() {
     setLoading(true)
     try {
-      const [detailResponse, plansResponse, organizationsResponse] = await Promise.all([
+      const [detailResponse, plansResponse, organizationsResponse, phoneNumbersResponse] = await Promise.all([
         fetch(`${API_ORIGIN}/api/v1/admin/organizations/${id}`, { credentials: "include" }),
         fetch(`${API_ORIGIN}/api/v1/admin/plans`, { credentials: "include" }),
         fetch(`${API_ORIGIN}/api/v1/admin/organizations`, { credentials: "include" }),
+        fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers?organizationId=${id}`, { credentials: "include" }),
       ])
       if (!detailResponse.ok || !plansResponse.ok || !organizationsResponse.ok) throw new Error("Failed to load organization")
       const [detailData, planData, organizationsData] = await Promise.all([
@@ -225,6 +239,10 @@ export default function AdminOrganizationPage() {
       setPlans(planData.plans ?? [])
       setFeatures(planData.features ?? [])
       setOrganizations(organizationsData.organizations ?? [])
+      if (phoneNumbersResponse.ok) {
+        const phoneNumbersData = await phoneNumbersResponse.json()
+        setPhoneNumbers(phoneNumbersData.phoneNumbers ?? [])
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load organization")
     } finally {
@@ -326,6 +344,66 @@ export default function AdminOrganizationPage() {
       toast.error(error instanceof Error ? error.message : "Failed to create account")
     } finally {
       setCreatingUser(false)
+    }
+  }
+
+  async function addPhoneNumber(event: React.FormEvent) {
+    event.preventDefault()
+    setAddingPhoneNumber(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organizationId: id, phoneNumber: newPhoneNumber, label: newPhoneLabel }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to assign phone number")
+      }
+      setNewPhoneNumber("")
+      setNewPhoneLabel("")
+      toast.success("Phone number assigned")
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to assign phone number")
+    } finally {
+      setAddingPhoneNumber(false)
+    }
+  }
+
+  async function togglePhoneNumberStatus(phoneNumber: PhoneNumber) {
+    setBusyAction(phoneNumber.id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers/${phoneNumber.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: phoneNumber.status === "active" ? "disabled" : "active" }),
+      })
+      if (!response.ok) throw new Error("Failed to update phone number")
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update phone number")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function deletePhoneNumber(phoneNumber: PhoneNumber) {
+    setBusyAction(phoneNumber.id)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/phone-numbers/${phoneNumber.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to remove phone number")
+      toast.success("Phone number removed")
+      await load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove phone number")
+    } finally {
+      setBusyAction(null)
     }
   }
 
@@ -766,6 +844,82 @@ export default function AdminOrganizationPage() {
                 </Button>
               </div>
             </form>
+          </SectionCard>
+
+          <SectionCard
+            title="Voice Support Phone Numbers"
+            description="Assign Vobiz phone numbers to this organization. Inbound calls to these numbers are answered by the AI voice agent and routed to support tickets."
+          >
+            <form onSubmit={addPhoneNumber}>
+              <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+                <Input
+                  value={newPhoneNumber}
+                  onChange={(event) => setNewPhoneNumber(event.target.value)}
+                  placeholder="+918046733659"
+                  required
+                />
+                <Input
+                  value={newPhoneLabel}
+                  onChange={(event) => setNewPhoneLabel(event.target.value)}
+                  placeholder="Label (optional)"
+                />
+                <Button type="submit" disabled={addingPhoneNumber}>
+                  {addingPhoneNumber ? <Spinner className="mr-2 size-4" /> : <PhoneIcon className="mr-2 size-4" />}
+                  Assign Number
+                </Button>
+              </div>
+            </form>
+            <Separator className="my-5" />
+            {phoneNumbers.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No Phone Numbers Assigned
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Number</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {phoneNumbers.map((phoneNumber) => (
+                    <TableRow key={phoneNumber.id}>
+                      <TableCell className="font-medium">{phoneNumber.phoneNumber}</TableCell>
+                      <TableCell className="text-muted-foreground">{phoneNumber.label || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={phoneNumber.status === "active" ? "default" : "secondary"} className="capitalize">
+                          {phoneNumber.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyAction === phoneNumber.id}
+                            onClick={() => void togglePhoneNumberStatus(phoneNumber)}
+                          >
+                            {phoneNumber.status === "active" ? "Disable" : "Enable"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyAction === phoneNumber.id}
+                            onClick={() => void deletePhoneNumber(phoneNumber)}
+                          >
+                            <Trash2Icon className="mr-2 size-3.5" />
+                            Remove
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </SectionCard>
 
           <SectionCard title="Invitations" description="Invite users and cancel pending invitations before they are accepted.">

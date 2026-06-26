@@ -2593,6 +2593,24 @@ interface SupportChatSettings {
   updatedAt: string | null
 }
 
+interface SupportCallSettings {
+  enabled: boolean
+  voice: string
+  greeting: string
+  instructions: string
+  recordingEnabled: boolean
+  updatedBy: string | null
+  updatedAt: string | null
+  supportedVoices: string[]
+}
+
+interface SupportCallPhoneNumber {
+  id: string
+  phoneNumber: string
+  label: string
+  status: string
+}
+
 interface SupportKnowledgeArticle {
   id: string
   title: string
@@ -2622,6 +2640,19 @@ function SupportTab() {
   })
   const [chatSettingsLoading, setChatSettingsLoading] = useState(true)
   const [chatSettingsSaving, setChatSettingsSaving] = useState(false)
+  const [callSettings, setCallSettings] = useState<SupportCallSettings>({
+    enabled: true,
+    voice: "marin",
+    greeting: "",
+    instructions: "",
+    recordingEnabled: true,
+    updatedBy: null,
+    updatedAt: null,
+    supportedVoices: ["marin"],
+  })
+  const [callPhoneNumbers, setCallPhoneNumbers] = useState<SupportCallPhoneNumber[]>([])
+  const [callSettingsLoading, setCallSettingsLoading] = useState(true)
+  const [callSettingsSaving, setCallSettingsSaving] = useState(false)
   const [articles, setArticles] = useState<SupportKnowledgeArticle[]>([])
   const [articlesLoading, setArticlesLoading] = useState(true)
   const [articleEditingId, setArticleEditingId] = useState<string | null>(null)
@@ -2716,6 +2747,49 @@ function SupportTab() {
     }
   }
 
+  const fetchCallSettings = useCallback(async () => {
+    setCallSettingsLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/call/settings`, {
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load voice agent settings")
+      if (data.settings) setCallSettings(data.settings)
+      setCallPhoneNumbers(data.phoneNumbers ?? [])
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load voice agent settings")
+    } finally {
+      setCallSettingsLoading(false)
+    }
+  }, [])
+
+  const saveCallSettings = async () => {
+    setCallSettingsSaving(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/call/settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: callSettings.enabled,
+          voice: callSettings.voice,
+          greeting: callSettings.greeting,
+          instructions: callSettings.instructions,
+          recordingEnabled: callSettings.recordingEnabled,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save voice agent settings")
+      setCallSettings((current) => ({ ...current, ...data.settings }))
+      toast.success("Voice agent settings saved")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save voice agent settings")
+    } finally {
+      setCallSettingsSaving(false)
+    }
+  }
+
   const fetchArticles = useCallback(async () => {
     setArticlesLoading(true)
     try {
@@ -2748,9 +2822,10 @@ function SupportTab() {
   useEffect(() => {
     void fetchSettings()
     void fetchChatSettings()
+    void fetchCallSettings()
     void fetchArticles()
     void fetchTemplates()
-  }, [fetchArticles, fetchChatSettings, fetchSettings, fetchTemplates])
+  }, [fetchArticles, fetchCallSettings, fetchChatSettings, fetchSettings, fetchTemplates])
 
   const resetArticleForm = () => {
     setArticleEditingId(null)
@@ -2999,6 +3074,151 @@ function SupportTab() {
                 {chatSettings.updatedAt && (
                   <p className="text-xs text-muted-foreground">
                     Last saved {formatDateTime(chatSettings.updatedAt)}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Voice Agent"
+        description="Answer inbound support calls with a realtime AI voice agent on your connected phone numbers."
+      >
+        <div className="space-y-5 p-5">
+          {callSettingsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading voice agent settings...</div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <Label htmlFor="supportCallEnabled" className="text-sm font-medium">
+                    Answer inbound calls with the voice agent
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    When enabled, calls to your connected numbers are answered by a realtime AI
+                    agent that can look up your knowledge base and open support tickets.
+                  </p>
+                </div>
+                <Switch
+                  id="supportCallEnabled"
+                  checked={callSettings.enabled}
+                  onCheckedChange={(enabled) =>
+                    setCallSettings((current) => ({ ...current, enabled }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Connected phone numbers</Label>
+                {callPhoneNumbers.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No phone numbers are assigned to your organization yet. Ask an administrator to
+                    assign one before the voice agent can take calls.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {callPhoneNumbers.map((number) => (
+                      <Badge
+                        key={number.id}
+                        variant={number.status === "active" ? "default" : "secondary"}
+                        className="font-mono"
+                      >
+                        {number.phoneNumber}
+                        {number.label ? ` · ${number.label}` : ""}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="supportCallVoice">Voice</Label>
+                <Select
+                  value={callSettings.voice}
+                  onValueChange={(voice) =>
+                    setCallSettings((current) => ({ ...current, voice }))
+                  }
+                >
+                  <SelectTrigger id="supportCallVoice" className="w-full sm:w-64">
+                    <SelectValue placeholder="Select a voice" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {callSettings.supportedVoices.map((voice) => (
+                      <SelectItem key={voice} value={voice}>
+                        {voice.charAt(0).toUpperCase() + voice.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="supportCallGreeting">Greeting</Label>
+                <textarea
+                  id="supportCallGreeting"
+                  rows={2}
+                  value={callSettings.greeting}
+                  onChange={(event) =>
+                    setCallSettings((current) => ({ ...current, greeting: event.target.value }))
+                  }
+                  placeholder="e.g. Thanks for calling Acme support, how can I help you today?"
+                  className={TEMPLATE_TEXTAREA_CLASS}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Spoken to the caller when the agent answers. Leave blank to use a default greeting.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="supportCallInstructions">Instructions</Label>
+                <textarea
+                  id="supportCallInstructions"
+                  rows={7}
+                  value={callSettings.instructions}
+                  onChange={(event) =>
+                    setCallSettings((current) => ({
+                      ...current,
+                      instructions: event.target.value,
+                    }))
+                  }
+                  placeholder="Tell the voice agent how to speak, what policies to follow, and when to create a ticket or escalate."
+                  className={TEMPLATE_TEXTAREA_CLASS}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The agent can use these Instructions, your enabled knowledge articles, and the
+                  live conversation to help callers.
+                </p>
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-xl border bg-muted/30 p-4">
+                <div>
+                  <Label htmlFor="supportCallRecording" className="text-sm font-medium">
+                    Record calls
+                  </Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    When enabled, call recordings are saved and attached to the support ticket
+                    created for each call.
+                  </p>
+                </div>
+                <Switch
+                  id="supportCallRecording"
+                  checked={callSettings.recordingEnabled}
+                  onCheckedChange={(recordingEnabled) =>
+                    setCallSettings((current) => ({ ...current, recordingEnabled }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <Button onClick={saveCallSettings} disabled={callSettingsSaving}>
+                  {callSettingsSaving && <Spinner data-icon="inline-start" />}
+                  Save Voice Agent
+                </Button>
+                {callSettings.updatedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Last saved {formatDateTime(callSettings.updatedAt)}
                   </p>
                 )}
               </div>
