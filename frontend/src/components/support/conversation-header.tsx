@@ -90,16 +90,16 @@ export function ConversationHeader({
               </h2>
             </ContactHoverCard>
             {notesCount > 0 && (
-              <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-amber-500/15 px-2 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              <span className="hidden h-5 shrink-0 items-center rounded-full bg-amber-500/15 px-2 text-[11px] font-medium text-amber-700 sm:inline-flex dark:text-amber-300">
                 {notesCount} {notesCount === 1 ? "Note" : "Notes"}
               </span>
             )}
             {ticket.customer && (
-              <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-emerald-500/15 px-2 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+              <span className="hidden h-5 min-w-0 shrink items-center truncate rounded-full bg-emerald-500/15 px-2 text-[11px] font-medium text-emerald-700 md:inline-flex dark:text-emerald-300">
                 {ticket.customer.company || ticket.customer.name}
               </span>
             )}
-            <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-accent px-2 text-[11px] font-medium text-accent-foreground">
+            <span className="hidden h-5 shrink-0 items-center rounded-full bg-accent px-2 text-[11px] font-medium text-accent-foreground sm:inline-flex">
               {aiModeLabel}
             </span>
           </div>
@@ -149,7 +149,9 @@ export function ConversationHeader({
           className="gap-1.5"
         >
           <BotIcon />
-          {ticket.aiMode === "autonomous" ? "Take Over" : "Resume AI"}
+          <span className="hidden sm:inline">
+            {ticket.aiMode === "autonomous" ? "Take Over" : "Resume AI"}
+          </span>
         </Button>
 
         <Button
@@ -161,7 +163,7 @@ export function ConversationHeader({
           className="gap-1.5"
         >
           {resolved ? <RotateCcwIcon /> : <CheckCircle2Icon />}
-          {resolved ? "Reopen" : "Resolve"}
+          <span className="hidden sm:inline">{resolved ? "Reopen" : "Resolve"}</span>
         </Button>
 
         <Tooltip>
