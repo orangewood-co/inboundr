@@ -121,19 +121,24 @@ export function AudioPlayer({ src, className }: { src: string; className?: strin
 export function AudioMessage({
   attachment,
   tone = "neutral",
+  label = "Voice message",
+  showSize = true,
 }: {
   attachment: TicketAttachment
   tone?: "neutral" | "agent"
+  label?: string
+  showSize?: boolean
 }) {
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2.5",
+        "inline-flex w-fit max-w-full flex-col gap-1.5 rounded-xl border px-3 py-2.5",
         tone === "agent" ? "border-primary/20 bg-background/40" : "border-border bg-background/60"
       )}
     >
-      <p className="mb-1.5 text-xs font-medium text-foreground/70">
-        Voice message · {fileSize(attachment.size)}
+      <p className="text-xs font-medium text-foreground/70">
+        {label}
+        {showSize && ` · ${fileSize(attachment.size)}`}
       </p>
       {attachment.url ? (
         <AudioPlayer src={attachment.url} />

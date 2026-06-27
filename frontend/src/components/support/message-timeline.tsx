@@ -147,15 +147,15 @@ function SystemGroup({ messages }: { messages: TicketMessage[] }) {
         const audio = message.attachments.filter(isAudioAttachment)
         if (audio.length > 0) {
           return (
-            <div key={message.id} className="w-full max-w-md">
-              <p className="mb-1 text-center text-[11px] font-medium text-muted-foreground">
-                {message.bodyText || "Call recording"}
-              </p>
-              <div className="grid gap-2">
-                {audio.map((attachment) => (
-                  <AudioMessage key={attachment.key} attachment={attachment} tone="neutral" />
-                ))}
-              </div>
+            <div key={message.id} className="flex flex-col items-center gap-2">
+              {audio.map((attachment) => (
+                <AudioMessage
+                  key={attachment.key}
+                  attachment={attachment}
+                  label="Call Recording"
+                  showSize={false}
+                />
+              ))}
             </div>
           )
         }
