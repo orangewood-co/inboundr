@@ -2,8 +2,8 @@
 
 This guide covers configuring inbound voice support: callers dial a phone number,
 OpenAI's Realtime API answers over SIP, an AI agent handles the conversation
-(knowledge-base lookups + ticket creation), and Vobiz delivers the call recording
-which is attached to the resulting support ticket.
+(knowledge-base lookups + ticket creation), and a background job pulls the call
+recording from the Vobiz Recordings API and attaches it to the support ticket.
 
 ## Architecture
 
@@ -22,31 +22,31 @@ Caller ──▶ Vobiz number ──(SIP origination)──▶ OpenAI Realtime (
                                                      │
                           on hangup: persist transcript + AI summary as a ticket
                                                      ▼
-                         Vobiz recording.completed callback
+              call-recording cron (every 2 min) ▶ Vobiz Recordings API (list)
                                                      │
-                         POST /api/v1/telephony/vobiz/callback  (backend)
-                                                     │
-                   verify HMAC ▶ correlate to call ▶ download recording ▶ S3
+                  match by caller/callee number + time ▶ download ▶ S3
                                                      ▼
                           recording attached to the support ticket
 ```
 
-Both webhook endpoints are mounted **before** the JSON body parser in `app.ts`
-because signature verification requires the exact raw request bytes.
+The OpenAI webhook is mounted **before** the JSON body parser in `app.ts`
+because signature verification requires the exact raw request bytes. Recordings
+are not delivered by webhook; the backend polls the Vobiz Recordings API.
 
 ## Endpoints
 
 | Purpose | Method | Path |
 | --- | --- | --- |
 | OpenAI realtime call webhook | `POST` | `/api/v1/telephony/openai/webhook` |
-| Vobiz recording / hangup callback | `POST` | `/api/v1/telephony/vobiz/callback` |
 | Org voice-agent settings (app UI) | `GET`/`PATCH` | `/api/v1/support/call/settings` |
 | Admin: assign org phone numbers | — | Admin → Organization page |
 
-With `API_ORIGIN=https://api.example.com` the public URLs are:
+With `API_ORIGIN=https://api.example.com` the public webhook URL is:
 
 - `https://api.example.com/api/v1/telephony/openai/webhook`
-- `https://api.example.com/api/v1/telephony/vobiz/callback`
+
+Recordings are pulled from Vobiz by a backend cron, so no inbound Vobiz webhook
+is required.
 
 ## Environment variables
 
@@ -59,20 +59,17 @@ OPENAI_PROJECT_ID=proj_your-project-id        # owns the realtime SIP endpoint
 OPENAI_WEBHOOK_SECRET=whsec_your-webhook-secret
 OPENAI_REALTIME_MODEL=gpt-realtime-2          # optional; this is the default
 
-# Vobiz REST credentials (Recordings API + callback signature verification)
+# Vobiz REST credentials (Recordings API: the backend polls for call recordings)
 VOBIZ_AUTH_ID=your-vobiz-auth-id
 VOBIZ_AUTH_TOKEN=your-vobiz-auth-token
-VOBIZ_WEBHOOK_SECRET=your-vobiz-webhook-secret  # optional but strongly recommended
 VOBIZ_API_BASE_URL=https://api.vobiz.ai/api/v1  # optional; this is the default
 ```
 
 Notes:
 - `OPENAI_API_KEY` + `OPENAI_WEBHOOK_SECRET` are **required** for voice support to
   initialize (`isVoiceSupportConfigured()`); without them inbound calls are rejected.
-- `VOBIZ_AUTH_ID` + `VOBIZ_AUTH_TOKEN` are **required** to download recordings
-  (`isVobizConfigured()`).
-- If `VOBIZ_WEBHOOK_SECRET` is left blank, callback signature verification is
-  **skipped** — set it in production.
+- `VOBIZ_AUTH_ID` + `VOBIZ_AUTH_TOKEN` are **required** for the recording cron to
+  list/download recordings (`isVobizConfigured()`); without them the cron is skipped.
 - `SKIP_SIGNATURE_VALIDATION=true` bypasses OpenAI webhook signature checks. Use it
   only for local testing; never set it in production.
 
@@ -123,19 +120,19 @@ proj_your-project-id@sip.api.openai.com:5061
    the dialed `To` number against active `OrgPhoneNumber` records; unmapped or
    inactive numbers are rejected (SIP `404`).
 
-### c. Recording callback
+### c. Recording capture (polled from the Recordings API)
 
-1. Enable call recording on the trunk/number in Vobiz.
-2. Set the recording (and hangup) callback URL to:
-   `https://api.example.com/api/v1/telephony/vobiz/callback`
-3. Set the callback signing secret to match `VOBIZ_WEBHOOK_SECRET`. Vobiz signs
-   the raw body with HMAC-SHA256 and sends it in `X-Vobiz-Signature-V3` /
-   `-V2` / `X-Vobiz-Signature` (base64 or hex accepted).
-4. On a `recording`-type event the backend correlates the recording to the call
-   (by `CallUUID`, then `SipCallId`/`Call-ID`, then most recent call from the
-   caller in the last 2h), downloads the audio (direct URL or via
-   `Account/{authId}/Recording/{recordingId}` using `X-Auth-ID`/`X-Auth-Token`),
-   uploads it to S3, and attaches it to the call's ticket.
+1. Enable call recording on the trunk/number in Vobiz so recordings are produced.
+2. No callback/webhook setup is needed. A backend cron (`call-recording-cron`,
+   every 2 minutes) lists recent recordings via the Vobiz Recordings API
+   (`GET /Account/{authId}/Recording/` with `X-Auth-ID`/`X-Auth-Token`).
+3. Each recently completed call (within the last ~2h, recording not yet stored)
+   is matched to a recording by caller/callee number (compared on the last 10
+   digits to tolerate `+91`/`0` formatting) and `add_time` within the call's time
+   window. If the Vobiz `call_uuid` is known it is used as an exact fast-path.
+4. The matched recording is downloaded (following redirects, with the auth
+   headers), uploaded to S3, and attached to the call's ticket. If no recording
+   is found within ~1h the session's `recordingStatus` is marked `failed`.
 
 ## 3. Per-organization configuration (app UI)
 
@@ -158,8 +155,8 @@ rejected (SIP `603`).
       `/openai/webhook` URL.
 - [ ] Vobiz origination URI = `proj_...@sip.api.openai.com:5061`.
 - [ ] Number assigned + **active** for the org in Admin → Organization.
-- [ ] Vobiz recording callback → `/vobiz/callback`, secret = `VOBIZ_WEBHOOK_SECRET`.
-- [ ] `VOBIZ_AUTH_ID` / `VOBIZ_AUTH_TOKEN` set so recordings can be downloaded.
+- [ ] Call recording enabled on the Vobiz trunk/number so recordings are produced.
+- [ ] `VOBIZ_AUTH_ID` / `VOBIZ_AUTH_TOKEN` set so the cron can list/download recordings.
 - [ ] Voice Agent enabled in Settings → Support for the org.
 - [ ] Place a test call; confirm: agent answers → ticket created (channel
       `phone`) → recording attached to the ticket.
@@ -172,5 +169,5 @@ rejected (SIP `603`).
 | Call rejected (603) | Org lacks `support` feature, or Voice Agent disabled. |
 | Webhook 400 "Invalid signature" | `OPENAI_WEBHOOK_SECRET` mismatch, or a proxy altered the raw body. |
 | Agent never answers | `OPENAI_API_KEY`/`OPENAI_WEBHOOK_SECRET` missing; or origination URI/project id wrong. |
-| No recording on ticket | `VOBIZ_AUTH_ID`/`TOKEN` missing, callback URL/secret wrong, or correlation failed (check logs). |
-| Vobiz callback ignored | `VOBIZ_WEBHOOK_SECRET` mismatch — signature rejected. |
+| No recording on ticket | `VOBIZ_AUTH_ID`/`TOKEN` missing, recording not enabled on the Vobiz trunk, the call wasn't answered, or no number/time match yet (cron retries for ~1h; check logs). |
+| Recording slow to appear | Normal — the cron runs every 2 min and Vobiz needs a little time to publish the recording after a call ends. |

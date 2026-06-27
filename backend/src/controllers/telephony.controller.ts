@@ -9,7 +9,6 @@ import { Organization } from "../models/organization.model";
 import { OrgPhoneNumber } from "../models/org-phone-number.model";
 import { hasEffectiveFeature } from "../services/entitlement.service";
 import { acceptAndMonitorCall } from "../services/voice-agent.service";
-import { ingestVobizCallback } from "../services/vobiz.service";
 
 function rawBody(req: Request): string {
   if (Buffer.isBuffer(req.body)) return req.body.toString("utf8");
@@ -272,14 +271,4 @@ export async function openaiCallWebhook(req: Request, res: Response): Promise<vo
       console.error("Failed to process incoming call:", err);
     });
   }
-}
-
-export async function vobizCallback(req: Request, res: Response): Promise<void> {
-  res.status(200).json({ status: "received" });
-  void ingestVobizCallback({
-    rawBody: rawBody(req),
-    headers: req.headers as Record<string, string | string[] | undefined>,
-  }).catch((err) => {
-    console.error("Failed to process Vobiz callback:", err);
-  });
 }

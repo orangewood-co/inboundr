@@ -136,6 +136,42 @@ function NoteGroup({ message }: { message: TicketMessage }) {
   )
 }
 
+/**
+ * Renders system messages. Audio attachments (e.g. a call recording) play inline
+ * via AudioMessage; plain system messages stay as a centered pill.
+ */
+function SystemGroup({ messages }: { messages: TicketMessage[] }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {messages.map((message) => {
+        const audio = message.attachments.filter(isAudioAttachment)
+        if (audio.length > 0) {
+          return (
+            <div key={message.id} className="w-full max-w-md">
+              <p className="mb-1 text-center text-[11px] font-medium text-muted-foreground">
+                {message.bodyText || "Call recording"}
+              </p>
+              <div className="grid gap-2">
+                {audio.map((attachment) => (
+                  <AudioMessage key={attachment.key} attachment={attachment} tone="neutral" />
+                ))}
+              </div>
+            </div>
+          )
+        }
+        return (
+          <p
+            key={message.id}
+            className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
+          >
+            {message.bodyText}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 function BubbleGroup({
   group,
   requesterName,
@@ -155,13 +191,7 @@ function BubbleGroup({
   const avatar = getAvatarColor(isAgent ? "You" : isBot ? "Assistant" : requesterName)
 
   if (isSystem) {
-    return (
-      <div className="flex justify-center">
-        <p className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-          {first.bodyText}
-        </p>
-      </div>
-    )
+    return <SystemGroup messages={group.messages} />
   }
 
   return (
@@ -249,13 +279,7 @@ function TranscriptGroup({
   const first = group.messages[0]
 
   if (isSystem) {
-    return (
-      <div className="flex justify-center">
-        <p className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-          {first.bodyText}
-        </p>
-      </div>
-    )
+    return <SystemGroup messages={group.messages} />
   }
 
   const isAgentSide = isBot || isAgent

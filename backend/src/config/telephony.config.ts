@@ -8,7 +8,6 @@ export interface OpenAiRealtimeConfig {
 export interface VobizConfig {
   authId: string;
   authToken: string;
-  webhookSecret: string;
   apiBaseUrl: string;
 }
 
@@ -42,8 +41,8 @@ export function isVoiceSupportConfigured(): boolean {
 }
 
 /**
- * Reads the Vobiz REST credentials used to download call recordings and verify
- * Vobiz callbacks. Throws when the integration is used without configuration.
+ * Reads the Vobiz REST credentials used to list and download call recordings
+ * from the Recordings API. Throws when the integration is used without config.
  */
 export function getVobizConfig(): VobizConfig {
   const authId = process.env.VOBIZ_AUTH_ID ?? "";
@@ -54,7 +53,6 @@ export function getVobizConfig(): VobizConfig {
   return {
     authId,
     authToken,
-    webhookSecret: process.env.VOBIZ_WEBHOOK_SECRET ?? "",
     apiBaseUrl: (process.env.VOBIZ_API_BASE_URL?.trim() || DEFAULT_VOBIZ_API_BASE_URL).replace(/\/+$/, ""),
   };
 }

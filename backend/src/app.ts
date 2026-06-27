@@ -47,6 +47,7 @@ import {
   scheduleWatchRenewal,
   stopWatchRenewal,
 } from "./services/gmail-watcher.service";
+import { startCallRecordingCron } from "./jobs/call-recording-cron";
 import { startDigestCron } from "./jobs/digest-cron";
 import { startPaymentReminderCron } from "./jobs/payment-reminder-cron";
 
@@ -135,6 +136,7 @@ export async function initializeServices(): Promise<void> {
 
   startDigestCron();
   startPaymentReminderCron();
+  startCallRecordingCron();
 }
 
 async function shutdown(): Promise<void> {
