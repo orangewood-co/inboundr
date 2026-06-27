@@ -1,5 +1,6 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { Readable } from "node:stream";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 import { OrganizationMember } from "../models/organization-member.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
@@ -173,6 +174,7 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
     const organizationId = String(req.body?.organizationId ?? "").trim();
     const name = String(req.body?.name ?? "").trim();
     const email = String(req.body?.email ?? "").trim().toLowerCase();
+    const phoneInput = String(req.body?.phoneNumber ?? "").trim();
     const subject = String(req.body?.subject ?? "").trim();
     const emailTranscriptRequested = Boolean(req.body?.emailTranscript);
 
@@ -184,6 +186,12 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
       res.status(400).json({ error: "Please enter a valid email address" });
       return;
     }
+    const parsedPhone = parsePhoneNumberFromString(phoneInput);
+    if (!parsedPhone || !parsedPhone.isValid()) {
+      res.status(400).json({ error: "Please enter a valid phone number" });
+      return;
+    }
+    const phoneNumber = parsedPhone.number;
 
     const organization = await getSupportOrganization(organizationId);
     if (!organization) {
@@ -193,7 +201,7 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
 
     const ticket = await createSupportSession(
       organization,
-      { name, email },
+      { name, email, phoneNumber },
       { initialIssue: subject, emailTranscriptRequested }
     );
     const serializedTicket = serializeTicket(ticket);

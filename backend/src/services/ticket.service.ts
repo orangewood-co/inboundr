@@ -473,7 +473,10 @@ export async function createAndLinkTicketCustomer(input: {
     name: ticket.requester.name,
     company: String(input.company ?? ticket.requester.name).trim() || ticket.requester.name,
     email: ticket.requester.email,
-    contactNumber: String(input.contactNumber ?? "").trim() || null,
+    contactNumber:
+      String(input.contactNumber ?? "").trim() ||
+      String(ticket.requester.phoneNumber ?? "").trim() ||
+      null,
     address: String(input.address ?? "").trim() || null,
     notes: String(input.notes ?? "Created from support conversation").trim() || null,
   });

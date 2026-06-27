@@ -122,7 +122,7 @@ async function nextTicketNumber(
 
 export async function createSupportSession(
   organization: SupportOrganizationBranding,
-  requester: { name: string; email: string },
+  requester: { name: string; email: string; phoneNumber?: string },
   options: { initialIssue?: string; emailTranscriptRequested?: boolean } = {}
 ): Promise<ITicket> {
   const organizationId = new mongoose.Types.ObjectId(organization._id);

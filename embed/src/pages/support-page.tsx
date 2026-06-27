@@ -18,9 +18,22 @@ import {
   XIcon,
 } from "lucide-react"
 
+import {
+  getCountries,
+  getCountryCallingCode,
+  parsePhoneNumber,
+  type CountryCode,
+} from "libphonenumber-js"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { AudioPlayer } from "@/components/audio-player"
 import { VoiceRecorder } from "@/components/voice-recorder"
@@ -86,6 +99,20 @@ type Phase = "loading" | "unavailable" | "prechat" | "chat" | "ended"
 const MESSAGE_MAX_LENGTH = 4000
 const MUTE_STORAGE_KEY = "inboundr-support-muted"
 const THEME_STORAGE_KEY = "inboundr-support-theme"
+const DEFAULT_PHONE_COUNTRY: CountryCode = "IN"
+
+const regionNames =
+  typeof Intl !== "undefined" && "DisplayNames" in Intl
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null
+
+const COUNTRY_OPTIONS = getCountries()
+  .map((country) => ({
+    country,
+    callingCode: getCountryCallingCode(country),
+    name: regionNames?.of(country) ?? country,
+  }))
+  .sort((a, b) => a.name.localeCompare(b.name))
 
 type Theme = "light" | "dark"
 
@@ -273,6 +300,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const [issue, setIssue] = useState("")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(DEFAULT_PHONE_COUNTRY)
+  const [phoneNational, setPhoneNational] = useState("")
   const [emailCopy, setEmailCopy] = useState(false)
   const [starting, setStarting] = useState(false)
   const [visitorName, setVisitorName] = useState("")
@@ -315,6 +344,15 @@ export default function SupportPage({ organizationId }: { organizationId: string
       new Date(ticket.lastAgentReadAt).getTime() >= new Date(latestVisitorMessage.createdAt).getTime()
   )
   const isResolved = ticket?.status === "resolved" || Boolean(ticket?.resolvedAt)
+  const phoneValid = (() => {
+    if (!phoneNational.trim()) return false
+    try {
+      return parsePhoneNumber(phoneNational, phoneCountry)?.isValid() ?? false
+    } catch {
+      return false
+    }
+  })()
+  const phoneError = phoneNational.trim().length > 0 && !phoneValid
 
   useEffect(() => {
     let cancelled = false
@@ -490,6 +528,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
     setError(null)
     connectedPlayedRef.current = false
     try {
+      let phoneE164: string
+      try {
+        const parsedPhone = parsePhoneNumber(phoneNational, phoneCountry)
+        if (!parsedPhone.isValid()) throw new Error("invalid")
+        phoneE164 = parsedPhone.number
+      } catch {
+        throw new Error("Please enter a valid phone number")
+      }
       const response = await fetch(`${apiBase}/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -497,6 +543,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
           organizationId,
           name,
           email,
+          phoneNumber: phoneE164,
           subject: issue.trim(),
           emailTranscript: emailCopy,
         }),
@@ -623,6 +670,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
     setFeedbackSubmitted(false)
     setMenuOpen(false)
     setIssue("")
+    setPhoneCountry(DEFAULT_PHONE_COUNTRY)
+    setPhoneNational("")
     setEmailCopy(false)
     setPhase("prechat")
   }
@@ -945,6 +994,55 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 />
               </div>
               <div className="grid gap-1.5">
+                <Label htmlFor="support-phone">Phone</Label>
+                <div className="flex items-stretch gap-2">
+                  <Select
+                    value={phoneCountry}
+                    onValueChange={(value) => setPhoneCountry(value as CountryCode)}
+                  >
+                    <SelectTrigger
+                      aria-label="Country calling code"
+                      style={{ flex: "0 0 auto", width: "5.5rem" }}
+                      className="h-11 shrink-0 justify-center gap-1 rounded-xl border-stone-300/80 dark:border-stone-700 dark:bg-stone-800/60"
+                    >
+                      <span className="text-sm tabular-nums text-stone-900 dark:text-stone-100">
+                        +{getCountryCallingCode(phoneCountry)}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100">
+                      {COUNTRY_OPTIONS.map((option) => (
+                        <SelectItem
+                          key={option.country}
+                          value={option.country}
+                          className="dark:focus:bg-stone-700/60"
+                        >
+                          {option.name} (+{option.callingCode})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="support-phone"
+                    type="tel"
+                    inputMode="tel"
+                    value={phoneNational}
+                    onChange={(event) =>
+                      setPhoneNational(event.target.value.replace(/[^\d]/g, "").slice(0, 15))
+                    }
+                    placeholder="Phone number"
+                    autoComplete="tel-national"
+                    aria-invalid={phoneError}
+                    required
+                    className="min-w-0 flex-1"
+                  />
+                </div>
+                {phoneError && (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Enter a valid phone number for the selected country.
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-1.5">
                 <Label htmlFor="support-email">Email</Label>
                 <Input
                   id="support-email"
@@ -982,7 +1080,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
               <Button
                 type="submit"
-                disabled={starting || !issue.trim() || !name.trim() || !email.trim()}
+                disabled={starting || !issue.trim() || !name.trim() || !email.trim() || !phoneValid}
                 className="mt-1 h-11 w-full"
               >
                 {starting && <LoaderIcon className="size-4 animate-spin" />}
