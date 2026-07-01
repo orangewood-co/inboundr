@@ -1,8 +1,20 @@
 import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Form } from "../models/form.model";
+import {
+  Feedback,
+  FEEDBACK_ATTACHMENT_MIME_TYPES,
+  FEEDBACK_IMAGE_MIME_TYPES,
+  FEEDBACK_IMAGE_MAX_BYTES,
+  FEEDBACK_VIDEO_MAX_BYTES,
+} from "../models/feedback.model";
 import { OrganizationMember } from "../models/organization-member.model";
-import type { OrganizationRequest } from "../middleware/auth.middleware";
+import {
+  isPlatformAdmin,
+  type AuthenticatedRequest,
+  type OrganizationRequest,
+} from "../middleware/auth.middleware";
+import { getOrganizationContextForUser } from "../services/organization.service";
 import { createPresignedUpload, createPresignedViewUrl, keyBelongsToPrefix } from "../services/storage.service";
 
 const DEFAULT_ALLOWED_MIME_TYPES = [
@@ -38,6 +50,7 @@ function normalizeUploadRequest(body: Record<string, unknown>) {
     size: Number(body.size ?? 0),
     formId: String(body.formId ?? "").trim(),
     fieldId: String(body.fieldId ?? "").trim(),
+    feedbackId: String(body.feedbackId ?? "").trim(),
   };
 }
 
@@ -54,6 +67,23 @@ function allowedMimeTypesForScope(scope: string): string[] {
   if (scope === "employee" || scope === "attendance") return AVATAR_ALLOWED_MIME_TYPES;
   if (scope === "support") return SUPPORT_ALLOWED_MIME_TYPES;
   return IMAGE_UPLOAD_SCOPES.includes(scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES;
+}
+
+function validateFeedbackUpload(input: ReturnType<typeof normalizeUploadRequest>): string | null {
+  const contentType = input.contentType;
+  const maxSize = FEEDBACK_IMAGE_MIME_TYPES.includes(contentType as any)
+    ? FEEDBACK_IMAGE_MAX_BYTES
+    : FEEDBACK_VIDEO_MAX_BYTES;
+  return validateUploadBasics(input, [...FEEDBACK_ATTACHMENT_MIME_TYPES], maxSize);
+}
+
+async function getOrganizationContext(req: Request) {
+  const authReq = req as AuthenticatedRequest;
+  return getOrganizationContextForUser(authReq.user, req.header("x-organization-id"));
+}
+
+function organizationContextErrorStatus(error: unknown): number {
+  return error instanceof Error && error.message === "Organization access denied" ? 403 : 400;
 }
 
 function fieldMaxBytes(maxFileSizeMb?: number): number {
@@ -79,9 +109,22 @@ async function canViewOrganizationMemberAvatar(orgReq: OrganizationRequest, key:
   return Boolean(member);
 }
 
+async function canViewFeedbackAttachment(req: AuthenticatedRequest, key: string): Promise<boolean> {
+  if (!keyBelongsToPrefix(key, ["feedback"])) return false;
+
+  const ownedThread = await Feedback.exists({
+    userId: req.user.id,
+    "messages.attachments.key": key,
+  });
+  if (ownedThread) return true;
+
+  if (!(await isPlatformAdmin(req.user))) return false;
+  return Boolean(await Feedback.exists({ "messages.attachments.key": key }));
+}
+
 export async function createAuthenticatedPresign(req: Request, res: Response): Promise<void> {
   try {
-    const orgReq = req as OrganizationRequest;
+    const authReq = req as AuthenticatedRequest;
     const input = normalizeUploadRequest(req.body ?? {});
 
     if (input.scope === "avatar") {
@@ -93,7 +136,7 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
 
       const presigned = await createPresignedUpload({
         scope: "avatar",
-        organizationId: String(orgReq.user.id),
+        organizationId: String(authReq.user.id),
         fileName: input.fileName,
         contentType: input.contentType,
         size: input.size,
@@ -103,8 +146,39 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
       return;
     }
 
+    if (input.scope === "feedback") {
+      const validationError = validateFeedbackUpload(input);
+      if (validationError) {
+        res.status(400).json({ error: validationError });
+        return;
+      }
+
+      const prefixParts = input.feedbackId ? [input.feedbackId] : ["draft"];
+      const presigned = await createPresignedUpload({
+        scope: "feedback",
+        organizationId: String(authReq.user.id),
+        fileName: input.fileName,
+        contentType: input.contentType,
+        size: input.size,
+        prefixParts,
+      });
+
+      res.json(presigned);
+      return;
+    }
+
     if (!AUTHENTICATED_UPLOAD_SCOPES.includes(input.scope as any)) {
       res.status(400).json({ error: "Invalid upload scope" });
+      return;
+    }
+
+    let orgContext: Awaited<ReturnType<typeof getOrganizationContext>>;
+    try {
+      orgContext = await getOrganizationContext(req);
+    } catch (err) {
+      res.status(organizationContextErrorStatus(err)).json({
+        error: err instanceof Error ? err.message : "Invalid organization context",
+      });
       return;
     }
 
@@ -130,7 +204,7 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
           : [];
     const presigned = await createPresignedUpload({
       scope: input.scope,
-      organizationId: String(orgReq.organization._id),
+      organizationId: String(orgContext.organization._id),
       fileName: input.fileName,
       contentType: input.contentType,
       size: input.size,
@@ -146,19 +220,42 @@ export async function createAuthenticatedPresign(req: Request, res: Response): P
 
 export async function createAuthenticatedViewUrl(req: Request, res: Response): Promise<void> {
   try {
-    const orgReq = req as OrganizationRequest;
+    const authReq = req as AuthenticatedRequest;
     const key = String(req.query.key ?? "").trim();
     if (!key) {
       res.status(400).json({ error: "File key is required" });
       return;
     }
 
-    const allowed =
-      keyBelongsToPrefix(key, ["avatar", String(orgReq.user.id)]) ||
-      (key.startsWith("avatar/") && (await canViewOrganizationMemberAvatar(orgReq, key))) ||
-      AUTHENTICATED_UPLOAD_SCOPES.some((scope) =>
-        keyBelongsToPrefix(key, [scope, String(orgReq.organization._id)])
-      );
+    let allowed =
+      keyBelongsToPrefix(key, ["avatar", String(authReq.user.id)]) ||
+      (await canViewFeedbackAttachment(authReq, key));
+
+    if (!allowed) {
+      let orgContext: Awaited<ReturnType<typeof getOrganizationContext>> | null;
+      try {
+        orgContext = await getOrganizationContext(req);
+      } catch {
+        orgContext = null;
+      }
+
+      if (!orgContext) {
+        res.status(403).json({ error: "File access denied" });
+        return;
+      }
+
+      const orgReq = {
+        ...authReq,
+        organization: orgContext.organization,
+        organizationMembership: orgContext.membership,
+      } as OrganizationRequest;
+
+      allowed =
+        (key.startsWith("avatar/") && (await canViewOrganizationMemberAvatar(orgReq, key))) ||
+        AUTHENTICATED_UPLOAD_SCOPES.some((scope) =>
+          keyBelongsToPrefix(key, [scope, String(orgContext.organization._id)])
+        );
+    }
     if (!allowed) {
       res.status(403).json({ error: "File access denied" });
       return;

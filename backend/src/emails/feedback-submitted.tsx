@@ -21,6 +21,7 @@ export interface FeedbackSubmittedEmailProps {
   typeLabel: string;
   moduleLabel: string;
   message: string;
+  attachmentSummary?: string;
   organizationName?: string | null;
   companyName?: string;
 }
@@ -31,6 +32,7 @@ export function FeedbackSubmittedEmail({
   typeLabel,
   moduleLabel,
   message,
+  attachmentSummary = "",
   organizationName = null,
   companyName = "Inboundr.co",
 }: FeedbackSubmittedEmailProps) {
@@ -96,6 +98,12 @@ export function FeedbackSubmittedEmail({
                     <Text className="font-13 text-fg-2 mt-3 mb-0 whitespace-pre-wrap font-sans">
                       {message}
                     </Text>
+                    {attachmentSummary ? (
+                      <Text className="font-13 text-fg-2 mt-3 mb-0 font-sans">
+                        {attachmentSummary} Screenshots may be attached to this
+                        email; videos are available in the feedback thread.
+                      </Text>
+                    ) : null}
                   </Section>
                 </Section>
               </Section>
@@ -111,6 +119,7 @@ FeedbackSubmittedEmail.PreviewProps = {
   companyName: "Inboundr.co",
   email: "person@example.com",
   message: "It would be great if the orders table could be exported to CSV.",
+  attachmentSummary: "Includes 1 screenshot.",
   moduleLabel: "Orders",
   name: "Customer",
   organizationName: "Acme Inc.",

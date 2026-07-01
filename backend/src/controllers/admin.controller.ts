@@ -19,9 +19,11 @@ import { ensureNotificationRecipient } from "../services/notification.service";
 import {
   addAdminMessage,
   getFeedbackForAdmin,
+  hasFeedbackMessageContent,
   listFeedbackForAdmin,
   normalizeFeedbackStatus,
   normalizeFeedbackType,
+  normalizeFeedbackAttachments,
   updateFeedbackStatus,
 } from "../services/feedback.service";
 import {
@@ -1037,20 +1039,30 @@ export async function getAdminFeedback(req: Request, res: Response): Promise<voi
 export async function replyAdminFeedback(req: Request, res: Response): Promise<void> {
   try {
     const message = stringValue(req.body?.message);
-    if (!message) {
-      res.status(400).json({ error: "Message is required" });
-      return;
-    }
     if (message.length > 5000) {
       res.status(400).json({ error: "Message is too long" });
       return;
     }
 
     const authReq = req as AuthenticatedRequest;
+    const { attachments, error } = normalizeFeedbackAttachments(
+      req.body?.attachments,
+      authReq.user.id
+    );
+    if (error) {
+      res.status(400).json({ error });
+      return;
+    }
+    if (!hasFeedbackMessageContent(message, attachments)) {
+      res.status(400).json({ error: "Message or attachment is required" });
+      return;
+    }
+
     const feedback = await addAdminMessage({
       feedbackId: stringValue(req.params.id),
       actor: { id: authReq.user.id, name: authReq.user.name, email: authReq.user.email },
       body: message,
+      attachments,
     });
     if (!feedback) {
       res.status(404).json({ error: "Feedback not found" });

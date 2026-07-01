@@ -27,6 +27,7 @@ import {
   replyAdminFeedback,
   updateAdminFeedbackStatus,
   type AppFeedback,
+  type FeedbackAttachment,
   type FeedbackStatus,
 } from "@/lib/feedback"
 
@@ -51,9 +52,9 @@ export default function AdminFeedbackDetailPage() {
     void load()
   }, [id])
 
-  async function handleReply(message: string) {
+  async function handleReply(message: string, attachments: FeedbackAttachment[]) {
     try {
-      setFeedback(await replyAdminFeedback(id, message))
+      setFeedback(await replyAdminFeedback(id, message, attachments))
       toast.success("Reply sent")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send reply")
@@ -124,7 +125,11 @@ export default function AdminFeedbackDetailPage() {
               <div className="flex flex-col gap-4 p-5">
                 <FeedbackMessageList messages={feedback.messages} />
                 <div className="border-t pt-4">
-                  <FeedbackReplyComposer onSend={handleReply} placeholder="Write a reply to the user..." />
+                  <FeedbackReplyComposer
+                    feedbackId={feedback._id}
+                    onSend={handleReply}
+                    placeholder="Write a reply to the user..."
+                  />
                 </div>
               </div>
             </section>

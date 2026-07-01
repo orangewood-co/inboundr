@@ -20,6 +20,7 @@ export interface FeedbackReplyEmailProps {
   reply: string;
   originalMessage: string;
   threadUrl: string;
+  attachmentSummary?: string;
   companyName?: string;
 }
 
@@ -28,6 +29,7 @@ export function FeedbackReplyEmail({
   reply,
   originalMessage,
   threadUrl,
+  attachmentSummary = "",
   companyName = "Inboundr.co",
 }: FeedbackReplyEmailProps) {
   const greetingName = name.trim() || "there";
@@ -77,6 +79,12 @@ export function FeedbackReplyEmail({
                     <Text className="font-13 text-fg-2 mt-3 mb-0 whitespace-pre-wrap font-sans">
                       {reply}
                     </Text>
+                    {attachmentSummary ? (
+                      <Text className="font-13 text-fg-2 mt-3 mb-0 font-sans">
+                        {attachmentSummary} Screenshots may be attached to this
+                        email; videos are available in the feedback thread.
+                      </Text>
+                    ) : null}
                   </Section>
                   <Section className="bg-bg mt-3 rounded-lg px-5 py-4">
                     <Text className="font-13 text-fg-3 m-0 font-sans">
@@ -108,6 +116,7 @@ FeedbackReplyEmail.PreviewProps = {
   name: "Customer",
   originalMessage: "It would be great if the orders table could be exported to CSV.",
   reply: "Thanks for the suggestion! CSV export is now on our roadmap.",
+  attachmentSummary: "Includes 1 screenshot.",
   threadUrl: "https://app.inboundr.co/feedback",
 } satisfies FeedbackReplyEmailProps;
 

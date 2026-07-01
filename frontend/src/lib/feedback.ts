@@ -28,7 +28,16 @@ export interface FeedbackMessage {
   authorId: string
   authorName: string
   body: string
+  attachments: FeedbackAttachment[]
   createdAt: string
+}
+
+export interface FeedbackAttachment {
+  key: string
+  originalName: string
+  contentType: string
+  size: number
+  url: string | null
 }
 
 export interface AppFeedback {
@@ -43,6 +52,7 @@ export interface AppFeedback {
   moduleLabel: string
   status: FeedbackStatus
   messages: FeedbackMessage[]
+  attachmentCount: number
   unreadForAdmin: boolean
   unreadForUser: boolean
   lastMessageAt: string
@@ -61,6 +71,17 @@ export const FEEDBACK_STATUS_OPTIONS: { value: FeedbackStatus; label: string }[]
   { value: "in_progress", label: "In Progress" },
   { value: "resolved", label: "Resolved" },
 ]
+
+export const FEEDBACK_MAX_ATTACHMENTS = 3
+export const FEEDBACK_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+export const FEEDBACK_VIDEO_MAX_BYTES = 50 * 1024 * 1024
+export const FEEDBACK_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
+export const FEEDBACK_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const
+export const FEEDBACK_ATTACHMENT_MIME_TYPES = [
+  ...FEEDBACK_IMAGE_MIME_TYPES,
+  ...FEEDBACK_VIDEO_MIME_TYPES,
+] as const
+export const FEEDBACK_ATTACHMENT_ACCEPT = FEEDBACK_ATTACHMENT_MIME_TYPES.join(",")
 
 /**
  * Module options shown in the feedback dialog. Labels mirror the sidebar /
@@ -131,10 +152,72 @@ async function ensureOk(response: Response, fallbackMessage: string) {
   return parseJson(response)
 }
 
+export function feedbackAttachmentSizeLimit(contentType: string) {
+  return FEEDBACK_IMAGE_MIME_TYPES.includes(contentType as any)
+    ? FEEDBACK_IMAGE_MAX_BYTES
+    : FEEDBACK_VIDEO_MAX_BYTES
+}
+
+export function fileSizeLabel(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+export function validateFeedbackFile(file: File): string | null {
+  const contentType = file.type || ""
+  if (!FEEDBACK_ATTACHMENT_MIME_TYPES.includes(contentType as any)) {
+    return `${file.name} is not a supported image or video type`
+  }
+  const maxBytes = feedbackAttachmentSizeLimit(contentType)
+  if (file.size > maxBytes) {
+    return `${file.name} must be ${Math.round(maxBytes / 1024 / 1024)}MB or smaller`
+  }
+  return null
+}
+
+export async function uploadFeedbackAttachment(
+  file: File,
+  feedbackId?: string
+): Promise<FeedbackAttachment> {
+  const validationError = validateFeedbackFile(file)
+  if (validationError) throw new Error(validationError)
+
+  const response = await fetch(buildUrl("/api/v1/uploads/presign"), {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scope: "feedback",
+      fileName: file.name,
+      contentType: file.type,
+      size: file.size,
+      feedbackId,
+    }),
+  })
+  const presign = await ensureOk(response, `Unable to upload ${file.name}`)
+
+  const upload = await fetch(presign.uploadUrl, {
+    method: presign.method,
+    headers: presign.headers,
+    body: file,
+  })
+  if (!upload.ok) throw new Error(`Upload failed for ${file.name}`)
+
+  return {
+    key: presign.file.key,
+    originalName: presign.file.originalName,
+    contentType: presign.file.contentType,
+    size: presign.file.size,
+    url: null,
+  }
+}
+
 export async function submitFeedback(input: {
   type: FeedbackType
   module: FeedbackModule
   message: string
+  attachments?: FeedbackAttachment[]
 }): Promise<AppFeedback> {
   const response = await fetch(buildUrl("/api/v1/feedback"), {
     method: "POST",
@@ -164,13 +247,14 @@ export async function getMyFeedback(id: string): Promise<AppFeedback> {
 
 export async function replyToMyFeedback(
   id: string,
-  message: string
+  message: string,
+  attachments: FeedbackAttachment[] = []
 ): Promise<AppFeedback> {
   const response = await fetch(buildUrl(`/api/v1/feedback/${id}/messages`), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, attachments }),
   })
   const data = await ensureOk(response, "Failed to send reply")
   return data.feedback
@@ -205,13 +289,14 @@ export async function getAdminFeedback(id: string): Promise<AppFeedback> {
 
 export async function replyAdminFeedback(
   id: string,
-  message: string
+  message: string,
+  attachments: FeedbackAttachment[] = []
 ): Promise<AppFeedback> {
   const response = await fetch(buildUrl(`/api/v1/admin/feedback/${id}/messages`), {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, attachments }),
   })
   const data = await ensureOk(response, "Failed to send reply")
   return data.feedback

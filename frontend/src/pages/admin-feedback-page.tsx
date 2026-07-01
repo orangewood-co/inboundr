@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "@tanstack/react-router"
-import { InboxIcon, RefreshCwIcon } from "lucide-react"
+import { InboxIcon, PaperclipIcon, RefreshCwIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
@@ -137,6 +137,7 @@ export default function AdminFeedbackPage() {
                     <TableHead>Type</TableHead>
                     <TableHead>Module</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Files</TableHead>
                     <TableHead>Last Activity</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -159,6 +160,16 @@ export default function AdminFeedbackPage() {
                       <TableCell className="text-muted-foreground">{entry.moduleLabel}</TableCell>
                       <TableCell>
                         <FeedbackStatusBadge status={entry.status} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {entry.attachmentCount > 0 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <PaperclipIcon className="size-3.5" />
+                            {entry.attachmentCount}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{formatDateTime(entry.lastMessageAt)}</TableCell>
                       <TableCell className="text-right">

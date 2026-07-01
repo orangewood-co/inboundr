@@ -2,19 +2,27 @@ import { createElement } from "react";
 import mongoose from "mongoose";
 import {
   Feedback,
+  FEEDBACK_ATTACHMENT_MIME_TYPES,
+  FEEDBACK_IMAGE_MIME_TYPES,
+  FEEDBACK_IMAGE_MAX_BYTES,
   FEEDBACK_MODULES,
+  FEEDBACK_MAX_ATTACHMENTS,
   FEEDBACK_STATUSES,
   FEEDBACK_TYPES,
+  FEEDBACK_VIDEO_MAX_BYTES,
   type FeedbackModule,
   type FeedbackStatus,
   type FeedbackType,
+  type FeedbackAttachmentContentType,
   type IFeedback,
+  type IFeedbackMessageAttachment,
 } from "../models/feedback.model";
 import { Organization } from "../models/organization.model";
 import { FeedbackSubmittedEmail } from "../emails/feedback-submitted";
 import { FeedbackReplyEmail } from "../emails/feedback-reply";
-import { sendEmail } from "../lib/email";
+import { sendEmail, type SendEmailAttachment } from "../lib/email";
 import { frontendOrigin } from "../config/origins.config";
+import { createPresignedViewUrl, getObjectBuffer, keyBelongsToPrefix } from "./storage.service";
 import { createNotificationForRecipient } from "./notification.service";
 
 const TYPE_LABELS: Record<FeedbackType, string> = {
@@ -50,12 +58,28 @@ export interface FeedbackActor {
   email?: string | null;
 }
 
+export interface FeedbackAttachmentInput {
+  key: string;
+  originalName: string;
+  contentType: FeedbackAttachmentContentType;
+  size: number;
+}
+
+export interface SerializedFeedbackAttachment {
+  key: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+  url: string | null;
+}
+
 export interface SerializedFeedbackMessage {
   _id: string;
   authorType: "user" | "admin";
   authorId: string;
   authorName: string;
   body: string;
+  attachments: SerializedFeedbackAttachment[];
   createdAt: string;
 }
 
@@ -71,6 +95,7 @@ export interface SerializedFeedback {
   moduleLabel: string;
   status: FeedbackStatus;
   messages: SerializedFeedbackMessage[];
+  attachmentCount: number;
   unreadForAdmin: boolean;
   unreadForUser: boolean;
   lastMessageAt: string;
@@ -96,18 +121,122 @@ export function normalizeFeedbackStatus(value: unknown): FeedbackStatus | null {
     : null;
 }
 
-function serializeMessage(message: any): SerializedFeedbackMessage {
+function maxBytesForFeedbackAttachment(contentType: string): number {
+  return FEEDBACK_IMAGE_MIME_TYPES.includes(contentType as any)
+    ? FEEDBACK_IMAGE_MAX_BYTES
+    : FEEDBACK_VIDEO_MAX_BYTES;
+}
+
+export function normalizeFeedbackAttachments(
+  value: unknown,
+  actorUserId: string
+): { attachments: FeedbackAttachmentInput[]; error: string | null } {
+  const rawAttachments = Array.isArray(value) ? value : [];
+  if (rawAttachments.length > FEEDBACK_MAX_ATTACHMENTS) {
+    return {
+      attachments: [],
+      error: `You can attach up to ${FEEDBACK_MAX_ATTACHMENTS} files`,
+    };
+  }
+
+  const attachments: FeedbackAttachmentInput[] = [];
+  const seenKeys = new Set<string>();
+  for (const raw of rawAttachments) {
+    const item = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const key = String(item.key ?? "").trim();
+    const originalName = String(item.originalName ?? "").trim();
+    const contentType = String(item.contentType ?? "").trim().toLowerCase();
+    const size = Number(item.size ?? 0);
+
+    if (!key || !originalName || !contentType || !Number.isFinite(size) || size <= 0) {
+      return { attachments: [], error: "Attachment metadata is invalid" };
+    }
+    if (seenKeys.has(key)) {
+      return { attachments: [], error: "Duplicate attachments are not allowed" };
+    }
+    if (!keyBelongsToPrefix(key, ["feedback", actorUserId])) {
+      return { attachments: [], error: "Attachment does not belong to this user" };
+    }
+    if (!FEEDBACK_ATTACHMENT_MIME_TYPES.includes(contentType as any)) {
+      return { attachments: [], error: "This file type is not allowed" };
+    }
+    if (size > maxBytesForFeedbackAttachment(contentType)) {
+      const limitMb = Math.round(maxBytesForFeedbackAttachment(contentType) / 1024 / 1024);
+      return { attachments: [], error: `Attachment must be ${limitMb}MB or smaller` };
+    }
+
+    seenKeys.add(key);
+    attachments.push({
+      key,
+      originalName: originalName.slice(0, 180),
+      contentType: contentType as FeedbackAttachmentContentType,
+      size,
+    });
+  }
+
+  return { attachments, error: null };
+}
+
+export function hasFeedbackMessageContent(
+  message: string,
+  attachments: FeedbackAttachmentInput[]
+): boolean {
+  return message.trim().length > 0 || attachments.length > 0;
+}
+
+async function serializeAttachment(
+  attachment: IFeedbackMessageAttachment | any,
+  includeAttachmentUrls: boolean
+): Promise<SerializedFeedbackAttachment> {
+  let url: string | null = null;
+  if (includeAttachmentUrls) {
+    try {
+      url = (await createPresignedViewUrl(attachment.key)).url;
+    } catch (err) {
+      console.error("Failed to create feedback attachment view URL:", err);
+    }
+  }
+
+  return {
+    key: attachment.key,
+    originalName: attachment.originalName,
+    contentType: attachment.contentType,
+    size: Number(attachment.size ?? 0),
+    url,
+  };
+}
+
+async function serializeMessage(
+  message: any,
+  includeAttachmentUrls: boolean
+): Promise<SerializedFeedbackMessage> {
   return {
     _id: String(message._id),
     authorType: message.authorType,
     authorId: message.authorId,
     authorName: message.authorName ?? "",
-    body: message.body,
+    body: message.body ?? "",
+    attachments: await Promise.all(
+      (message.attachments ?? []).map((attachment: any) =>
+        serializeAttachment(attachment, includeAttachmentUrls)
+      )
+    ),
     createdAt: new Date(message.createdAt).toISOString(),
   };
 }
 
-export function serializeFeedback(feedback: IFeedback | any): SerializedFeedback {
+function feedbackAttachmentCount(feedback: IFeedback | any): number {
+  return (feedback.messages ?? []).reduce(
+    (sum: number, message: any) => sum + (message.attachments?.length ?? 0),
+    0
+  );
+}
+
+export async function serializeFeedback(
+  feedback: IFeedback | any,
+  options: { includeAttachmentUrls?: boolean } = {}
+): Promise<SerializedFeedback> {
+  const includeAttachmentUrls = Boolean(options.includeAttachmentUrls);
   return {
     _id: String(feedback._id),
     userId: feedback.userId,
@@ -119,7 +248,12 @@ export function serializeFeedback(feedback: IFeedback | any): SerializedFeedback
     module: feedback.module,
     moduleLabel: MODULE_LABELS[feedback.module as FeedbackModule] ?? feedback.module,
     status: feedback.status,
-    messages: (feedback.messages ?? []).map(serializeMessage),
+    messages: await Promise.all(
+      (feedback.messages ?? []).map((message: any) =>
+        serializeMessage(message, includeAttachmentUrls)
+      )
+    ),
+    attachmentCount: feedbackAttachmentCount(feedback),
     unreadForAdmin: Boolean(feedback.unreadForAdmin),
     unreadForUser: Boolean(feedback.unreadForUser),
     lastMessageAt: new Date(feedback.lastMessageAt).toISOString(),
@@ -149,10 +283,61 @@ async function resolveOrganizationName(
   return organization?.name ?? null;
 }
 
+function attachmentCounts(attachments: FeedbackAttachmentInput[] = []) {
+  const images = attachments.filter((attachment) =>
+    FEEDBACK_IMAGE_MIME_TYPES.includes(attachment.contentType as any)
+  ).length;
+  const videos = attachments.length - images;
+  return { images, videos, total: attachments.length };
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function attachmentSummary(attachments: FeedbackAttachmentInput[] = []): string {
+  const { images, videos, total } = attachmentCounts(attachments);
+  if (total === 0) return "";
+  const parts = [
+    images > 0 ? pluralize(images, "screenshot") : "",
+    videos > 0 ? pluralize(videos, "video") : "",
+  ].filter(Boolean);
+  return `Includes ${parts.join(" and ")}.`;
+}
+
+function messageForEmail(body: string, attachments: FeedbackAttachmentInput[] = []): string {
+  const trimmed = body.trim();
+  if (trimmed) return trimmed;
+  return attachmentSummary(attachments) || "Shared an attachment.";
+}
+
+function messagePreview(body: string, attachments: FeedbackAttachmentInput[] = []): string {
+  const trimmed = body.trim();
+  if (trimmed) return trimmed.slice(0, 280);
+  return (attachmentSummary(attachments) || "Shared an attachment.").slice(0, 280);
+}
+
+async function imageEmailAttachments(
+  attachments: FeedbackAttachmentInput[] = []
+): Promise<SendEmailAttachment[]> {
+  const images = attachments.filter((attachment) =>
+    FEEDBACK_IMAGE_MIME_TYPES.includes(attachment.contentType as any)
+  );
+
+  return Promise.all(
+    images.map(async (attachment) => ({
+      filename: attachment.originalName,
+      contentType: attachment.contentType,
+      content: await getObjectBuffer(attachment.key),
+    }))
+  );
+}
+
 async function notifyRecipient(options: {
   subject: string;
   react: ReturnType<typeof createElement>;
   replyTo?: string[];
+  attachments?: FeedbackAttachmentInput[];
 }): Promise<void> {
   const recipient = feedbackRecipientEmail();
   if (!recipient) {
@@ -168,9 +353,22 @@ async function notifyRecipient(options: {
       subject: options.subject,
       react: options.react as any,
       replyTo: options.replyTo,
+      attachments: await imageEmailAttachments(options.attachments),
     });
   } catch (err) {
     console.error("Failed to send feedback notification email:", err);
+    if (options.attachments?.length) {
+      try {
+        await sendEmail({
+          to: recipient,
+          subject: options.subject,
+          react: options.react as any,
+          replyTo: options.replyTo,
+        });
+      } catch (fallbackErr) {
+        console.error("Failed to send feedback notification fallback email:", fallbackErr);
+      }
+    }
   }
 }
 
@@ -180,6 +378,7 @@ export async function createFeedback(input: {
   type: FeedbackType;
   module: FeedbackModule;
   message: string;
+  attachments?: FeedbackAttachmentInput[];
 }): Promise<SerializedFeedback> {
   const organizationId =
     input.organizationId && mongoose.Types.ObjectId.isValid(input.organizationId)
@@ -188,6 +387,7 @@ export async function createFeedback(input: {
 
   const now = new Date();
   const authorName = input.actor.name?.trim() || input.actor.email || "User";
+  const attachments = input.attachments ?? [];
 
   const feedback = await Feedback.create({
     userId: input.actor.id,
@@ -203,6 +403,7 @@ export async function createFeedback(input: {
         authorId: input.actor.id,
         authorName,
         body: input.message,
+        attachments,
         createdAt: now,
       },
     ],
@@ -220,13 +421,15 @@ export async function createFeedback(input: {
       email: input.actor.email ?? "",
       typeLabel: TYPE_LABELS[input.type],
       moduleLabel: MODULE_LABELS[input.module],
-      message: input.message,
+      message: messageForEmail(input.message, attachments),
+      attachmentSummary: attachmentSummary(attachments),
       organizationName,
     }),
     replyTo: input.actor.email ? [input.actor.email] : undefined,
+    attachments,
   });
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback, { includeAttachmentUrls: true });
 }
 
 export async function listFeedbackForUser(
@@ -235,7 +438,7 @@ export async function listFeedbackForUser(
   const items = await Feedback.find({ userId })
     .sort({ lastMessageAt: -1 })
     .lean();
-  return items.map(serializeFeedback);
+  return Promise.all(items.map((item) => serializeFeedback(item)));
 }
 
 export async function getFeedbackForUser(
@@ -253,13 +456,14 @@ export async function getFeedbackForUser(
     await feedback.save();
   }
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback, { includeAttachmentUrls: true });
 }
 
 export async function addUserMessage(input: {
   feedbackId: string;
   actor: FeedbackActor;
   body: string;
+  attachments?: FeedbackAttachmentInput[];
 }): Promise<SerializedFeedback | null> {
   if (!mongoose.Types.ObjectId.isValid(input.feedbackId)) return null;
 
@@ -271,11 +475,13 @@ export async function addUserMessage(input: {
 
   const now = new Date();
   const authorName = input.actor.name?.trim() || input.actor.email || "User";
+  const attachments = input.attachments ?? [];
   feedback.messages.push({
     authorType: "user",
     authorId: input.actor.id,
     authorName,
     body: input.body,
+    attachments,
     createdAt: now,
   });
   feedback.unreadForAdmin = true;
@@ -292,19 +498,22 @@ export async function addUserMessage(input: {
       email: feedback.userEmail,
       typeLabel: TYPE_LABELS[feedback.type],
       moduleLabel: MODULE_LABELS[feedback.module],
-      message: input.body,
+      message: messageForEmail(input.body, attachments),
+      attachmentSummary: attachmentSummary(attachments),
       organizationName,
     }),
     replyTo: feedback.userEmail ? [feedback.userEmail] : undefined,
+    attachments,
   });
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback, { includeAttachmentUrls: true });
 }
 
 export async function addAdminMessage(input: {
   feedbackId: string;
   actor: FeedbackActor;
   body: string;
+  attachments?: FeedbackAttachmentInput[];
 }): Promise<SerializedFeedback | null> {
   if (!mongoose.Types.ObjectId.isValid(input.feedbackId)) return null;
 
@@ -313,11 +522,13 @@ export async function addAdminMessage(input: {
 
   const now = new Date();
   const authorName = input.actor.name?.trim() || "Inboundr Team";
+  const attachments = input.attachments ?? [];
   feedback.messages.push({
     authorType: "admin",
     authorId: input.actor.id,
     authorName,
     body: input.body,
+    attachments,
     createdAt: now,
   });
   feedback.unreadForUser = true;
@@ -340,7 +551,7 @@ export async function addAdminMessage(input: {
         recipientUserId: feedback.userId,
         type: "feedback.reply",
         title: "New Reply to Your Feedback",
-        body: input.body.slice(0, 280),
+        body: messagePreview(input.body, attachments),
         actionUrl: "/feedback",
         actorUserId: input.actor.id,
         entityType: "feedback",
@@ -359,17 +570,36 @@ export async function addAdminMessage(input: {
         subject: "We replied to your feedback",
         react: createElement(FeedbackReplyEmail, {
           name: feedback.userName || feedback.userEmail,
-          reply: input.body,
+          reply: messageForEmail(input.body, attachments),
           originalMessage: firstUserMessage?.body ?? "",
+          attachmentSummary: attachmentSummary(attachments),
           threadUrl,
         }),
+        attachments: await imageEmailAttachments(attachments),
       });
     } catch (err) {
       console.error("Failed to send feedback reply email:", err);
+      if (attachments.length > 0) {
+        try {
+          await sendEmail({
+            to: feedback.userEmail,
+            subject: "We replied to your feedback",
+            react: createElement(FeedbackReplyEmail, {
+              name: feedback.userName || feedback.userEmail,
+              reply: messageForEmail(input.body, attachments),
+              originalMessage: firstUserMessage?.body ?? "",
+              attachmentSummary: attachmentSummary(attachments),
+              threadUrl,
+            }),
+          });
+        } catch (fallbackErr) {
+          console.error("Failed to send feedback reply fallback email:", fallbackErr);
+        }
+      }
     }
   }
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback, { includeAttachmentUrls: true });
 }
 
 export interface AdminFeedbackFilters {
@@ -392,7 +622,7 @@ export async function listFeedbackForAdmin(
   ]);
 
   return {
-    feedback: items.map(serializeFeedback),
+    feedback: await Promise.all(items.map((item) => serializeFeedback(item))),
     unreadCount,
   };
 }
@@ -411,7 +641,7 @@ export async function getFeedbackForAdmin(
     await feedback.save();
   }
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback, { includeAttachmentUrls: true });
 }
 
 export async function updateFeedbackStatus(
@@ -427,7 +657,7 @@ export async function updateFeedbackStatus(
   );
   if (!feedback) return null;
 
-  return serializeFeedback(feedback);
+  return await serializeFeedback(feedback);
 }
 
 export async function getAdminUnreadFeedbackCount(): Promise<number> {

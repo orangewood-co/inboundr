@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { MessageSquarePlusIcon } from "lucide-react"
+import { MessageSquarePlusIcon, PaperclipIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
@@ -20,6 +20,7 @@ import {
   listMyFeedback,
   replyToMyFeedback,
   type AppFeedback,
+  type FeedbackAttachment,
 } from "@/lib/feedback"
 
 export default function FeedbackPage() {
@@ -67,10 +68,10 @@ export default function FeedbackPage() {
     else setSelected(null)
   }, [selectedId])
 
-  async function handleReply(message: string) {
+  async function handleReply(message: string, attachments: FeedbackAttachment[]) {
     if (!selected) return
     try {
-      const updated = await replyToMyFeedback(selected._id, message)
+      const updated = await replyToMyFeedback(selected._id, message, attachments)
       setSelected(updated)
       setFeedback((current) =>
         current.map((entry) => (entry._id === updated._id ? updated : entry))
@@ -137,6 +138,15 @@ export default function FeedbackPage() {
                       <span>{entry.moduleLabel}</span>
                       <span>·</span>
                       <span>{formatDateTime(entry.lastMessageAt)}</span>
+                      {entry.attachmentCount > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1">
+                            <PaperclipIcon className="size-3" />
+                            {entry.attachmentCount}
+                          </span>
+                        </>
+                      )}
                       {entry.unreadForUser && (
                         <span className="ml-auto size-2 rounded-full bg-primary" />
                       )}
@@ -165,7 +175,7 @@ export default function FeedbackPage() {
                     </div>
                     <FeedbackMessageList messages={selected.messages} />
                     <div className="border-t pt-4">
-                      <FeedbackReplyComposer onSend={handleReply} />
+                      <FeedbackReplyComposer feedbackId={selected._id} onSend={handleReply} />
                     </div>
                   </div>
                 )}
