@@ -18,6 +18,7 @@ import {
 interface SupportTicketRow {
   id: string
   ticketNumber: number
+  ticketReference: string
   subject: string
   requester: { name: string; email: string }
   lastMessageAt: string
@@ -38,7 +39,7 @@ function TicketRow({ ticket }: { ticket: SupportTicketRow }) {
       <WidgetAvatar name={requester} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {ticket.subject || `Ticket #${ticket.ticketNumber}`}
+          {ticket.subject || `Ticket ${ticket.ticketReference}`}
         </p>
         <p className="truncate text-xs text-muted-foreground">{requester}</p>
       </div>

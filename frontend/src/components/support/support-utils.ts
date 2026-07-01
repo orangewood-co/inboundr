@@ -113,13 +113,13 @@ export function authorLabel(message: TicketMessage, requesterName: string) {
 }
 
 /** Resolve simple {{placeholders}} when inserting a template. */
-export function resolveTemplate(body: string, ticket: { requester: { name: string }; ticketNumber: number } | null) {
+export function resolveTemplate(body: string, ticket: { requester: { name: string }; ticketReference: string } | null) {
   if (!ticket) return body
   const firstName = ticket.requester.name.split(/\s+/)[0] || ticket.requester.name
   return body
     .replace(/\{\{\s*name\s*\}\}/gi, ticket.requester.name)
     .replace(/\{\{\s*first_name\s*\}\}/gi, firstName)
-    .replace(/\{\{\s*ticket_number\s*\}\}/gi, `#${ticket.ticketNumber}`)
+    .replace(/\{\{\s*ticket_number\s*\}\}/gi, ticket.ticketReference)
 }
 
 export const SUPPORT_MESSAGE_MAX_LENGTH = 4000

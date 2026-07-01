@@ -27,7 +27,7 @@ export type TranscriptMessage = {
 export interface SupportEmailBaseProps {
   organizationName: string;
   requesterName: string;
-  ticketNumber: number;
+  ticketReference: string;
   initialIssue: string;
   messages: TranscriptMessage[];
   rating?: number | null;
@@ -130,18 +130,18 @@ export function SupportHero({
 }
 
 export function TicketSummaryCard({
-  ticketNumber,
+  ticketReference,
   initialIssue,
   rating,
   feedbackComment,
 }: Pick<
   SupportEmailBaseProps,
-  "ticketNumber" | "initialIssue" | "rating" | "feedbackComment"
+  "ticketReference" | "initialIssue" | "rating" | "feedbackComment"
 >) {
   return (
     <Section className="bg-bg mb-3 rounded-lg px-5 py-4">
       <Text className="font-13 text-fg m-0 font-sans">
-        <strong>Ticket #{ticketNumber}</strong>
+        <strong>Ticket {ticketReference}</strong>
       </Text>
       {initialIssue ? (
         <Text className="font-13 text-fg-2 mt-2 mb-0 font-sans">

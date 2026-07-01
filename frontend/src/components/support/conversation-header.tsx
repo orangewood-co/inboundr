@@ -104,7 +104,7 @@ export function ConversationHeader({
             </span>
           </div>
           <p className="truncate text-xs text-muted-foreground">
-            <span className="tabular-nums">#{ticket.ticketNumber}</span>
+            <span className="tabular-nums">{ticket.ticketReference}</span>
             <span className="px-1">·</span>
             {secondaryContact || channelLabel}
           </p>

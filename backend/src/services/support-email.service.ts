@@ -9,6 +9,7 @@ import { sendEmail } from "../lib/email";
 import { Organization } from "../models/organization.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
 import { TicketMessage } from "../models/ticket-message.model";
+import { formatTicketReference } from "./ticket.service";
 
 function formatEmailDate(value: Date): string {
   return new Intl.DateTimeFormat("en-IN", {
@@ -51,7 +52,7 @@ async function emailPayload(ticket: ITicket | any) {
   return {
     organizationName: organization.name,
     requesterName: ticket.requester?.name ?? "",
-    ticketNumber: ticket.ticketNumber,
+    ticketReference: ticket.ticketReference || formatTicketReference(ticket.ticketNumber),
     initialIssue: ticket.initialIssue ?? ticket.subject ?? "",
     messages: messages.map((message) => ({
       author: messageAuthor(message, ticket.requester?.name ?? ""),

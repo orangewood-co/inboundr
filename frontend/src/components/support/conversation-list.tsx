@@ -98,7 +98,7 @@ function ConversationListItem({
           )}
         </div>
         <div className="mt-1 flex items-center gap-1.5">
-          <p className="text-[11px] text-muted-foreground/60 tabular-nums">#{ticket.ticketNumber}</p>
+          <p className="text-[11px] text-muted-foreground/60 tabular-nums">{ticket.ticketReference}</p>
           {ticket.visitorEndedAt && ticket.status === "open" && (
             <span className="inline-flex rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
               Visitor ended
@@ -161,6 +161,7 @@ export function ConversationList({
         ticket.subject,
         ticket.initialIssue,
         ticket.lastMessagePreview ?? "",
+        ticket.ticketReference,
         `#${ticket.ticketNumber}`,
         String(ticket.ticketNumber),
       ]

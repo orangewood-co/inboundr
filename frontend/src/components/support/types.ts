@@ -36,6 +36,7 @@ export type SupportTicketTag = TicketTag & {
 export type Ticket = {
   id: string
   ticketNumber: number
+  ticketReference: string
   subject: string
   status: TicketStatus
   priority: string

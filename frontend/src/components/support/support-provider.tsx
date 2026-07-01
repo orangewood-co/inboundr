@@ -49,6 +49,7 @@ function ticketMatchesSearchQuery(ticket: Ticket, search: string) {
     ticket.requester.name,
     ticket.requester.email,
     ticket.lastMessagePreview ?? "",
+    ticket.ticketReference,
     `#${ticket.ticketNumber}`,
     String(ticket.ticketNumber),
   ].some((value) => value.toLowerCase().includes(ticketNumber || term))

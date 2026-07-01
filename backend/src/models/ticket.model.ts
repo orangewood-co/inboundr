@@ -21,6 +21,7 @@ export interface ITicket extends Document {
   organizationId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId | null;
   ticketNumber: number;
+  ticketReference: string;
   subject: string;
   initialIssue: string;
   status: TicketStatus;
@@ -83,6 +84,7 @@ const ticketSchema = new Schema<ITicket>(
       index: true,
     },
     ticketNumber: { type: Number, required: true },
+    ticketReference: { type: String, default: "" },
     subject: { type: String, default: "", trim: true },
     initialIssue: { type: String, default: "", trim: true, maxlength: 2000 },
     status: {
@@ -135,6 +137,7 @@ const ticketSchema = new Schema<ITicket>(
 );
 
 ticketSchema.index({ organizationId: 1, ticketNumber: 1 }, { unique: true });
+ticketSchema.index({ organizationId: 1, ticketReference: 1 });
 ticketSchema.index(
   { sessionToken: 1 },
   { unique: true, partialFilterExpression: { sessionToken: { $type: "string" } } }

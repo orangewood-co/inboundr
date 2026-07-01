@@ -11,7 +11,7 @@ export interface SupportTranscriptEmailProps extends SupportEmailBaseProps {}
 export function SupportTranscriptEmail({
   organizationName,
   requesterName,
-  ticketNumber,
+  ticketReference,
   initialIssue,
   messages,
   rating,
@@ -33,7 +33,7 @@ export function SupportTranscriptEmail({
 
         <Section className="mx-auto mb-8 max-w-[440px] text-left">
           <TicketSummaryCard
-            ticketNumber={ticketNumber}
+            ticketReference={ticketReference}
             initialIssue={initialIssue}
             rating={rating}
             feedbackComment={feedbackComment}
@@ -73,7 +73,7 @@ export function SupportTranscriptEmail({
 SupportTranscriptEmail.PreviewProps = {
   organizationName: "Acme",
   requesterName: "Tushar",
-  ticketNumber: 42,
+  ticketReference: "SR-000042",
   initialIssue: "Need help with an order",
   messages: [
     {

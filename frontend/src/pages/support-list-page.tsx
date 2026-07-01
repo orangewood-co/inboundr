@@ -282,7 +282,7 @@ function TicketRow({
           {STATUS_LABELS[ticket.status] ?? ticket.status}
         </Badge>
       </TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">#{ticket.ticketNumber}</TableCell>
+      <TableCell className="tabular-nums text-muted-foreground">{ticket.ticketReference}</TableCell>
       <TableCell className="max-w-0">
         <div className="flex items-center gap-2">
           {unread && (
@@ -690,7 +690,7 @@ export default function SupportListPage() {
             <DialogTitle>Delete Conversation</DialogTitle>
             <DialogDescription>
               {pendingDelete
-                ? `This permanently deletes the chat with ${pendingDelete.requester.name} (#${pendingDelete.ticketNumber}), all its messages, and any uploaded files. This cannot be undone.`
+                ? `This permanently deletes the chat with ${pendingDelete.requester.name} (${pendingDelete.ticketReference}), all its messages, and any uploaded files. This cannot be undone.`
                 : null}
             </DialogDescription>
           </DialogHeader>

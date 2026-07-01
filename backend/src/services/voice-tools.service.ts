@@ -5,6 +5,7 @@ import { Ticket, type ITicket, type TicketPriority } from "../models/ticket.mode
 import { TicketMessage } from "../models/ticket-message.model";
 import { CallSession } from "../models/call-session.model";
 import { loadOrgPromptContext } from "./support-chat.service";
+import { formatTicketReference } from "./ticket.service";
 
 export interface VoiceToolContext {
   organizationId: mongoose.Types.ObjectId;
@@ -164,9 +165,11 @@ export async function ensureCallTicket(
   let ticket: ITicket | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
+      const ticketNumber = await nextTicketNumber(ctx.organizationId);
       ticket = await Ticket.create({
         organizationId: ctx.organizationId,
-        ticketNumber: await nextTicketNumber(ctx.organizationId),
+        ticketNumber,
+        ticketReference: formatTicketReference(ticketNumber),
         customerId,
         subject,
         initialIssue,

@@ -78,7 +78,7 @@ export default function SupportConversationPage() {
     }
 
     const requester = selectedTicket.requester.name.trim() || selectedTicket.requester.email
-    document.title = `#${selectedTicket.ticketNumber} ${requester} - Support - ${APP_TITLE}`
+    document.title = `${selectedTicket.ticketReference} ${requester} - Support - ${APP_TITLE}`
   }, [selectedTicket, ticketId])
 
   const handleArchiveToggle = async () => {
@@ -108,7 +108,7 @@ export default function SupportConversationPage() {
       <SiteHeader
         breadcrumbs={[
           { label: "Support", href: "/support" },
-          { label: selectedTicket ? `#${selectedTicket.ticketNumber}` : "Conversation" },
+          { label: selectedTicket ? selectedTicket.ticketReference : "Conversation" },
         ]}
         actions={
           <>
@@ -195,7 +195,7 @@ export default function SupportConversationPage() {
             <DialogTitle>Delete Conversation</DialogTitle>
             <DialogDescription>
               {selectedTicket
-                ? `This permanently deletes the chat with ${selectedTicket.requester.name} (#${selectedTicket.ticketNumber}), all its messages, and any uploaded files. This cannot be undone.`
+                ? `This permanently deletes the chat with ${selectedTicket.requester.name} (${selectedTicket.ticketReference}), all its messages, and any uploaded files. This cannot be undone.`
                 : null}
             </DialogDescription>
           </DialogHeader>

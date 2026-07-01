@@ -16,6 +16,7 @@ import {
 } from "../models/ticket-message.model";
 import { hasEffectiveFeature } from "./entitlement.service";
 import { createPresignedViewUrl } from "./storage.service";
+import { formatTicketReference } from "./ticket.service";
 
 const openrouter = createOpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -143,9 +144,11 @@ export async function createSupportSession(
   // ticketNumber is assigned optimistically; retry on the rare concurrent clash.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
+      const ticketNumber = await nextTicketNumber(organizationId);
       ticket = await Ticket.create({
         organizationId,
-        ticketNumber: await nextTicketNumber(organizationId),
+        ticketNumber,
+        ticketReference: formatTicketReference(ticketNumber),
         customerId,
         subject: initialIssue ? initialIssue.slice(0, 80) : "",
         initialIssue,

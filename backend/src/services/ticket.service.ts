@@ -21,6 +21,10 @@ export interface TicketAgent {
   image: string | null;
 }
 
+export function formatTicketReference(ticketNumber: number): string {
+  return `SR-${String(ticketNumber).padStart(6, "0")}`;
+}
+
 export function normalizeTicketAiMode(ticket: Pick<any, "aiMode" | "botEnabled">) {
   return ticket.aiMode === "autonomous" ||
     ticket.aiMode === "review" ||
@@ -105,6 +109,7 @@ export function serializeTicket(ticket: ITicket | any) {
   return {
     id: String(ticket._id),
     ticketNumber: ticket.ticketNumber,
+    ticketReference: ticket.ticketReference || formatTicketReference(ticket.ticketNumber),
     subject: ticket.subject,
     status: ticket.status,
     priority: ticket.priority,
@@ -233,8 +238,9 @@ export async function listTickets(input: {
       { subject: { $regex: pattern, $options: "i" } },
       { "requester.name": { $regex: pattern, $options: "i" } },
       { "requester.email": { $regex: pattern, $options: "i" } },
+      { ticketReference: { $regex: pattern, $options: "i" } },
     ];
-    const asNumber = Number(search.replace(/^#/, ""));
+    const asNumber = Number(search.replace(/^#/, "").replace(/^SR-?/i, ""));
     if (Number.isInteger(asNumber) && asNumber > 0) {
       or.push({ ticketNumber: asNumber });
     }

@@ -12,7 +12,7 @@ export interface SupportOpenedEmailProps extends SupportEmailBaseProps {}
 export function SupportOpenedEmail({
   organizationName,
   requesterName,
-  ticketNumber,
+  ticketReference,
   initialIssue,
   companyName,
   resumeUrl,
@@ -31,7 +31,7 @@ export function SupportOpenedEmail({
         </Text>
 
         <Section className="mx-auto mb-8 max-w-[440px] text-left">
-          <TicketSummaryCard ticketNumber={ticketNumber} initialIssue={initialIssue} />
+          <TicketSummaryCard ticketReference={ticketReference} initialIssue={initialIssue} />
         </Section>
 
         <ResumeChatButton href={resumeUrl}>Open support chat</ResumeChatButton>
@@ -48,7 +48,7 @@ export function SupportOpenedEmail({
 SupportOpenedEmail.PreviewProps = {
   organizationName: "Acme",
   requesterName: "Tushar",
-  ticketNumber: 42,
+  ticketReference: "SR-000042",
   initialIssue: "Need help with an order",
   messages: [],
   resumeUrl: "https://forms.example.com/support/organization-id?session=session-token",

@@ -135,7 +135,7 @@ function PastTickets({ ticket, onSelect }: { ticket: Ticket; onSelect: (id: stri
         >
           <span className="flex items-center justify-between gap-2">
             <span className="truncate text-xs font-medium">
-              #{item.ticketNumber} {item.subject || "Support chat"}
+              {item.ticketReference} {item.subject || "Support chat"}
             </span>
             <span
               className={cn(
