@@ -27,7 +27,7 @@ const route = getRouteApi("/support/$ticketId")
 
 // The /support list route validates required search params, so navigations
 // back to it must supply defaults.
-const LIST_SEARCH = { status: "open" as const, q: "", page: 1 }
+const LIST_SEARCH = { status: "open" as const, q: "", tags: [] as string[], page: 1 }
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() =>

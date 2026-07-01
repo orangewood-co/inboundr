@@ -29,7 +29,7 @@ interface SupportListResponse {
   total: number
 }
 
-const SUPPORT_LIST_SEARCH = { status: "open" as const, q: "", page: 1 }
+const SUPPORT_LIST_SEARCH = { status: "open" as const, q: "", tags: [] as string[], page: 1 }
 
 function TicketRow({ ticket }: { ticket: SupportTicketRow }) {
   const requester = ticket.requester?.name || ticket.requester?.email || "Unknown"
