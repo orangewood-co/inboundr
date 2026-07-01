@@ -11,7 +11,9 @@ import {
   PhoneIcon,
   RefreshCcwIcon,
   SearchIcon,
+  TagIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
@@ -21,6 +23,8 @@ import { PageHeader } from "@/components/page-header"
 import { ChannelIcon } from "@/components/support/channel"
 import { STATUS_STYLES } from "@/components/support/context-panel"
 import { useSupport } from "@/components/support/support-provider"
+import { TagChipList } from "@/components/support/tag-chip"
+import { TagMultiSelect } from "@/components/support/tag-select"
 import { formatFullTime, formatRelativeTime, initialsFromName, isUnread } from "@/components/support/support-utils"
 import type { Ticket, TicketFilter } from "@/components/support/types"
 import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "@/components/ui/avatar"
@@ -290,6 +294,9 @@ function TicketRow({
               {ticket.subject || "New support chat"}
             </p>
             {preview && <p className="truncate text-xs text-muted-foreground">{preview}</p>}
+            {ticket.tags.length > 0 && (
+              <TagChipList tags={ticket.tags} max={3} className="mt-1" />
+            )}
           </div>
         </div>
       </TableCell>
@@ -377,13 +384,33 @@ export default function SupportListPage() {
   }, [navigate, search.q, searchInput])
 
   // Fetch whenever the resolved query changes.
+  const tagsKey = search.tags.join(",")
   useEffect(() => {
-    void loadTickets({ status: search.status, search: search.q, page: search.page, limit: PAGE_SIZE })
-  }, [loadTickets, search.status, search.q, search.page])
+    void loadTickets({
+      status: search.status,
+      search: search.q,
+      tags: search.tags,
+      page: search.page,
+      limit: PAGE_SIZE,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadTickets, search.status, search.q, tagsKey, search.page])
 
   const setStatus = (status: TicketFilter) =>
     void navigate({ search: (prev) => ({ ...prev, status, page: 1 }) })
   const setPage = (page: number) => void navigate({ search: (prev) => ({ ...prev, page }) })
+  const toggleTagFilter = (tagId: string, selected: boolean) =>
+    void navigate({
+      search: (prev) => {
+        const current = prev.tags ?? []
+        const next = selected
+          ? [...new Set([...current, tagId])]
+          : current.filter((id) => id !== tagId)
+        return { ...prev, tags: next, page: 1 }
+      },
+    })
+  const clearTagFilter = () =>
+    void navigate({ search: (prev) => ({ ...prev, tags: [], page: 1 }) })
 
   const { pagination, tickets, loadingTickets, unreadCount, error } = inbox
   const pages = useMemo(
@@ -504,16 +531,65 @@ export default function SupportListPage() {
               })}
             </div>
 
-            <div className="relative w-full sm:w-48">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search"
-                className="pl-8"
-              />
+            <div className="flex items-center gap-2">
+              {inbox.ticketTags.length > 0 && (
+                <TagMultiSelect
+                  tags={inbox.ticketTags}
+                  selectedIds={search.tags}
+                  onToggle={toggleTagFilter}
+                  align="end"
+                  trigger={
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <TagIcon />
+                      Tags
+                      {search.tags.length > 0 && (
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums text-primary-foreground">
+                          {search.tags.length}
+                        </span>
+                      )}
+                    </Button>
+                  }
+                />
+              )}
+              <div className="relative w-full sm:w-48">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder="Search"
+                  className="pl-8"
+                />
+              </div>
             </div>
           </div>
+
+          {search.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filtered by:</span>
+              {search.tags.map((tagId) => {
+                const tag = inbox.ticketTags.find((item) => item.id === tagId)
+                if (!tag) return null
+                return (
+                  <button
+                    key={tagId}
+                    type="button"
+                    onClick={() => toggleTagFilter(tagId, false)}
+                    className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs transition-colors hover:bg-muted"
+                  >
+                    {tag.name}
+                    <XIcon className="size-3 text-muted-foreground" />
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={clearTagFilter}
+                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           {error ? (
             <ErrorState
@@ -527,10 +603,10 @@ export default function SupportListPage() {
             <EmptyState
               className="mt-6 rounded-xl border border-dashed"
               icon={InboxIcon}
-              title={search.q ? "No Matches Found" : "No Conversations Yet"}
+              title={search.q || search.tags.length > 0 ? "No Matches Found" : "No Conversations Yet"}
               description={
-                search.q
-                  ? "Try a different subject, name, email, or ticket number."
+                search.q || search.tags.length > 0
+                  ? "Try a different search, tag, or filter."
                   : "New support chats from your customers will appear here."
               }
             />

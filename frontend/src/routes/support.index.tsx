@@ -8,7 +8,17 @@ const VALID_STATUSES: TicketFilter[] = ["open", "resolved", "all", "archived"]
 export type SupportListSearch = {
   status: TicketFilter
   q: string
+  tags: string[]
   page: number
+}
+
+function parseTags(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value.map((entry) => String(entry))
+    : typeof value === "string"
+      ? value.split(",")
+      : []
+  return [...new Set(raw.map((entry) => entry.trim()).filter(Boolean))]
 }
 
 export const Route = createFileRoute("/support/")({
@@ -18,6 +28,7 @@ export const Route = createFileRoute("/support/")({
     return {
       status: VALID_STATUSES.includes(status) ? status : "open",
       q: typeof search.q === "string" ? search.q : "",
+      tags: parseTags(search.tags),
       page: Number.isFinite(page) && page >= 1 ? Math.trunc(page) : 1,
     }
   },

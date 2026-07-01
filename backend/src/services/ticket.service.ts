@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import { Customer } from "../models/customer.model";
+import { SupportTicketTag } from "../models/support-ticket-tag.model";
 import { Ticket, type ITicket, type TicketStatus } from "../models/ticket.model";
 import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft.model";
 import {
@@ -53,6 +54,21 @@ function customerFromTicket(ticket: any) {
   return candidate && typeof candidate === "object" && "email" in candidate ? candidate : null;
 }
 
+export function serializeTicketTags(ticket: any) {
+  const source = Array.isArray(ticket.tags)
+    ? ticket.tags
+    : Array.isArray(ticket.tagIds)
+      ? ticket.tagIds
+      : [];
+  return source
+    .filter((tag: any) => tag && typeof tag === "object" && "name" in tag)
+    .map((tag: any) => ({
+      id: String(tag._id),
+      name: tag.name,
+      color: tag.color ?? "slate",
+    }));
+}
+
 export function normalizeTicketListStatus(value: unknown): TicketListStatus {
   return value === "all" ||
     value === "open" ||
@@ -94,6 +110,7 @@ export function serializeTicket(ticket: ITicket | any) {
     priority: ticket.priority,
     channel: ticket.channel,
     requester: ticket.requester,
+    tags: serializeTicketTags(ticket),
     customerId: customerIdFromTicket(ticket),
     customer: serializeCustomer(customerFromTicket(ticket)),
     initialIssue: ticket.initialIssue ?? "",
@@ -187,6 +204,7 @@ export async function listTickets(input: {
   organizationId: mongoose.Types.ObjectId;
   status: TicketListStatus;
   search?: string;
+  tagIds?: string[];
   page?: number;
   limit?: number;
 }) {
@@ -199,6 +217,13 @@ export async function listTickets(input: {
   } else {
     match.isArchived = { $ne: true };
     if (input.status !== "all") match.status = input.status;
+  }
+
+  const tagIds = (input.tagIds ?? [])
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (tagIds.length > 0) {
+    match.tagIds = { $in: tagIds };
   }
 
   const search = String(input.search ?? "").trim();
@@ -275,6 +300,14 @@ export async function listTickets(input: {
               as: "customer",
             },
           },
+          {
+            $lookup: {
+              from: SupportTicketTag.collection.name,
+              localField: "tagIds",
+              foreignField: "_id",
+              as: "tags",
+            },
+          },
           { $addFields: { lastMessage: { $arrayElemAt: ["$lastMessage", 0] } } },
           { $addFields: { customer: { $arrayElemAt: ["$customer", 0] } } },
         ],
@@ -327,6 +360,7 @@ export async function getTicketWithMessages(input: {
     organizationId: input.organizationId,
   })
     .populate("customerId")
+    .populate("tagIds")
     .lean();
   if (!ticket) return null;
 
@@ -448,6 +482,7 @@ export async function linkTicketCustomer(input: {
     { new: true }
   )
     .populate("customerId")
+    .populate("tagIds")
     .lean();
 
   return ticket ? serializeTicket(ticket) : null;
@@ -513,7 +548,10 @@ export async function resolveTicket(input: {
   } catch (err) {
     console.error(`Failed to send support resolution email for ticket ${ticket._id}:`, err);
   }
-  const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
+  const fresh = await Ticket.findById(ticket._id)
+    .populate("customerId")
+    .populate("tagIds")
+    .lean();
   return fresh ? serializeTicket(fresh) : serializeTicket(ticket);
 }
 
@@ -529,7 +567,10 @@ export async function reopenTicket(input: {
     { new: true }
   ).lean();
   if (!ticket) return null;
-  const fresh = await Ticket.findById(ticket._id).populate("customerId").lean();
+  const fresh = await Ticket.findById(ticket._id)
+    .populate("customerId")
+    .populate("tagIds")
+    .lean();
   return fresh ? serializeTicket(fresh) : serializeTicket(ticket);
 }
 
@@ -545,7 +586,39 @@ export async function setTicketArchived(input: {
     { new: true }
   )
     .populate("customerId")
+    .populate("tagIds")
     .lean();
+  return ticket ? serializeTicket(ticket) : null;
+}
+
+export async function updateTicketTags(input: {
+  organizationId: mongoose.Types.ObjectId;
+  ticketId: string;
+  tagIds: string[];
+}) {
+  if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
+
+  const requestedIds = [
+    ...new Set(input.tagIds.filter((id) => mongoose.Types.ObjectId.isValid(id))),
+  ];
+
+  const validTags = await SupportTicketTag.find({
+    _id: { $in: requestedIds },
+    organizationId: input.organizationId,
+  })
+    .select("_id")
+    .lean();
+  const validIds = validTags.map((tag) => tag._id as mongoose.Types.ObjectId);
+
+  const ticket = await Ticket.findOneAndUpdate(
+    { _id: input.ticketId, organizationId: input.organizationId },
+    { tagIds: validIds },
+    { new: true }
+  )
+    .populate("customerId")
+    .populate("tagIds")
+    .lean();
+
   return ticket ? serializeTicket(ticket) : null;
 }
 

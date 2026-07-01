@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { FileIcon, LoaderIcon, LockIcon, MicIcon, StarIcon, UserRoundCheckIcon } from "lucide-react"
+import { FileIcon, LoaderIcon, LockIcon, MicIcon, PlusIcon, StarIcon, UserRoundCheckIcon } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -7,6 +7,9 @@ import { CopyableText } from "@/components/copy-button"
 import { API_ORIGIN } from "@/lib/env"
 import { cn, getAvatarColor } from "@/lib/utils"
 import { ChannelBadge } from "./channel"
+import { useSupport } from "./support-provider"
+import { TagChip } from "./tag-chip"
+import { TagMultiSelect } from "./tag-select"
 import {
   fileSize,
   formatFullTime,
@@ -292,6 +295,41 @@ function CustomerMapping({ ticket }: { ticket: Ticket }) {
   )
 }
 
+function TagsSection({ ticket }: { ticket: Ticket }) {
+  const { ticketTags, updateTicketTags } = useSupport()
+  const selectedIds = useMemo(() => ticket.tags.map((tag) => tag.id), [ticket.tags])
+
+  async function toggle(tagId: string, selected: boolean) {
+    const next = selected
+      ? [...new Set([...selectedIds, tagId])]
+      : selectedIds.filter((id) => id !== tagId)
+    await updateTicketTags(ticket.id, next)
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {ticket.tags.map((tag) => (
+        <TagChip key={tag.id} tag={tag} onRemove={() => void toggle(tag.id, false)} />
+      ))}
+      <TagMultiSelect
+        tags={ticketTags}
+        selectedIds={selectedIds}
+        onToggle={(tagId, selected) => void toggle(tagId, selected)}
+        emptyLabel="No tags yet. Create them in Settings."
+        trigger={
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded border border-dashed px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <PlusIcon className="size-2.5" />
+            {ticket.tags.length === 0 ? "Add tags" : "Add"}
+          </button>
+        }
+      />
+    </div>
+  )
+}
+
 export function ContextPanel({
   ticket,
   messages,
@@ -363,6 +401,10 @@ export function ContextPanel({
           {ticket.visitorEndedAt && <MetaRow label="Visitor ended">{formatFullTime(ticket.visitorEndedAt)}</MetaRow>}
           {ticket.resolvedAt && <MetaRow label="Resolved">{formatFullTime(ticket.resolvedAt)}</MetaRow>}
         </div>
+      </Section>
+
+      <Section title="Tags" count={ticket.tags.length}>
+        <TagsSection ticket={ticket} />
       </Section>
 
       <Section title="Initial issue">

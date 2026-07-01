@@ -13,6 +13,7 @@ import {
   reopenTicket as reopenTicketRecord,
   resolveTicket as resolveTicketRecord,
   setTicketArchived,
+  updateTicketTags,
 } from "../services/ticket.service";
 import { broadcastTicketDeleted, broadcastTicketUpdate } from "../services/support-ws.service";
 
@@ -22,10 +23,21 @@ export async function listSupportTickets(req: Request, res: Response): Promise<v
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
     const parsedPage = Number(req.query.page);
     const parsedLimit = Number(req.query.limit);
+    const tagsParam = req.query.tags;
+    const tagIds = (
+      Array.isArray(tagsParam)
+        ? tagsParam.map((value) => String(value))
+        : typeof tagsParam === "string"
+          ? tagsParam.split(",")
+          : []
+    )
+      .map((value) => value.trim())
+      .filter(Boolean);
     const { tickets, total, page, limit } = await listTickets({
       organizationId: orgReq.organization._id,
       status: normalizeTicketListStatus(req.query.status),
       search,
+      tagIds,
       page: Number.isFinite(parsedPage) ? parsedPage : undefined,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
@@ -133,6 +145,28 @@ export async function createTicketCustomer(req: Request, res: Response): Promise
   } catch (err) {
     console.error("Failed to create ticket customer:", err);
     res.status(500).json({ error: "Failed to create customer" });
+  }
+}
+
+export async function updateSupportTicketTags(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const rawTagIds = Array.isArray(req.body?.tagIds) ? req.body.tagIds : [];
+    const tagIds = rawTagIds.map((value: unknown) => String(value));
+    const ticket = await updateTicketTags({
+      organizationId: orgReq.organization._id,
+      ticketId: String(req.params.id ?? ""),
+      tagIds,
+    });
+    if (!ticket) {
+      res.status(404).json({ error: "Ticket not found" });
+      return;
+    }
+    broadcastTicketUpdate(orgReq.organization._id.toString(), ticket);
+    res.json({ ticket });
+  } catch (err) {
+    console.error("Failed to update ticket tags:", err);
+    res.status(500).json({ error: "Failed to update ticket tags" });
   }
 }
 

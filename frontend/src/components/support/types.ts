@@ -9,6 +9,30 @@ export type TicketAgent = {
   image: string | null
 }
 
+export type SupportTicketTagColor =
+  | "slate"
+  | "red"
+  | "orange"
+  | "amber"
+  | "green"
+  | "teal"
+  | "blue"
+  | "indigo"
+  | "violet"
+  | "pink"
+
+export type TicketTag = {
+  id: string
+  name: string
+  color: SupportTicketTagColor
+}
+
+export type SupportTicketTag = TicketTag & {
+  usageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type Ticket = {
   id: string
   ticketNumber: number
@@ -17,6 +41,7 @@ export type Ticket = {
   priority: string
   channel: string
   requester: { name: string; email: string; phoneNumber?: string | null }
+  tags: TicketTag[]
   customerId: string | null
   customer: SupportCustomer | null
   initialIssue: string

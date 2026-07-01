@@ -42,6 +42,8 @@ import { useSession, updateUser } from "@/lib/auth-client"
 import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organization-context"
 import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
+import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/tag-chip"
+import type { SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -2624,6 +2626,221 @@ interface SupportKnowledgeArticle {
 const TEMPLATE_TEXTAREA_CLASS =
   "flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 
+function SupportTicketTagsCard() {
+  const { canManageOrganization } = useEntitlements()
+  const [tags, setTags] = useState<SupportTicketTag[]>([])
+  const [loading, setLoading] = useState(true)
+  const [name, setName] = useState("")
+  const [color, setColor] = useState<SupportTicketTagColor>("slate")
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<SupportTicketTag | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchTags = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags`, { credentials: "include" })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load ticket tags")
+      setTags(data.tags ?? [])
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load ticket tags")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchTags()
+  }, [fetchTags])
+
+  const resetForm = () => {
+    setEditingId(null)
+    setName("")
+    setColor("slate")
+  }
+
+  const startEdit = (tag: SupportTicketTag) => {
+    setEditingId(tag.id)
+    setName(tag.name)
+    setColor(tag.color)
+  }
+
+  const save = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      const url = editingId
+        ? `${API_ORIGIN}/api/v1/support/ticket-tags/${editingId}`
+        : `${API_ORIGIN}/api/v1/support/ticket-tags`
+      const res = await fetch(url, {
+        method: editingId ? "PATCH" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), color }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save tag")
+      toast.success(editingId ? "Tag updated" : "Tag created")
+      resetForm()
+      await fetchTags()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save tag")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags/${pendingDelete.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to delete tag")
+      toast.success("Tag deleted")
+      if (editingId === pendingDelete.id) resetForm()
+      setPendingDelete(null)
+      await fetchTags()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete tag")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <SettingsCard
+      title="Ticket Tags"
+      description="Categorize support conversations (e.g. Service Calls, Warranty Support) and filter the inbox by tag."
+    >
+      <div className="space-y-4 p-5">
+        {canManageOrganization ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-48 flex-1 space-y-1.5">
+              <Label htmlFor="ticketTagName">Tag name</Label>
+              <Input
+                id="ticketTagName"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Warranty Support"
+                maxLength={40}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    void save()
+                  }
+                }}
+              />
+            </div>
+            <div className="w-40 space-y-1.5">
+              <Label htmlFor="ticketTagColor">Color</Label>
+              <Select value={color} onValueChange={(value) => setColor(value as SupportTicketTagColor)}>
+                <SelectTrigger id="ticketTagColor" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORT_TICKET_TAG_COLORS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      <span className="flex items-center gap-2">
+                        <span className={`size-2.5 rounded-full ${TAG_DOT_STYLES[option]}`} />
+                        <span className="capitalize">{option}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={save} disabled={saving || !name.trim()}>
+                {saving && <Spinner data-icon="inline-start" />}
+                {editingId ? "Save Tag" : "Add Tag"}
+              </Button>
+              {editingId && (
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Only organization admins can create or edit tags. You can apply existing tags from a conversation.
+          </p>
+        )}
+
+        <div className="rounded-xl border">
+          {loading ? (
+            <div className="px-4 py-5 text-sm text-muted-foreground">Loading tags...</div>
+          ) : tags.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No tags yet.{canManageOrganization ? " Create your first one above." : ""}
+            </div>
+          ) : (
+            <div className="divide-y">
+              {tags.map((tag) => (
+                <div key={tag.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className={`size-2.5 shrink-0 rounded-full ${TAG_DOT_STYLES[tag.color] ?? TAG_DOT_STYLES.slate}`} />
+                    <span className="truncate text-sm font-medium">{tag.name}</span>
+                    <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                      {tag.usageCount} {tag.usageCount === 1 ? "ticket" : "tickets"}
+                    </span>
+                  </div>
+                  {canManageOrganization && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(tag)}>
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setPendingDelete(tag)}
+                        aria-label="Delete tag"
+                      >
+                        <Trash2Icon className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Tag</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? pendingDelete.usageCount > 0
+                  ? `"${pendingDelete.name}" is applied to ${pendingDelete.usageCount} ${pendingDelete.usageCount === 1 ? "ticket" : "tickets"}. Deleting it removes the tag from those conversations. This cannot be undone.`
+                  : `Delete the "${pendingDelete.name}" tag? This cannot be undone.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Spinner data-icon="inline-start" />}
+              Delete Tag
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SettingsCard>
+  )
+}
+
 function SupportTab() {
   const [settings, setSettings] = useState<SupportAiSettings>({
     enabled: true,
@@ -3342,6 +3559,8 @@ function SupportTab() {
           )}
         </div>
       </SettingsCard>
+
+      <SupportTicketTagsCard />
 
       <SettingsCard
         title={editingId ? "Edit Template" : "New Template"}

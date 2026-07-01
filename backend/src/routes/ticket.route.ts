@@ -10,6 +10,7 @@ import {
   reopenSupportTicket,
   resolveSupportTicket,
   unarchiveSupportTicket,
+  updateSupportTicketTags,
   updateTicketCustomer,
 } from "../controllers/ticket.controller";
 import {
@@ -33,6 +34,7 @@ router.get("/:id/related", getRelatedTickets);
 router.get("/:id/customer-candidates", getCustomerCandidates);
 router.patch("/:id/customer", updateTicketCustomer);
 router.post("/:id/customer", createTicketCustomer);
+router.patch("/:id/tags", updateSupportTicketTags);
 router.patch("/:id/ai-mode", updateSupportTicketAiMode);
 router.post("/:id/ai-drafts", createSupportAiDraft);
 router.patch("/:id/ai-drafts/:draftId/approve", approveSupportAiDraft);

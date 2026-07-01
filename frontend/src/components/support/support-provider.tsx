@@ -15,6 +15,7 @@ import { previewFromMessage, ticketMatchesFilter } from "./support-utils"
 import type {
   SocketEvent,
   SupportAiDraft,
+  SupportTicketTag,
   Ticket,
   TicketAttachment,
   TicketFilter,
@@ -81,8 +82,15 @@ export type SendMessageInput = {
 export type SupportListQuery = {
   status: TicketFilter
   search: string
+  tags: string[]
   page: number
   limit: number
+}
+
+function ticketMatchesTagFilter(ticket: Ticket, tagIds: string[]) {
+  if (tagIds.length === 0) return true
+  const ticketTagIds = new Set((ticket.tags ?? []).map((tag) => tag.id))
+  return tagIds.some((id) => ticketTagIds.has(id))
 }
 
 export type SupportPagination = {
@@ -95,6 +103,7 @@ export type SupportPagination = {
 const DEFAULT_QUERY: SupportListQuery = {
   status: "open",
   search: "",
+  tags: [],
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
 }
@@ -109,6 +118,7 @@ function useSupportInboxValue() {
   })
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [ticketTags, setTicketTags] = useState<SupportTicketTag[]>([])
   const [messages, setMessages] = useState<TicketMessage[]>([])
   const [aiDrafts, setAiDrafts] = useState<SupportAiDraft[]>([])
   const [loadingTickets, setLoadingTickets] = useState(true)
@@ -207,6 +217,7 @@ function useSupportInboxValue() {
           limit: String(query.limit),
         })
         if (query.search.trim()) params.set("search", query.search.trim())
+        if (query.tags.length > 0) params.set("tags", query.tags.join(","))
         const response = await fetch(`${apiBase}?${params.toString()}`, { credentials: "include" })
         const body = await response.json().catch(() => null)
         if (!response.ok) throw new Error(body?.error ?? "Failed to load support tickets")
@@ -310,7 +321,8 @@ function useSupportInboxValue() {
               if (
                 query.page !== 1 ||
                 !ticketMatchesFilter(payload.ticket, filter) ||
-                !ticketMatchesSearchQuery(payload.ticket, query.search)
+                !ticketMatchesSearchQuery(payload.ticket, query.search) ||
+                !ticketMatchesTagFilter(payload.ticket, query.tags)
               ) {
                 return current
               }
@@ -325,7 +337,11 @@ function useSupportInboxValue() {
               return next
             }
             const without = current.filter((ticket) => ticket.id !== payload.ticket.id)
-            if (!ticketMatchesFilter(payload.ticket, filter)) return without
+            if (
+              !ticketMatchesFilter(payload.ticket, filter) ||
+              !ticketMatchesTagFilter(payload.ticket, query.tags)
+            )
+              return without
             const merged = ticketWithPreviewFallback(payload.ticket, existing)
             return [merged, ...without].sort(byRecency)
           })
@@ -658,6 +674,126 @@ function useSupportInboxValue() {
     [apiBase]
   )
 
+  const loadTicketTags = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags`, {
+        credentials: "include",
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to load ticket tags")
+      setTicketTags(body?.tags ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load ticket tags")
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadTicketTags()
+  }, [loadTicketTags])
+
+  const createTicketTag = useCallback(
+    async (input: { name: string; color: string }): Promise<boolean> => {
+      try {
+        const response = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to create tag")
+        await loadTicketTags()
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to create tag")
+        return false
+      }
+    },
+    [loadTicketTags]
+  )
+
+  const updateTicketTag = useCallback(
+    async (tagId: string, input: { name?: string; color?: string }): Promise<boolean> => {
+      try {
+        const response = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags/${tagId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to update tag")
+        await loadTicketTags()
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update tag")
+        return false
+      }
+    },
+    [loadTicketTags]
+  )
+
+  const deleteTicketTag = useCallback(
+    async (tagId: string): Promise<boolean> => {
+      try {
+        const response = await fetch(`${API_ORIGIN}/api/v1/support/ticket-tags/${tagId}`, {
+          method: "DELETE",
+          credentials: "include",
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to delete tag")
+        setTicketTags((current) => current.filter((tag) => tag.id !== tagId))
+        setTickets((current) =>
+          current.map((ticket) => ({
+            ...ticket,
+            tags: (ticket.tags ?? []).filter((tag) => tag.id !== tagId),
+          }))
+        )
+        setSelectedTicket((current) =>
+          current
+            ? { ...current, tags: (current.tags ?? []).filter((tag) => tag.id !== tagId) }
+            : current
+        )
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete tag")
+        return false
+      }
+    },
+    []
+  )
+
+  const updateTicketTags = useCallback(
+    async (ticketId: string, tagIds: string[]): Promise<boolean> => {
+      setError(null)
+      try {
+        const response = await fetch(`${apiBase}/${ticketId}/tags`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tagIds }),
+        })
+        const body = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(body?.error ?? "Failed to update ticket tags")
+        if (body?.ticket) {
+          setSelectedTicket((current) =>
+            current?.id === body.ticket.id ? { ...current, ...body.ticket } : current
+          )
+          setTickets((current) =>
+            current.map((ticket) =>
+              ticket.id === body.ticket.id ? { ...ticket, tags: body.ticket.tags } : ticket
+            )
+          )
+        }
+        return true
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update ticket tags")
+        return false
+      }
+    },
+    [apiBase]
+  )
+
   const selectTicket = useCallback((ticketId: string | null) => {
     setSelectedTicketId(ticketId)
   }, [])
@@ -677,7 +813,13 @@ function useSupportInboxValue() {
     pagination,
     loadingTickets,
     unreadCount,
+    ticketTags,
     loadTickets,
+    loadTicketTags,
+    createTicketTag,
+    updateTicketTag,
+    deleteTicketTag,
+    updateTicketTags,
     refresh,
     selectedTicketId,
     selectTicket,

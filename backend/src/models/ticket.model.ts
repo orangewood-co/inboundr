@@ -27,6 +27,7 @@ export interface ITicket extends Document {
   priority: TicketPriority;
   channel: TicketChannel;
   requester: ITicketRequester;
+  tagIds: mongoose.Types.ObjectId[];
   /** Visitor resume key for chat-channel tickets. */
   sessionToken: string | null;
   emailTranscriptRequested: boolean;
@@ -102,6 +103,11 @@ const ticketSchema = new Schema<ITicket>(
       index: true,
     },
     requester: { type: ticketRequesterSchema, required: true },
+    tagIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: "SupportTicketTag" }],
+      default: [],
+      index: true,
+    },
     sessionToken: { type: String, default: null },
     emailTranscriptRequested: { type: Boolean, default: false },
     botEnabled: { type: Boolean, default: true },
