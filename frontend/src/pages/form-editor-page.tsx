@@ -458,6 +458,8 @@ export default function FormEditorPage() {
   const [sortKey, setSortKey] = useState<string>("createdAt")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [filePreview, setFilePreview] = useState<FormFilePreview | null>(null)
   const [driveSaveTarget, setDriveSaveTarget] = useState<UploadedFileValue | null>(null)
   const [savingToDrive, setSavingToDrive] = useState(false)
@@ -590,6 +592,24 @@ export default function FormEditorPage() {
       method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
     })
     if (response.ok) setSubmissions((cur) => cur.map((s) => (s._id === submissionId ? { ...s, status } : s)))
+  }
+
+  async function deleteSubmission(submissionId: string) {
+    if (!form) return
+    setDeleting(true)
+    try {
+      const r = await fetch(`${API_BASE}/${form._id}/submissions/${submissionId}`, {
+        method: "DELETE", credentials: "include",
+      })
+      if (r.ok) {
+        setSubmissions((cur) => cur.filter((s) => s._id !== submissionId))
+        setDetailId(null)
+        setDeleteTargetId(null)
+        toast.success("Response deleted")
+      } else {
+        toast.error("Failed to delete response")
+      }
+    } finally { setDeleting(false) }
   }
 
   async function openSubmissionFile(file: UploadedFileValue) {
@@ -1253,11 +1273,32 @@ export default function FormEditorPage() {
                       <Button size="sm" variant="outline" onClick={() => void updateSubmissionStatus(detailSubmission._id, "archived")}>
                         <ArchiveIcon className="size-3.5" /> Archive
                       </Button>
+                      <Button size="sm" variant="destructive" onClick={() => setDeleteTargetId(detailSubmission._id)}>
+                        <Trash2Icon className="size-3.5" /> Delete
+                      </Button>
                     </div>
                   </div>
                 )}
               </SheetContent>
             </Sheet>
+
+            <Dialog open={deleteTargetId !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTargetId(null) }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete Response</DialogTitle>
+                  <DialogDescription>
+                    This will permanently delete this response. This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" disabled={deleting} onClick={() => setDeleteTargetId(null)}>Cancel</Button>
+                  <Button variant="destructive" disabled={deleting}
+                    onClick={() => { if (deleteTargetId) void deleteSubmission(deleteTargetId) }}>
+                    {deleting ? "Deleting..." : "Delete Response"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </div>
       </Tabs>

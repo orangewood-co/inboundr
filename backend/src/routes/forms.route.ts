@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   archiveForm,
   createForm,
+  deleteSubmission,
   duplicateForm,
   exportSubmissionsCsv,
   getForm,
@@ -44,6 +45,11 @@ router.put(
   "/:id/submissions/:submissionId",
   requireOrganizationAdmin(),
   updateSubmissionStatus
+);
+router.delete(
+  "/:id/submissions/:submissionId",
+  requireOrganizationAdmin(),
+  deleteSubmission
 );
 
 export default router;

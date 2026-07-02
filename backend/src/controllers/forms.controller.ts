@@ -387,6 +387,31 @@ export async function updateSubmissionStatus(req: Request, res: Response): Promi
   }
 }
 
+export async function deleteSubmission(req: Request, res: Response): Promise<void> {
+  try {
+    const id = String(req.params.id ?? "");
+    const submissionId = String(req.params.submissionId ?? "");
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(submissionId)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    const { organization } = req as OrganizationRequest;
+    const deleted = await FormSubmission.findOneAndDelete({
+      _id: submissionId,
+      formId: new mongoose.Types.ObjectId(id),
+      organizationId: organization._id,
+    });
+    if (!deleted) {
+      res.status(404).json({ error: "Submission not found" });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting submission:", err);
+    res.status(500).json({ error: "Failed to delete submission" });
+  }
+}
+
 export async function saveSubmissionFileToDrive(req: Request, res: Response): Promise<void> {
   try {
     const formId = String(req.params.id ?? "");
