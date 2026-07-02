@@ -39,7 +39,7 @@ import supportTemplateRouter from "./routes/support-template.route";
 import supportTicketTagRouter from "./routes/support-ticket-tag.route";
 import notificationRouter from "./routes/notification.route";
 import { connectDB, disconnectDB } from "./config/database.config";
-import { ensureKnowledgeSchema } from "./db/knowledge-schema";
+import { ensureDocumentPipelineSchema } from "./db/document-pipeline-schema";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
 import { auth } from "./lib/auth";
 import { registerNotificationEventHandlers } from "./events/notification-event-handlers";
@@ -120,10 +120,10 @@ export async function initializeServices(): Promise<void> {
   registerNotificationEventHandlers();
 
   try {
-    await ensureKnowledgeSchema();
-    console.log("Knowledge (RAG) schema ready");
+    await ensureDocumentPipelineSchema();
+    console.log("Document pipeline (RAG) schema ready");
   } catch (err) {
-    console.error("Failed to provision knowledge schema:", err);
+    console.error("Failed to provision document pipeline schema:", err);
     console.warn("Chat document retrieval will be unavailable until the database is reachable");
   }
 

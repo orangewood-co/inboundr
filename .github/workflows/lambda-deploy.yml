@@ -1,0 +1,67 @@
+name: Lambda CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "lambda/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/lambda-deploy.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "lambda/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/lambda-deploy.yml"
+
+concurrency:
+  group: lambda-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck document-processor
+        run: bun run typecheck:lambda
+
+  deploy:
+    name: Deploy document-processor Lambda
+    needs: typecheck
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy
+        env:
+          LAMBDA_FUNCTION_NAME: ${{ vars.DOCUMENT_PROCESSOR_FUNCTION_NAME || 'inboundr-document-processor' }}
+        run: bash lambda/document-processor/scripts/deploy.sh

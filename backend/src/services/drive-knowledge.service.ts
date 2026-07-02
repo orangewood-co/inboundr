@@ -1,22 +1,13 @@
-import crypto from "node:crypto";
 import type { Types } from "mongoose";
 
-import { ensureKnowledgeSchema, getKnowledgePool } from "../db/knowledge-schema";
-import {
-  DriveDocumentIndex,
-  type DriveDocumentIndexStatus,
-} from "../models/drive-document-index.model";
+import { ensureDocumentPipelineSchema } from "../db/document-pipeline-schema";
+import { getKnowledgePool } from "../db/knowledge-schema";
 import { DriveNode, type IDriveNode } from "../models/drive-node.model";
-import {
-  extractDriveNodeText,
-  isExtractableNode,
-} from "./document-extraction.service";
-import { embedQuery, embedTexts, toVectorLiteral } from "./embedding.service";
+import { isExtractableNode } from "./document-extraction.service";
+import { enqueueDocument, removeDocument } from "./document-pipeline.service";
+import { embedQuery, toVectorLiteral } from "./embedding.service";
 
-const CHUNK_SIZE = 1000;
-const CHUNK_OVERLAP = 150;
-const MAX_CHUNKS_PER_DOCUMENT = 400;
-const INSERT_BATCH_ROWS = 100;
+const DRIVE_SOURCE_TYPE = "drive";
 const MAX_ANCESTOR_WALK = 64;
 
 export type KnowledgeMatch = {
@@ -27,229 +18,32 @@ export type KnowledgeMatch = {
 };
 
 /**
- * Splits text into overlapping chunks, preferring to break on whitespace so
- * chunks stay semantically coherent.
- */
-function chunkText(text: string): string[] {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
-  if (!normalized) return [];
-
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < normalized.length && chunks.length < MAX_CHUNKS_PER_DOCUMENT) {
-    let end = Math.min(start + CHUNK_SIZE, normalized.length);
-    if (end < normalized.length) {
-      const slice = normalized.slice(start, end);
-      const breakAt = Math.max(
-        slice.lastIndexOf("\n"),
-        slice.lastIndexOf(". "),
-        slice.lastIndexOf(" ")
-      );
-      if (breakAt > CHUNK_SIZE - 200) {
-        end = start + breakAt + 1;
-      }
-    }
-    const chunk = normalized.slice(start, end).trim();
-    if (chunk) chunks.push(chunk);
-    if (end >= normalized.length) break;
-    start = Math.max(end - CHUNK_OVERLAP, start + 1);
-  }
-  return chunks;
-}
-
-async function upsertIndexStatus(input: {
-  organizationId: Types.ObjectId;
-  nodeId: Types.ObjectId;
-  folderId: Types.ObjectId | null;
-  status: DriveDocumentIndexStatus;
-  chunkCount: number;
-  contentHash: string | null;
-  error: string | null;
-  indexedAt?: Date | null;
-}): Promise<void> {
-  await DriveDocumentIndex.findOneAndUpdate(
-    { nodeId: input.nodeId },
-    {
-      organizationId: input.organizationId,
-      nodeId: input.nodeId,
-      folderId: input.folderId,
-      status: input.status,
-      chunkCount: input.chunkCount,
-      contentHash: input.contentHash,
-      error: input.error,
-      indexedAt: input.indexedAt ?? null,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-}
-
-async function deleteChunks(nodeId: string): Promise<void> {
-  await getKnowledgePool().query(
-    "DELETE FROM drive_document_chunks WHERE node_id = $1",
-    [nodeId]
-  );
-}
-
-async function replaceChunks(input: {
-  organizationId: string;
-  nodeId: string;
-  folderId: string | null;
-  fileName: string;
-  chunks: string[];
-  embeddings: number[][];
-}): Promise<void> {
-  const client = await getKnowledgePool().connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("DELETE FROM drive_document_chunks WHERE node_id = $1", [
-      input.nodeId,
-    ]);
-
-    for (let offset = 0; offset < input.chunks.length; offset += INSERT_BATCH_ROWS) {
-      const batch = input.chunks.slice(offset, offset + INSERT_BATCH_ROWS);
-      const values: string[] = [];
-      const params: unknown[] = [];
-      batch.forEach((chunk, i) => {
-        const base = i * 7;
-        values.push(
-          `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7}::vector)`
-        );
-        params.push(
-          input.organizationId,
-          input.nodeId,
-          input.folderId,
-          input.fileName,
-          offset + i,
-          chunk,
-          toVectorLiteral(input.embeddings[offset + i]!)
-        );
-      });
-      await client.query(
-        `INSERT INTO drive_document_chunks
-           (organization_id, node_id, folder_id, file_name, chunk_index, content, embedding)
-         VALUES ${values.join(",")}`,
-        params
-      );
-    }
-
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Extracts, chunks, embeds, and stores a single Drive file. Skips work when the
- * content hash matches a prior successful index. Records status in Mongo.
+ * Hands a Drive file to the general document pipeline (convert to markdown,
+ * chunk, embed). Unsupported files just get any stale pipeline state cleared.
  */
 export async function indexNode(node: IDriveNode): Promise<void> {
-  const organizationId = node.organizationId;
-  const nodeId = node._id as Types.ObjectId;
-  const folderId = node.parentId;
+  const nodeId = String(node._id);
 
-  if (!isExtractableNode(node)) {
-    await deleteChunks(nodeId.toString());
-    await upsertIndexStatus({
-      organizationId,
-      nodeId,
-      folderId,
-      status: "unsupported",
-      chunkCount: 0,
-      contentHash: null,
-      error: null,
-    });
+  if (!isExtractableNode(node) || !node.storageKey) {
+    await removeDocument(DRIVE_SOURCE_TYPE, nodeId);
     return;
   }
 
-  try {
-    await ensureKnowledgeSchema();
-    const extraction = await extractDriveNodeText(node);
-
-    if (extraction.status !== "extracted") {
-      await deleteChunks(nodeId.toString());
-      await upsertIndexStatus({
-        organizationId,
-        nodeId,
-        folderId,
-        status: extraction.status === "empty" ? "indexed" : "unsupported",
-        chunkCount: 0,
-        contentHash: null,
-        error: null,
-        indexedAt: extraction.status === "empty" ? new Date() : null,
-      });
-      return;
-    }
-
-    const contentHash = crypto
-      .createHash("sha256")
-      .update(extraction.text)
-      .digest("hex");
-
-    const existing = await DriveDocumentIndex.findOne({ nodeId }).lean();
-    if (existing && existing.status === "indexed" && existing.contentHash === contentHash) {
-      return;
-    }
-
-    const chunks = chunkText(extraction.text);
-    if (chunks.length === 0) {
-      await deleteChunks(nodeId.toString());
-      await upsertIndexStatus({
-        organizationId,
-        nodeId,
-        folderId,
-        status: "indexed",
-        chunkCount: 0,
-        contentHash,
-        error: null,
-        indexedAt: new Date(),
-      });
-      return;
-    }
-
-    const embeddings = await embedTexts(chunks);
-    await replaceChunks({
-      organizationId: organizationId.toString(),
-      nodeId: nodeId.toString(),
-      folderId: folderId ? folderId.toString() : null,
-      fileName: node.name,
-      chunks,
-      embeddings,
-    });
-
-    await upsertIndexStatus({
-      organizationId,
-      nodeId,
-      folderId,
-      status: "indexed",
-      chunkCount: chunks.length,
-      contentHash,
-      error: null,
-      indexedAt: new Date(),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Indexing failed";
-    await upsertIndexStatus({
-      organizationId,
-      nodeId,
-      folderId,
-      status: "failed",
-      chunkCount: 0,
-      contentHash: null,
-      error: message.slice(0, 500),
-    });
-    throw err;
-  }
+  await enqueueDocument({
+    organizationId: node.organizationId.toString(),
+    sourceType: DRIVE_SOURCE_TYPE,
+    sourceId: nodeId,
+    storageKey: node.storageKey,
+    fileName: node.name,
+    contentType: node.contentType ?? null,
+  });
 }
 
 /**
- * Removes all stored chunks and index status for a single node.
+ * Removes all stored chunks and pipeline state for a single node.
  */
 export async function removeNode(nodeId: string): Promise<void> {
-  await deleteChunks(nodeId);
-  await DriveDocumentIndex.deleteOne({ nodeId });
+  await removeDocument(DRIVE_SOURCE_TYPE, nodeId);
 }
 
 /**
@@ -304,9 +98,9 @@ async function collectDescendantFiles(
 }
 
 /**
- * Indexes every supported file under a folder (recursively). Runs sequentially
- * to avoid overwhelming the embedding API; failures on individual files are
- * recorded per node and do not abort the batch.
+ * Enqueues every supported file under a folder (recursively) onto the
+ * document pipeline. Failures on individual files are logged and do not
+ * abort the batch.
  */
 export async function indexFolderSubtree(
   organizationId: Types.ObjectId,
@@ -326,7 +120,7 @@ export async function indexFolderSubtree(
 }
 
 /**
- * Removes stored chunks/index status for every file under a folder.
+ * Removes stored chunks/pipeline state for every file under a folder.
  */
 export async function removeFolderSubtree(
   organizationId: Types.ObjectId,
@@ -356,7 +150,7 @@ export async function searchKnowledge(input: {
   query: string;
   limit?: number;
 }): Promise<KnowledgeMatch[]> {
-  await ensureKnowledgeSchema();
+  await ensureDocumentPipelineSchema();
 
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 8);
   const embedding = await embedQuery(input.query);
@@ -368,12 +162,17 @@ export async function searchKnowledge(input: {
     content: string;
     score: string;
   }>(
-    `SELECT node_id, file_name, content, 1 - (embedding <=> $1::vector) AS score
-       FROM drive_document_chunks
-      WHERE organization_id = $2
-      ORDER BY embedding <=> $1::vector
-      LIMIT $3`,
-    [literal, input.organizationId, limit]
+    `SELECT d.source_id AS node_id,
+            d.file_name,
+            c.content,
+            1 - (c.embedding <=> $1::vector) AS score
+       FROM document_chunks c
+       JOIN documents d ON d.id = c.document_id
+      WHERE c.organization_id = $2
+        AND d.source_type = $3
+      ORDER BY c.embedding <=> $1::vector
+      LIMIT $4`,
+    [literal, input.organizationId, DRIVE_SOURCE_TYPE, limit]
   );
 
   return result.rows.map((row) => ({
