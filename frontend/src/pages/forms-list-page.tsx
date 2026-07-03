@@ -1,20 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import {
-  ClipboardListIcon,
-  CopyIcon,
-  EllipsisIcon,
-  LinkIcon,
-  PlusIcon,
-  Trash2Icon,
-} from "lucide-react"
+import { ClipboardListIcon, PlusIcon, SearchXIcon } from "lucide-react"
 
 import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { FormTemplateDialog } from "@/components/form-template-dialog"
 import { SiteHeader } from "@/components/site-header"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,44 +15,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
-import { ListSkeleton } from "@/components/list-states"
 import { PageHeader } from "@/components/page-header"
-import { formatDateTime, formatRelativeTime } from "@/lib/format"
 import {
   archiveForm as apiArchiveForm,
   duplicateForm as apiDuplicateForm,
   listForms,
   saveForm,
 } from "@/lib/forms-api"
+import { cn } from "@/lib/utils"
+import { FormCard } from "@/components/forms/form-card"
+import { FormsStatCards } from "@/components/forms/forms-stat-cards"
 import { publicFormUrl, type ManagedForm } from "@/components/forms/types"
 
-const statusConfig = {
-  draft: { label: "Draft", variant: "outline" as const, tooltip: "Form is in draft mode and not publicly accessible" },
-  published: { label: "Published", variant: "default" as const, tooltip: "Form is live and accepting submissions" },
-  archived: { label: "Archived", variant: "secondary" as const, tooltip: "Form has been archived and is no longer accessible" },
-}
+type StatusFilter = "all" | "published" | "draft"
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "published", label: "Live" },
+  { value: "draft", label: "Drafts" },
+]
 
 export default function FormsListPage() {
   const navigate = useNavigate()
@@ -70,6 +46,7 @@ export default function FormsListPage() {
   const [templateOpen, setTemplateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ManagedForm | null>(null)
   const [archiving, setArchiving] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +72,12 @@ export default function FormsListPage() {
       /* keep current list */
     }
   }
+
+  const filteredForms = useMemo(() => {
+    return forms
+      .filter((form) => statusFilter === "all" || form.status === statusFilter)
+      .sort((a, b) => lastActivity(b) - lastActivity(a))
+  }, [forms, statusFilter])
 
   async function createFromTemplate(template: {
     title: string
@@ -158,7 +141,7 @@ export default function FormsListPage() {
     <AppLayout>
         <SiteHeader breadcrumbs={[{ label: "Forms" }]} />
         <main className="flex-1 overflow-auto">
-          <div className="mx-auto max-w-5xl p-6 lg:p-8">
+          <div className="mx-auto max-w-6xl p-6 lg:p-8">
             <PageHeader
               title="Forms"
               description={`${forms.length} ${forms.length === 1 ? "form" : "forms"}`}
@@ -175,7 +158,7 @@ export default function FormsListPage() {
             />
 
             {loading ? (
-              <ListSkeleton rows={6} columns={3} className="mt-8 rounded-2xl border" />
+              <LoadingState />
             ) : forms.length === 0 ? (
               <div className="mt-16 flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed p-12 text-center">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
@@ -194,130 +177,71 @@ export default function FormsListPage() {
                 </Button>
               </div>
             ) : (
-              <div className="mt-6 animate-in fade-in-0 duration-300 rounded-xl border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[40%]">Name</TableHead>
-                      <TableHead>Responses</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Updated</TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {forms.map((form) => {
-                      const status = statusConfig[form.status]
+              <div className="mt-6 space-y-6 animate-in fade-in-0 duration-300">
+                <FormsStatCards forms={forms} />
+
+                <div className="flex justify-end">
+                  <div className="flex w-fit items-center rounded-lg bg-muted p-[3px]">
+                    {STATUS_FILTERS.map((filter) => {
+                      const count =
+                        filter.value === "all"
+                          ? forms.length
+                          : forms.filter((form) => form.status === filter.value).length
                       return (
-                        <TableRow
-                          key={form._id}
-                          className="group/row cursor-pointer"
-                          onClick={() =>
-                            void navigate({
-                              to: "/forms/$slug",
-                              params: { slug: form.slug },
-                            })
-                          }
+                        <button
+                          key={filter.value}
+                          type="button"
+                          onClick={() => setStatusFilter(filter.value)}
+                          className={cn(
+                            "inline-flex items-baseline gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors",
+                            statusFilter === filter.value
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
                         >
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10">
-                                <ClipboardListIcon className="size-4 text-success" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate font-medium">
-                                  {form.title}
-                                </p>
-                                {form.description && (
-                                  <p className="truncate text-xs text-muted-foreground">
-                                    {form.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="tabular-nums text-muted-foreground">
-                            {form.submissionCount > 0
-                              ? form.submissionCount
-                              : "-"}
-                          </TableCell>
-                          <TableCell>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge variant={status.variant}>
-                                  {status.label}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>{status.tooltip}</TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>{formatRelativeTime(form.updatedAt)}</span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {formatDateTime(form.updatedAt)}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="size-8 opacity-0 group-hover/row:opacity-100 data-[state=open]:opacity-100 transition-opacity"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <EllipsisIcon className="size-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                </TooltipTrigger>
-                                <TooltipContent>More actions</TooltipContent>
-                              </Tooltip>
-                              <DropdownMenuContent align="end">
-                                {form.status === "published" && (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      copyLink(form)
-                                    }}
-                                  >
-                                    <LinkIcon className="size-4" />
-                                    Copy Link
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    void duplicateForm(form)
-                                  }}
-                                >
-                                  <CopyIcon className="size-4" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setArchiveTarget(form)
-                                  }}
-                                >
-                                  <Trash2Icon className="size-4" />
-                                  Archive
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                          {filter.label}
+                          <span className="text-[11px] tabular-nums text-muted-foreground">
+                            {count}
+                          </span>
+                        </button>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+                </div>
+
+                {filteredForms.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-16 text-center">
+                    <SearchXIcon className="size-8 text-muted-foreground/40" />
+                    <div>
+                      <p className="font-medium">No Matching Forms</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        No forms with this status yet.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStatusFilter("all")}
+                    >
+                      Show All Forms
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {filteredForms.map((form) => (
+                      <FormCard
+                        key={form._id}
+                        form={form}
+                        onOpen={() =>
+                          void navigate({ to: "/forms/$slug", params: { slug: form.slug } })
+                        }
+                        onCopyLink={() => copyLink(form)}
+                        onDuplicate={() => void duplicateForm(form)}
+                        onArchive={() => setArchiveTarget(form)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -362,5 +286,31 @@ export default function FormsListPage() {
           creating={creating}
         />
     </AppLayout>
+  )
+}
+
+function lastActivity(form: ManagedForm): number {
+  const updated = new Date(form.updatedAt).getTime()
+  const lastSubmission = form.lastSubmissionAt ? new Date(form.lastSubmissionAt).getTime() : 0
+  return Math.max(updated, lastSubmission)
+}
+
+function LoadingState() {
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-[92px] rounded-xl" />
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <Skeleton className="h-9 w-48 rounded-lg" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton key={index} className="h-[210px] rounded-xl" />
+        ))}
+      </div>
+    </div>
   )
 }

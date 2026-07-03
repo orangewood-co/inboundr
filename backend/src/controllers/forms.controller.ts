@@ -194,19 +194,44 @@ async function validateDriveDestinationAccess(req: OrganizationRequest, parentId
 export async function listForms(req: Request, res: Response): Promise<void> {
   try {
     const { organization } = req as OrganizationRequest;
+    const recentSince = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const forms = await Form.aggregate([
       { $match: { organizationId: organization._id, status: { $ne: "archived" } } },
       { $sort: { updatedAt: -1, createdAt: -1 } },
       {
         $lookup: {
           from: "formsubmissions",
-          localField: "_id",
-          foreignField: "formId",
-          as: "submissions",
+          let: { formId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$formId", "$$formId"] } } },
+            {
+              $group: {
+                _id: null,
+                submissionCount: { $sum: 1 },
+                newSubmissionCount: {
+                  $sum: { $cond: [{ $eq: ["$status", "new"] }, 1, 0] },
+                },
+                lastSubmissionAt: { $max: "$createdAt" },
+                recentSubmissionDates: {
+                  $push: {
+                    $cond: [{ $gte: ["$createdAt", recentSince] }, "$createdAt", "$$REMOVE"],
+                  },
+                },
+              },
+            },
+          ],
+          as: "submissionStats",
         },
       },
-      { $addFields: { submissionCount: { $size: "$submissions" } } },
-      { $project: { submissions: 0 } },
+      {
+        $addFields: {
+          submissionCount: { $ifNull: [{ $first: "$submissionStats.submissionCount" }, 0] },
+          newSubmissionCount: { $ifNull: [{ $first: "$submissionStats.newSubmissionCount" }, 0] },
+          lastSubmissionAt: { $ifNull: [{ $first: "$submissionStats.lastSubmissionAt" }, null] },
+          recentSubmissionDates: { $ifNull: [{ $first: "$submissionStats.recentSubmissionDates" }, []] },
+        },
+      },
+      { $project: { submissionStats: 0 } },
     ]);
 
     res.json({ forms: forms.map(serializeForm) });

@@ -71,6 +71,10 @@ export type ManagedForm = {
   settings: FormSettings
   submissionCount: number
   updatedAt: string
+  /** List-endpoint stats — absent on single-form responses. */
+  newSubmissionCount?: number
+  lastSubmissionAt?: string | null
+  recentSubmissionDates?: string[]
 }
 
 export type FormSubmission = {
@@ -203,6 +207,32 @@ export function formatFileSize(size?: number) {
   const units = ["B", "KB", "MB", "GB"]
   const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1)
   return `${(size / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`
+}
+
+export const RECENT_STATS_DAYS = 14
+
+/**
+ * Buckets submission timestamps into daily counts (viewer's local days) for
+ * the trailing RECENT_STATS_DAYS window, oldest day first (today is the last
+ * slot).
+ */
+export function bucketRecentSubmissions(dates: string[] | undefined, now = new Date()): number[] {
+  const buckets = new Array<number>(RECENT_STATS_DAYS).fill(0)
+  if (!dates || dates.length === 0) return buckets
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const dayMs = 24 * 60 * 60 * 1000
+  for (const raw of dates) {
+    const date = new Date(raw)
+    if (!Number.isFinite(date.getTime())) continue
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+    // Diffing local midnights (with rounding) keeps buckets aligned to
+    // calendar days even when the window crosses a DST transition, where
+    // fixed 24h-day arithmetic would drift by an hour.
+    const daysAgo = Math.round((startOfToday - startOfDay) / dayMs)
+    const index = RECENT_STATS_DAYS - 1 - daysAgo
+    if (index >= 0 && index < RECENT_STATS_DAYS) buckets[index] += 1
+  }
+  return buckets
 }
 
 export function formatResponseValue(value: unknown): string {
