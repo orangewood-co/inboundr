@@ -49,6 +49,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -281,6 +288,11 @@ function TicketRow({
         >
           {STATUS_LABELS[ticket.status] ?? ticket.status}
         </Badge>
+        {ticket.status === "resolved" && ticket.resolution && (
+          <p className="mt-1 max-w-24 truncate text-[11px] text-muted-foreground">
+            {ticket.resolution.reasonLabel}
+          </p>
+        )}
       </TableCell>
       <TableCell className="tabular-nums text-muted-foreground">{ticket.ticketReference}</TableCell>
       <TableCell className="max-w-0">
@@ -390,14 +402,24 @@ export default function SupportListPage() {
       status: search.status,
       search: search.q,
       tags: search.tags,
+      resolutionReason: search.reason,
       page: search.page,
       limit: PAGE_SIZE,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTickets, search.status, search.q, tagsKey, search.page])
+  }, [loadTickets, search.status, search.q, tagsKey, search.reason, search.page])
 
   const setStatus = (status: TicketFilter) =>
-    void navigate({ search: (prev) => ({ ...prev, status, page: 1 }) })
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        status,
+        reason: status === "resolved" ? prev.reason : "",
+        page: 1,
+      }),
+    })
+  const setReasonFilter = (reason: string) =>
+    void navigate({ search: (prev) => ({ ...prev, reason, page: 1 }) })
   const setPage = (page: number) => void navigate({ search: (prev) => ({ ...prev, page }) })
   const toggleTagFilter = (tagId: string, selected: boolean) =>
     void navigate({
@@ -532,6 +554,24 @@ export default function SupportListPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {search.status === "resolved" && inbox.resolutionReasons.length > 0 && (
+                <Select
+                  value={search.reason || "all"}
+                  onValueChange={(value) => setReasonFilter(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger size="sm" className="w-40">
+                    <SelectValue placeholder="Reason" />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    <SelectItem value="all">All Reasons</SelectItem>
+                    {inbox.resolutionReasons.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {inbox.ticketTags.length > 0 && (
                 <TagMultiSelect
                   tags={inbox.ticketTags}

@@ -400,6 +400,14 @@ export function ContextPanel({
           <MetaRow label="Last activity">{formatRelativeTime(ticket.lastMessageAt)}</MetaRow>
           {ticket.visitorEndedAt && <MetaRow label="Visitor ended">{formatFullTime(ticket.visitorEndedAt)}</MetaRow>}
           {ticket.resolvedAt && <MetaRow label="Resolved">{formatFullTime(ticket.resolvedAt)}</MetaRow>}
+          {ticket.resolution && (
+            <MetaRow label="Resolution reason">{ticket.resolution.reasonLabel}</MetaRow>
+          )}
+          {ticket.resolution?.note && (
+            <p className="mt-1 rounded-lg border bg-muted/30 p-2 text-xs whitespace-pre-wrap text-foreground/90">
+              {ticket.resolution.note}
+            </p>
+          )}
         </div>
       </Section>
 

@@ -9,6 +9,7 @@ export type SupportListSearch = {
   status: TicketFilter
   q: string
   tags: string[]
+  reason: string
   page: number
 }
 
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/support/")({
       status: VALID_STATUSES.includes(status) ? status : "open",
       q: typeof search.q === "string" ? search.q : "",
       tags: parseTags(search.tags),
+      reason: typeof search.reason === "string" ? search.reason : "",
       page: Number.isFinite(page) && page >= 1 ? Math.trunc(page) : 1,
     }
   },

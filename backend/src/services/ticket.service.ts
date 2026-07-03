@@ -136,6 +136,13 @@ export function serializeTicket(ticket: ITicket | any) {
     transcriptEmailSentAt: ticket.transcriptEmailSentAt ?? null,
     resolvedEmailSentAt: ticket.resolvedEmailSentAt ?? null,
     resolvedAt: ticket.resolvedAt,
+    resolution: ticket.resolution
+      ? {
+          reasonId: ticket.resolution.reasonId,
+          reasonLabel: ticket.resolution.reasonLabel,
+          note: ticket.resolution.note ?? null,
+        }
+      : null,
     isArchived: Boolean(ticket.isArchived),
     archivedAt: ticket.archivedAt ?? null,
     // Optional list-only fields, populated by listTickets' aggregation.
@@ -146,6 +153,12 @@ export function serializeTicket(ticket: ITicket | any) {
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
   };
+}
+
+/** Visitor-facing ticket payload; the resolution reason and note are agent-only. */
+export function serializeTicketForVisitor(ticket: ITicket | any) {
+  const { resolution: _resolution, ...serialized } = serializeTicket(ticket);
+  return serialized;
 }
 
 function previewFromMessage(message: any): string {
@@ -210,6 +223,7 @@ export async function listTickets(input: {
   status: TicketListStatus;
   search?: string;
   tagIds?: string[];
+  resolutionReasonId?: string;
   page?: number;
   limit?: number;
 }) {
@@ -222,6 +236,11 @@ export async function listTickets(input: {
   } else {
     match.isArchived = { $ne: true };
     if (input.status !== "all") match.status = input.status;
+  }
+
+  const resolutionReasonId = String(input.resolutionReasonId ?? "").trim();
+  if (resolutionReasonId) {
+    match["resolution.reasonId"] = resolutionReasonId;
   }
 
   const tagIds = (input.tagIds ?? [])
@@ -534,6 +553,7 @@ export async function createAndLinkTicketCustomer(input: {
 export async function resolveTicket(input: {
   organizationId: mongoose.Types.ObjectId;
   ticketId: string;
+  resolution: { reasonId: string; reasonLabel: string; note: string | null };
 }) {
   if (!mongoose.Types.ObjectId.isValid(input.ticketId)) return null;
   const now = new Date();
@@ -542,6 +562,7 @@ export async function resolveTicket(input: {
     {
       status: "resolved",
       resolvedAt: now,
+      resolution: input.resolution,
       botEnabled: false,
       aiMode: "paused",
       lastMessageAt: now,
@@ -569,7 +590,7 @@ export async function reopenTicket(input: {
   const now = new Date();
   const ticket = await Ticket.findOneAndUpdate(
     { _id: input.ticketId, organizationId: input.organizationId },
-    { status: "open", resolvedAt: null, lastMessageAt: now },
+    { status: "open", resolvedAt: null, resolution: null, lastMessageAt: now },
     { new: true }
   ).lean();
   if (!ticket) return null;

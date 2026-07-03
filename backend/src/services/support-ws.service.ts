@@ -20,6 +20,10 @@ import {
   type SupportMessageAttachmentInput,
 } from "./support-chat.service";
 import { sendSupportResolvedEmail } from "./support-email.service";
+import {
+  findResolutionReasonForOrganization,
+  normalizeResolutionNote,
+} from "./support-resolution.service";
 import { serializeSupportAiDraft, serializeTicket, serializeTicketMessage } from "./ticket.service";
 import { keyBelongsToPrefix } from "./storage.service";
 
@@ -74,10 +78,17 @@ function ticketIdFromPayload(ticket: unknown): string {
 export function broadcastTicketUpdate(organizationId: string, ticket: unknown): void {
   const ticketId = ticketIdFromPayload(ticket);
   broadcast(
+    (context) => context.organizationId === organizationId && context.kind === "agent",
+    { type: "ticket.updated", ticket }
+  );
+  // The resolution reason and note are agent-only; never push them to visitor sockets.
+  const { resolution: _resolution, ...visitorTicket } = (ticket ?? {}) as Record<string, unknown>;
+  broadcast(
     (context) =>
       context.organizationId === organizationId &&
-      (context.kind === "agent" || (ticketId ? ticketTopic(ticketId, context) : false)),
-    { type: "ticket.updated", ticket }
+      context.kind === "visitor" &&
+      (ticketId ? ticketTopic(ticketId, context) : false),
+    { type: "ticket.updated", ticket: visitorTicket }
   );
 }
 
@@ -357,17 +368,34 @@ async function handleResolve(ws: SupportSocket, payload: Record<string, unknown>
   const ticketId = String(payload.ticketId ?? "");
   if (!mongoose.Types.ObjectId.isValid(ticketId)) return;
   const now = new Date();
+
+  let resolution: { reasonId: string; reasonLabel: string; note: string | null } | null = null;
+  if (resolved) {
+    const reasonId = String(payload.reasonId ?? "").trim();
+    const reason = await findResolutionReasonForOrganization(ws.context.organizationId, reasonId);
+    if (!reason) {
+      send(ws, { type: "error", error: "A resolution reason is required to resolve a conversation" });
+      return;
+    }
+    resolution = {
+      reasonId: reason.id,
+      reasonLabel: reason.label,
+      note: normalizeResolutionNote(payload.note),
+    };
+  }
+
   const ticket = await Ticket.findOneAndUpdate(
     { _id: ticketId, organizationId: ws.context.organizationId },
     resolved
       ? {
           status: "resolved",
           resolvedAt: now,
+          resolution,
           botEnabled: false,
           aiMode: "paused",
           lastMessageAt: now,
         }
-      : { status: "open", resolvedAt: null, lastMessageAt: now },
+      : { status: "open", resolvedAt: null, resolution: null, lastMessageAt: now },
     { new: true }
   ).lean();
   if (!ticket) return;

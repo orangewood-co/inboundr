@@ -43,7 +43,7 @@ import { notifyOrganizationBrandingChanged } from "@/lib/organization-branding"
 import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organization-context"
 import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
 import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/tag-chip"
-import type { SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
+import type { ResolutionReason, SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -2841,6 +2841,197 @@ function SupportTicketTagsCard() {
   )
 }
 
+function SupportResolutionReasonsCard() {
+  const { canManageOrganization } = useEntitlements()
+  const [reasons, setReasons] = useState<ResolutionReason[]>([])
+  const [loading, setLoading] = useState(true)
+  const [label, setLabel] = useState("")
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<ResolutionReason | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchReasons = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/support/resolution-reasons`, {
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to load resolution reasons")
+      setReasons(data.reasons ?? [])
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load resolution reasons")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchReasons()
+  }, [fetchReasons])
+
+  const resetForm = () => {
+    setEditingId(null)
+    setLabel("")
+  }
+
+  const startEdit = (reason: ResolutionReason) => {
+    setEditingId(reason.id)
+    setLabel(reason.label)
+  }
+
+  const saveList = async (next: { id: string; label: string }[]): Promise<boolean> => {
+    const res = await fetch(`${API_ORIGIN}/api/v1/support/resolution-reasons`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reasons: next }),
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(data?.error || "Failed to save resolution reasons")
+    setReasons(data.reasons ?? [])
+    return true
+  }
+
+  const save = async () => {
+    const trimmed = label.trim()
+    if (!trimmed) return
+    setSaving(true)
+    try {
+      const next = editingId
+        ? reasons.map((reason) =>
+            reason.id === editingId ? { ...reason, label: trimmed } : reason
+          )
+        : [...reasons, { id: "", label: trimmed }]
+      await saveList(next)
+      toast.success(editingId ? "Reason updated" : "Reason added")
+      resetForm()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save resolution reasons")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    try {
+      await saveList(reasons.filter((reason) => reason.id !== pendingDelete.id))
+      toast.success("Reason deleted")
+      if (editingId === pendingDelete.id) resetForm()
+      setPendingDelete(null)
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete resolution reason")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <SettingsCard
+      title="Resolution Reasons"
+      description="Agents pick one of these reasons when resolving a conversation. At least one reason is required."
+    >
+      <div className="space-y-4 p-5">
+        {canManageOrganization ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-48 flex-1 space-y-1.5">
+              <Label htmlFor="resolutionReasonLabel">Reason</Label>
+              <Input
+                id="resolutionReasonLabel"
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="e.g. Issue Fixed"
+                maxLength={100}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault()
+                    void save()
+                  }
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={save} disabled={saving || !label.trim()}>
+                {saving && <Spinner data-icon="inline-start" />}
+                {editingId ? "Save Reason" : "Add Reason"}
+              </Button>
+              {editingId && (
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Only organization admins can edit resolution reasons.
+          </p>
+        )}
+
+        <div className="rounded-xl border">
+          {loading ? (
+            <div className="px-4 py-5 text-sm text-muted-foreground">Loading reasons...</div>
+          ) : reasons.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No reasons configured.
+            </div>
+          ) : (
+            <div className="divide-y">
+              {reasons.map((reason) => (
+                <div key={reason.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <span className="truncate text-sm font-medium">{reason.label}</span>
+                  {canManageOrganization && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => startEdit(reason)}>
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setPendingDelete(reason)}
+                        disabled={reasons.length <= 1}
+                        aria-label="Delete reason"
+                      >
+                        <Trash2Icon className="size-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Reason</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? `Delete the "${pendingDelete.label}" reason? Conversations already resolved with it keep it; agents just can't pick it anymore.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Spinner data-icon="inline-start" />}
+              Delete Reason
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SettingsCard>
+  )
+}
+
 function SupportTab() {
   const [settings, setSettings] = useState<SupportAiSettings>({
     enabled: true,
@@ -3561,6 +3752,8 @@ function SupportTab() {
       </SettingsCard>
 
       <SupportTicketTagsCard />
+
+      <SupportResolutionReasonsCard />
 
       <SettingsCard
         title={editingId ? "Edit Template" : "New Template"}

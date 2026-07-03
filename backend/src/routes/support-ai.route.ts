@@ -10,8 +10,10 @@ import {
 } from "../controllers/support-ai.controller";
 import {
   getSupportCallSettings,
+  getSupportResolutionReasons,
   getSupportSettings,
   updateSupportCallSettings,
+  updateSupportResolutionReasons,
   updateSupportSettings,
 } from "../controllers/support-settings.controller";
 import {
@@ -19,6 +21,7 @@ import {
   requireEmployeeModule,
   requireFeature,
   requireOrganization,
+  requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
 
 const router = Router();
@@ -30,6 +33,8 @@ router.use(requireEmployeeModule("support"));
 
 router.get("/settings", getSupportSettings);
 router.patch("/settings", updateSupportSettings);
+router.get("/resolution-reasons", getSupportResolutionReasons);
+router.patch("/resolution-reasons", requireOrganizationAdmin(), updateSupportResolutionReasons);
 router.get("/call/settings", getSupportCallSettings);
 router.patch("/call/settings", updateSupportCallSettings);
 router.get("/ai/settings", getSupportAiSettings);

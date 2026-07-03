@@ -1,10 +1,11 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { MessagesSquareIcon, SparklesIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Composer } from "./composer"
 import { ConversationHeader } from "./conversation-header"
 import { MessageTimeline } from "./message-timeline"
+import { ResolveDialog } from "./resolve-dialog"
 import type { SupportInbox } from "./support-provider"
 
 export function ConversationView({
@@ -21,6 +22,7 @@ export function ConversationView({
   onDelete: () => void
 }) {
   const ticket = inbox.selectedTicket
+  const [resolveOpen, setResolveOpen] = useState(false)
   const notesCount = useMemo(
     () => inbox.messages.filter((message) => message.isInternal).length,
     [inbox.messages]
@@ -48,7 +50,10 @@ export function ConversationView({
         socketReady={inbox.socketReady}
         detailsOpen={detailsOpen}
         onToggleDetails={onToggleDetails}
-        onResolveToggle={() => inbox.setStatus(ticket.status !== "resolved")}
+        onResolveToggle={() => {
+          if (ticket.status === "resolved") inbox.reopenTicket()
+          else setResolveOpen(true)
+        }}
         onAiModeChange={inbox.setAiMode}
         onArchiveToggle={onArchiveToggle}
         onDelete={onDelete}
@@ -89,6 +94,12 @@ export function ConversationView({
         socketReady={inbox.socketReady}
         onSend={inbox.sendMessage}
         onDraftChange={inbox.handleDraftChange}
+      />
+      <ResolveDialog
+        open={resolveOpen}
+        onOpenChange={setResolveOpen}
+        reasons={inbox.resolutionReasons}
+        onResolve={inbox.resolveTicket}
       />
     </div>
   )

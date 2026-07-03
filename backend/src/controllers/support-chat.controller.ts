@@ -19,7 +19,7 @@ import {
 import { broadcastMessageCreated, broadcastTicketUpdate } from "../services/support-ws.service";
 import { sendSupportOpenedEmail, sendSupportTranscriptEmail } from "../services/support-email.service";
 import { createPresignedUpload } from "../services/storage.service";
-import { serializeTicket } from "../services/ticket.service";
+import { serializeTicket, serializeTicketForVisitor } from "../services/ticket.service";
 import { createNotificationForRecipient } from "../services/notification.service";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -190,7 +190,7 @@ export async function startSupportSession(req: Request, res: ExpressResponse): P
     res.status(201).json({
       sessionToken: ticket.sessionToken,
       organization,
-      ticket: serializedTicket,
+      ticket: serializeTicketForVisitor(ticket),
       requester: ticket.requester,
       messages: await listSessionMessages(ticket),
     });
@@ -217,7 +217,7 @@ export async function getSupportSession(req: Request, res: ExpressResponse): Pro
     res.json({
       sessionToken: ticket.sessionToken,
       organization,
-      ticket: serializeTicket(ticket),
+      ticket: serializeTicketForVisitor(ticket),
       requester: ticket.requester,
       messages: await listSessionMessages(ticket),
     });
@@ -340,7 +340,7 @@ export async function endSupportSession(req: Request, res: ExpressResponse): Pro
         console.error("Failed to send support transcript email:", err);
         res.status(502).json({
           error: "Chat ended, but we could not email the transcript. Please try again.",
-          ticket: serializeTicket(updatedTicket),
+          ticket: serializeTicketForVisitor(updatedTicket),
           transcriptEmailSent: false,
         });
         return;
@@ -348,7 +348,7 @@ export async function endSupportSession(req: Request, res: ExpressResponse): Pro
     }
 
     res.json({
-      ticket: serializeTicket(updatedTicket),
+      ticket: serializeTicketForVisitor(updatedTicket),
       transcriptEmailSent,
     });
   } catch (err) {

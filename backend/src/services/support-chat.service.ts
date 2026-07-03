@@ -596,6 +596,7 @@ export async function appendVisitorMessage(
   if (ticket.status === "resolved" || ticket.status === "closed") {
     update.status = "open";
     update.resolvedAt = null;
+    update.resolution = null;
   }
   if (!ticket.subject) {
     update.subject = bodyText.slice(0, 80);

@@ -46,6 +46,11 @@ export interface IOrganizationSupportCall {
   updatedAt: Date | null;
 }
 
+export interface IOrganizationSupportResolutionReason {
+  id: string;
+  label: string;
+}
+
 export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
@@ -60,6 +65,8 @@ export interface IOrganizationPreferences {
   supportAi: IOrganizationSupportAi;
   supportChat: IOrganizationSupportChat;
   supportCall: IOrganizationSupportCall;
+  /** Empty means "not customized" — defaults are served as the effective list. */
+  supportResolutionReasons: IOrganizationSupportResolutionReason[];
 }
 
 export interface IOrganizationPaymentTerm {
@@ -195,6 +202,15 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     supportAi: { type: organizationSupportAiSchema, default: () => ({}) },
     supportChat: { type: organizationSupportChatSchema, default: () => ({}) },
     supportCall: { type: organizationSupportCallSchema, default: () => ({}) },
+    supportResolutionReasons: {
+      type: [
+        {
+          id: { type: String, required: true, trim: true },
+          label: { type: String, required: true, trim: true },
+        },
+      ],
+      default: [],
+    },
   },
   { _id: false }
 );

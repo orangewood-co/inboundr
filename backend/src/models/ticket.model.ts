@@ -17,6 +17,13 @@ export interface ITicketVisitorFeedback {
   submittedAt: Date | null;
 }
 
+export interface ITicketResolution {
+  reasonId: string;
+  /** Label snapshot taken at resolve time so later renames/deletes never rewrite history. */
+  reasonLabel: string;
+  note: string | null;
+}
+
 export interface ITicket extends Document {
   organizationId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId | null;
@@ -45,6 +52,7 @@ export interface ITicket extends Document {
   transcriptEmailSentAt: Date | null;
   resolvedEmailSentAt: Date | null;
   resolvedAt: Date | null;
+  resolution: ITicketResolution | null;
   isArchived: boolean;
   archivedAt: Date | null;
   createdAt: Date;
@@ -65,6 +73,15 @@ const ticketVisitorFeedbackSchema = new Schema<ITicketVisitorFeedback>(
     rating: { type: Number, default: null, min: 1, max: 5 },
     comment: { type: String, default: "", trim: true, maxlength: 2000 },
     submittedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const ticketResolutionSchema = new Schema<ITicketResolution>(
+  {
+    reasonId: { type: String, required: true, trim: true },
+    reasonLabel: { type: String, required: true, trim: true },
+    note: { type: String, default: null, trim: true, maxlength: 2000 },
   },
   { _id: false }
 );
@@ -130,6 +147,7 @@ const ticketSchema = new Schema<ITicket>(
     transcriptEmailSentAt: { type: Date, default: null },
     resolvedEmailSentAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },
+    resolution: { type: ticketResolutionSchema, default: null },
     isArchived: { type: Boolean, default: false },
     archivedAt: { type: Date, default: null },
   },

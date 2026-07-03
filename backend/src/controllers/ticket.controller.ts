@@ -15,6 +15,10 @@ import {
   setTicketArchived,
   updateTicketTags,
 } from "../services/ticket.service";
+import {
+  findResolutionReasonForOrganization,
+  normalizeResolutionNote,
+} from "../services/support-resolution.service";
 import { broadcastTicketDeleted, broadcastTicketUpdate } from "../services/support-ws.service";
 
 export async function listSupportTickets(req: Request, res: Response): Promise<void> {
@@ -38,6 +42,8 @@ export async function listSupportTickets(req: Request, res: Response): Promise<v
       status: normalizeTicketListStatus(req.query.status),
       search,
       tagIds,
+      resolutionReasonId:
+        typeof req.query.resolutionReason === "string" ? req.query.resolutionReason : undefined,
       page: Number.isFinite(parsedPage) ? parsedPage : undefined,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
@@ -173,9 +179,20 @@ export async function updateSupportTicketTags(req: Request, res: Response): Prom
 export async function resolveSupportTicket(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
+    const reasonId = String(req.body?.reasonId ?? "").trim();
+    const reason = await findResolutionReasonForOrganization(orgReq.organization._id, reasonId);
+    if (!reason) {
+      res.status(400).json({ error: "A valid resolution reason is required" });
+      return;
+    }
     const ticket = await resolveTicketRecord({
       organizationId: orgReq.organization._id,
       ticketId: String(req.params.id ?? ""),
+      resolution: {
+        reasonId: reason.id,
+        reasonLabel: reason.label,
+        note: normalizeResolutionNote(req.body?.note),
+      },
     });
     if (!ticket) {
       res.status(404).json({ error: "Ticket not found" });

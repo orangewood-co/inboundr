@@ -33,6 +33,17 @@ export type SupportTicketTag = TicketTag & {
   updatedAt: string
 }
 
+export type ResolutionReason = {
+  id: string
+  label: string
+}
+
+export type TicketResolution = {
+  reasonId: string
+  reasonLabel: string
+  note: string | null
+}
+
 export type Ticket = {
   id: string
   ticketNumber: number
@@ -63,6 +74,7 @@ export type Ticket = {
   transcriptEmailSentAt: string | null
   resolvedEmailSentAt: string | null
   resolvedAt: string | null
+  resolution: TicketResolution | null
   isArchived: boolean
   archivedAt: string | null
   lastMessagePreview?: string | null

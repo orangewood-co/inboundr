@@ -13,6 +13,7 @@ import { API_ORIGIN, getEmbedOrigin } from "@/lib/env"
 import { getActiveOrganizationId, setActiveOrganizationId } from "@/lib/organization-context"
 import { previewFromMessage, ticketMatchesFilter } from "./support-utils"
 import type {
+  ResolutionReason,
   SocketEvent,
   SupportAiDraft,
   SupportTicketTag,
@@ -84,6 +85,7 @@ export type SupportListQuery = {
   status: TicketFilter
   search: string
   tags: string[]
+  resolutionReason: string
   page: number
   limit: number
 }
@@ -92,6 +94,11 @@ function ticketMatchesTagFilter(ticket: Ticket, tagIds: string[]) {
   if (tagIds.length === 0) return true
   const ticketTagIds = new Set((ticket.tags ?? []).map((tag) => tag.id))
   return tagIds.some((id) => ticketTagIds.has(id))
+}
+
+function ticketMatchesReasonFilter(ticket: Ticket, resolutionReason: string) {
+  if (!resolutionReason) return true
+  return ticket.resolution?.reasonId === resolutionReason
 }
 
 export type SupportPagination = {
@@ -105,6 +112,7 @@ const DEFAULT_QUERY: SupportListQuery = {
   status: "open",
   search: "",
   tags: [],
+  resolutionReason: "",
   page: 1,
   limit: DEFAULT_PAGE_SIZE,
 }
@@ -120,6 +128,7 @@ function useSupportInboxValue() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [ticketTags, setTicketTags] = useState<SupportTicketTag[]>([])
+  const [resolutionReasons, setResolutionReasons] = useState<ResolutionReason[]>([])
   const [messages, setMessages] = useState<TicketMessage[]>([])
   const [aiDrafts, setAiDrafts] = useState<SupportAiDraft[]>([])
   const [loadingTickets, setLoadingTickets] = useState(true)
@@ -219,6 +228,7 @@ function useSupportInboxValue() {
         })
         if (query.search.trim()) params.set("search", query.search.trim())
         if (query.tags.length > 0) params.set("tags", query.tags.join(","))
+        if (query.resolutionReason) params.set("resolutionReason", query.resolutionReason)
         const response = await fetch(`${apiBase}?${params.toString()}`, { credentials: "include" })
         const body = await response.json().catch(() => null)
         if (!response.ok) throw new Error(body?.error ?? "Failed to load support tickets")
@@ -323,7 +333,8 @@ function useSupportInboxValue() {
                 query.page !== 1 ||
                 !ticketMatchesFilter(payload.ticket, filter) ||
                 !ticketMatchesSearchQuery(payload.ticket, query.search) ||
-                !ticketMatchesTagFilter(payload.ticket, query.tags)
+                !ticketMatchesTagFilter(payload.ticket, query.tags) ||
+                !ticketMatchesReasonFilter(payload.ticket, query.resolutionReason)
               ) {
                 return current
               }
@@ -340,7 +351,8 @@ function useSupportInboxValue() {
             const without = current.filter((ticket) => ticket.id !== payload.ticket.id)
             if (
               !ticketMatchesFilter(payload.ticket, filter) ||
-              !ticketMatchesTagFilter(payload.ticket, query.tags)
+              !ticketMatchesTagFilter(payload.ticket, query.tags) ||
+              !ticketMatchesReasonFilter(payload.ticket, query.resolutionReason)
             )
               return without
             const merged = ticketWithPreviewFallback(payload.ticket, existing)
@@ -512,12 +524,18 @@ function useSupportInboxValue() {
     [notifyTyping, selectedTicket, sending, uploadAttachment]
   )
 
-  const setStatus = useCallback((resolved: boolean) => {
+  const resolveTicket = useCallback((reasonId: string, note: string) => {
     const ticketId = selectedTicketIdRef.current
     if (!ticketId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
     socketRef.current.send(
-      JSON.stringify({ type: resolved ? "resolve_ticket" : "reopen_ticket", ticketId })
+      JSON.stringify({ type: "resolve_ticket", ticketId, reasonId, note: note.trim() || null })
     )
+  }, [])
+
+  const reopenTicket = useCallback(() => {
+    const ticketId = selectedTicketIdRef.current
+    if (!ticketId || !socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return
+    socketRef.current.send(JSON.stringify({ type: "reopen_ticket", ticketId }))
   }, [])
 
   const setAiMode = useCallback(
@@ -692,6 +710,23 @@ function useSupportInboxValue() {
     void loadTicketTags()
   }, [loadTicketTags])
 
+  const loadResolutionReasons = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/support/resolution-reasons`, {
+        credentials: "include",
+      })
+      const body = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(body?.error ?? "Failed to load resolution reasons")
+      setResolutionReasons(body?.reasons ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load resolution reasons")
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadResolutionReasons()
+  }, [loadResolutionReasons])
+
   const createTicketTag = useCallback(
     async (input: { name: string; color: string }): Promise<boolean> => {
       try {
@@ -835,7 +870,9 @@ function useSupportInboxValue() {
     organizationId,
     supportChatLink,
     sendMessage,
-    setStatus,
+    resolveTicket,
+    reopenTicket,
+    resolutionReasons,
     setAiMode,
     generateAiDraft,
     approveAiDraft,

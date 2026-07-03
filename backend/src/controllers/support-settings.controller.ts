@@ -1,8 +1,10 @@
+import crypto from "node:crypto";
 import type { Request, Response } from "express";
 
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { Organization } from "../models/organization.model";
 import { OrgPhoneNumber } from "../models/org-phone-number.model";
+import { getEffectiveResolutionReasons } from "../services/support-resolution.service";
 
 const SUPPORTED_VOICES = [
   "alloy",
@@ -73,6 +75,77 @@ export async function updateSupportSettings(req: Request, res: Response): Promis
   } catch (err) {
     console.error("Failed to update support chat settings:", err);
     res.status(500).json({ error: "Failed to update chat widget settings" });
+  }
+}
+
+const RESOLUTION_REASON_LABEL_MAX_LENGTH = 100;
+const MAX_RESOLUTION_REASONS = 50;
+
+export async function getSupportResolutionReasons(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const organization = await Organization.findById(orgReq.organization._id)
+      .select("preferences.supportResolutionReasons")
+      .lean();
+    res.json({ reasons: getEffectiveResolutionReasons(organization ?? orgReq.organization) });
+  } catch (err) {
+    console.error("Failed to load support resolution reasons:", err);
+    res.status(500).json({ error: "Failed to load resolution reasons" });
+  }
+}
+
+export async function updateSupportResolutionReasons(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const raw = req.body?.reasons;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      res.status(400).json({ error: "At least one resolution reason is required" });
+      return;
+    }
+    if (raw.length > MAX_RESOLUTION_REASONS) {
+      res
+        .status(400)
+        .json({ error: `A maximum of ${MAX_RESOLUTION_REASONS} resolution reasons is allowed` });
+      return;
+    }
+
+    const seenLabels = new Set<string>();
+    const seenIds = new Set<string>();
+    const reasons: { id: string; label: string }[] = [];
+    for (const item of raw) {
+      const source = (item ?? {}) as Record<string, unknown>;
+      const label = String(source.label ?? "")
+        .trim()
+        .slice(0, RESOLUTION_REASON_LABEL_MAX_LENGTH);
+      if (!label) {
+        res.status(400).json({ error: "Resolution reason label is required" });
+        return;
+      }
+      const normalizedLabel = label.toLowerCase();
+      if (seenLabels.has(normalizedLabel)) {
+        res.status(400).json({ error: `Duplicate resolution reason: ${label}` });
+        return;
+      }
+      seenLabels.add(normalizedLabel);
+      // Preserve incoming ids so renames keep their identity; generate ids for new entries.
+      let id = String(source.id ?? "").trim();
+      if (!id || seenIds.has(id)) id = crypto.randomUUID();
+      seenIds.add(id);
+      reasons.push({ id, label });
+    }
+
+    const organization = await Organization.findByIdAndUpdate(
+      orgReq.organization._id,
+      { "preferences.supportResolutionReasons": reasons },
+      { new: true }
+    )
+      .select("preferences.supportResolutionReasons")
+      .lean();
+
+    res.json({ reasons: getEffectiveResolutionReasons(organization) });
+  } catch (err) {
+    console.error("Failed to update support resolution reasons:", err);
+    res.status(500).json({ error: "Failed to update resolution reasons" });
   }
 }
 
