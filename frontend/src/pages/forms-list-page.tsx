@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   ClipboardListIcon,
   CopyIcon,
   EllipsisIcon,
+  LinkIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -15,6 +16,13 @@ import { FormTemplateDialog } from "@/components/form-template-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Spinner } from "@/components/ui/spinner"
 import {
   DropdownMenu,
@@ -39,20 +47,14 @@ import {
 
 import { ListSkeleton } from "@/components/list-states"
 import { PageHeader } from "@/components/page-header"
-import { API_ORIGIN } from "@/lib/env"
 import { formatDateTime, formatRelativeTime } from "@/lib/format"
-const API_BASE = `${API_ORIGIN}/api/v1/forms`
-
-type ManagedForm = {
-  _id: string
-  title: string
-  description: string | null
-  slug: string
-  status: "draft" | "published" | "archived"
-  fields: { id: string; label: string }[]
-  submissionCount: number
-  updatedAt: string
-}
+import {
+  archiveForm as apiArchiveForm,
+  duplicateForm as apiDuplicateForm,
+  listForms,
+  saveForm,
+} from "@/lib/forms-api"
+import { publicFormUrl, type ManagedForm } from "@/components/forms/types"
 
 const statusConfig = {
   draft: { label: "Draft", variant: "outline" as const, tooltip: "Form is in draft mode and not publicly accessible" },
@@ -66,49 +68,56 @@ export default function FormsListPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState<ManagedForm | null>(null)
+  const [archiving, setArchiving] = useState(false)
 
-  const fetchForms = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(API_BASE, { credentials: "include" })
-      if (!response.ok) throw new Error("Failed to fetch forms")
-      const data = (await response.json()) as { forms: ManagedForm[] }
-      setForms(data.forms)
-    } catch {
-      /* handled by empty state */
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let cancelled = false
+    listForms()
+      .then((data) => {
+        if (!cancelled) setForms(data)
+      })
+      .catch(() => {
+        /* handled by empty state */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
   }, [])
 
-  useEffect(() => {
-    void fetchForms()
-  }, [fetchForms])
+  async function refreshForms() {
+    try {
+      setForms(await listForms())
+    } catch {
+      /* keep current list */
+    }
+  }
 
-  async function createFromTemplate(template: { title: string; description: string; fields: { id: string; label: string; type: string; required: boolean; description?: string | null; placeholder?: string | null; options?: string[] }[] }) {
+  async function createFromTemplate(template: {
+    title: string
+    description: string
+    fields: { id: string; label: string; type: string; required: boolean; description?: string | null; placeholder?: string | null; options?: string[] }[]
+  }) {
     setCreating(true)
     try {
       const slug = `form-${Date.now().toString(36)}`
-      const response = await fetch(API_BASE, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: template.title,
-          description: template.description,
-          slug,
-          status: "draft",
-          fields: template.fields,
-          branding: { accentColor: "#111827", logoUrl: null },
-          settings: {
-            submitButtonLabel: "Submit",
-            successMessage: "Thanks! Your response has been submitted.",
-            notifyOnSubmission: true,
-          },
-        }),
+      const created = await saveForm({
+        title: template.title,
+        description: template.description,
+        slug,
+        status: "draft",
+        fields: template.fields as ManagedForm["fields"],
+        branding: { accentColor: "#111827", logoUrl: null },
+        settings: {
+          submitButtonLabel: "Submit",
+          successMessage: "Thanks! Your response has been submitted.",
+          notifyOnSubmission: true,
+          collectDeviceInfo: false,
+        },
       })
-      if (!response.ok) throw new Error("Failed to create form")
-      const created = await response.json()
       void navigate({ to: "/forms/$slug", params: { slug: created.slug } })
     } catch {
       toast.error("Failed to create form")
@@ -118,30 +127,31 @@ export default function FormsListPage() {
 
   async function duplicateForm(form: ManagedForm) {
     try {
-      const response = await fetch(`${API_BASE}/${form._id}/duplicate`, {
-        method: "POST",
-        credentials: "include",
-      })
-      if (!response.ok) throw new Error("Failed to duplicate form")
+      await apiDuplicateForm(form._id)
       toast.success("Form duplicated")
-      void fetchForms()
+      void refreshForms()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to duplicate form")
     }
   }
 
   async function archiveForm(form: ManagedForm) {
+    setArchiving(true)
     try {
-      const response = await fetch(`${API_BASE}/${form._id}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-      if (!response.ok) throw new Error("Failed to archive form")
+      await apiArchiveForm(form._id)
       toast.success("Form archived")
-      void fetchForms()
+      setArchiveTarget(null)
+      void refreshForms()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to archive form")
+    } finally {
+      setArchiving(false)
     }
+  }
+
+  function copyLink(form: ManagedForm) {
+    void navigator.clipboard.writeText(publicFormUrl(form.slug))
+    toast.success("Link copied")
   }
 
   return (
@@ -269,6 +279,17 @@ export default function FormsListPage() {
                                 <TooltipContent>More actions</TooltipContent>
                               </Tooltip>
                               <DropdownMenuContent align="end">
+                                {form.status === "published" && (
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      copyLink(form)
+                                    }}
+                                  >
+                                    <LinkIcon className="size-4" />
+                                    Copy Link
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation()
@@ -283,11 +304,11 @@ export default function FormsListPage() {
                                   variant="destructive"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    void archiveForm(form)
+                                    setArchiveTarget(form)
                                   }}
                                 >
                                   <Trash2Icon className="size-4" />
-                                  Delete
+                                  Archive
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -301,6 +322,39 @@ export default function FormsListPage() {
             )}
           </div>
         </main>
+
+        <Dialog
+          open={archiveTarget !== null}
+          onOpenChange={(open) => {
+            if (!open && !archiving) setArchiveTarget(null)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Archive Form</DialogTitle>
+              <DialogDescription>
+                {archiveTarget?.status === "published"
+                  ? `"${archiveTarget?.title}" is live — archiving takes it offline and its public link stops working. Existing responses are kept.`
+                  : `"${archiveTarget?.title}" will be removed from this list. Existing responses are kept.`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" disabled={archiving} onClick={() => setArchiveTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={archiving}
+                onClick={() => {
+                  if (archiveTarget) void archiveForm(archiveTarget)
+                }}
+              >
+                {archiving ? "Archiving..." : "Archive Form"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <FormTemplateDialog
           open={templateOpen}
           onOpenChange={setTemplateOpen}

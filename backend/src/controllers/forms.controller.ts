@@ -22,6 +22,9 @@ const FIELD_TYPES: FormFieldType[] = [
   "checkbox",
   "date",
   "file",
+  "rating",
+  "url",
+  "yes_no",
 ];
 
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
@@ -61,6 +64,7 @@ function normalizeFields(value: unknown): IFormField[] {
         label: String(source.label ?? "").trim().slice(0, 120),
         type,
         required: Boolean(source.required),
+        description: String(source.description ?? "").trim().slice(0, 500) || null,
         placeholder: String(source.placeholder ?? "").trim().slice(0, 180) || null,
         options: type === "dropdown" || type === "checkbox" ? options : [],
         maxFileSizeMb: Math.max(1, Math.min(Number(source.maxFileSizeMb ?? 10), 50)),
@@ -91,6 +95,15 @@ function normalizeFormInput(body: Record<string, unknown>) {
     branding: {
       accentColor: String(branding.accentColor ?? "#111827").trim() || "#111827",
       logoUrl: String(branding.logoUrl ?? "").trim() || null,
+      backgroundType: ["solid", "gradient", "none"].includes(String(branding.backgroundType))
+        ? (String(branding.backgroundType) as "solid" | "gradient" | "none")
+        : "none",
+      backgroundColor: String(branding.backgroundColor ?? "").trim() || null,
+      backgroundGradient: String(branding.backgroundGradient ?? "").trim().slice(0, 500) || null,
+      theme: String(branding.theme ?? "").trim().slice(0, 60) || null,
+      borderRadius: ["sm", "md", "lg"].includes(String(branding.borderRadius))
+        ? (String(branding.borderRadius) as "sm" | "md" | "lg")
+        : "md",
     },
     settings: {
       submitButtonLabel: String(settings.submitButtonLabel ?? "Submit").trim() || "Submit",
