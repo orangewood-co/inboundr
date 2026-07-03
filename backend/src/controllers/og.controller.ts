@@ -49,7 +49,6 @@ export async function getFormOgImage(req: Request, res: Response): Promise<void>
       png = await renderFormOgImage({
         title: form.title,
         description: form.description,
-        fieldCount: form.fields.length,
         branding: form.branding,
       });
       remember(key, png);

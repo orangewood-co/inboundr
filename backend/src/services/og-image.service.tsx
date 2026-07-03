@@ -6,7 +6,6 @@ import { Resvg } from "@resvg/resvg-js";
 export interface OgFormData {
   title: string;
   description: string | null;
-  fieldCount: number;
   branding: {
     accentColor: string;
     logoUrl: string | null;
@@ -119,7 +118,6 @@ export async function renderFormOgImage(form: OgFormData): Promise<Buffer> {
     .join("")
     .toUpperCase();
 
-  const questionLabel = `${form.fieldCount} ${form.fieldCount === 1 ? "question" : "questions"}`;
   const wordmark = await loadWordmark();
   const wordmarkDims = wordmarkSize(wordmark, 30);
 
@@ -208,24 +206,6 @@ export async function renderFormOgImage(form: OgFormData): Promise<Buffer> {
         </div>
       ) : null}
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          marginTop: 44,
-          padding: "16px 36px",
-          borderRadius: 9999,
-          backgroundColor: accent,
-          color: "#ffffff",
-          fontFamily: "Hanken Grotesk",
-          fontWeight: 700,
-          fontSize: 26,
-          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-        }}
-      >
-        {questionLabel}
-      </div>
-
       <img
         src={wordmark.dataUrl}
         width={wordmarkDims.width}
@@ -268,7 +248,7 @@ export async function renderFallbackOgImage(): Promise<Buffer> {
           marginTop: 20,
         }}
       >
-        Share forms and collect responses
+        Forms - Collect responses and track submissions.
       </div>
     </div>,
   );
