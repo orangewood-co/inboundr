@@ -33,13 +33,16 @@ function createLimiter(config: LimiterConfig): RateLimitRequestHandler {
 const MINUTE = 60 * 1000;
 
 /**
- * Generous per-IP safety net for everything under /api/v1. Webhooks are
- * skipped: Google Pub/Sub pushes come from a small set of shared IPs that
- * would collide in one bucket, and signature verification is the right
- * control for them.
+ * Generous per-IP safety net for everything under /api/v1. This is a flood
+ * backstop, not a usage quota: an SPA page load fires many parallel calls and
+ * whole offices share one NAT IP, so the limit must be high and the window
+ * short (a tripped bucket recovers in under a minute instead of 15).
+ * Webhooks are skipped: Google Pub/Sub pushes come from a small set of shared
+ * IPs that would collide in one bucket, and signature verification is the
+ * right control for them.
  */
 export const generalApiLimiter = createLimiter({
-  windowMs: 15 * MINUTE,
+  windowMs: MINUTE,
   limit: 300,
   message: "Too many requests. Please try again later.",
   skip: (req: Request) => {
