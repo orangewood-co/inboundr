@@ -16,5 +16,10 @@ export const apiOrigin = requiredOrigin("API_ORIGIN", "http://localhost:3000");
 export const embedOrigin = requiredOrigin("EMBED_ORIGIN", "http://localhost:5175");
 export const landingOrigin = requiredOrigin("LANDING_ORIGIN", "http://localhost:5174");
 
+// Public origin for form share links (/f/:slug). Falls back to the API origin
+// until a dedicated subdomain is pointed at the backend.
+export const formsShareOrigin =
+  process.env.FORMS_SHARE_URL?.trim().replace(/\/+$/, "") || apiOrigin;
+
 export const gmailOAuthRedirectUri =
   process.env.GMAIL_OAUTH_REDIRECT_URI?.trim() || `${apiOrigin}/api/v1/gmail/callback`;

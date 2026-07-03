@@ -14,7 +14,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getEmbedOrigin } from "@/lib/env"
+import { getFormsShareOrigin } from "@/lib/env"
 import { embedSnippet, publicFormUrl } from "@/components/forms/types"
 
 export function ShareTab({
@@ -86,7 +86,7 @@ export function ShareTab({
             <Label className="text-[13px] text-muted-foreground">Link slug</Label>
             <div className="flex items-center overflow-hidden rounded-md border focus-within:ring-2 focus-within:ring-ring/50">
               <span className="shrink-0 border-r bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground">
-                {getEmbedOrigin().replace(/^https?:\/\//, "")}/form/
+                {getFormsShareOrigin().replace(/^https?:\/\//, "")}/f/
               </span>
               <input
                 value={slug}

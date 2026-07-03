@@ -14,7 +14,7 @@ import {
   TypeIcon,
 } from "lucide-react"
 
-import { getEmbedOrigin } from "@/lib/env"
+import { getEmbedOrigin, getFormsShareOrigin } from "@/lib/env"
 
 export type FieldType =
   | "short_text"
@@ -175,12 +175,19 @@ export function newField(type: FieldType = "short_text"): FormField {
   }
 }
 
+// Share links go through the backend (/f/:slug), which serves OG meta tags to
+// crawlers and instantly redirects browsers to the embed form page.
 export function publicFormUrl(slug: string) {
+  return `${getFormsShareOrigin()}/f/${slug}`
+}
+
+// Iframes load the embed page directly — no redirect hop, no OG tags needed.
+export function embedFormUrl(slug: string) {
   return `${getEmbedOrigin()}/form/${slug}`
 }
 
 export function embedSnippet(slug: string) {
-  return `<iframe src="${publicFormUrl(slug)}?embed=1" width="100%" height="720" style="border:0;border-radius:16px;overflow:hidden" loading="lazy"></iframe>`
+  return `<iframe src="${embedFormUrl(slug)}?embed=1" width="100%" height="720" style="border:0;border-radius:16px;overflow:hidden" loading="lazy"></iframe>`
 }
 
 export function isUploadedFileValue(value: unknown): value is UploadedFileValue {

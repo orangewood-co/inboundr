@@ -34,6 +34,13 @@ export function getEmbedOrigin(): string {
   );
 }
 
+// Origin serving form share links (/f/:slug) with OG meta tags. Defaults to
+// the API origin until a dedicated subdomain is pointed at the backend.
+export function getFormsShareOrigin(): string {
+  const value = import.meta.env.VITE_FORMS_SHARE_URL?.trim();
+  return value ? value.replace(/\/+$/, "") : API_ORIGIN;
+}
+
 export const POSTHOG_PROJECT_TOKEN = requiredViteValue(
   "VITE_POSTHOG_PROJECT_TOKEN",
   import.meta.env.VITE_POSTHOG_PROJECT_TOKEN,
