@@ -20,6 +20,29 @@ const WIDTH = 1200;
 const HEIGHT = 630;
 
 const FONTS_DIR = path.join(import.meta.dir, "..", "assets", "fonts");
+const WORDMARK_PATH = path.join(import.meta.dir, "..", "assets", "logo", "logo-black.png");
+
+interface Wordmark {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+let wordmarkPromise: Promise<Wordmark> | null = null;
+
+function loadWordmark(): Promise<Wordmark> {
+  // PNG IHDR: width and height are big-endian uint32 at bytes 16 and 20.
+  wordmarkPromise ??= readFile(WORDMARK_PATH).then((buf) => ({
+    dataUrl: `data:image/png;base64,${buf.toString("base64")}`,
+    width: buf.readUInt32BE(16),
+    height: buf.readUInt32BE(20),
+  }));
+  return wordmarkPromise;
+}
+
+function wordmarkSize(wordmark: Wordmark, height: number): { width: number; height: number } {
+  return { width: Math.round((height / wordmark.height) * wordmark.width), height };
+}
 
 let fontsPromise: Promise<SatoriOptions["fonts"]> | null = null;
 
@@ -97,6 +120,8 @@ export async function renderFormOgImage(form: OgFormData): Promise<Buffer> {
     .toUpperCase();
 
   const questionLabel = `${form.fieldCount} ${form.fieldCount === 1 ? "question" : "questions"}`;
+  const wordmark = await loadWordmark();
+  const wordmarkDims = wordmarkSize(wordmark, 30);
 
   return renderPng(
     <div
@@ -201,25 +226,25 @@ export async function renderFormOgImage(form: OgFormData): Promise<Buffer> {
         {questionLabel}
       </div>
 
-      <div
+      <img
+        src={wordmark.dataUrl}
+        width={wordmarkDims.width}
+        height={wordmarkDims.height}
         style={{
           position: "absolute",
           bottom: 36,
           right: 48,
-          display: "flex",
-          fontFamily: "Bricolage Grotesque",
-          fontWeight: 700,
-          fontSize: 26,
-          color: "rgba(28, 25, 23, 0.4)",
+          opacity: 0.45,
         }}
-      >
-        Inboundr
-      </div>
+      />
     </div>,
   );
 }
 
 export async function renderFallbackOgImage(): Promise<Buffer> {
+  const wordmark = await loadWordmark();
+  const wordmarkDims = wordmarkSize(wordmark, 80);
+
   return renderPng(
     <div
       style={{
@@ -232,37 +257,7 @@ export async function renderFallbackOgImage(): Promise<Buffer> {
         background: "#ffffff",
       }}
     >
-      <div
-        style={{
-          width: 104,
-          height: 104,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 26,
-          backgroundColor: "#111827",
-          color: "#ffffff",
-          fontFamily: "Bricolage Grotesque",
-          fontWeight: 700,
-          fontSize: 44,
-          marginBottom: 40,
-          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-        }}
-      >
-        In
-      </div>
-      <div
-        style={{
-          display: "flex",
-          fontFamily: "Bricolage Grotesque",
-          fontWeight: 700,
-          fontSize: 68,
-          letterSpacing: "-0.02em",
-          color: "#1c1917",
-        }}
-      >
-        Inboundr
-      </div>
+      <img src={wordmark.dataUrl} width={wordmarkDims.width} height={wordmarkDims.height} />
       <div
         style={{
           display: "flex",
