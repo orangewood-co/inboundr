@@ -55,7 +55,9 @@ export interface CompletedMultipartPart {
 }
 
 const PRESIGN_EXPIRES_IN_SECONDS = 60 * 5;
-const VIEW_EXPIRES_IN_SECONDS = 60 * 10;
+// Long expiry so signed URLs held by open SPA tabs survive the session.
+// Stable, non-expiring access still goes through backend redirect routes.
+const VIEW_EXPIRES_IN_SECONDS = 60 * 60 * 12;
 
 let s3Client: S3Client | null = null;
 
