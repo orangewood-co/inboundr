@@ -44,6 +44,25 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [frontendOrigin],
+  // Better Auth's built-in limiter (in-memory) protects all /api/auth/*
+  // routes. Enabled explicitly so it also runs outside production.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 60,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 3 },
+      "/forget-password": { window: 300, max: 3 },
+      "/request-password-reset": { window: 300, max: 3 },
+    },
+  },
+  advanced: {
+    // Behind Nginx, the client IP arrives via X-Forwarded-For.
+    ipAddress: {
+      ipAddressHeaders: ["x-forwarded-for"],
+    },
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

@@ -39,32 +39,6 @@ const SUPPORT_ALLOWED_MIME_TYPES = [
 ];
 const SUPPORT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// Lightweight in-memory rate limiter. Good enough for a single-process API;
-// swap for a shared store if the backend is ever scaled horizontally.
-const rateBuckets = new Map<string, number[]>();
-
-function isRateLimited(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const hits = (rateBuckets.get(key) ?? []).filter((at) => now - at < windowMs);
-  if (hits.length >= limit) {
-    rateBuckets.set(key, hits);
-    return true;
-  }
-  hits.push(now);
-  rateBuckets.set(key, hits);
-  return false;
-}
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, hits] of rateBuckets) {
-    if (hits.every((at) => now - at > 15 * 60 * 1000)) rateBuckets.delete(key);
-  }
-}, 5 * 60 * 1000).unref();
-
-function clientIp(req: Request): string {
-  return req.ip || req.socket.remoteAddress || "unknown";
-}
 
 function supportNotificationBody(input: { name: string; email: string; subject: string }): string {
   const subject = input.subject.replace(/\s+/g, " ").trim();
@@ -166,11 +140,6 @@ export async function getSupportWorkspace(req: Request, res: ExpressResponse): P
 
 export async function startSupportSession(req: Request, res: ExpressResponse): Promise<void> {
   try {
-    if (isRateLimited(`session:${clientIp(req)}`, 10, 15 * 60 * 1000)) {
-      res.status(429).json({ error: "Too many chats started. Please try again later." });
-      return;
-    }
-
     const organizationId = String(req.body?.organizationId ?? "").trim();
     const name = String(req.body?.name ?? "").trim();
     const email = String(req.body?.email ?? "").trim().toLowerCase();
@@ -263,11 +232,6 @@ export async function postSupportSessionMessage(
   res: ExpressResponse
 ): Promise<void> {
   try {
-    if (isRateLimited(`message:${clientIp(req)}`, 15, 60 * 1000)) {
-      res.status(429).json({ error: "You are sending messages too quickly. Please slow down." });
-      return;
-    }
-
     const ticket = await findSessionTicket(String(req.params.token ?? ""));
     if (!ticket) {
       res.status(404).json({ error: "Chat session not found" });
@@ -329,11 +293,6 @@ export async function postSupportSessionMessage(
 
 export async function endSupportSession(req: Request, res: ExpressResponse): Promise<void> {
   try {
-    if (isRateLimited(`end:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
-      res.status(429).json({ error: "Too many updates. Please try again later." });
-      return;
-    }
-
     const ticket = await findSessionTicket(String(req.params.token ?? ""));
     if (!ticket) {
       res.status(404).json({ error: "Chat session not found" });
@@ -403,11 +362,6 @@ export async function createSupportUploadPresign(
   res: ExpressResponse
 ): Promise<void> {
   try {
-    if (isRateLimited(`upload:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
-      res.status(429).json({ error: "Too many uploads. Please try again later." });
-      return;
-    }
-
     const ticket = await findSessionTicket(String(req.params.token ?? ""));
     if (!ticket) {
       res.status(404).json({ error: "Chat session not found" });

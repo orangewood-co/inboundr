@@ -43,6 +43,11 @@ import formShareRouter from "./routes/form-share.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { ensureKnowledgeSchema } from "./db/knowledge-schema";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
+import {
+  contactLimiter,
+  generalApiLimiter,
+  publicReadLimiter,
+} from "./middleware/rate-limit.middleware";
 import { auth } from "./lib/auth";
 import { registerNotificationEventHandlers } from "./events/notification-event-handlers";
 import {
@@ -55,6 +60,10 @@ import { startDigestCron } from "./jobs/digest-cron";
 import { startPaymentReminderCron } from "./jobs/payment-reminder-cron";
 
 const app: Application = express();
+
+// Exactly one reverse-proxy hop (Nginx) sets X-Forwarded-For. Without this,
+// req.ip resolves to 127.0.0.1 and every IP-keyed rate limit shares one bucket.
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -80,6 +89,11 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
+// Per-IP safety net for the whole API. Telephony webhooks are mounted above
+// (signature-verified) and the email webhook is skipped inside the limiter.
+// Route-specific limiters below add stricter limits on top of this one.
+app.use("/api/v1", generalApiLimiter);
+
 app.use("/api/v1/email", emailRouter);
 app.use("/api/v1/gmail", gmailRouter);
 app.use("/api/v1/products", productsRouter);
@@ -92,7 +106,7 @@ app.use("/api/v1/links", linksRouter);
 app.use("/api/v1/uploads", uploadsRouter);
 app.use("/api/v1/drive", driveRouter);
 app.use("/api/v1/invoices", invoiceRouter);
-app.use("/api/v1/contact", contactRouter);
+app.use("/api/v1/contact", contactLimiter, contactRouter);
 app.use("/api/v1/feedback", feedbackRouter);
 app.use("/api/v1/employees", employeeRouter);
 app.use("/api/v1/projects", projectRouter);
@@ -103,13 +117,13 @@ app.use("/api/v1/support", supportAiRouter);
 app.use("/api/v1/support/templates", supportTemplateRouter);
 app.use("/api/v1/support/ticket-tags", supportTicketTagRouter);
 app.use("/api/v1/notifications", notificationRouter);
-app.use("/api/v1/og", ogRouter);
+app.use("/api/v1/og", publicReadLimiter, ogRouter);
 app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/public/drive", publicDriveRouter);
 app.use("/api/v1/public/attendance", publicAttendanceRouter);
 app.use("/api/v1/public/support", publicSupportRouter);
-app.use("/l", publicLinksRouter);
-app.use("/f", formShareRouter);
+app.use("/l", publicReadLimiter, publicLinksRouter);
+app.use("/f", publicReadLimiter, formShareRouter);
 app.use("/api/v1/stats", statsRouter);
 app.use("/api/v1/digest", digestRouter);
 app.use("/api/v1/dashboard-layout", dashboardLayoutRouter);
