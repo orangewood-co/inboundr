@@ -46,15 +46,19 @@ export const auth = betterAuth({
   trustedOrigins: [frontendOrigin],
   // Better Auth's built-in limiter (in-memory) protects all /api/auth/*
   // routes. Enabled explicitly so it also runs outside production.
+  // The global bucket is a flood backstop, not a usage quota: it also counts
+  // high-frequency calls like /get-session and the organization plugin
+  // endpoints, and whole offices share one NAT IP. Only the sensitive
+  // credential endpoints below get tight limits.
   rateLimit: {
     enabled: true,
     window: 60,
-    max: 60,
+    max: 300,
     customRules: {
-      "/sign-in/email": { window: 60, max: 5 },
-      "/sign-up/email": { window: 60, max: 3 },
-      "/forget-password": { window: 300, max: 3 },
-      "/request-password-reset": { window: 300, max: 3 },
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/forget-password": { window: 300, max: 5 },
+      "/request-password-reset": { window: 300, max: 5 },
     },
   },
   advanced: {
