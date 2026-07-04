@@ -374,6 +374,7 @@ For the detailed backend EC2 runbook, see [`docs/deployment/ec2-backend.md`](doc
 
 ## Resources
 - [TanStack Start Guide for Next.js Developers](https://www.adarsha.dev/blog/tanstack-mental-model-for-nextjs-developers)
+- [Rate Limiting in Express.js](https://betterstack.com/community/guides/scaling-nodejs/rate-limiting-express/)
 
 ## License
 
