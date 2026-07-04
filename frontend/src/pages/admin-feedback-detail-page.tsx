@@ -123,7 +123,7 @@ export default function AdminFeedbackDetailPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-4 p-5">
-                <FeedbackMessageList messages={feedback.messages} />
+                <FeedbackMessageList messages={feedback.messages} viewerType="admin" />
                 <div className="border-t pt-4">
                   <FeedbackReplyComposer
                     feedbackId={feedback._id}

@@ -39,33 +39,41 @@ export function FeedbackStatusBadge({ status }: { status: FeedbackStatus }) {
   return <Badge variant={STATUS_VARIANTS[status]}>{STATUS_LABELS[status]}</Badge>
 }
 
-export function FeedbackMessageList({ messages }: { messages: FeedbackMessage[] }) {
+export function FeedbackMessageList({
+  messages,
+  viewerType = "user",
+}: {
+  messages: FeedbackMessage[]
+  viewerType?: FeedbackMessage["authorType"]
+}) {
   return (
     <div className="flex flex-col gap-3">
       {messages.map((message) => {
-        const isAdmin = message.authorType === "admin"
+        const isOwn = message.authorType === viewerType
+        const authorLabel = isOwn
+          ? "You"
+          : message.authorName ||
+            (message.authorType === "admin" ? "Inboundr Team" : "Customer")
         return (
           <div
             key={message._id}
-            className={cn("flex", isAdmin ? "justify-start" : "justify-end")}
+            className={cn("flex", isOwn ? "justify-end" : "justify-start")}
           >
             <div
               className={cn(
                 "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
-                isAdmin
-                  ? "bg-muted text-foreground"
-                  : "bg-primary text-primary-foreground"
+                isOwn
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground"
               )}
             >
               <div
                 className={cn(
                   "mb-1 flex items-center gap-2 text-xs",
-                  isAdmin ? "text-muted-foreground" : "text-primary-foreground/80"
+                  isOwn ? "text-primary-foreground/80" : "text-muted-foreground"
                 )}
               >
-                <span className="font-medium">
-                  {isAdmin ? message.authorName || "Inboundr Team" : "You"}
-                </span>
+                <span className="font-medium">{authorLabel}</span>
                 <span>·</span>
                 <span>{formatDateTime(message.createdAt)}</span>
               </div>
