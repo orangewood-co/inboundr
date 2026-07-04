@@ -22,6 +22,9 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
+  // No lineHeight here: react-pdf resolves a unitless page lineHeight against
+  // the base fontSize and children inherit that absolute value, so larger text
+  // (e.g. the 26pt title) overlaps the line below it. Leading is set per-style.
   page: {
     paddingTop: 40,
     paddingBottom: 56,
@@ -29,14 +32,13 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontSize: 9,
     color: COLORS.text,
-    lineHeight: 1.4,
   },
   letterhead: { width: "100%", height: 64, objectFit: "contain", marginBottom: 16 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   brandBlock: { maxWidth: 280 },
   logo: { height: 34, width: 120, objectFit: "contain", marginBottom: 8 },
   orgName: { fontFamily: "Helvetica-Bold", fontSize: 15, color: COLORS.text },
-  orgLine: { fontSize: 8.5, color: COLORS.muted },
+  orgLine: { fontSize: 8.5, color: COLORS.muted, lineHeight: 1.4 },
   titleBlock: { alignItems: "flex-end" },
   title: { fontFamily: "Helvetica-Bold", fontSize: 26, letterSpacing: 1 },
   invoiceNo: { fontSize: 10, color: COLORS.muted, marginTop: 2 },
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
   metaBlock: { width: 200 },
   blockLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, color: COLORS.muted, letterSpacing: 0.6, marginBottom: 4 },
   partyName: { fontFamily: "Helvetica-Bold", fontSize: 11 },
-  partyLine: { fontSize: 9, color: COLORS.muted },
+  partyLine: { fontSize: 9, color: COLORS.muted, lineHeight: 1.4 },
   metaItem: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
   metaKey: { color: COLORS.muted, fontSize: 9 },
   metaValue: { fontFamily: "Helvetica-Bold", fontSize: 9 },
@@ -74,11 +76,11 @@ const styles = StyleSheet.create({
   gst: { width: 40, textAlign: "right" },
   total: { width: 74, textAlign: "right", fontFamily: "Helvetica-Bold" },
   footRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, gap: 24 },
-  payBox: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12 },
+  payBox: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12, alignSelf: "flex-start" },
   payTitle: { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 8 },
   payInner: { flexDirection: "row", gap: 10, alignItems: "center" },
   qr: { width: 76, height: 76 },
-  payHint: { fontSize: 8, color: COLORS.muted, flex: 1 },
+  payHint: { fontSize: 8, color: COLORS.muted, lineHeight: 1.4 },
   payUpi: { fontFamily: "Helvetica-Bold", fontSize: 9, marginTop: 4 },
   totalsBox: { width: 230 },
   totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5 },
@@ -98,7 +100,7 @@ const styles = StyleSheet.create({
   notesWrap: { marginTop: 22, gap: 12 },
   noteBlock: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12 },
   noteTitle: { fontFamily: "Helvetica-Bold", fontSize: 9.5, marginBottom: 4 },
-  noteText: { fontSize: 8.5, color: COLORS.muted },
+  noteText: { fontSize: 8.5, color: COLORS.muted, lineHeight: 1.4 },
   footer: {
     position: "absolute",
     bottom: 24,
@@ -214,22 +216,22 @@ export function StandardTemplate({ invoice, branding, assets }: InvoiceTemplateP
         </View>
 
         <View style={styles.footRow}>
-          <View>
-            {qr && assets?.upiQr ? (
-              <View style={styles.payBox}>
-                <Text style={styles.payTitle}>Pay via UPI</Text>
-                <View style={styles.payInner}>
-                  <Image src={qr} style={styles.qr} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.payHint}>Scan with any UPI app to pay the balance due.</Text>
-                    <Text style={[styles.payUpi, { color: primary }]}>{assets.upiQr.upiId}</Text>
-                  </View>
+          {/* The pay box must be a direct flex child of the row: wrapping it in
+              an unsized View lets yoga collapse its width to almost nothing. */}
+          {qr && assets?.upiQr ? (
+            <View style={styles.payBox}>
+              <Text style={styles.payTitle}>Pay via UPI</Text>
+              <View style={styles.payInner}>
+                <Image src={qr} style={styles.qr} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.payHint}>Scan with any UPI app to pay the balance due.</Text>
+                  <Text style={[styles.payUpi, { color: primary }]}>{assets.upiQr.upiId}</Text>
                 </View>
               </View>
-            ) : (
-              <View />
-            )}
-          </View>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
 
           <View style={styles.totalsBox}>
             <View style={styles.totalsRow}>

@@ -21,6 +21,9 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
+  // No lineHeight here: react-pdf resolves a unitless page lineHeight against
+  // the base fontSize and children inherit that absolute value, so larger text
+  // (e.g. the 44pt title) overlaps the line below it. Leading is set per-style.
   page: {
     paddingTop: 44,
     paddingBottom: 56,
@@ -28,17 +31,16 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontSize: 9,
     color: COLORS.text,
-    lineHeight: 1.4,
   },
   logoWrap: { alignItems: "center", marginBottom: 18 },
   logo: { height: 46, width: 200, objectFit: "contain" },
   wordmark: { fontFamily: "Helvetica-Bold", fontSize: 18, letterSpacing: 1, color: COLORS.strong },
   title: { fontFamily: "Helvetica-Bold", fontSize: 44, color: COLORS.strong, letterSpacing: -1 },
-  subtitle: { fontSize: 12, color: COLORS.strong, marginTop: 2, marginBottom: 22 },
+  subtitle: { fontSize: 12, color: COLORS.strong, marginTop: 2, marginBottom: 22, lineHeight: 1.35 },
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 26 },
   infoCol: { gap: 3 },
   infoColRight: { gap: 3, alignItems: "flex-end" },
-  infoLine: { fontSize: 10, color: COLORS.muted },
+  infoLine: { fontSize: 10, color: COLORS.muted, lineHeight: 1.4 },
   infoStrong: { fontFamily: "Helvetica-Bold", color: COLORS.strong },
   headRow: { flexDirection: "row", backgroundColor: COLORS.headBg, paddingVertical: 8, paddingHorizontal: 8 },
   headText: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: COLORS.muted, letterSpacing: 0.6 },
@@ -51,7 +53,7 @@ const styles = StyleSheet.create({
   },
   cDesc: { flex: 1, paddingRight: 8 },
   cDescText: { color: COLORS.strong },
-  cMeta: { fontSize: 7.5, color: COLORS.muted, marginTop: 1 },
+  cMeta: { fontSize: 7.5, color: COLORS.muted, marginTop: 1, lineHeight: 1.4 },
   cHsn: { width: 52 },
   cQty: { width: 50, textAlign: "right" },
   cUnit: { width: 84, textAlign: "right" },
@@ -66,7 +68,7 @@ const styles = StyleSheet.create({
   bottom: { marginTop: 40, flexDirection: "row", gap: 36 },
   bottomCol: { flex: 1, gap: 4 },
   bottomLabel: { fontFamily: "Helvetica-Bold", fontSize: 8.5, color: COLORS.muted, letterSpacing: 0.8 },
-  bottomValue: { color: COLORS.strong },
+  bottomValue: { color: COLORS.strong, fontSize: 9, lineHeight: 1.4 },
   upiWrap: { marginTop: 28, flexDirection: "row", gap: 12, alignItems: "center" },
   qr: { width: 72, height: 72 },
   footer: {
