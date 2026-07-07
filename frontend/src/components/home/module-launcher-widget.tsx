@@ -11,6 +11,7 @@ import {
   InboxIcon,
   LayoutGridIcon,
   LinkIcon,
+  MonitorCogIcon,
   PackageIcon,
   UsersIcon,
 } from "lucide-react"
@@ -38,6 +39,7 @@ const launcherTiles: LauncherTile[] = [
   { title: "Customers", url: "/customers", icon: UsersIcon, feature: "customers", module: "customers" },
   { title: "Employees", url: "/employees", icon: IdCardIcon, feature: "employees", module: "employees" },
   { title: "Projects", url: "/projects", icon: FolderKanbanIcon, feature: "projects", module: "projects" },
+  { title: "Assets", url: "/assets", icon: MonitorCogIcon, feature: "assets", module: "assets" },
   { title: "Forms", url: "/forms", icon: ClipboardListIcon, feature: "forms", module: "forms" },
   { title: "Links", url: "/links", icon: LinkIcon, feature: "links", module: "links" },
   { title: "Drive", url: "/drive", icon: HardDriveIcon, feature: "drive", module: "drive" },

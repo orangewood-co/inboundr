@@ -16,6 +16,7 @@ export type FeatureKey =
   | "projects"
   | "chat"
   | "support"
+  | "assets"
 export type EmployeeAccessModule =
   | "rfq"
   | "inbox"
@@ -30,6 +31,7 @@ export type EmployeeAccessModule =
   | "projects"
   | "chat"
   | "support"
+  | "assets"
 
 interface EntitlementState {
   effectiveFeatures: FeatureKey[]
@@ -65,6 +67,7 @@ const DEFAULT_ENTITLEMENTS: EntitlementState = {
     "projects",
     "chat",
     "support",
+    "assets",
   ],
   planSlug: "all_features",
   employeeAccess: {

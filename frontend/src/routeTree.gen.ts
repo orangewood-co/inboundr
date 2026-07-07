@@ -31,6 +31,7 @@ import { Route as EmailsRouteImport } from './routes/emails'
 import { Route as DriveRouteImport } from './routes/drive'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AssetsRouteImport } from './routes/assets'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
@@ -52,6 +53,9 @@ import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.att
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
+import { Route as AssetsSettingsRouteImport } from './routes/assets_.settings'
+import { Route as AssetsImportRouteImport } from './routes/assets_.import'
+import { Route as AssetsIdRouteImport } from './routes/assets_.$id'
 import { Route as AdminFeedbackRouteImport } from './routes/admin_.feedback'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin_.feedback.index'
 import { Route as EmployeesAttendanceLogsRouteImport } from './routes/employees_.attendance_.logs'
@@ -169,6 +173,11 @@ const ChatRoute = ChatRouteImport.update({
   path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssetsRoute = AssetsRouteImport.update({
+  id: '/assets',
+  path: '/assets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -274,6 +283,21 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssetsSettingsRoute = AssetsSettingsRouteImport.update({
+  id: '/assets_/settings',
+  path: '/assets/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsImportRoute = AssetsImportRouteImport.update({
+  id: '/assets_/import',
+  path: '/assets/import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsIdRoute = AssetsIdRouteImport.update({
+  id: '/assets_/$id',
+  path: '/assets/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
   id: '/admin_/feedback',
   path: '/admin/feedback',
@@ -308,6 +332,7 @@ const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/assets': typeof AssetsRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRoute
@@ -331,6 +356,9 @@ export interface FileRoutesByFullPath {
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
   '/admin/feedback': typeof AdminFeedbackRouteWithChildren
+  '/assets/$id': typeof AssetsIdRoute
+  '/assets/import': typeof AssetsImportRoute
+  '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -359,6 +387,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/assets': typeof AssetsRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRoute
@@ -377,6 +406,9 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/assets/$id': typeof AssetsIdRoute
+  '/assets/import': typeof AssetsImportRoute
+  '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
   '/employees/$id': typeof EmployeesIdRoute
@@ -406,6 +438,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/assets': typeof AssetsRoute
   '/chat': typeof ChatRoute
   '/customers': typeof CustomersRoute
   '/drive': typeof DriveRoute
@@ -429,6 +462,9 @@ export interface FileRoutesById {
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
   '/admin_/feedback': typeof AdminFeedbackRouteWithChildren
+  '/assets_/$id': typeof AssetsIdRoute
+  '/assets_/import': typeof AssetsImportRoute
+  '/assets_/settings': typeof AssetsSettingsRoute
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
   '/employees_/$id': typeof EmployeesIdRoute
@@ -459,6 +495,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/assets'
     | '/chat'
     | '/customers'
     | '/drive'
@@ -482,6 +519,9 @@ export interface FileRouteTypes {
     | '/stats'
     | '/support'
     | '/admin/feedback'
+    | '/assets/$id'
+    | '/assets/import'
+    | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -510,6 +550,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/assets'
     | '/chat'
     | '/customers'
     | '/drive'
@@ -528,6 +569,9 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/stats'
+    | '/assets/$id'
+    | '/assets/import'
+    | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
     | '/employees/$id'
@@ -556,6 +600,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/assets'
     | '/chat'
     | '/customers'
     | '/drive'
@@ -579,6 +624,9 @@ export interface FileRouteTypes {
     | '/stats'
     | '/support'
     | '/admin_/feedback'
+    | '/assets_/$id'
+    | '/assets_/import'
+    | '/assets_/settings'
     | '/customers_/$id'
     | '/customers_/import'
     | '/employees_/$id'
@@ -608,6 +656,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AssetsRoute: typeof AssetsRoute
   ChatRoute: typeof ChatRoute
   CustomersRoute: typeof CustomersRoute
   DriveRoute: typeof DriveRoute
@@ -631,6 +680,9 @@ export interface RootRouteChildren {
   StatsRoute: typeof StatsRoute
   SupportRoute: typeof SupportRouteWithChildren
   AdminFeedbackRoute: typeof AdminFeedbackRouteWithChildren
+  AssetsIdRoute: typeof AssetsIdRoute
+  AssetsImportRoute: typeof AssetsImportRoute
+  AssetsSettingsRoute: typeof AssetsSettingsRoute
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
@@ -801,6 +853,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assets': {
+      id: '/assets'
+      path: '/assets'
+      fullPath: '/assets'
+      preLoaderRoute: typeof AssetsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -948,6 +1007,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assets_/settings': {
+      id: '/assets_/settings'
+      path: '/assets/settings'
+      fullPath: '/assets/settings'
+      preLoaderRoute: typeof AssetsSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets_/import': {
+      id: '/assets_/import'
+      path: '/assets/import'
+      fullPath: '/assets/import'
+      preLoaderRoute: typeof AssetsImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets_/$id': {
+      id: '/assets_/$id'
+      path: '/assets/$id'
+      fullPath: '/assets/$id'
+      preLoaderRoute: typeof AssetsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin_/feedback': {
       id: '/admin_/feedback'
       path: '/admin/feedback'
@@ -1065,6 +1145,7 @@ const AdminFeedbackRouteWithChildren = AdminFeedbackRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AssetsRoute: AssetsRoute,
   ChatRoute: ChatRoute,
   CustomersRoute: CustomersRoute,
   DriveRoute: DriveRoute,
@@ -1088,6 +1169,9 @@ const rootRouteChildren: RootRouteChildren = {
   StatsRoute: StatsRoute,
   SupportRoute: SupportRouteWithChildren,
   AdminFeedbackRoute: AdminFeedbackRouteWithChildren,
+  AssetsIdRoute: AssetsIdRoute,
+  AssetsImportRoute: AssetsImportRoute,
+  AssetsSettingsRoute: AssetsSettingsRoute,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
   EmployeesIdRoute: EmployeesIdRoute,
