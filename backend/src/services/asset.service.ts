@@ -33,6 +33,7 @@ import {
   generateSchedule,
   toUtcDay,
 } from "./asset-depreciation.service";
+import { notifyAssetAssignmentChange } from "./asset-notification.service";
 
 export type AssetServiceErrorCode =
   | "validation"
@@ -52,6 +53,7 @@ export class AssetServiceError extends Error {
 export interface AssetActor {
   userId: string | null;
   name: string;
+  email: string | null;
 }
 
 function parseDate(value: unknown): Date | null {
@@ -640,6 +642,7 @@ export async function assignAsset(
     employeeName = employee.fullName;
   }
 
+  const previousEmployeeId = asset.assignedEmployeeId;
   asset.assignedEmployeeId = employeeId;
   await asset.save();
 
@@ -653,6 +656,25 @@ export async function assignAsset(
       : "Assignment cleared",
     payload: { employeeId: employeeId ? String(employeeId) : null, employeeName },
   });
+
+  if (employeeId && String(employeeId) !== String(previousEmployeeId ?? "")) {
+    void notifyAssetAssignmentChange({
+      organizationId,
+      asset,
+      employeeId,
+      event: "assigned",
+      actor,
+    });
+  }
+  if (previousEmployeeId && String(previousEmployeeId) !== String(employeeId ?? "")) {
+    void notifyAssetAssignmentChange({
+      organizationId,
+      asset,
+      employeeId: previousEmployeeId,
+      event: "unassigned",
+      actor,
+    });
+  }
 
   return asset;
 }
@@ -802,8 +824,20 @@ export async function disposeAsset(
     gainLoss,
   };
   asset.lifecycleStatus = type;
+  const holderEmployeeId = asset.assignedEmployeeId;
   asset.assignedEmployeeId = null;
   await asset.save();
+
+  if (holderEmployeeId) {
+    void notifyAssetAssignmentChange({
+      organizationId,
+      asset,
+      employeeId: holderEmployeeId,
+      event: "disposed",
+      disposalType: type,
+      actor,
+    });
+  }
 
   await logAssetActivity({
     organizationId,

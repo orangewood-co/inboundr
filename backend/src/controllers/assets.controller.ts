@@ -47,6 +47,7 @@ function actorOf(req: Request): AssetActor {
   return {
     userId: orgReq.user?.id ?? null,
     name: orgReq.user?.name ?? "",
+    email: orgReq.user?.email ?? null,
   };
 }
 
