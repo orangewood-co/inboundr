@@ -18,6 +18,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { DatePicker } from "@/components/date-picker"
 import { ErrorState } from "@/components/list-states"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -74,7 +75,13 @@ function todayInput(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string
+  value: React.ReactNode
+}) {
   return (
     <div className="flex items-start justify-between gap-4 py-2">
       <span className="text-sm text-muted-foreground">{label}</span>
@@ -140,15 +147,19 @@ export default function AssetDetailPage() {
       .then((data) => setLocations(data.locations))
       .catch(() => undefined)
 
-    void fetch(`${API_ORIGIN}/api/v1/employees?limit=100`, { credentials: "include" })
+    void fetch(`${API_ORIGIN}/api/v1/employees?limit=100`, {
+      credentials: "include",
+    })
       .then(async (response) => {
         if (!response.ok) return
         const data = await response.json()
         setEmployees(
-          (data.employees ?? []).map((employee: { _id: string; fullName: string }) => ({
-            _id: employee._id,
-            fullName: employee.fullName,
-          }))
+          (data.employees ?? []).map(
+            (employee: { _id: string; fullName: string }) => ({
+              _id: employee._id,
+              fullName: employee.fullName,
+            })
+          )
         )
       })
       .catch(() => undefined)
@@ -185,7 +196,9 @@ export default function AssetDetailPage() {
       toast.success("Attachment added")
       await fetchAsset()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to upload attachment")
+      toast.error(
+        err instanceof Error ? err.message : "Failed to upload attachment"
+      )
     } finally {
       setUploadingAttachment(false)
     }
@@ -194,7 +207,12 @@ export default function AssetDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <SiteHeader breadcrumbs={[{ label: "Assets", href: "/assets" }, { label: "Asset" }]} />
+        <SiteHeader
+          breadcrumbs={[
+            { label: "Assets", href: "/assets" },
+            { label: "Asset" },
+          ]}
+        />
         <div className="space-y-4 p-6">
           <Skeleton className="h-8 w-64" />
           <div className="grid gap-4 lg:grid-cols-3">
@@ -209,8 +227,16 @@ export default function AssetDetailPage() {
   if (error || !asset) {
     return (
       <AppLayout>
-        <SiteHeader breadcrumbs={[{ label: "Assets", href: "/assets" }, { label: "Asset" }]} />
-        <ErrorState message={error ?? "Asset not found"} onRetry={() => void fetchAsset()} />
+        <SiteHeader
+          breadcrumbs={[
+            { label: "Assets", href: "/assets" },
+            { label: "Asset" },
+          ]}
+        />
+        <ErrorState
+          message={error ?? "Asset not found"}
+          onRetry={() => void fetchAsset()}
+        />
       </AppLayout>
     )
   }
@@ -218,7 +244,8 @@ export default function AssetDetailPage() {
   const category = populatedRef(asset.categoryId)
   const location = populatedRef(asset.locationId)
   const employee = populatedRef(asset.assignedEmployeeId)
-  const isDisposed = asset.lifecycleStatus === "sold" || asset.lifecycleStatus === "scrapped"
+  const isDisposed =
+    asset.lifecycleStatus === "sold" || asset.lifecycleStatus === "scrapped"
   const isDraft = asset.lifecycleStatus === "draft"
   const accumulatedDepreciation =
     Math.round((asset.purchaseCost - asset.currentBookValue) * 100) / 100
@@ -226,32 +253,45 @@ export default function AssetDetailPage() {
   return (
     <AppLayout>
       <SiteHeader
-        breadcrumbs={[{ label: "Assets", href: "/assets" }, { label: asset.assetCode }]}
+        breadcrumbs={[
+          { label: "Assets", href: "/assets" },
+          { label: asset.assetCode },
+        ]}
       />
       <main className="flex-1 overflow-auto">
         <div className="mx-auto max-w-6xl space-y-6 p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
+              <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2">
                 <Link to="/assets">
                   <ArrowLeftIcon className="size-4" />
                   Back to Assets
                 </Link>
               </Button>
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight">{asset.name}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {asset.name}
+                </h1>
                 <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
                   {asset.assetCode}
                 </span>
-                <Badge variant={asset.lifecycleStatus === "active" ? "default" : "secondary"}>
+                <Badge
+                  variant={
+                    asset.lifecycleStatus === "active" ? "default" : "secondary"
+                  }
+                >
                   {LIFECYCLE_STATUS_LABELS[asset.lifecycleStatus]}
                 </Badge>
                 {!isDisposed && !isDraft && (
-                  <Badge variant="outline">{CONDITION_LABELS[asset.condition]}</Badge>
+                  <Badge variant="outline">
+                    {CONDITION_LABELS[asset.condition]}
+                  </Badge>
                 )}
               </div>
               {asset.description && (
-                <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{asset.description}</p>
+                <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+                  {asset.description}
+                </p>
               )}
             </div>
             {canManageOrganization && (
@@ -263,13 +303,19 @@ export default function AssetDetailPage() {
                       onClick={() =>
                         void runAction(
                           "activate",
-                          () => assetsFetch(`/${asset._id}/activate`, { method: "POST", body: "{}" }),
+                          () =>
+                            assetsFetch(`/${asset._id}/activate`, {
+                              method: "POST",
+                              body: "{}",
+                            }),
                           "Asset activated — depreciation schedule generated"
                         )
                       }
                       disabled={busyAction !== null}
                     >
-                      {busyAction === "activate" && <Spinner data-icon="inline-start" />}
+                      {busyAction === "activate" && (
+                        <Spinner data-icon="inline-start" />
+                      )}
                       <CircleCheckIcon className="size-4" />
                       Activate
                     </Button>
@@ -323,33 +369,52 @@ export default function AssetDetailPage() {
           {isDisposed && asset.disposal && (
             <div className="rounded-xl border bg-muted/30 p-4">
               <p className="text-sm font-semibold">
-                {asset.disposal.type === "sold" ? "Sold" : "Scrapped"} on {formatDate(asset.disposal.date)}
+                {asset.disposal.type === "sold" ? "Sold" : "Scrapped"} on{" "}
+                {formatDate(asset.disposal.date)}
               </p>
               <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
                 <p>
-                  <span className="text-muted-foreground">Book value at disposal: </span>
-                  <span className="font-medium">{formatInrExact(asset.disposal.bookValueAtDisposal)}</span>
+                  <span className="text-muted-foreground">
+                    Book value at disposal:{" "}
+                  </span>
+                  <span className="font-medium">
+                    {formatInrExact(asset.disposal.bookValueAtDisposal)}
+                  </span>
                 </p>
                 {asset.disposal.type === "sold" && (
                   <p>
                     <span className="text-muted-foreground">Sale amount: </span>
-                    <span className="font-medium">{formatInrExact(asset.disposal.saleAmount)}</span>
+                    <span className="font-medium">
+                      {formatInrExact(asset.disposal.saleAmount)}
+                    </span>
                   </p>
                 )}
                 <p>
-                  <span className="text-muted-foreground">{asset.disposal.gainLoss >= 0 ? "Gain: " : "Loss: "}</span>
-                  <span className={asset.disposal.gainLoss >= 0 ? "font-medium text-primary" : "font-medium text-destructive"}>
+                  <span className="text-muted-foreground">
+                    {asset.disposal.gainLoss >= 0 ? "Gain: " : "Loss: "}
+                  </span>
+                  <span
+                    className={
+                      asset.disposal.gainLoss >= 0
+                        ? "font-medium text-primary"
+                        : "font-medium text-destructive"
+                    }
+                  >
                     {formatInrExact(Math.abs(asset.disposal.gainLoss))}
                   </span>
                 </p>
                 {asset.disposal.buyerName && (
                   <p>
                     <span className="text-muted-foreground">Buyer: </span>
-                    <span className="font-medium">{asset.disposal.buyerName}</span>
+                    <span className="font-medium">
+                      {asset.disposal.buyerName}
+                    </span>
                   </p>
                 )}
                 {asset.disposal.notes && (
-                  <p className="sm:col-span-3 text-muted-foreground">{asset.disposal.notes}</p>
+                  <p className="text-muted-foreground sm:col-span-3">
+                    {asset.disposal.notes}
+                  </p>
                 )}
               </div>
             </div>
@@ -357,43 +422,93 @@ export default function AssetDetailPage() {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-lg border bg-muted/30 px-4 py-3.5">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Purchase Cost</p>
-              <p className="mt-1.5 text-2xl font-bold tabular-nums">{formatInrExact(asset.purchaseCost)}</p>
+              <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                Purchase Cost
+              </p>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums">
+                {formatInrExact(asset.purchaseCost)}
+              </p>
             </div>
             <div className="rounded-lg border bg-muted/30 px-4 py-3.5">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Accumulated Depreciation</p>
-              <p className="mt-1.5 text-2xl font-bold tabular-nums">{formatInrExact(accumulatedDepreciation)}</p>
+              <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                Accumulated Depreciation
+              </p>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums">
+                {formatInrExact(accumulatedDepreciation)}
+              </p>
             </div>
             <div className="rounded-lg border bg-muted/30 px-4 py-3.5">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Current Book Value</p>
-              <p className="mt-1.5 text-2xl font-bold tabular-nums">{formatInrExact(asset.currentBookValue)}</p>
+              <p className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                Current Book Value
+              </p>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums">
+                {formatInrExact(asset.currentBookValue)}
+              </p>
             </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <section className="rounded-xl border">
-                <div className="border-b bg-muted/30 px-4 py-2.5 text-sm font-semibold">Details</div>
+                <div className="border-b bg-muted/30 px-4 py-2.5 text-sm font-semibold">
+                  Details
+                </div>
                 <div className="grid gap-x-8 px-4 py-2 sm:grid-cols-2">
                   <DetailRow label="Category" value={category?.name ?? "—"} />
-                  <DetailRow label="Serial number" value={asset.serialNumber || "—"} />
-                  <DetailRow label="Purchase date" value={formatDate(asset.purchaseDate)} />
-                  <DetailRow label="Available for use" value={formatDate(asset.availableForUseDate ?? asset.purchaseDate)} />
+                  <DetailRow
+                    label="Serial number"
+                    value={asset.serialNumber || "—"}
+                  />
+                  <DetailRow
+                    label="Purchase date"
+                    value={formatDate(asset.purchaseDate)}
+                  />
+                  <DetailRow
+                    label="Available for use"
+                    value={formatDate(
+                      asset.availableForUseDate ?? asset.purchaseDate
+                    )}
+                  />
                   <DetailRow label="Vendor" value={asset.vendorName || "—"} />
-                  <DetailRow label="Invoice reference" value={asset.invoiceReference || "—"} />
-                  <DetailRow label="Warranty expiry" value={formatDate(asset.warrantyExpiryDate)} />
-                  <DetailRow label="AMC expiry" value={formatDate(asset.amcExpiryDate)} />
-                  <DetailRow label="Depreciation method" value={DEPRECIATION_METHOD_LABELS[asset.depreciation.method]} />
-                  <DetailRow label="Useful life" value={`${asset.depreciation.usefulLifeMonths} months`} />
+                  <DetailRow
+                    label="Invoice reference"
+                    value={asset.invoiceReference || "—"}
+                  />
+                  <DetailRow
+                    label="Warranty expiry"
+                    value={formatDate(asset.warrantyExpiryDate)}
+                  />
+                  <DetailRow
+                    label="AMC expiry"
+                    value={formatDate(asset.amcExpiryDate)}
+                  />
+                  <DetailRow
+                    label="Depreciation method"
+                    value={
+                      DEPRECIATION_METHOD_LABELS[asset.depreciation.method]
+                    }
+                  />
+                  <DetailRow
+                    label="Useful life"
+                    value={`${asset.depreciation.usefulLifeMonths} months`}
+                  />
                   {asset.depreciation.method === "straight_line" ? (
-                    <DetailRow label="Salvage" value={`${asset.depreciation.salvagePercentage}% of cost`} />
+                    <DetailRow
+                      label="Salvage"
+                      value={`${asset.depreciation.salvagePercentage}% of cost`}
+                    />
                   ) : (
-                    <DetailRow label="WDV rate" value={`${asset.depreciation.wdvRatePercentage}% per year`} />
+                    <DetailRow
+                      label="WDV rate"
+                      value={`${asset.depreciation.wdvRatePercentage}% per year`}
+                    />
                   )}
                   {asset.depreciation.openingAccumulatedDepreciation > 0 && (
                     <DetailRow
                       label="Opening accumulated depreciation"
-                      value={formatInrExact(asset.depreciation.openingAccumulatedDepreciation)}
+                      value={formatInrExact(
+                        asset.depreciation.openingAccumulatedDepreciation
+                      )}
                     />
                   )}
                 </div>
@@ -413,7 +528,7 @@ export default function AssetDetailPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[560px] text-sm">
                       <thead>
-                        <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        <tr className="border-b text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
                           <th className="px-4 py-2">Period</th>
                           <th className="px-4 py-2 text-right">Depreciation</th>
                           <th className="px-4 py-2 text-right">Accumulated</th>
@@ -424,15 +539,18 @@ export default function AssetDetailPage() {
                         {asset.depreciationSchedule.map((row, index) => (
                           <tr key={index} className="border-b last:border-0">
                             <td className="px-4 py-2.5">
-                              {formatDate(row.periodStartDate)} – {formatDate(row.periodEndDate)}
+                              {formatDate(row.periodStartDate)} –{" "}
+                              {formatDate(row.periodEndDate)}
                               {row.source === "adjustment" && (
-                                <Badge variant="outline" className="ml-2">Adjusted</Badge>
+                                <Badge variant="outline" className="ml-2">
+                                  Adjusted
+                                </Badge>
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums">
                               {formatInrExact(row.depreciationAmount)}
                             </td>
-                            <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                            <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
                               {formatInrExact(row.accumulatedDepreciation)}
                             </td>
                             <td className="px-4 py-2.5 text-right font-medium tabular-nums">
@@ -453,13 +571,19 @@ export default function AssetDetailPage() {
                   </div>
                   <div className="divide-y">
                     {asset.valueAdjustments.map((adjustment) => (
-                      <div key={adjustment.id} className="flex items-start justify-between gap-4 px-4 py-3">
+                      <div
+                        key={adjustment.id}
+                        className="flex items-start justify-between gap-4 px-4 py-3"
+                      >
                         <div>
                           <p className="text-sm font-medium">
-                            {formatInrExact(adjustment.previousBookValue)} → {formatInrExact(adjustment.newValue)}
+                            {formatInrExact(adjustment.previousBookValue)} →{" "}
+                            {formatInrExact(adjustment.newValue)}
                           </p>
                           {adjustment.reason && (
-                            <p className="mt-0.5 text-xs text-muted-foreground">{adjustment.reason}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {adjustment.reason}
+                            </p>
                           )}
                         </div>
                         <span className="shrink-0 text-xs text-muted-foreground">
@@ -494,16 +618,24 @@ export default function AssetDetailPage() {
                   )}
                 </div>
                 {asset.repairs.length === 0 ? (
-                  <p className="p-6 text-center text-sm text-muted-foreground">No repairs logged.</p>
+                  <p className="p-6 text-center text-sm text-muted-foreground">
+                    No repairs logged.
+                  </p>
                 ) : (
                   <div className="divide-y">
                     {[...asset.repairs].reverse().map((repair) => (
-                      <div key={repair.id} className="flex items-start justify-between gap-4 px-4 py-3">
+                      <div
+                        key={repair.id}
+                        className="flex items-start justify-between gap-4 px-4 py-3"
+                      >
                         <div>
-                          <p className="text-sm font-medium">{repair.description}</p>
+                          <p className="text-sm font-medium">
+                            {repair.description}
+                          </p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {formatDate(repair.date)}
-                            {repair.cost > 0 && ` · ${formatInrExact(repair.cost)}`}
+                            {repair.cost > 0 &&
+                              ` · ${formatInrExact(repair.cost)}`}
                           </p>
                         </div>
                       </div>
@@ -521,7 +653,11 @@ export default function AssetDetailPage() {
                   {canManageOrganization && (
                     <Label className="inline-flex cursor-pointer">
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-muted">
-                        {uploadingAttachment ? <Spinner className="size-3.5" /> : <PlusIcon className="size-3.5" />}
+                        {uploadingAttachment ? (
+                          <Spinner className="size-3.5" />
+                        ) : (
+                          <PlusIcon className="size-3.5" />
+                        )}
                         Add File
                       </span>
                       <Input
@@ -530,7 +666,9 @@ export default function AssetDetailPage() {
                         className="sr-only"
                         disabled={uploadingAttachment}
                         onChange={(event) => {
-                          void handleAttachmentUpload(event.target.files?.[0] ?? null)
+                          void handleAttachmentUpload(
+                            event.target.files?.[0] ?? null
+                          )
                           event.target.value = ""
                         }}
                       />
@@ -539,23 +677,36 @@ export default function AssetDetailPage() {
                 </div>
                 {asset.attachments.length === 0 ? (
                   <p className="p-6 text-center text-sm text-muted-foreground">
-                    No attachments. Add the purchase invoice, photos, or warranty card.
+                    No attachments. Add the purchase invoice, photos, or
+                    warranty card.
                   </p>
                 ) : (
                   <div className="divide-y">
                     {asset.attachments.map((attachment) => (
-                      <div key={attachment.id} className="flex items-center justify-between gap-4 px-4 py-3">
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between gap-4 px-4 py-3"
+                      >
                         <button
                           type="button"
                           className="flex min-w-0 items-center gap-2 text-left text-sm font-medium hover:underline"
                           onClick={() =>
-                            void openAssetAttachment(attachment.key, attachment.originalName).catch((err) =>
-                              toast.error(err instanceof Error ? err.message : "Failed to open attachment")
+                            void openAssetAttachment(
+                              attachment.key,
+                              attachment.originalName
+                            ).catch((err) =>
+                              toast.error(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Failed to open attachment"
+                              )
                             )
                           }
                         >
                           <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{attachment.originalName || attachment.key}</span>
+                          <span className="truncate">
+                            {attachment.originalName || attachment.key}
+                          </span>
                         </button>
                         {canManageOrganization && (
                           <Button
@@ -566,9 +717,12 @@ export default function AssetDetailPage() {
                               void runAction(
                                 `remove-attachment-${attachment.id}`,
                                 () =>
-                                  assetsFetch(`/${asset._id}/attachments/${attachment.id}`, {
-                                    method: "DELETE",
-                                  }),
+                                  assetsFetch(
+                                    `/${asset._id}/attachments/${attachment.id}`,
+                                    {
+                                      method: "DELETE",
+                                    }
+                                  ),
                                 "Attachment removed"
                               )
                             }
@@ -587,7 +741,9 @@ export default function AssetDetailPage() {
 
             <div className="space-y-6">
               <section className="rounded-xl border">
-                <div className="border-b bg-muted/30 px-4 py-2.5 text-sm font-semibold">Custody</div>
+                <div className="border-b bg-muted/30 px-4 py-2.5 text-sm font-semibold">
+                  Custody
+                </div>
                 <div className="space-y-4 p-4">
                   <div className="grid gap-2">
                     <Label className="flex items-center gap-1.5">
@@ -604,7 +760,8 @@ export default function AssetDetailPage() {
                               assetsFetch(`/${asset._id}/assign`, {
                                 method: "POST",
                                 body: JSON.stringify({
-                                  employeeId: value === NONE_VALUE ? null : value,
+                                  employeeId:
+                                    value === NONE_VALUE ? null : value,
                                 }),
                               }),
                             "Assignment updated"
@@ -625,7 +782,9 @@ export default function AssetDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm font-medium">{employee?.fullName ?? "Unassigned"}</p>
+                      <p className="text-sm font-medium">
+                        {employee?.fullName ?? "Unassigned"}
+                      </p>
                     )}
                   </div>
 
@@ -644,7 +803,8 @@ export default function AssetDetailPage() {
                               assetsFetch(`/${asset._id}/move`, {
                                 method: "POST",
                                 body: JSON.stringify({
-                                  locationId: value === NONE_VALUE ? null : value,
+                                  locationId:
+                                    value === NONE_VALUE ? null : value,
                                 }),
                               }),
                             "Location updated"
@@ -656,7 +816,9 @@ export default function AssetDetailPage() {
                           <SelectValue placeholder="No location" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={NONE_VALUE}>No Location</SelectItem>
+                          <SelectItem value={NONE_VALUE}>
+                            No Location
+                          </SelectItem>
                           {locations.map((option) => (
                             <SelectItem key={option._id} value={option._id}>
                               {option.name}
@@ -665,7 +827,9 @@ export default function AssetDetailPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm font-medium">{location?.name ?? "—"}</p>
+                      <p className="text-sm font-medium">
+                        {location?.name ?? "—"}
+                      </p>
                     )}
                   </div>
 
@@ -680,7 +844,9 @@ export default function AssetDetailPage() {
                             () =>
                               assetsFetch(`/${asset._id}/condition`, {
                                 method: "POST",
-                                body: JSON.stringify({ condition: value as AssetCondition }),
+                                body: JSON.stringify({
+                                  condition: value as AssetCondition,
+                                }),
                               }),
                             "Condition updated"
                           )
@@ -691,15 +857,19 @@ export default function AssetDetailPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(CONDITION_LABELS).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
+                          {Object.entries(CONDITION_LABELS).map(
+                            ([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            )
+                          )}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm font-medium">{CONDITION_LABELS[asset.condition]}</p>
+                      <p className="text-sm font-medium">
+                        {CONDITION_LABELS[asset.condition]}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -711,7 +881,9 @@ export default function AssetDetailPage() {
                   Activity
                 </div>
                 {activity.length === 0 ? (
-                  <p className="p-6 text-center text-sm text-muted-foreground">No activity yet.</p>
+                  <p className="p-6 text-center text-sm text-muted-foreground">
+                    No activity yet.
+                  </p>
                 ) : (
                   <div className="max-h-96 divide-y overflow-y-auto">
                     {activity.map((entry) => (
@@ -736,18 +908,14 @@ export default function AssetDetailPage() {
           <DialogHeader>
             <DialogTitle>Adjust Asset Value</DialogTitle>
             <DialogDescription>
-              Revalue the asset as of a date. The remaining schedule is recalculated from the new value.
+              Revalue the asset as of a date. The remaining schedule is
+              recalculated from the new value.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="adjust-date">Adjustment date</Label>
-              <Input
-                id="adjust-date"
-                type="date"
-                value={adjustDate}
-                onChange={(event) => setAdjustDate(event.target.value)}
-              />
+              <Label>Adjustment date</Label>
+              <DatePicker value={adjustDate} onChange={setAdjustDate} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="adjust-value">New value (INR)</Label>
@@ -773,7 +941,11 @@ export default function AssetDetailPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustOpen(false)} disabled={busyAction !== null}>
+            <Button
+              variant="outline"
+              onClick={() => setAdjustOpen(false)}
+              disabled={busyAction !== null}
+            >
               Cancel
             </Button>
             <Button
@@ -808,14 +980,20 @@ export default function AssetDetailPage() {
           <DialogHeader>
             <DialogTitle>Dispose Asset</DialogTitle>
             <DialogDescription>
-              Record a sale or scrapping. The gain or loss is computed against the book value at the disposal date.
+              Record a sale or scrapping. The gain or loss is computed against
+              the book value at the disposal date.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Disposal type</Label>
-                <Select value={disposeType} onValueChange={(value) => setDisposeType(value as "sold" | "scrapped")}>
+                <Select
+                  value={disposeType}
+                  onValueChange={(value) =>
+                    setDisposeType(value as "sold" | "scrapped")
+                  }
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -826,13 +1004,8 @@ export default function AssetDetailPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="dispose-date">Disposal date</Label>
-                <Input
-                  id="dispose-date"
-                  type="date"
-                  value={disposeDate}
-                  onChange={(event) => setDisposeDate(event.target.value)}
-                />
+                <Label>Disposal date</Label>
+                <DatePicker value={disposeDate} onChange={setDisposeDate} />
               </div>
             </div>
             {disposeType === "sold" && (
@@ -866,12 +1039,16 @@ export default function AssetDetailPage() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Current book value: {formatInrExact(asset.currentBookValue)}. Disposal is permanent — the
-              asset can no longer be edited.
+              Current book value: {formatInrExact(asset.currentBookValue)}.
+              Disposal is permanent — the asset can no longer be edited.
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDisposeOpen(false)} disabled={busyAction !== null}>
+            <Button
+              variant="outline"
+              onClick={() => setDisposeOpen(false)}
+              disabled={busyAction !== null}
+            >
               Cancel
             </Button>
             <Button
@@ -890,7 +1067,9 @@ export default function AssetDetailPage() {
                         notes: disposeNotes,
                       }),
                     }),
-                  disposeType === "sold" ? "Asset marked as sold" : "Asset scrapped"
+                  disposeType === "sold"
+                    ? "Asset marked as sold"
+                    : "Asset scrapped"
                 ).then((success) => {
                   if (success) setDisposeOpen(false)
                 })
@@ -908,18 +1087,15 @@ export default function AssetDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Log Repair</DialogTitle>
-            <DialogDescription>Record maintenance or repair work done on this asset.</DialogDescription>
+            <DialogDescription>
+              Record maintenance or repair work done on this asset.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="repair-date">Repair date</Label>
-                <Input
-                  id="repair-date"
-                  type="date"
-                  value={repairDate}
-                  onChange={(event) => setRepairDate(event.target.value)}
-                />
+                <Label>Repair date</Label>
+                <DatePicker value={repairDate} onChange={setRepairDate} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="repair-cost">Cost (INR)</Label>
@@ -943,7 +1119,11 @@ export default function AssetDetailPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRepairOpen(false)} disabled={busyAction !== null}>
+            <Button
+              variant="outline"
+              onClick={() => setRepairOpen(false)}
+              disabled={busyAction !== null}
+            >
               Cancel
             </Button>
             <Button
@@ -978,11 +1158,16 @@ export default function AssetDetailPage() {
           <DialogHeader>
             <DialogTitle>Delete Draft Asset</DialogTitle>
             <DialogDescription>
-              This permanently removes {asset.assetCode} and its activity log. Only draft assets can be deleted.
+              This permanently removes {asset.assetCode} and its activity log.
+              Only draft assets can be deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={busyAction !== null}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={busyAction !== null}
+            >
               Cancel
             </Button>
             <Button
@@ -995,7 +1180,11 @@ export default function AssetDetailPage() {
                     void navigate({ to: "/assets" })
                   })
                   .catch((err) => {
-                    toast.error(err instanceof Error ? err.message : "Failed to delete asset")
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to delete asset"
+                    )
                     setBusyAction(null)
                   })
               }}

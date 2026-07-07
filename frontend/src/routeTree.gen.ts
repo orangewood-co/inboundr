@@ -54,6 +54,7 @@ import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 import { Route as AssetsSettingsRouteImport } from './routes/assets_.settings'
+import { Route as AssetsNewRouteImport } from './routes/assets_.new'
 import { Route as AssetsImportRouteImport } from './routes/assets_.import'
 import { Route as AssetsIdRouteImport } from './routes/assets_.$id'
 import { Route as AdminFeedbackRouteImport } from './routes/admin_.feedback'
@@ -288,6 +289,11 @@ const AssetsSettingsRoute = AssetsSettingsRouteImport.update({
   path: '/assets/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssetsNewRoute = AssetsNewRouteImport.update({
+  id: '/assets_/new',
+  path: '/assets/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssetsImportRoute = AssetsImportRouteImport.update({
   id: '/assets_/import',
   path: '/assets/import',
@@ -358,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/admin/feedback': typeof AdminFeedbackRouteWithChildren
   '/assets/$id': typeof AssetsIdRoute
   '/assets/import': typeof AssetsImportRoute
+  '/assets/new': typeof AssetsNewRoute
   '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
@@ -408,6 +415,7 @@ export interface FileRoutesByTo {
   '/stats': typeof StatsRoute
   '/assets/$id': typeof AssetsIdRoute
   '/assets/import': typeof AssetsImportRoute
+  '/assets/new': typeof AssetsNewRoute
   '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
@@ -464,6 +472,7 @@ export interface FileRoutesById {
   '/admin_/feedback': typeof AdminFeedbackRouteWithChildren
   '/assets_/$id': typeof AssetsIdRoute
   '/assets_/import': typeof AssetsImportRoute
+  '/assets_/new': typeof AssetsNewRoute
   '/assets_/settings': typeof AssetsSettingsRoute
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
@@ -521,6 +530,7 @@ export interface FileRouteTypes {
     | '/admin/feedback'
     | '/assets/$id'
     | '/assets/import'
+    | '/assets/new'
     | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
@@ -571,6 +581,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/assets/$id'
     | '/assets/import'
+    | '/assets/new'
     | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
@@ -626,6 +637,7 @@ export interface FileRouteTypes {
     | '/admin_/feedback'
     | '/assets_/$id'
     | '/assets_/import'
+    | '/assets_/new'
     | '/assets_/settings'
     | '/customers_/$id'
     | '/customers_/import'
@@ -682,6 +694,7 @@ export interface RootRouteChildren {
   AdminFeedbackRoute: typeof AdminFeedbackRouteWithChildren
   AssetsIdRoute: typeof AssetsIdRoute
   AssetsImportRoute: typeof AssetsImportRoute
+  AssetsNewRoute: typeof AssetsNewRoute
   AssetsSettingsRoute: typeof AssetsSettingsRoute
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
@@ -1014,6 +1027,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AssetsSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assets_/new': {
+      id: '/assets_/new'
+      path: '/assets/new'
+      fullPath: '/assets/new'
+      preLoaderRoute: typeof AssetsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/assets_/import': {
       id: '/assets_/import'
       path: '/assets/import'
@@ -1171,6 +1191,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminFeedbackRoute: AdminFeedbackRouteWithChildren,
   AssetsIdRoute: AssetsIdRoute,
   AssetsImportRoute: AssetsImportRoute,
+  AssetsNewRoute: AssetsNewRoute,
   AssetsSettingsRoute: AssetsSettingsRoute,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
