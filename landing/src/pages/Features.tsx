@@ -5,10 +5,18 @@ import { PageHeader } from "@/components/PageHeader"
 
 const features = [
   {
+    title: "Assets",
+    description: "A full asset register with employee custody, locations, automatic depreciation schedules, warranty and repair tracking, and disposal with gain or loss — built right into Inboundr.",
+    date: "July 2026",
+    tag: "New",
+    to: "/features/assets",
+    bg: "#5c3a1a",
+  },
+  {
     title: "Support",
     description: "Live chat for your website backed by a realtime team inbox — with visitor context, file and voice messages, branding, and post-chat feedback, built right into Inboundr.",
     date: "June 2026",
-    tag: "New",
+    tag: "Feature",
     to: "/features/support",
     bg: "#1a6a5c",
   },

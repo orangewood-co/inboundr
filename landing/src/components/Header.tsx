@@ -18,10 +18,10 @@ export default function Header() {
     <>
       {/* ── Banner ── */}
       <div className="noise relative z-50 overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide">
-        <span className="relative z-10 text-text-muted">Introducing Invoices</span>
+        <span className="relative z-10 text-text-muted">Introducing Assets</span>
         <span className="relative z-10 mx-2 text-text-dim">|</span>
         <Link
-          to="/features/invoices"
+          to="/features/assets"
           className="relative z-10 font-medium text-text transition-colors duration-200 hover:text-gold"
         >
           Learn more <ArrowRight className="mb-px inline size-3" />
