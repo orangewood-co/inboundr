@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   ArchiveIcon,
   ArrowLeftIcon,
   ClipboardListIcon,
+  ImagePlusIcon,
+  ImagesIcon,
   MapPinIcon,
   ReceiptTextIcon,
   TrendingDownIcon,
+  XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -32,9 +35,12 @@ import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { API_ORIGIN } from "@/lib/env"
 import {
+  ASSET_IMAGE_MIME_TYPES,
   assetsFetch,
   DEPRECIATION_METHOD_LABELS,
   formatInr,
+  MAX_ASSET_IMAGES,
+  uploadAssetImage,
   type Asset,
   type AssetCategory,
   type AssetDepreciationMethod,
@@ -46,6 +52,14 @@ const NONE_VALUE = "__none__"
 interface EmployeeOption {
   _id: string
   fullName: string
+}
+
+interface UploadedPhoto {
+  key: string
+  originalName: string
+  contentType: string
+  size: number
+  previewUrl: string
 }
 
 type AssetFormState = {
@@ -149,8 +163,24 @@ export default function AssetNewPage() {
     prefix: string
     nextSequence: number
   } | null>(null)
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const photosRef = useRef<UploadedPhoto[]>([])
+
+  useEffect(() => {
+    photosRef.current = photos
+  }, [photos])
+
+  // Revoke local preview object URLs when leaving the page.
+  useEffect(() => {
+    return () => {
+      for (const photo of photosRef.current) {
+        URL.revokeObjectURL(photo.previewUrl)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     void assetsFetch<{ categories: AssetCategory[] }>("/categories")
@@ -222,6 +252,46 @@ export default function AssetNewPage() {
     return `${first} – ${formatCode(codePreview.prefix, codePreview.nextSequence + copies - 1)}`
   }, [codePreview, copies])
 
+  async function handlePhotoFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return
+
+    const files = Array.from(fileList)
+    const remaining = MAX_ASSET_IMAGES - photos.length
+    if (remaining <= 0) {
+      toast.error(`Assets can have up to ${MAX_ASSET_IMAGES} photos`)
+      return
+    }
+    if (files.length > remaining) {
+      toast.error(
+        `Only ${remaining} more photo${remaining === 1 ? "" : "s"} can be added`
+      )
+    }
+
+    setUploadingPhotos(true)
+    for (const file of files.slice(0, remaining)) {
+      try {
+        const uploaded = await uploadAssetImage(file)
+        setPhotos((current) => [
+          ...current,
+          { ...uploaded, previewUrl: URL.createObjectURL(file) },
+        ])
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : `Failed to upload ${file.name}`
+        )
+      }
+    }
+    setUploadingPhotos(false)
+  }
+
+  function removePhoto(key: string) {
+    setPhotos((current) => {
+      const photo = current.find((item) => item.key === key)
+      if (photo) URL.revokeObjectURL(photo.previewUrl)
+      return current.filter((item) => item.key !== key)
+    })
+  }
+
   async function createAsset() {
     setSaving(true)
     setSaveError(null)
@@ -244,6 +314,12 @@ export default function AssetNewPage() {
             : form.assignedEmployeeId,
         warrantyExpiryDate: form.warrantyExpiryDate || null,
         amcExpiryDate: form.amcExpiryDate || null,
+        images: photos.map(({ key, originalName, contentType, size }) => ({
+          key,
+          originalName,
+          contentType,
+          size,
+        })),
         depreciation: {
           method: form.method,
           usefulLifeMonths: Number(form.usefulLifeMonths) || 60,
@@ -397,6 +473,67 @@ export default function AssetNewPage() {
                     </Field>
                   </div>
                 </FieldGroup>
+              </FormSection>
+
+              <FormSection
+                icon={ImagesIcon}
+                title="Photos"
+                description="Pictures of the asset; the first photo is used as the cover."
+              >
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                  {photos.map((photo, index) => (
+                    <div
+                      key={photo.key}
+                      className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                    >
+                      <img
+                        src={photo.previewUrl}
+                        alt={photo.originalName}
+                        className="size-full object-cover"
+                      />
+                      {index === 0 && (
+                        <span className="absolute bottom-1 left-1 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-semibold">
+                          Cover
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(photo.key)}
+                        className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-background/85 opacity-0 shadow-xs transition-opacity group-hover:opacity-100 hover:bg-background"
+                      >
+                        <XIcon className="size-3.5" />
+                        <span className="sr-only">Remove photo</span>
+                      </button>
+                    </div>
+                  ))}
+                  {photos.length < MAX_ASSET_IMAGES && (
+                    <FieldLabel className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed bg-muted/20 text-center transition-colors hover:border-primary/50 hover:bg-primary/5">
+                      {uploadingPhotos ? (
+                        <Spinner className="size-5 text-primary" />
+                      ) : (
+                        <ImagePlusIcon className="size-5 text-primary" />
+                      )}
+                      <span className="text-xs font-medium">Add Photos</span>
+                      <Input
+                        type="file"
+                        multiple
+                        accept={ASSET_IMAGE_MIME_TYPES.join(",")}
+                        className="sr-only"
+                        disabled={uploadingPhotos}
+                        onChange={(event) => {
+                          void handlePhotoFiles(event.target.files)
+                          event.target.value = ""
+                        }}
+                      />
+                    </FieldLabel>
+                  )}
+                </div>
+                <FieldDescription className="mt-3">
+                  JPG, PNG, or WebP up to 10MB each; max {MAX_ASSET_IMAGES}{" "}
+                  photos.
+                  {copies > 1 &&
+                    " When creating copies, photos attach only to the first asset."}
+                </FieldDescription>
               </FormSection>
 
               <FormSection
@@ -688,6 +825,10 @@ export default function AssetNewPage() {
                     label="Method"
                     value={DEPRECIATION_METHOD_LABELS[form.method]}
                   />
+                  <SummaryRow
+                    label="Photos"
+                    value={photos.length > 0 ? photos.length : "None"}
+                  />
                   <Separator />
                   <p className="text-xs text-muted-foreground">
                     Created as a draft. Activate the asset from its detail page
@@ -704,7 +845,7 @@ export default function AssetNewPage() {
                   <Button
                     className="w-full"
                     onClick={() => void createAsset()}
-                    disabled={saving || !form.name.trim()}
+                    disabled={saving || uploadingPhotos || !form.name.trim()}
                   >
                     {saving && <Spinner data-icon="inline-start" />}
                     {copies === 1 ? "Create Asset" : `Create ${copies} Assets`}

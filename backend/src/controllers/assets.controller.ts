@@ -12,6 +12,7 @@ import { Asset } from "../models/asset.model";
 import {
   activateAsset,
   addAssetAttachment,
+  addAssetImages,
   addAssetRepair,
   adjustAssetValue,
   assignAsset,
@@ -29,7 +30,9 @@ import {
   moveAsset,
   normalizeAssetInput,
   removeAssetAttachment,
+  removeAssetImage,
   setAssetCondition,
+  setAssetCoverImage,
   updateAssetRecord,
   updateAssetSettings,
   type AssetActor,
@@ -483,6 +486,48 @@ export async function removeAttachment(req: Request, res: Response): Promise<voi
     res.json(asset);
   } catch (err) {
     handleError(res, err, "Failed to remove attachment");
+  }
+}
+
+export async function addImages(req: Request, res: Response): Promise<void> {
+  try {
+    const asset = await addAssetImages(
+      organizationIdOf(req),
+      String(req.params.id),
+      req.body ?? {},
+      actorOf(req)
+    );
+    res.json(asset);
+  } catch (err) {
+    handleError(res, err, "Failed to add photos");
+  }
+}
+
+export async function removeImage(req: Request, res: Response): Promise<void> {
+  try {
+    const asset = await removeAssetImage(
+      organizationIdOf(req),
+      String(req.params.id),
+      String(req.params.imageId),
+      actorOf(req)
+    );
+    res.json(asset);
+  } catch (err) {
+    handleError(res, err, "Failed to remove photo");
+  }
+}
+
+export async function setCoverImage(req: Request, res: Response): Promise<void> {
+  try {
+    const asset = await setAssetCoverImage(
+      organizationIdOf(req),
+      String(req.params.id),
+      String(req.params.imageId),
+      actorOf(req)
+    );
+    res.json(asset);
+  } catch (err) {
+    handleError(res, err, "Failed to set cover photo");
   }
 }
 

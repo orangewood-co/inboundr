@@ -6,6 +6,7 @@ import {
   ChevronRightIcon,
   CircleDollarSignIcon,
   DownloadIcon,
+  ImageIcon,
   MonitorCogIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -19,6 +20,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { AssetImage } from "@/components/asset-image"
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { PageToolbar } from "@/components/page-header"
 import { Badge } from "@/components/ui/badge"
@@ -513,12 +515,29 @@ export default function AssetsPage() {
                         </span>
                       </td>
                       <td className="max-w-sm px-5 py-3.5 align-top">
-                        <p className="line-clamp-1 font-medium">{asset.name}</p>
-                        {asset.serialNumber && (
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            SN {asset.serialNumber}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {asset.images?.[0] ? (
+                            <AssetImage
+                              imageKey={asset.images[0].key}
+                              alt={asset.name}
+                              className="size-9 shrink-0 rounded-md border"
+                            />
+                          ) : (
+                            <div className="flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                              <ImageIcon className="size-4 text-muted-foreground/50" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="line-clamp-1 font-medium">
+                              {asset.name}
+                            </p>
+                            {asset.serialNumber && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                SN {asset.serialNumber}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 align-top text-muted-foreground">
                         {populatedRef(asset.categoryId)?.name ?? "—"}

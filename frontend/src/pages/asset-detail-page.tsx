@@ -7,9 +7,12 @@ import {
   CircleCheckIcon,
   FileIcon,
   HistoryIcon,
+  ImagePlusIcon,
+  ImagesIcon,
   MapPinIcon,
   PaperclipIcon,
   PlusIcon,
+  StarIcon,
   Trash2Icon,
   UserIcon,
   WrenchIcon,
@@ -18,6 +21,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { AssetImage } from "@/components/asset-image"
 import { DatePicker } from "@/components/date-picker"
 import { ErrorState } from "@/components/list-states"
 import { Badge } from "@/components/ui/badge"
@@ -45,16 +49,21 @@ import { useEntitlements } from "@/lib/entitlements"
 import { API_ORIGIN } from "@/lib/env"
 import { formatDate, formatDateTime } from "@/lib/format"
 import {
+  ASSET_IMAGE_MIME_TYPES,
   assetsFetch,
   CONDITION_LABELS,
   DEPRECIATION_METHOD_LABELS,
   formatInrExact,
   LIFECYCLE_STATUS_LABELS,
+  MAX_ASSET_IMAGES,
   openAssetAttachment,
   populatedRef,
+  resolveAssetImageUrl,
   uploadAssetAttachment,
+  uploadAssetImage,
   type Asset,
   type AssetActivityEntry,
+  type AssetAttachment,
   type AssetCondition,
   type AssetLocation,
 } from "@/lib/assets"
@@ -124,6 +133,11 @@ export default function AssetDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<AssetAttachment | null>(
+    null
+  )
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   const fetchAsset = useCallback(async () => {
     setError(null)
@@ -202,6 +216,60 @@ export default function AssetDetailPage() {
     } finally {
       setUploadingAttachment(false)
     }
+  }
+
+  async function handlePhotoUpload(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0 || !asset) return
+
+    const files = Array.from(fileList)
+    const remaining = MAX_ASSET_IMAGES - asset.images.length
+    if (remaining <= 0) {
+      toast.error(`Assets can have up to ${MAX_ASSET_IMAGES} photos`)
+      return
+    }
+    if (files.length > remaining) {
+      toast.error(
+        `Only ${remaining} more photo${remaining === 1 ? "" : "s"} can be added`
+      )
+    }
+
+    setUploadingPhotos(true)
+    try {
+      const uploaded = []
+      for (const file of files.slice(0, remaining)) {
+        try {
+          uploaded.push(await uploadAssetImage(file))
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : `Failed to upload ${file.name}`
+          )
+        }
+      }
+      if (uploaded.length > 0) {
+        await assetsFetch(`/${asset._id}/images`, {
+          method: "POST",
+          body: JSON.stringify({ images: uploaded }),
+        })
+        toast.success(
+          uploaded.length === 1
+            ? "Photo added"
+            : `${uploaded.length} photos added`
+        )
+        await fetchAsset()
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add photos")
+    } finally {
+      setUploadingPhotos(false)
+    }
+  }
+
+  function openLightbox(image: AssetAttachment) {
+    setLightboxImage(image)
+    setLightboxUrl(null)
+    void resolveAssetImageUrl(image.key)
+      .then(setLightboxUrl)
+      .catch(() => toast.error("Failed to load photo"))
   }
 
   if (loading) {
@@ -638,6 +706,117 @@ export default function AssetDetailPage() {
                               ` · ${formatInrExact(repair.cost)}`}
                           </p>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border">
+                <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-2.5">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <ImagesIcon className="size-4 text-muted-foreground" />
+                    Photos
+                  </span>
+                  {canManageOrganization &&
+                    asset.images.length < MAX_ASSET_IMAGES && (
+                      <Label className="inline-flex cursor-pointer">
+                        <span className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-muted">
+                          {uploadingPhotos ? (
+                            <Spinner className="size-3.5" />
+                          ) : (
+                            <ImagePlusIcon className="size-3.5" />
+                          )}
+                          Add Photos
+                        </span>
+                        <Input
+                          type="file"
+                          multiple
+                          accept={ASSET_IMAGE_MIME_TYPES.join(",")}
+                          className="sr-only"
+                          disabled={uploadingPhotos}
+                          onChange={(event) => {
+                            void handlePhotoUpload(event.target.files)
+                            event.target.value = ""
+                          }}
+                        />
+                      </Label>
+                    )}
+                </div>
+                {asset.images.length === 0 ? (
+                  <p className="p-6 text-center text-sm text-muted-foreground">
+                    No photos yet. Add pictures of the asset; the first one
+                    becomes the cover.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-4 md:grid-cols-5">
+                    {asset.images.map((image, index) => (
+                      <div
+                        key={image.id}
+                        className="group relative aspect-square overflow-hidden rounded-lg border"
+                      >
+                        <button
+                          type="button"
+                          className="size-full cursor-zoom-in"
+                          onClick={() => openLightbox(image)}
+                        >
+                          <AssetImage
+                            imageKey={image.key}
+                            alt={image.originalName || "Asset photo"}
+                            className="size-full"
+                          />
+                        </button>
+                        {index === 0 && (
+                          <span className="absolute bottom-1 left-1 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-semibold">
+                            Cover
+                          </span>
+                        )}
+                        {canManageOrganization && (
+                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                title="Set as cover"
+                                className="flex size-6 items-center justify-center rounded-full bg-background/85 shadow-xs hover:bg-background"
+                                onClick={() =>
+                                  void runAction(
+                                    `cover-${image.id}`,
+                                    () =>
+                                      assetsFetch(
+                                        `/${asset._id}/images/${image.id}/cover`,
+                                        { method: "POST", body: "{}" }
+                                      ),
+                                    "Cover photo updated"
+                                  )
+                                }
+                                disabled={busyAction !== null}
+                              >
+                                <StarIcon className="size-3.5" />
+                                <span className="sr-only">Set as cover</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              title="Remove photo"
+                              className="flex size-6 items-center justify-center rounded-full bg-background/85 shadow-xs hover:bg-background"
+                              onClick={() =>
+                                void runAction(
+                                  `remove-image-${image.id}`,
+                                  () =>
+                                    assetsFetch(
+                                      `/${asset._id}/images/${image.id}`,
+                                      { method: "DELETE" }
+                                    ),
+                                  "Photo removed"
+                                )
+                              }
+                              disabled={busyAction !== null}
+                            >
+                              <Trash2Icon className="size-3.5" />
+                              <span className="sr-only">Remove photo</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1194,6 +1373,35 @@ export default function AssetDetailPage() {
               Delete Asset
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={lightboxImage !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setLightboxImage(null)
+            setLightboxUrl(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-6">
+              {lightboxImage?.originalName || "Asset Photo"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex max-h-[70vh] min-h-48 items-center justify-center overflow-hidden rounded-lg bg-muted/40">
+            {lightboxUrl ? (
+              <img
+                src={lightboxUrl}
+                alt={lightboxImage?.originalName || "Asset photo"}
+                className="max-h-[70vh] w-auto max-w-full object-contain"
+              />
+            ) : (
+              <Spinner className="size-6 text-muted-foreground" />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>

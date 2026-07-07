@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   activateAssetHandler,
   addAttachment,
+  addImages,
   addRepairHandler,
   adjustValueHandler,
   archiveCategory,
@@ -23,7 +24,9 @@ import {
   listLocations,
   moveAssetHandler,
   removeAttachment,
+  removeImage,
   setConditionHandler,
+  setCoverImage,
   updateAsset,
   updateCategory,
   updateLocation,
@@ -77,5 +80,8 @@ router.post("/:id/dispose", requireOrganizationAdmin(), disposeAssetHandler);
 router.post("/:id/repairs", addRepairHandler);
 router.post("/:id/attachments", requireOrganizationAdmin(), addAttachment);
 router.delete("/:id/attachments/:attachmentId", requireOrganizationAdmin(), removeAttachment);
+router.post("/:id/images", requireOrganizationAdmin(), addImages);
+router.delete("/:id/images/:imageId", requireOrganizationAdmin(), removeImage);
+router.post("/:id/images/:imageId/cover", requireOrganizationAdmin(), setCoverImage);
 
 export default router;

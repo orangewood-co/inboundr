@@ -104,6 +104,8 @@ export interface IAsset extends Document {
   valueAdjustments: IAssetValueAdjustment[];
   disposal: IAssetDisposal | null;
   attachments: IAssetAttachment[];
+  /** Photo gallery; the first image is the cover. */
+  images: IAssetAttachment[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -240,6 +242,7 @@ const assetSchema = new Schema<IAsset>(
     valueAdjustments: { type: [valueAdjustmentSchema], default: [] },
     disposal: { type: disposalSchema, default: null },
     attachments: { type: [attachmentSchema], default: [] },
+    images: { type: [attachmentSchema], default: [] },
   },
   { timestamps: true }
 );

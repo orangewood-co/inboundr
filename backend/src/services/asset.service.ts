@@ -306,6 +306,133 @@ async function validateReferences(
 }
 
 // ---------------------------------------------------------------------------
+// Images
+// ---------------------------------------------------------------------------
+
+export const MAX_ASSET_IMAGES = 8;
+
+interface AssetImageInput {
+  key: string;
+  originalName: string;
+  contentType: string;
+  size: number;
+}
+
+function normalizeImageInputs(value: unknown): AssetImageInput[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object" && !Array.isArray(item)
+    )
+    .map((item) => ({
+      key: stringValue(item.key),
+      originalName: stringValue(item.originalName),
+      contentType: stringValue(item.contentType),
+      size: Math.max(0, parseNumber(item.size)),
+    }))
+    .filter((item) => item.key.length > 0)
+    .slice(0, MAX_ASSET_IMAGES);
+}
+
+function toImageRecord(input: AssetImageInput) {
+  return {
+    id: crypto.randomUUID(),
+    key: input.key,
+    originalName: input.originalName,
+    contentType: input.contentType,
+    size: input.size,
+    createdAt: new Date(),
+  };
+}
+
+export async function addAssetImages(
+  organizationId: Types.ObjectId,
+  assetId: string,
+  body: Record<string, unknown>,
+  actor: AssetActor
+): Promise<IAsset> {
+  const asset = await findAssetOrThrow(organizationId, assetId);
+  const inputs = normalizeImageInputs(body.images ?? [body]);
+  if (inputs.length === 0) {
+    throw new AssetServiceError("validation", "At least one image is required");
+  }
+  if (asset.images.length + inputs.length > MAX_ASSET_IMAGES) {
+    throw new AssetServiceError(
+      "validation",
+      `Assets can have up to ${MAX_ASSET_IMAGES} photos`
+    );
+  }
+
+  asset.images.push(...inputs.map(toImageRecord));
+  await asset.save();
+
+  await logAssetActivity({
+    organizationId,
+    assetId: asset._id as Types.ObjectId,
+    type: "edited",
+    actor,
+    message: inputs.length === 1 ? "Photo added" : `${inputs.length} photos added`,
+  });
+
+  return asset;
+}
+
+export async function removeAssetImage(
+  organizationId: Types.ObjectId,
+  assetId: string,
+  imageId: string,
+  actor: AssetActor
+): Promise<IAsset> {
+  const asset = await findAssetOrThrow(organizationId, assetId);
+  const before = asset.images.length;
+  asset.images = asset.images.filter((image) => image.id !== imageId);
+  if (asset.images.length === before) {
+    throw new AssetServiceError("not_found", "Photo not found");
+  }
+  await asset.save();
+
+  await logAssetActivity({
+    organizationId,
+    assetId: asset._id as Types.ObjectId,
+    type: "edited",
+    actor,
+    message: "Photo removed",
+  });
+
+  return asset;
+}
+
+export async function setAssetCoverImage(
+  organizationId: Types.ObjectId,
+  assetId: string,
+  imageId: string,
+  actor: AssetActor
+): Promise<IAsset> {
+  const asset = await findAssetOrThrow(organizationId, assetId);
+  const index = asset.images.findIndex((image) => image.id === imageId);
+  if (index === -1) {
+    throw new AssetServiceError("not_found", "Photo not found");
+  }
+  if (index > 0) {
+    const [image] = asset.images.splice(index, 1);
+    asset.images.unshift(image!);
+    await asset.save();
+
+    await logAssetActivity({
+      organizationId,
+      assetId: asset._id as Types.ObjectId,
+      type: "edited",
+      actor,
+      message: "Cover photo changed",
+    });
+  }
+
+  return asset;
+}
+
+// ---------------------------------------------------------------------------
 // CRUD
 // ---------------------------------------------------------------------------
 
@@ -332,8 +459,10 @@ export async function createAssetRecords(
 
   const codes = await nextAssetCodes(organizationId, copies);
   const assets: IAsset[] = [];
+  // Photos attach only to the first created copy.
+  const images = normalizeImageInputs(body.images).map(toImageRecord);
 
-  for (const assetCode of codes) {
+  for (const [index, assetCode] of codes.entries()) {
     const asset = await Asset.create({
       organizationId,
       assetCode,
@@ -352,6 +481,7 @@ export async function createAssetRecords(
       condition: input.condition ?? "in_storage",
       warrantyExpiryDate: input.warrantyExpiryDate ?? null,
       amcExpiryDate: input.amcExpiryDate ?? null,
+      images: index === 0 ? images : [],
     });
 
     await logAssetActivity({

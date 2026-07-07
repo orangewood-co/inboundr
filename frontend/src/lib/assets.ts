@@ -4,7 +4,11 @@ export const ASSETS_API_BASE = `${API_ORIGIN}/api/v1/assets`
 
 export type AssetDepreciationMethod = "straight_line" | "written_down_value"
 export type AssetLifecycleStatus = "draft" | "active" | "sold" | "scrapped"
-export type AssetCondition = "in_use" | "in_storage" | "in_repair" | "out_of_order"
+export type AssetCondition =
+  | "in_use"
+  | "in_storage"
+  | "in_repair"
+  | "out_of_order"
 
 export interface AssetCategory {
   _id: string
@@ -110,6 +114,8 @@ export interface Asset {
   valueAdjustments: AssetValueAdjustment[]
   disposal: AssetDisposal | null
   attachments: AssetAttachment[]
+  /** Photo gallery; the first image is the cover. */
+  images: AssetAttachment[]
   currentBookValue: number
   createdAt: string
   updatedAt: string
@@ -149,7 +155,10 @@ export const CONDITION_LABELS: Record<AssetCondition, string> = {
   out_of_order: "Out of order",
 }
 
-export const DEPRECIATION_METHOD_LABELS: Record<AssetDepreciationMethod, string> = {
+export const DEPRECIATION_METHOD_LABELS: Record<
+  AssetDepreciationMethod,
+  string
+> = {
   straight_line: "Straight line",
   written_down_value: "Written down value",
 }
@@ -221,9 +230,12 @@ export async function uploadAssetAttachment(file: File): Promise<{
       size: file.size,
     }),
   })
-  const presign: PresignedUpload | { error?: string } = await presignResponse.json()
+  const presign: PresignedUpload | { error?: string } =
+    await presignResponse.json()
   if (!presignResponse.ok || !("uploadUrl" in presign)) {
-    throw new Error((presign as { error?: string }).error || `Unable to upload ${file.name}`)
+    throw new Error(
+      (presign as { error?: string }).error || `Unable to upload ${file.name}`
+    )
   }
 
   const uploadResponse = await fetch(presign.uploadUrl, {
@@ -243,12 +255,66 @@ export async function uploadAssetAttachment(file: File): Promise<{
   }
 }
 
-export async function openAssetAttachment(key: string, fileName: string): Promise<void> {
+export const MAX_ASSET_IMAGES = 8
+export const ASSET_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const ASSET_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+
+export async function uploadAssetImage(file: File): Promise<{
+  key: string
+  originalName: string
+  contentType: string
+  size: number
+}> {
+  if (!ASSET_IMAGE_MIME_TYPES.includes(file.type)) {
+    throw new Error(`${file.name} must be a JPG, PNG, or WebP image`)
+  }
+  if (file.size > ASSET_IMAGE_MAX_BYTES) {
+    throw new Error(`${file.name} must be 10MB or smaller`)
+  }
+  return uploadAssetAttachment(file)
+}
+
+const imageUrlCache = new Map<string, Promise<string>>()
+
+/** Presigned view URL for an asset image key, cached per session. */
+export function resolveAssetImageUrl(key: string): Promise<string> {
+  const cached = imageUrlCache.get(key)
+  if (cached) return cached
+
+  const promise = fetch(
+    `${API_ORIGIN}/api/v1/uploads/view?key=${encodeURIComponent(key)}`,
+    { credentials: "include" }
+  )
+    .then(async (response) => {
+      const data: { url?: string; error?: string } = await response
+        .json()
+        .catch(() => ({}))
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Failed to load image")
+      }
+      return data.url
+    })
+    .catch((err) => {
+      // Presigned URLs are transient; do not cache failures.
+      imageUrlCache.delete(key)
+      throw err
+    })
+
+  imageUrlCache.set(key, promise)
+  return promise
+}
+
+export async function openAssetAttachment(
+  key: string,
+  fileName: string
+): Promise<void> {
   const response = await fetch(
     `${API_ORIGIN}/api/v1/uploads/view?key=${encodeURIComponent(key)}&filename=${encodeURIComponent(fileName)}`,
     { credentials: "include" }
   )
-  const data: { url?: string; error?: string } = await response.json().catch(() => ({}))
+  const data: { url?: string; error?: string } = await response
+    .json()
+    .catch(() => ({}))
   if (!response.ok || !data.url) {
     throw new Error(data.error || "Failed to open attachment")
   }
