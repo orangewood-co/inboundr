@@ -37,6 +37,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/settings": "Settings",
   "/stats": "Stats",
   "/support": "Support",
+  "/assets": "Assets",
 }
 
 const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: string }> = [
