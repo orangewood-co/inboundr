@@ -3,9 +3,9 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { fetchGlobalSearch, type SearchResult, type SearchResponse } from "@/lib/search-api"
+import { SEARCH_GROUPS, fetchGlobalSearch, type SearchResult, type SearchResponse } from "@/lib/search-api"
 import { useNavigate } from "@tanstack/react-router"
-import { Building2Icon, FileTextIcon, LoaderIcon, PackageIcon, SearchIcon } from "lucide-react"
+import { LoaderIcon, SearchIcon } from "lucide-react"
 
 export function SearchForm({ ...props }: React.ComponentProps<"form">) {
   const navigate = useNavigate()
@@ -18,11 +18,11 @@ export function SearchForm({ ...props }: React.ComponentProps<"form">) {
   const containerRef = useRef<HTMLFormElement | null>(null)
 
   const groupedResults = useMemo(
-    () => [
-      { key: "customers", label: "Customers", icon: Building2Icon, items: results?.results.customers ?? [] },
-      { key: "products", label: "Products", icon: PackageIcon, items: results?.results.products ?? [] },
-      { key: "rfqs", label: "RFQs", icon: FileTextIcon, items: results?.results.rfqs ?? [] },
-    ],
+    () =>
+      SEARCH_GROUPS.map((group) => ({
+        ...group,
+        items: results?.results[group.key] ?? [],
+      })),
     [results]
   )
   const flatResults = groupedResults.flatMap((group) => group.items)

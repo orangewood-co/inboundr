@@ -1,27 +1,28 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
-import { AlertCircleIcon, Building2Icon, FileTextIcon, PackageIcon, SearchIcon } from "lucide-react"
+import { AlertCircleIcon, SearchIcon } from "lucide-react"
 
 import { AppLayout } from "@/components/app-layout"
 import { ListSkeleton } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { fetchGlobalSearch, type SearchResult, type SearchResponse } from "@/lib/search-api"
+import {
+  SEARCH_GROUPS,
+  fetchGlobalSearch,
+  type SearchGroup,
+  type SearchResult,
+  type SearchResponse,
+} from "@/lib/search-api"
 import { cn } from "@/lib/utils"
 
 type SearchParams = {
   q?: string
 }
 
-const groups = [
-  { key: "customers", label: "Customers", icon: Building2Icon },
-  { key: "products", label: "Products", icon: PackageIcon },
-  { key: "rfqs", label: "RFQs", icon: FileTextIcon },
-] as const
-
-function ResultCard({ result }: { result: SearchResult }) {
+function ResultCard({ result, group }: { result: SearchResult; group: SearchGroup }) {
   const navigate = useNavigate()
+  const Icon = group.icon
   return (
     <button
       type="button"
@@ -29,13 +30,7 @@ function ResultCard({ result }: { result: SearchResult }) {
       className="group flex w-full items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent/50"
     >
       <div className="mt-0.5 rounded-lg bg-muted p-2">
-        {result.type === "customer" ? (
-          <Building2Icon className="size-4 text-muted-foreground" />
-        ) : result.type === "product" ? (
-          <PackageIcon className="size-4 text-muted-foreground" />
-        ) : (
-          <FileTextIcon className="size-4 text-muted-foreground" />
-        )}
+        <Icon className="size-4 text-muted-foreground" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold group-hover:text-foreground">{result.title}</div>
@@ -81,7 +76,7 @@ function SearchPageContent() {
   const total = results?.total ?? 0
   const groupedResults = useMemo(
     () =>
-      groups.map((group) => ({
+      SEARCH_GROUPS.map((group) => ({
         ...group,
         items: results?.results[group.key] ?? [],
       })),
@@ -96,7 +91,7 @@ function SearchPageContent() {
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">Search</h1>
               <p className="text-sm text-muted-foreground">
-                Find customers, catalog products, and RFQs across the active organization.
+                Find customers, products, RFQs, assets, invoices, employees, projects, tickets, forms, links, and Drive files across the active organization.
               </p>
             </div>
             <form
@@ -111,7 +106,7 @@ function SearchPageContent() {
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search by company, product code, RFQ subject..."
+                  placeholder="Search by name, code, number, subject..."
                   className="pl-9"
                 />
               </div>
@@ -153,7 +148,7 @@ function SearchPageContent() {
                   </div>
                   <div className="grid gap-2 md:grid-cols-2">
                     {group.items.map((result) => (
-                      <ResultCard key={`${result.type}-${result.id}`} result={result} />
+                      <ResultCard key={`${result.type}-${result.id}`} result={result} group={group} />
                     ))}
                   </div>
                 </section>
