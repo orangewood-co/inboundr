@@ -465,7 +465,7 @@ export async function changeServiceStatus(req: Request, res: Response): Promise<
     item.statusId = status.id;
     item.systemCategory = status.systemCategory;
     item.resolvedAt = status.systemCategory === "resolved" ? new Date() : item.resolvedAt;
-    item.cancelledAt = status.systemCategory === "cancelled" ? new Date() : null;
+    item.cancelledAt = status.systemCategory === "cancelled" ? item.cancelledAt ?? new Date() : item.cancelledAt;
     item.updatedBy = actorId;
     await item.save();
     await writeServiceActivity({
