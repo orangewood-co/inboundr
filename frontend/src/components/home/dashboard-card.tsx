@@ -36,16 +36,14 @@ export function DashboardCard({
   return (
     <section
       className={cn(
-        "flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-xs",
+        "flex h-full flex-col overflow-hidden rounded-xl border bg-card",
         className
       )}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+      <header className="flex items-center justify-between gap-3 px-4 pb-2 pt-4">
+        <div className="flex min-w-0 items-center gap-2">
           {Icon ? (
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              <Icon className="size-4" />
-            </span>
+            <Icon className="size-4 shrink-0 text-muted-foreground" />
           ) : null}
           <h2 className="truncate text-sm font-semibold tracking-tight">{title}</h2>
         </div>
@@ -83,7 +81,7 @@ function getInitials(value: string) {
 /** Neutral initials avatar used as a row's leading anchor. */
 export function WidgetAvatar({ name }: { name: string }) {
   return (
-    <span className="flex size-8 shrink-0 select-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
+    <span className="flex size-8 shrink-0 select-none items-center justify-center rounded-full bg-muted/70 text-[11px] font-semibold text-muted-foreground">
       {getInitials(name)}
     </span>
   )
@@ -143,7 +141,7 @@ export function WidgetEmpty({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2.5 px-4 py-10 text-center">
       {Icon ? (
-        <span className="flex size-10 items-center justify-center rounded-full bg-muted/70 ring-1 ring-border/60">
+        <span className="flex size-10 items-center justify-center rounded-full bg-muted/60">
           <Icon className="size-[18px] text-muted-foreground" />
         </span>
       ) : null}

@@ -18,6 +18,7 @@ import { CheckIcon, RotateCcwIcon, Settings2Icon, SlidersHorizontalIcon, XIcon }
 
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useEntitlements } from "@/lib/entitlements"
 import type { HomeLayoutItem } from "@/lib/home-layout"
 
@@ -124,15 +125,20 @@ export function DashboardGrid({
             </Button>
           </div>
         ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={enterEdit}
-            className="shrink-0 animate-in fade-in-0 duration-200 motion-reduce:animate-none"
-          >
-            <Settings2Icon className="mr-1.5 size-4" />
-            Customize
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={enterEdit}
+                className="shrink-0 text-muted-foreground hover:text-foreground animate-in fade-in-0 duration-200 motion-reduce:animate-none"
+              >
+                <Settings2Icon className="size-4" />
+                <span className="sr-only">Customize dashboard</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Customize dashboard</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
