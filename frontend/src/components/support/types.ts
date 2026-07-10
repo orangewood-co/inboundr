@@ -46,6 +46,7 @@ export type TicketResolution = {
 
 export type Ticket = {
   id: string
+  serviceRequestId: string | null
   ticketNumber: number
   ticketReference: string
   subject: string

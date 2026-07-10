@@ -117,6 +117,7 @@ export function serializeTicket(ticket: ITicket | any) {
     requester: ticket.requester,
     tags: serializeTicketTags(ticket),
     customerId: customerIdFromTicket(ticket),
+    serviceRequestId: ticket.serviceRequestId ? String(ticket.serviceRequestId) : null,
     customer: serializeCustomer(customerFromTicket(ticket)),
     initialIssue: ticket.initialIssue ?? "",
     emailTranscriptRequested: Boolean(ticket.emailTranscriptRequested),

@@ -16,7 +16,7 @@ import { getAdminMe } from "@/lib/admin"
 import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, MonitorCogIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShieldCheckIcon, ShoppingCartIcon, UsersIcon } from "lucide-react"
+import { BarChart3Icon, BotMessageSquareIcon, CircleDollarSignIcon, ClipboardListIcon, FileTextIcon, FolderKanbanIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, MonitorCogIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShieldCheckIcon, ShoppingCartIcon, UsersIcon, WrenchIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -136,6 +136,13 @@ const data: { navMain: SidebarCategory[] } = {
           icon: <MonitorCogIcon />,
           feature: "assets",
           module: "assets",
+        },
+        {
+          title: "Service",
+          url: "/service",
+          icon: <WrenchIcon />,
+          feature: "service_management",
+          module: "service_management",
         },
         {
           title: "Forms",

@@ -38,6 +38,9 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/stats": "Stats",
   "/support": "Support",
   "/assets": "Assets",
+  "/service": "Service",
+  "/service/new": "New Service Request",
+  "/service/summary": "Service Summary",
 }
 
 const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: string }> = [
@@ -51,6 +54,7 @@ const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: strin
   { match: (p) => p.startsWith("/projects/"), title: "Project Details" },
   { match: (p) => p.startsWith("/links/"), title: "Link Details" },
   { match: (p) => p.startsWith("/support/"), title: "Support Ticket" },
+  { match: (p) => p.startsWith("/service/"), title: "Service Request" },
   { match: (p) => p.startsWith("/invite/"), title: "Invitation" },
 ]
 

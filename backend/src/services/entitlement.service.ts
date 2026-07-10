@@ -15,6 +15,7 @@ export const FEATURE_KEYS = [
   "chat",
   "support",
   "assets",
+  "service_management",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -46,6 +47,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "chat", label: "Chat", description: "AI assistant chat for organization workflows." },
   { key: "support", label: "Support", description: "Support inbox, tickets, templates, and public chat." },
   { key: "assets", label: "Assets", description: "Asset register, depreciation schedules, custody, and disposal tracking." },
+  { key: "service_management", label: "Service Management", description: "Service requests, visits, equipment, workflow, and service history." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [

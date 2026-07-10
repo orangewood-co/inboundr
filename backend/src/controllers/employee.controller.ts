@@ -256,7 +256,12 @@ export async function listEmployeeModules(_req: Request, res: Response): Promise
   res.json({
     modules: VISIBLE_EMPLOYEE_ACCESS_MODULES.map((key) => ({
       key,
-      label: key === "rfq" ? "Quotation" : key.charAt(0).toUpperCase() + key.slice(1),
+      label:
+        key === "rfq"
+          ? "Quotation"
+          : key === "service_management"
+            ? "Service Management"
+            : key.charAt(0).toUpperCase() + key.slice(1),
     })),
   });
 }

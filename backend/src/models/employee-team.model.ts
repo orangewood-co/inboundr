@@ -15,6 +15,7 @@ export const EMPLOYEE_ACCESS_MODULES = [
   "chat",
   "support",
   "assets",
+  "service_management",
 ] as const;
 
 export type EmployeeAccessModule = (typeof EMPLOYEE_ACCESS_MODULES)[number];

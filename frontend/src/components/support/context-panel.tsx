@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
-import { FileIcon, LoaderIcon, LockIcon, MicIcon, PlusIcon, StarIcon, UserRoundCheckIcon } from "lucide-react"
+import { ExternalLinkIcon, FileIcon, LoaderIcon, LockIcon, MicIcon, PlusIcon, StarIcon, UserRoundCheckIcon, WrenchIcon } from "lucide-react"
+import { toast } from "sonner"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { CopyableText } from "@/components/copy-button"
+import { useEntitlements } from "@/lib/entitlements"
 import { API_ORIGIN } from "@/lib/env"
+import { serviceFetch } from "@/lib/service-management"
 import { cn, getAvatarColor } from "@/lib/utils"
 import { ChannelBadge } from "./channel"
 import { useSupport } from "./support-provider"
@@ -295,6 +298,231 @@ function CustomerMapping({ ticket }: { ticket: Ticket }) {
   )
 }
 
+type LinkedServiceRequest = {
+  _id: string
+  reference: string
+  title: string
+  systemCategory: string
+}
+
+function ServiceRequestMapping({ ticket }: { ticket: Ticket }) {
+  const [linkedId, setLinkedId] = useState(ticket.serviceRequestId ?? null)
+  const [linked, setLinked] = useState<LinkedServiceRequest | null>(null)
+  const [matches, setMatches] = useState<LinkedServiceRequest[]>([])
+  const [search, setSearch] = useState("")
+  const [loading, setLoading] = useState(Boolean(ticket.serviceRequestId))
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    if (linkedId) {
+      serviceFetch<{ request?: LinkedServiceRequest; item?: LinkedServiceRequest }>(
+        `/requests/${linkedId}`
+      )
+        .then((data) => {
+          if (!cancelled) setLinked(data.request ?? data.item ?? null)
+        })
+        .catch(() => {
+          if (!cancelled) setLinked(null)
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      setLoading(true)
+      const params = new URLSearchParams({ limit: "8" })
+      if (search.trim()) params.set("search", search.trim())
+      if (ticket.customerId) params.set("customerId", ticket.customerId)
+      serviceFetch<{
+        requests?: LinkedServiceRequest[]
+        items?: LinkedServiceRequest[]
+      }>(`/requests?${params}`)
+        .then((data) => {
+          if (!cancelled) setMatches(data.requests ?? data.items ?? [])
+        })
+        .catch(() => {
+          if (!cancelled) setMatches([])
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, 250)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [linkedId, search, ticket.customerId])
+
+  async function link(requestId: string) {
+    setBusy(true)
+    try {
+      await serviceFetch(`/requests/${requestId}/tickets/${ticket.id}`, {
+        method: "PUT",
+      })
+      setLoading(true)
+      setLinkedId(requestId)
+      toast.success("Service request linked")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to link service request")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function unlink() {
+    if (!linkedId) return
+    setBusy(true)
+    try {
+      await serviceFetch(`/requests/${linkedId}/tickets/${ticket.id}`, {
+        method: "DELETE",
+      })
+      setLinkedId(null)
+      setLinked(null)
+      toast.success("Service request unlinked")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to unlink service request")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function create(allowDuplicate = false) {
+    if (!ticket.customerId) {
+      toast.error("Link this conversation to a customer first")
+      return
+    }
+    setBusy(true)
+    try {
+      const data = await serviceFetch<{ item: LinkedServiceRequest }>(
+        `/tickets/${ticket.id}/create-request`,
+        {
+          method: "POST",
+          body: JSON.stringify({ allowDuplicate }),
+        }
+      )
+      setLinkedId(data.item._id)
+      setLinked(data.item)
+      toast.success(`${data.item.reference} created and linked`)
+    } catch (error) {
+      const payload = error as Error & {
+        status?: number
+        payload?: { duplicateCandidates?: LinkedServiceRequest[] }
+      }
+      const duplicates = payload.payload?.duplicateCandidates ?? []
+      if (
+        payload.status === 409 &&
+        duplicates.length > 0 &&
+        window.confirm(
+          `${duplicates.length} possible duplicate service request${duplicates.length === 1 ? "" : "s"} found. Create a new SR anyway?`
+        )
+      ) {
+        setBusy(false)
+        await create(true)
+        return
+      }
+      toast.error(error instanceof Error ? error.message : "Unable to create service request")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (linkedId) {
+    return (
+      <div className="rounded-lg border bg-primary/[0.04] p-3">
+        {loading && !linked ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <LoaderIcon className="size-3.5 animate-spin" /> Loading request...
+          </div>
+        ) : linked ? (
+          <>
+            <div className="flex items-start gap-2">
+              <WrenchIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-xs font-semibold">{linked.reference}</p>
+                <p className="truncate text-xs text-muted-foreground">{linked.title}</p>
+              </div>
+              <a
+                href={`/service/${linked._id}`}
+                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Open service request"
+              >
+                <ExternalLinkIcon className="size-3.5" />
+              </a>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 text-muted-foreground"
+              disabled={busy}
+              onClick={() => void unlink()}
+            >
+              Unlink
+            </Button>
+          </>
+        ) : (
+          <p className="text-xs text-destructive">Linked request is unavailable.</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        value={search}
+        onChange={(event) => {
+          setLoading(true)
+          setSearch(event.target.value)
+        }}
+        placeholder="Find an active SR..."
+        className="h-8 w-full rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+      />
+      {loading ? (
+        <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+          <LoaderIcon className="size-3.5 animate-spin" /> Searching...
+        </div>
+      ) : matches.length > 0 ? (
+        <div className="max-h-40 space-y-1 overflow-y-auto">
+          {matches.map((request) => (
+            <button
+              key={request._id}
+              type="button"
+              disabled={busy}
+              onClick={() => void link(request._id)}
+              className="flex w-full flex-col rounded-lg border bg-background px-2.5 py-2 text-left transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              <span className="font-mono text-[11px] font-semibold">{request.reference}</span>
+              <span className="truncate text-xs text-muted-foreground">{request.title}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No matching service requests.</p>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7"
+        disabled={busy || !ticket.customerId}
+        onClick={() => void create()}
+      >
+        {busy ? <LoaderIcon className="animate-spin" /> : <PlusIcon />}
+        Create from conversation
+      </Button>
+      {!ticket.customerId && (
+        <p className="text-[11px] text-muted-foreground">Link a customer before creating an SR.</p>
+      )}
+    </div>
+  )
+}
+
 function TagsSection({ ticket }: { ticket: Ticket }) {
   const { ticketTags, updateTicketTags } = useSupport()
   const selectedIds = useMemo(() => ticket.tags.map((tag) => tag.id), [ticket.tags])
@@ -340,6 +568,9 @@ export function ContextPanel({
   onSelectTicket: (id: string) => void
 }) {
   const avatar = getAvatarColor(ticket.requester.name)
+  const { hasFeature, hasModuleAccess } = useEntitlements()
+  const canUseServiceManagement =
+    hasFeature("service_management") && hasModuleAccess("service_management")
 
   const attachments = useMemo(
     () => messages.flatMap((message) => message.attachments),
@@ -476,6 +707,12 @@ export function ContextPanel({
       <Section title="Customer match">
         <CustomerMapping key={ticket.id} ticket={ticket} />
       </Section>
+
+      {canUseServiceManagement && (
+        <Section title="Service request">
+          <ServiceRequestMapping key={ticket.id} ticket={ticket} />
+        </Section>
+      )}
 
       <Section title="Internal notes" count={notes.length}>
         {notes.length === 0 ? (

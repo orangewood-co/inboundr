@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ServiceRouteImport } from './routes/service'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
@@ -39,6 +40,9 @@ import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
+import { Route as ServiceSummaryRouteImport } from './routes/service_.summary'
+import { Route as ServiceNewRouteImport } from './routes/service_.new'
+import { Route as ServiceRequestIdRouteImport } from './routes/service_.$requestId'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
@@ -77,6 +81,11 @@ const StatsRoute = StatsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceRoute = ServiceRouteImport.update({
+  id: '/service',
+  path: '/service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -213,6 +222,21 @@ const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
   id: '/$ticketId',
   path: '/$ticketId',
   getParentRoute: () => SupportRoute,
+} as any)
+const ServiceSummaryRoute = ServiceSummaryRouteImport.update({
+  id: '/service_/summary',
+  path: '/service/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceNewRoute = ServiceNewRouteImport.update({
+  id: '/service_/new',
+  path: '/service/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServiceRequestIdRoute = ServiceRequestIdRouteImport.update({
+  id: '/service_/$requestId',
+  path: '/service/$requestId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsNewRoute = ProjectsNewRouteImport.update({
   id: '/projects_/new',
@@ -358,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
   '/search': typeof SearchRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
@@ -380,6 +405,9 @@ export interface FileRoutesByFullPath {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/service/$requestId': typeof ServiceRequestIdRoute
+  '/service/new': typeof ServiceNewRoute
+  '/service/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
@@ -411,6 +439,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
   '/search': typeof SearchRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/assets/$id': typeof AssetsIdRoute
@@ -431,6 +460,9 @@ export interface FileRoutesByTo {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/service/$requestId': typeof ServiceRequestIdRoute
+  '/service/new': typeof ServiceNewRoute
+  '/service/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
@@ -466,6 +498,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
   '/search': typeof SearchRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
@@ -488,6 +521,9 @@ export interface FileRoutesById {
   '/products_/import': typeof ProductsImportRoute
   '/projects_/$id': typeof ProjectsIdRoute
   '/projects_/new': typeof ProjectsNewRoute
+  '/service_/$requestId': typeof ServiceRequestIdRoute
+  '/service_/new': typeof ServiceNewRoute
+  '/service_/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
@@ -524,6 +560,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/rfq'
     | '/search'
+    | '/service'
     | '/settings'
     | '/stats'
     | '/support'
@@ -546,6 +583,9 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/service/$requestId'
+    | '/service/new'
+    | '/service/summary'
     | '/support/$ticketId'
     | '/forms/'
     | '/invoices/'
@@ -577,6 +617,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/rfq'
     | '/search'
+    | '/service'
     | '/settings'
     | '/stats'
     | '/assets/$id'
@@ -597,6 +638,9 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/service/$requestId'
+    | '/service/new'
+    | '/service/summary'
     | '/support/$ticketId'
     | '/forms'
     | '/invoices'
@@ -631,6 +675,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/rfq'
     | '/search'
+    | '/service'
     | '/settings'
     | '/stats'
     | '/support'
@@ -653,6 +698,9 @@ export interface FileRouteTypes {
     | '/products_/import'
     | '/projects_/$id'
     | '/projects_/new'
+    | '/service_/$requestId'
+    | '/service_/new'
+    | '/service_/summary'
     | '/support/$ticketId'
     | '/forms/'
     | '/invoices/'
@@ -688,6 +736,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   RfqRoute: typeof RfqRoute
   SearchRoute: typeof SearchRoute
+  ServiceRoute: typeof ServiceRoute
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   SupportRoute: typeof SupportRouteWithChildren
@@ -705,6 +754,9 @@ export interface RootRouteChildren {
   ProductsImportRoute: typeof ProductsImportRoute
   ProjectsIdRoute: typeof ProjectsIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
+  ServiceRequestIdRoute: typeof ServiceRequestIdRoute
+  ServiceNewRoute: typeof ServiceNewRoute
+  ServiceSummaryRoute: typeof ServiceSummaryRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
   EmployeesAttendanceLogsRoute: typeof EmployeesAttendanceLogsRoute
   ProjectsIdTasksTaskIdRoute: typeof ProjectsIdTasksTaskIdRoute
@@ -731,6 +783,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service': {
+      id: '/service'
+      path: '/service'
+      fullPath: '/service'
+      preLoaderRoute: typeof ServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -921,6 +980,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/support/$ticketId'
       preLoaderRoute: typeof SupportTicketIdRouteImport
       parentRoute: typeof SupportRoute
+    }
+    '/service_/summary': {
+      id: '/service_/summary'
+      path: '/service/summary'
+      fullPath: '/service/summary'
+      preLoaderRoute: typeof ServiceSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service_/new': {
+      id: '/service_/new'
+      path: '/service/new'
+      fullPath: '/service/new'
+      preLoaderRoute: typeof ServiceNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/service_/$requestId': {
+      id: '/service_/$requestId'
+      path: '/service/$requestId'
+      fullPath: '/service/$requestId'
+      preLoaderRoute: typeof ServiceRequestIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/projects_/new': {
       id: '/projects_/new'
@@ -1185,6 +1265,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   RfqRoute: RfqRoute,
   SearchRoute: SearchRoute,
+  ServiceRoute: ServiceRoute,
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   SupportRoute: SupportRouteWithChildren,
@@ -1202,6 +1283,9 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsImportRoute: ProductsImportRoute,
   ProjectsIdRoute: ProjectsIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
+  ServiceRequestIdRoute: ServiceRequestIdRoute,
+  ServiceNewRoute: ServiceNewRoute,
+  ServiceSummaryRoute: ServiceSummaryRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
   EmployeesAttendanceLogsRoute: EmployeesAttendanceLogsRoute,
   ProjectsIdTasksTaskIdRoute: ProjectsIdTasksTaskIdRoute,

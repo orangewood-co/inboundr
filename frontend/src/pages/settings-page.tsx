@@ -357,6 +357,7 @@ const ACCESS_MODULE_OPTIONS: { value: EmployeeAccessModule; label: string }[] = 
   { value: "chat", label: "Chat" },
   { value: "support", label: "Support" },
   { value: "assets", label: "Assets" },
+  { value: "service_management", label: "Service" },
 ]
 
 function AccessGroupBadges({ groups }: { groups: AccessGroupSummary[] }) {

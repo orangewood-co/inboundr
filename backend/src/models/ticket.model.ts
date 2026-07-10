@@ -27,6 +27,7 @@ export interface ITicketResolution {
 export interface ITicket extends Document {
   organizationId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId | null;
+  serviceRequestId: mongoose.Types.ObjectId | null;
   ticketNumber: number;
   ticketReference: string;
   subject: string;
@@ -100,6 +101,12 @@ const ticketSchema = new Schema<ITicket>(
       default: null,
       index: true,
     },
+    serviceRequestId: {
+      type: Schema.Types.ObjectId,
+      ref: "ServiceRequest",
+      default: null,
+      index: true,
+    },
     ticketNumber: { type: Number, required: true },
     ticketReference: { type: String, default: "" },
     subject: { type: String, default: "", trim: true },
@@ -162,6 +169,7 @@ ticketSchema.index(
 );
 ticketSchema.index({ organizationId: 1, status: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, customerId: 1, lastMessageAt: -1 });
+ticketSchema.index({ organizationId: 1, serviceRequestId: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, isArchived: 1, lastMessageAt: -1 });
 
 export const Ticket = mongoose.model<ITicket>("Ticket", ticketSchema);
