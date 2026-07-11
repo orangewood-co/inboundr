@@ -309,7 +309,7 @@ export default function ServiceNewPage() {
         return
       }
       const request =
-        "item" in data ? data.item : "request" in data ? data.request : data
+        "_id" in data ? data : (data.item ?? data.request)
       if (!request?._id)
         throw new Error("The service request was created without an identifier")
       toast.success("Service request created")

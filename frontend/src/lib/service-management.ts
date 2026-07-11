@@ -256,7 +256,10 @@ export async function coreApiFetch<T>(path: string): Promise<T> {
   return payload as T
 }
 
-export function referenceName(value: ServiceReference, fallback = "—"): string {
+export function referenceName(
+  value: ServiceReference | undefined,
+  fallback = "—"
+): string {
   if (!value || typeof value === "string") return fallback
   return value.name ?? value.fullName ?? fallback
 }
