@@ -15,6 +15,7 @@ import {
 
 import { AppLayout } from "@/components/app-layout"
 import { CopyableText } from "@/components/copy-button"
+import { CustomerFieldInput } from "@/components/customer-field-input"
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { PageToolbar } from "@/components/page-header"
 import { SiteHeader } from "@/components/site-header"
@@ -51,6 +52,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { formatDateTime, formatNumber, formatRelativeTime } from "@/lib/format"
+import {
+  activeCustomerFields,
+  customerFieldValue,
+  formatCustomerFieldValue,
+  SPECIAL_DISCOUNT_FIELD_ID,
+  type CustomerFieldDefinition,
+  type CustomerFieldValues,
+} from "@/lib/customer-fields"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -71,6 +80,7 @@ interface Customer {
   address: string
   notes: string | null
   specialDiscountPercentage: number
+  customFields: CustomerFieldValues
   createdAt: string
   updatedAt: string
 }
@@ -81,6 +91,7 @@ interface CustomersResponse {
   page: number
   limit: number
   totalPages: number
+  fieldDefinitions: CustomerFieldDefinition[]
 }
 
 type CustomerFormState = {
@@ -90,7 +101,7 @@ type CustomerFormState = {
   contactNumber: string
   address: string
   notes: string
-  specialDiscountPercentage: string
+  fieldValues: CustomerFieldValues
 }
 
 const emptyForm: CustomerFormState = {
@@ -100,10 +111,13 @@ const emptyForm: CustomerFormState = {
   contactNumber: "",
   address: "",
   notes: "",
-  specialDiscountPercentage: "0",
+  fieldValues: {},
 }
 
-function customerToForm(customer: Customer): CustomerFormState {
+function customerToForm(
+  customer: Customer,
+  fieldDefinitions: CustomerFieldDefinition[],
+): CustomerFormState {
   return {
     name: customer.name ?? "",
     company: customer.company ?? "",
@@ -111,12 +125,27 @@ function customerToForm(customer: Customer): CustomerFormState {
     contactNumber: customer.contactNumber ?? "",
     address: customer.address ?? "",
     notes: customer.notes ?? "",
-    specialDiscountPercentage: customer.specialDiscountPercentage?.toString() ?? "0",
+    fieldValues: Object.fromEntries(
+      activeCustomerFields(fieldDefinitions).map((field) => [
+        field.id,
+        customerFieldValue(customer, field),
+      ]),
+    ),
   }
 }
 
-function formToPayload(form: CustomerFormState) {
-  const specialDiscountPercentage = Number(form.specialDiscountPercentage)
+function formToPayload(form: CustomerFormState, fieldDefinitions: CustomerFieldDefinition[]) {
+  const discountField = fieldDefinitions.find(
+    (field) => field.id === SPECIAL_DISCOUNT_FIELD_ID && field.isActive,
+  )
+  const customFields = Object.fromEntries(
+    activeCustomerFields(fieldDefinitions)
+      .filter((field) => !field.isSystem)
+      .map((field) => [field.id, form.fieldValues[field.id] ?? null]),
+  )
+  const discountValue = discountField
+    ? Number(form.fieldValues[SPECIAL_DISCOUNT_FIELD_ID] ?? 0)
+    : undefined
 
   return {
     name: form.name.trim(),
@@ -125,18 +154,27 @@ function formToPayload(form: CustomerFormState) {
     contactNumber: form.contactNumber.trim(),
     address: form.address.trim(),
     notes: form.notes.trim() || null,
-    specialDiscountPercentage: Number.isFinite(specialDiscountPercentage)
-      ? specialDiscountPercentage
-      : 0,
+    customFields,
+    ...(discountField
+      ? {
+          specialDiscountPercentage: Number.isFinite(discountValue)
+            ? discountValue
+            : 0,
+        }
+      : {}),
   }
 }
 
 function CustomerForm({
   form,
+  fieldDefinitions,
   onChange,
+  onFieldChange,
 }: {
   form: CustomerFormState
-  onChange: (field: keyof CustomerFormState, value: string) => void
+  fieldDefinitions: CustomerFieldDefinition[]
+  onChange: (field: Exclude<keyof CustomerFormState, "fieldValues">, value: string) => void
+  onFieldChange: (fieldId: string, value: string | number | boolean | null) => void
 }) {
   return (
     <div className="grid gap-5 px-5 pb-5">
@@ -174,19 +212,18 @@ function CustomerForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="specialDiscountPercentage">Special discount percentage</Label>
-          <Input
-            id="specialDiscountPercentage"
-            type="number"
-            min="0"
-            max="100"
-            value={form.specialDiscountPercentage}
-            onChange={(event) => onChange("specialDiscountPercentage", event.target.value)}
-          />
+      {activeCustomerFields(fieldDefinitions).length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {activeCustomerFields(fieldDefinitions).map((field) => (
+            <CustomerFieldInput
+              key={field.id}
+              field={field}
+              value={form.fieldValues[field.id]}
+              onChange={(value) => onFieldChange(field.id, value)}
+            />
+          ))}
         </div>
-      </div>
+      )}
 
       <div className="grid gap-2">
         <Label htmlFor="notes">Notes</Label>
@@ -203,7 +240,13 @@ function CustomerForm({
   )
 }
 
-function CustomerDetails({ customer }: { customer: Customer }) {
+function CustomerDetails({
+  customer,
+  fieldDefinitions,
+}: {
+  customer: Customer
+  fieldDefinitions: CustomerFieldDefinition[]
+}) {
   return (
     <div className="grid gap-5 px-5 pb-5 text-sm">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -241,10 +284,16 @@ function CustomerDetails({ customer }: { customer: Customer }) {
         </p>
       </div>
 
-      <div className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Special discount</p>
-        <p className="font-medium">{customer.specialDiscountPercentage ?? 0}%</p>
-      </div>
+      {activeCustomerFields(fieldDefinitions).map((field) => (
+        <div key={field.id} className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {field.label}
+          </p>
+          <p className="font-medium">
+            {formatCustomerFieldValue(customerFieldValue(customer, field), field)}
+          </p>
+        </div>
+      ))}
 
       <div className="space-y-1">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Notes</p>
@@ -284,6 +333,7 @@ export default function CustomersPage() {
   const navigate = useNavigate()
   const initialSearch = getInitialListSearch()
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [fieldDefinitions, setFieldDefinitions] = useState<CustomerFieldDefinition[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -318,6 +368,7 @@ export default function CustomersPage() {
 
       const data = (await response.json()) as CustomersResponse
       setCustomers(data.customers)
+      setFieldDefinitions(data.fieldDefinitions ?? [])
       setTotal(data.total)
       setTotalPages(Math.max(1, data.totalPages))
     } catch (err) {
@@ -346,6 +397,10 @@ export default function CustomersPage() {
     const end = Math.min(page * PAGE_LIMIT, total)
     return `${start}-${end}`
   }, [page, total])
+  const listFields = useMemo(
+    () => activeCustomerFields(fieldDefinitions).filter((field) => field.showInList),
+    [fieldDefinitions],
+  )
 
   function openViewSheet(customer: Customer) {
     setEditingCustomer(customer)
@@ -357,7 +412,7 @@ export default function CustomersPage() {
   function openEditSheet(customer: Customer) {
     setEditingCustomer(customer)
     setSheetMode("edit")
-    setForm(customerToForm(customer))
+    setForm(customerToForm(customer, fieldDefinitions))
     setSaveError(null)
     setSheetOpen(true)
   }
@@ -365,12 +420,15 @@ export default function CustomersPage() {
   async function saveCustomer() {
     if (!editingCustomer) return
 
-    const payload = formToPayload(form)
+    const payload = formToPayload(form, fieldDefinitions)
     if (!payload.name || !payload.company || !payload.email) {
       setSaveError("Name, company, and email are required")
       return
     }
-    if (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100) {
+    if (
+      payload.specialDiscountPercentage !== undefined &&
+      (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100)
+    ) {
       setSaveError("Special discount must be between 0 and 100")
       return
     }
@@ -512,7 +570,7 @@ export default function CustomersPage() {
               description={
                 debouncedSearch
                   ? "Try a customer name, company, email, phone number, or address fragment."
-                  : "Customers identified from RFQs will appear here after they are saved."
+                  : "Customer records created by your organization’s workflows will appear here."
               }
             />
           ) : (
@@ -524,6 +582,9 @@ export default function CustomersPage() {
                     <th className="px-5 py-2.5">Company</th>
                     <th className="px-5 py-2.5">Email</th>
                     <th className="px-5 py-2.5">Contact</th>
+                    {listFields.map((field) => (
+                      <th key={field.id} className="px-5 py-2.5">{field.label}</th>
+                    ))}
                     <th className="w-20 px-3 py-2.5" />
                   </tr>
                 </thead>
@@ -557,12 +618,16 @@ export default function CustomersPage() {
                                 </p>
                               </div>
                             )}
-                            {customer.specialDiscountPercentage > 0 && (
-                              <p className="text-xs">
-                                <span className="text-muted-foreground">Discount:</span>{" "}
-                                <span className="font-medium">{customer.specialDiscountPercentage}%</span>
-                              </p>
-                            )}
+                            {activeCustomerFields(fieldDefinitions).map((field) => {
+                              const value = customerFieldValue(customer, field)
+                              if (value === null || value === undefined || value === "") return null
+                              return (
+                                <p key={field.id} className="text-xs">
+                                  <span className="text-muted-foreground">{field.label}:</span>{" "}
+                                  <span className="font-medium">{formatCustomerFieldValue(value, field)}</span>
+                                </p>
+                              )
+                            })}
                             <div className="flex gap-3 border-t pt-2 text-[11px] text-muted-foreground">
                               <span>Updated {formatRelativeTime(customer.updatedAt)}</span>
                               <span>Created {formatRelativeTime(customer.createdAt)}</span>
@@ -583,6 +648,11 @@ export default function CustomersPage() {
                           <span>{customer.contactNumber || "-"}</span>
                         </CopyableText>
                       </td>
+                      {listFields.map((field) => (
+                        <td key={field.id} className="px-5 py-3.5 align-top">
+                          {formatCustomerFieldValue(customerFieldValue(customer, field), field)}
+                        </td>
+                      ))}
                       <td className="px-3 py-3.5 align-top" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Tooltip>
@@ -652,14 +722,14 @@ export default function CustomersPage() {
             )}
             {sheetMode === "edit" && (
               <SheetDescription>
-                Update the shared customer directory entry saved from identified RFQs.
+                Update this shared customer directory entry.
               </SheetDescription>
             )}
           </SheetHeader>
           <Separator />
           {sheetMode === "view" && editingCustomer ? (
             <>
-              <CustomerDetails customer={editingCustomer} />
+              <CustomerDetails customer={editingCustomer} fieldDefinitions={fieldDefinitions} />
               <SheetFooter className="flex-row justify-end border-t bg-muted/30">
                 <Button variant="outline" onClick={() => setSheetOpen(false)}>
                   Close
@@ -678,7 +748,14 @@ export default function CustomersPage() {
             <>
               <CustomerForm
                 form={form}
+                fieldDefinitions={fieldDefinitions}
                 onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
+                onFieldChange={(fieldId, value) =>
+                  setForm((current) => ({
+                    ...current,
+                    fieldValues: { ...current.fieldValues, [fieldId]: value },
+                  }))
+                }
               />
               {saveError && (
                 <div className="mx-5 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">

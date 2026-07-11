@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
@@ -31,21 +31,25 @@ import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
 import { formatNumber } from "@/lib/format"
+import {
+  activeCustomerFields,
+  fetchCustomerSettings,
+  type CustomerFieldDefinition,
+} from "@/lib/customer-fields"
 const API_BASE = `${API_ORIGIN}/api/v1/customers`
 const UNMAPPED_COLUMN = "__unmapped__"
 
 type ImportStep = "upload" | "mapping" | "review" | "complete"
 type ImportMode = "skip" | "update"
-type CustomerImportField =
-  | "name"
-  | "company"
-  | "email"
-  | "contactNumber"
-  | "address"
-  | "notes"
-  | "specialDiscountPercentage"
+type CustomerImportField = string
 
 type ImportMapping = Record<CustomerImportField, string>
+type ImportField = {
+  key: CustomerImportField
+  label: string
+  required?: boolean
+  aliases: string[]
+}
 
 type ParsedImportFile = {
   fileName: string
@@ -65,19 +69,13 @@ type ImportResult = {
   skipped: Array<{ row: number; email: string; reason: string }>
 }
 
-const importFields: Array<{
-  key: CustomerImportField
-  label: string
-  required?: boolean
-  aliases: string[]
-}> = [
+const baseImportFields: ImportField[] = [
   { key: "name", label: "Name", required: true, aliases: ["name", "customer name", "contact name", "full name", "customer"] },
   { key: "company", label: "Company", required: true, aliases: ["company", "company name", "organization", "firm", "business"] },
   { key: "email", label: "Email", required: true, aliases: ["email", "email address", "e-mail", "mail"] },
   { key: "contactNumber", label: "Contact number", aliases: ["contactnumber", "contact number", "phone", "phone number", "mobile", "tel", "telephone"] },
   { key: "address", label: "Address", aliases: ["address", "billing address", "office address", "location"] },
   { key: "notes", label: "Notes", aliases: ["notes", "remarks", "comments", "description"] },
-  { key: "specialDiscountPercentage", label: "Special discount %", aliases: ["specialdiscountpercentage", "special discount", "discount", "discount %", "discount percentage"] },
 ]
 
 const steps: Array<{ id: ImportStep; label: string; description: string }> = [
@@ -97,11 +95,11 @@ function stringifyCell(value: unknown) {
   return String(value).trim()
 }
 
-function createEmptyMapping(): ImportMapping {
+function createEmptyMapping(importFields: ImportField[]): ImportMapping {
   return Object.fromEntries(importFields.map((field) => [field.key, UNMAPPED_COLUMN])) as ImportMapping
 }
 
-function suggestMapping(headers: string[]): ImportMapping {
+function suggestMapping(headers: string[], importFields: ImportField[]): ImportMapping {
   const normalizedHeaders = headers.map((header) => ({ header, normalized: normalizeHeader(header) }))
 
   return Object.fromEntries(
@@ -138,19 +136,36 @@ async function parseImportFile(file: File): Promise<ParsedImportFile> {
   return { fileName: file.name, headers, rows }
 }
 
-function buildImportCustomers(file: ParsedImportFile | null, mapping: ImportMapping) {
+function buildImportCustomers(
+  file: ParsedImportFile | null,
+  mapping: ImportMapping,
+  importFields: ImportField[],
+) {
   if (!file) return []
 
-  return file.rows.map((row) =>
-    Object.fromEntries(
-      importFields
-        .filter((field) => mapping[field.key] !== UNMAPPED_COLUMN)
-        .map((field) => [field.key, row[mapping[field.key]] ?? ""])
-    )
-  )
+  return file.rows.map((row) => {
+    const customer: Record<string, unknown> = {}
+    const customFields: Record<string, string> = {}
+    for (const field of importFields.filter(
+      (item) => mapping[item.key] && mapping[item.key] !== UNMAPPED_COLUMN,
+    )) {
+      const value = row[mapping[field.key]] ?? ""
+      if (field.key.startsWith("customFields.")) {
+        customFields[field.key.slice("customFields.".length)] = value
+      } else {
+        customer[field.key] = value
+      }
+    }
+    if (Object.keys(customFields).length > 0) customer.customFields = customFields
+    return customer
+  })
 }
 
-function getImportValidationErrors(file: ParsedImportFile | null, mapping: ImportMapping) {
+function getImportValidationErrors(
+  file: ParsedImportFile | null,
+  mapping: ImportMapping,
+  importFields: ImportField[],
+) {
   const errors: string[] = []
   if (!file) return ["Upload a CSV or Excel file to continue."]
 
@@ -160,7 +175,7 @@ function getImportValidationErrors(file: ParsedImportFile | null, mapping: Impor
     }
   }
 
-  buildImportCustomers(file, mapping).forEach((customer, index) => {
+  buildImportCustomers(file, mapping, importFields).forEach((customer, index) => {
     for (const field of importFields.filter((item) => item.required)) {
       if (!String(customer[field.key] ?? "").trim()) {
         errors.push(`Row ${index + 2} is missing ${field.label}.`)
@@ -219,14 +234,54 @@ export default function CustomersImportPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState<ImportStep>("upload")
   const [parsedFile, setParsedFile] = useState<ParsedImportFile | null>(null)
-  const [mapping, setMapping] = useState<ImportMapping>(() => createEmptyMapping())
+  const [fieldDefinitions, setFieldDefinitions] = useState<CustomerFieldDefinition[]>([])
+  const importFields = useMemo<ImportField[]>(
+    () => [
+      ...baseImportFields,
+      ...activeCustomerFields(fieldDefinitions).map((field) => ({
+        key: field.isSystem ? field.key : `customFields.${field.id}`,
+        label: field.label,
+        aliases: field.isSystem
+          ? [field.label, field.key, "special discount", "discount", "discount %", "discount percentage"]
+          : [field.label, field.key],
+      })),
+    ],
+    [fieldDefinitions],
+  )
+  const [mapping, setMapping] = useState<ImportMapping>(() => createEmptyMapping(baseImportFields))
   const [mode, setMode] = useState<ImportMode>("skip")
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
 
-  const validationErrors = useMemo(() => getImportValidationErrors(parsedFile, mapping), [parsedFile, mapping])
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchCustomerSettings(controller.signal)
+      .then((fields) => {
+        setFieldDefinitions(fields)
+        if (!parsedFile) {
+          const nextFields: ImportField[] = [
+            ...baseImportFields,
+            ...activeCustomerFields(fields).map((field) => ({
+              key: field.isSystem ? field.key : `customFields.${field.id}`,
+              label: field.label,
+              aliases: field.isSystem
+                ? [field.label, field.key, "special discount", "discount", "discount %", "discount percentage"]
+                : [field.label, field.key],
+            })),
+          ]
+          setMapping(createEmptyMapping(nextFields))
+        }
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [parsedFile])
+
+  const validationErrors = useMemo(
+    () => getImportValidationErrors(parsedFile, mapping, importFields),
+    [importFields, mapping, parsedFile],
+  )
   const previewRows = parsedFile?.rows.slice(0, 8) ?? []
   const mappedCount = importFields.filter((field) => mapping[field.key] !== UNMAPPED_COLUMN).length
 
@@ -239,11 +294,11 @@ export default function CustomersImportPage() {
     try {
       const parsed = await parseImportFile(file)
       setParsedFile(parsed)
-      setMapping(suggestMapping(parsed.headers))
+      setMapping(suggestMapping(parsed.headers, importFields))
       setStep("mapping")
     } catch (err) {
       setParsedFile(null)
-      setMapping(createEmptyMapping())
+      setMapping(createEmptyMapping(importFields))
       setError(err instanceof Error ? err.message : "Unable to parse import file")
       setStep("upload")
     } finally {
@@ -253,7 +308,7 @@ export default function CustomersImportPage() {
 
   function resetFile() {
     setParsedFile(null)
-    setMapping(createEmptyMapping())
+    setMapping(createEmptyMapping(importFields))
     setError(null)
     setResult(null)
     setStep("upload")
@@ -271,7 +326,7 @@ export default function CustomersImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode,
-          customers: buildImportCustomers(parsedFile, mapping),
+          customers: buildImportCustomers(parsedFile, mapping, importFields),
         }),
       })
       const payload = await response.json().catch(() => null)

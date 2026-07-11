@@ -4,9 +4,11 @@ import {
   createCustomer,
   exportCustomers,
   getCustomer,
+  getCustomerSettings,
   importCustomers,
   listCustomers,
   updateCustomer,
+  updateCustomerSettings,
 } from "../controllers/customer.controller";
 import { requireAuth, requireEmployeeModule, requireFeature, requireOrganization, requireOrganizationAdmin } from "../middleware/auth.middleware";
 
@@ -19,6 +21,8 @@ router.use(requireEmployeeModule("customers"));
 router.get("/", listCustomers);
 router.get("/export", exportCustomers);
 router.post("/import", requireOrganizationAdmin(), importCustomers);
+router.get("/settings", getCustomerSettings);
+router.put("/settings", requireOrganizationAdmin(), updateCustomerSettings);
 router.get("/:id", getCustomer);
 router.post("/", createCustomer);
 router.put("/:id", updateCustomer);

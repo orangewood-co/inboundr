@@ -21,6 +21,10 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { formatMoney } from "@/lib/format"
+import {
+  isSpecialDiscountEnabled,
+  type CustomerFieldDefinition,
+} from "@/lib/customer-fields"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -184,6 +188,7 @@ export default function InvoiceNewPage() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
   const [productPickerLine, setProductPickerLine] = useState<number | null>(null)
   const [orgDefaultUpiId, setOrgDefaultUpiId] = useState("")
+  const [customerDiscountEnabled, setCustomerDiscountEnabled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -211,6 +216,9 @@ export default function InvoiceNewPage() {
     const response = await fetch(`${CUSTOMER_API}?${params}`, { credentials: "include", signal })
     if (!response.ok) throw new Error("Unable to load customers")
     const data = await response.json()
+    setCustomerDiscountEnabled(
+      isSpecialDiscountEnabled((data.fieldDefinitions ?? []) as CustomerFieldDefinition[]),
+    )
     return (data.customers ?? []) as Customer[]
   }, [])
 
@@ -290,7 +298,9 @@ export default function InvoiceNewPage() {
       shippingAddress: customer.address ?? "",
       lineItems: current.lineItems.map((line) => ({
         ...line,
-        discountPercentage: customer.specialDiscountPercentage ?? line.discountPercentage,
+        discountPercentage: customerDiscountEnabled
+          ? (customer.specialDiscountPercentage ?? line.discountPercentage)
+          : line.discountPercentage,
       })),
     }))
   }

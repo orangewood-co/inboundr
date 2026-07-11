@@ -15,6 +15,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { CopyableText } from "@/components/copy-button"
+import { CustomerFieldInput } from "@/components/customer-field-input"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,6 +38,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { formatDateTime, formatRelativeTime } from "@/lib/format"
+import {
+  activeCustomerFields,
+  customerFieldValue,
+  fetchCustomerSettings,
+  formatCustomerFieldValue,
+  SPECIAL_DISCOUNT_FIELD_ID,
+  type CustomerFieldDefinition,
+  type CustomerFieldValues,
+} from "@/lib/customer-fields"
 
 import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/customers`
@@ -50,6 +60,7 @@ interface Customer {
   address: string
   notes: string | null
   specialDiscountPercentage: number
+  customFields: CustomerFieldValues
   createdAt: string
   updatedAt: string
 }
@@ -61,10 +72,13 @@ type CustomerFormState = {
   contactNumber: string
   address: string
   notes: string
-  specialDiscountPercentage: string
+  fieldValues: CustomerFieldValues
 }
 
-function customerToForm(customer: Customer): CustomerFormState {
+function customerToForm(
+  customer: Customer,
+  fieldDefinitions: CustomerFieldDefinition[],
+): CustomerFormState {
   return {
     name: customer.name ?? "",
     company: customer.company ?? "",
@@ -72,12 +86,27 @@ function customerToForm(customer: Customer): CustomerFormState {
     contactNumber: customer.contactNumber ?? "",
     address: customer.address ?? "",
     notes: customer.notes ?? "",
-    specialDiscountPercentage: customer.specialDiscountPercentage?.toString() ?? "0",
+    fieldValues: Object.fromEntries(
+      activeCustomerFields(fieldDefinitions).map((field) => [
+        field.id,
+        customerFieldValue(customer, field),
+      ]),
+    ),
   }
 }
 
-function formToPayload(form: CustomerFormState) {
-  const specialDiscountPercentage = Number(form.specialDiscountPercentage)
+function formToPayload(form: CustomerFormState, fieldDefinitions: CustomerFieldDefinition[]) {
+  const discountField = fieldDefinitions.find(
+    (field) => field.id === SPECIAL_DISCOUNT_FIELD_ID && field.isActive,
+  )
+  const customFields = Object.fromEntries(
+    activeCustomerFields(fieldDefinitions)
+      .filter((field) => !field.isSystem)
+      .map((field) => [field.id, form.fieldValues[field.id] ?? null]),
+  )
+  const discountValue = discountField
+    ? Number(form.fieldValues[SPECIAL_DISCOUNT_FIELD_ID] ?? 0)
+    : undefined
 
   return {
     name: form.name.trim(),
@@ -86,9 +115,14 @@ function formToPayload(form: CustomerFormState) {
     contactNumber: form.contactNumber.trim(),
     address: form.address.trim(),
     notes: form.notes.trim() || null,
-    specialDiscountPercentage: Number.isFinite(specialDiscountPercentage)
-      ? specialDiscountPercentage
-      : 0,
+    customFields,
+    ...(discountField
+      ? {
+          specialDiscountPercentage: Number.isFinite(discountValue)
+            ? discountValue
+            : 0,
+        }
+      : {}),
   }
 }
 
@@ -117,6 +151,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams({ from: "/customers_/$id" })
   const navigate = useNavigate()
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [fieldDefinitions, setFieldDefinitions] = useState<CustomerFieldDefinition[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
@@ -127,7 +162,7 @@ export default function CustomerDetailPage() {
     contactNumber: "",
     address: "",
     notes: "",
-    specialDiscountPercentage: "0",
+    fieldValues: {},
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -138,13 +173,17 @@ export default function CustomerDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_BASE}/${id}`, { credentials: "include" })
+      const [response, fields] = await Promise.all([
+        fetch(`${API_BASE}/${id}`, { credentials: "include" }),
+        fetchCustomerSettings().catch(() => []),
+      ])
       if (!response.ok) {
         if (response.status === 404) throw new Error("Customer not found")
         throw new Error("Failed to fetch customer")
       }
       const data = (await response.json()) as Customer
       setCustomer(data)
+      setFieldDefinitions(fields)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch customer")
     } finally {
@@ -158,7 +197,7 @@ export default function CustomerDetailPage() {
 
   function startEditing() {
     if (!customer) return
-    setForm(customerToForm(customer))
+    setForm(customerToForm(customer, fieldDefinitions))
     setSaveError(null)
     setEditing(true)
   }
@@ -171,12 +210,15 @@ export default function CustomerDetailPage() {
   async function saveCustomer() {
     if (!customer) return
 
-    const payload = formToPayload(form)
+    const payload = formToPayload(form, fieldDefinitions)
     if (!payload.name || !payload.company || !payload.email) {
       setSaveError("Name, company, and email are required")
       return
     }
-    if (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100) {
+    if (
+      payload.specialDiscountPercentage !== undefined &&
+      (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100)
+    ) {
       setSaveError("Special discount must be between 0 and 100")
       return
     }
@@ -338,12 +380,18 @@ export default function CustomerDetailPage() {
                   </p>
                 </div>
 
-                {/* Discount and notes */}
+                {/* Organization fields and notes */}
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-xl border bg-card p-5">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Special Discount</p>
-                    <p className="mt-2 text-2xl font-bold">{customer.specialDiscountPercentage ?? 0}%</p>
-                  </div>
+                  {activeCustomerFields(fieldDefinitions).map((field) => (
+                    <div key={field.id} className="rounded-xl border bg-card p-5">
+                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        {field.label}
+                      </p>
+                      <p className="mt-2 text-lg font-semibold">
+                        {formatCustomerFieldValue(customerFieldValue(customer, field), field)}
+                      </p>
+                    </div>
+                  ))}
                   <div className="rounded-xl border bg-card p-5">
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Notes</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
@@ -432,19 +480,26 @@ export default function CustomerDetailPage() {
                     />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="specialDiscountPercentage">Special discount percentage</Label>
-                      <Input
-                        id="specialDiscountPercentage"
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={form.specialDiscountPercentage}
-                        onChange={(e) => setForm((f) => ({ ...f, specialDiscountPercentage: e.target.value }))}
-                      />
+                  {activeCustomerFields(fieldDefinitions).length > 0 && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {activeCustomerFields(fieldDefinitions).map((field) => (
+                        <CustomerFieldInput
+                          key={field.id}
+                          field={field}
+                          value={form.fieldValues[field.id]}
+                          onChange={(value) =>
+                            setForm((current) => ({
+                              ...current,
+                              fieldValues: {
+                                ...current.fieldValues,
+                                [field.id]: value,
+                              },
+                            }))
+                          }
+                        />
+                      ))}
                     </div>
-                  </div>
+                  )}
 
                   <div className="grid gap-2">
                     <Label htmlFor="notes">Notes</Label>

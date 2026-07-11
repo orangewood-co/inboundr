@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearch } from "@tanstack/react-router"
 
 import { AppLayout } from "@/components/app-layout"
+import { CustomerFieldSettings } from "@/components/customer-field-settings"
 import { SiteHeader } from "@/components/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +53,7 @@ import {
   CheckCircle2Icon,
   CrownIcon,
   CheckIcon,
+  ContactRoundIcon,
   ImageIcon,
   KeyIcon,
   LogOutIcon,
@@ -3876,6 +3878,8 @@ export function SettingsPage() {
   const canShowManagementTabs = !entitlementsLoading && canManageOrganization
   const canShowSupportTab =
     !entitlementsLoading && hasFeature("support") && hasModuleAccess("support")
+  const canShowCustomerTab =
+    canShowManagementTabs && hasFeature("customers") && hasModuleAccess("customers")
   const settingsTabs = useMemo(
     () => [
       {
@@ -3884,6 +3888,13 @@ export function SettingsPage() {
         icon: Building2Icon,
         isVisible: canShowManagementTabs,
         content: <OrganizationTab />,
+      },
+      {
+        value: "customers",
+        label: "Customers",
+        icon: ContactRoundIcon,
+        isVisible: canShowCustomerTab,
+        content: <CustomerFieldSettings />,
       },
       {
         value: "account",
@@ -3921,7 +3932,7 @@ export function SettingsPage() {
         content: <NotificationsTab />,
       },
     ],
-    [canShowManagementTabs, canShowSupportTab],
+    [canShowCustomerTab, canShowManagementTabs, canShowSupportTab],
   )
   const visibleTabs = settingsTabs.filter((settingsTab) => settingsTab.isVisible)
   const activeTab = visibleTabs.some((settingsTab) => settingsTab.value === tab)

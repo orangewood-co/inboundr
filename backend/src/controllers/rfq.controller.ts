@@ -9,6 +9,10 @@ import { GmailAccount } from "../models/gmail-account.model";
 import { sendQuoteOnGmailThread } from "../services/gmail-send.service";
 import { Customer } from "../models/customer.model";
 import {
+  getOrCreateCustomerSettings,
+  isSpecialDiscountEnabled,
+} from "../services/customer-field.service";
+import {
   buildRFQProcessingInput,
   hasRFQProcessableContent,
 } from "../services/rfq-input.service";
@@ -817,19 +821,27 @@ export const generateQuote = async (
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
     const customerEmail = extractEmailAddress(rfq.customer.email) || originalSenderEmail;
-    const savedCustomer = customerEmail
-      ? await Customer.findOne({
-          email: customerEmail,
-          organizationId: organization._id,
-        }).lean()
-      : null;
+    const [savedCustomer, customerSettings] = await Promise.all([
+      customerEmail
+        ? Customer.findOne({
+            email: customerEmail,
+            organizationId: organization._id,
+          }).lean()
+        : null,
+      getOrCreateCustomerSettings(organization._id),
+    ]);
+    const customerDiscountEnabled = isSpecialDiscountEnabled([
+      ...customerSettings.fieldDefinitions,
+    ]);
 
     const { subject, body } = await generateQuoteReply({
       customerName: savedCustomer?.name || rfq.customer.name,
       customerCompany: savedCustomer?.company || rfq.customer.company,
       customerEmail,
       customerNotes: savedCustomer?.notes ?? null,
-      specialDiscountPercentage: savedCustomer?.specialDiscountPercentage ?? null,
+      specialDiscountPercentage: customerDiscountEnabled
+        ? savedCustomer?.specialDiscountPercentage ?? null
+        : null,
       organizationName: organization.name,
       organizationContactName: organization.defaultContact?.name,
       organizationContactEmail: organization.defaultContact?.email,

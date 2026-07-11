@@ -9,6 +9,7 @@ export interface ICustomer extends Document {
   address: string | null;
   notes: string | null;
   specialDiscountPercentage: number;
+  customFields: Map<string, string | number | boolean | null>;
   isArchived: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -28,7 +29,8 @@ const customerSchema = new Schema<ICustomer>(
     contactNumber: { type: String, default: null },
     address: { type: String, default: null },
     notes: { type: String, default: null },
-    specialDiscountPercentage: { type: Number, default: 0 },
+    specialDiscountPercentage: { type: Number, min: 0, max: 100, default: 0 },
+    customFields: { type: Map, of: Schema.Types.Mixed, default: () => new Map() },
     isArchived: { type: Boolean, default: false },
   },
   { timestamps: true }

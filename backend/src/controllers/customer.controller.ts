@@ -2,6 +2,14 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
+import {
+  activeCustomerFields,
+  customerCustomFieldsToObject,
+  getOrCreateCustomerSettings,
+  isSpecialDiscountEnabled,
+  normalizeCustomerFieldDefinitions,
+  normalizeCustomerFieldValues,
+} from "../services/customer-field.service";
 
 export const archiveCustomer = async (
   req: Request,
@@ -46,6 +54,15 @@ const EDITABLE_FIELDS = [
   "specialDiscountPercentage",
 ] as const;
 
+function serializeCustomer(customer: any) {
+  if (!customer) return customer;
+  const source = typeof customer.toObject === "function" ? customer.toObject() : customer;
+  return {
+    ...source,
+    customFields: customerCustomFieldsToObject(source.customFields),
+  };
+}
+
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
   const parsed = parseInt(String(value ?? ""), 10);
   const normalized = Number.isFinite(parsed) ? Math.max(1, parsed) : fallback;
@@ -87,6 +104,46 @@ function validateCustomerInput(input: Record<string, string | number | null>): s
   return null;
 }
 
+export const getCustomerSettings = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const settings = await getOrCreateCustomerSettings(organization._id);
+    res.json({
+      fieldDefinitions: [...settings.fieldDefinitions].sort(
+        (a, b) => a.order - b.order || a.label.localeCompare(b.label)
+      ),
+    });
+  } catch (err) {
+    console.error("Error fetching customer settings:", err);
+    res.status(500).json({ error: "Failed to fetch customer settings" });
+  }
+};
+
+export const updateCustomerSettings = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+    const settings = await getOrCreateCustomerSettings(organization._id);
+    settings.fieldDefinitions = normalizeCustomerFieldDefinitions(
+      req.body?.fieldDefinitions,
+      [...settings.fieldDefinitions]
+    );
+    await settings.save();
+    res.json({ fieldDefinitions: settings.fieldDefinitions });
+  } catch (err) {
+    console.error("Error updating customer settings:", err);
+    const statusCode = (err as any)?.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 400 ? (err as Error).message : "Failed to update customer settings",
+    });
+  }
+};
+
 export const listCustomers = async (
   req: Request,
   res: Response
@@ -111,17 +168,19 @@ export const listCustomers = async (
         : {}),
     };
 
-    const [customers, total] = await Promise.all([
+    const [customers, total, settings] = await Promise.all([
       Customer.find(filter)
         .sort({ updatedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       Customer.countDocuments(filter),
+      getOrCreateCustomerSettings(organization._id),
     ]);
 
     res.json({
-      customers,
+      customers: customers.map(serializeCustomer),
+      fieldDefinitions: activeCustomerFields([...settings.fieldDefinitions]),
       total,
       page,
       limit,
@@ -141,6 +200,14 @@ export const createCustomer = async (
     const input = normalizeCustomerInput(req.body ?? {});
     const orgReq = req as OrganizationRequest;
     const organization = orgReq.organization;
+    const settings = await getOrCreateCustomerSettings(organization._id);
+    const customFields = normalizeCustomerFieldValues(
+      req.body?.customFields,
+      [...settings.fieldDefinitions]
+    );
+    if (!isSpecialDiscountEnabled([...settings.fieldDefinitions])) {
+      delete input.specialDiscountPercentage;
+    }
     const validationError = validateCustomerInput(input);
 
     if (!input.name || !input.company || !input.email) {
@@ -155,13 +222,17 @@ export const createCustomer = async (
 
     const customer = await Customer.create({
       ...input,
+      customFields,
       organizationId: organization._id,
     });
 
-    res.status(201).json(customer);
+    res.status(201).json(serializeCustomer(customer));
   } catch (err) {
     console.error("Error creating customer:", err);
-    res.status(500).json({ error: "Failed to create customer" });
+    const statusCode = (err as any)?.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 400 ? (err as Error).message : "Failed to create customer",
+    });
   }
 };
 
@@ -189,7 +260,7 @@ export const getCustomer = async (
       return;
     }
 
-    res.json(customer);
+    res.json(serializeCustomer(customer));
   } catch (err) {
     console.error("Error fetching customer:", err);
     res.status(500).json({ error: "Failed to fetch customer" });
@@ -210,6 +281,14 @@ export const updateCustomer = async (
     const input = normalizeCustomerInput(req.body ?? {});
     const orgReq = req as OrganizationRequest;
     const organization = orgReq.organization;
+    const settings = await getOrCreateCustomerSettings(organization._id);
+    if (!isSpecialDiscountEnabled([...settings.fieldDefinitions])) {
+      delete input.specialDiscountPercentage;
+    }
+    const customFieldUpdates =
+      req.body?.customFields === undefined
+        ? null
+        : normalizeCustomerFieldValues(req.body.customFields, [...settings.fieldDefinitions]);
     const validationError = validateCustomerInput(input);
 
     if (validationError) {
@@ -217,9 +296,30 @@ export const updateCustomer = async (
       return;
     }
 
+    let update: Record<string, unknown> = input;
+    if (customFieldUpdates) {
+      const existing = await Customer.findOne({
+        _id: id,
+        organizationId: organization._id,
+      })
+        .select("customFields")
+        .lean();
+      if (!existing) {
+        res.status(404).json({ error: "Customer not found" });
+        return;
+      }
+      update = {
+        ...input,
+        customFields: {
+          ...customerCustomFieldsToObject(existing.customFields),
+          ...customFieldUpdates,
+        },
+      };
+    }
+
     const customer = await Customer.findOneAndUpdate(
       { _id: id, organizationId: organization._id },
-      input,
+      update,
       {
         new: true,
         runValidators: true,
@@ -231,10 +331,13 @@ export const updateCustomer = async (
       return;
     }
 
-    res.json(customer);
+    res.json(serializeCustomer(customer));
   } catch (err) {
     console.error("Error updating customer:", err);
-    res.status(500).json({ error: "Failed to update customer" });
+    const statusCode = (err as any)?.statusCode || 500;
+    res.status(statusCode).json({
+      error: statusCode === 400 ? (err as Error).message : "Failed to update customer",
+    });
   }
 };
 
@@ -259,12 +362,22 @@ export const exportCustomers = async (
         : {}),
     };
 
-    const customers = await Customer.find(filter)
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .lean();
+    const [customers, settings] = await Promise.all([
+      Customer.find(filter).sort({ updatedAt: -1, createdAt: -1 }).lean(),
+      getOrCreateCustomerSettings(organization._id),
+    ]);
+    const fieldDefinitions = activeCustomerFields([...settings.fieldDefinitions]);
 
-    const csvHeaders = ["Name", "Company", "Email", "Contact Number", "Address", "Notes", "Special Discount %"];
-    const escapeCell = (value: string | number | null | undefined): string => {
+    const csvHeaders = [
+      "Name",
+      "Company",
+      "Email",
+      "Contact Number",
+      "Address",
+      "Notes",
+      ...fieldDefinitions.map((field) => field.label),
+    ];
+    const escapeCell = (value: string | number | boolean | null | undefined): string => {
       const str = String(value ?? "");
       if (str.includes(",") || str.includes('"') || str.includes("\n")) {
         return `"${str.replaceAll('"', '""')}"`;
@@ -272,15 +385,24 @@ export const exportCustomers = async (
       return str;
     };
 
-    const rows = customers.map((c) => [
-      escapeCell(c.name),
-      escapeCell(c.company),
-      escapeCell(c.email),
-      escapeCell(c.contactNumber),
-      escapeCell(c.address),
-      escapeCell(c.notes),
-      escapeCell(c.specialDiscountPercentage),
-    ].join(","));
+    const rows = customers.map((c) => {
+      const customFields = customerCustomFieldsToObject(c.customFields);
+      return [
+        escapeCell(c.name),
+        escapeCell(c.company),
+        escapeCell(c.email),
+        escapeCell(c.contactNumber),
+        escapeCell(c.address),
+        escapeCell(c.notes),
+        ...fieldDefinitions.map((field) =>
+          escapeCell(
+            field.isSystem
+              ? c.specialDiscountPercentage
+              : customFields[field.id]
+          )
+        ),
+      ].join(",");
+    });
 
     const csv = [csvHeaders.join(","), ...rows].join("\r\n");
 
@@ -316,6 +438,9 @@ export const importCustomers = async (
     const organization = orgReq.organization;
     const mode = req.body?.mode as ImportMode;
     const customers = Array.isArray(req.body?.customers) ? req.body.customers : [];
+    const settings = await getOrCreateCustomerSettings(organization._id);
+    const definitions = [...settings.fieldDefinitions];
+    const discountEnabled = isSpecialDiscountEnabled(definitions);
 
     if (mode !== "skip" && mode !== "update") {
       res.status(400).json({ error: "Import mode must be skip or update" });
@@ -343,6 +468,11 @@ export const importCustomers = async (
 
       try {
         const input = normalizeCustomerInput(rawCustomer ?? {});
+        if (!discountEnabled) delete input.specialDiscountPercentage;
+        const customFields = normalizeCustomerFieldValues(
+          rawCustomer?.customFields,
+          definitions
+        );
 
         if (!input.name || !input.company || !input.email) {
           result.summary.failed++;
@@ -374,13 +504,22 @@ export const importCustomers = async (
           } else {
             await Customer.updateOne(
               { _id: existing._id },
-              { $set: input }
+              {
+                $set: {
+                  ...input,
+                  customFields: {
+                    ...customerCustomFieldsToObject(existing.customFields),
+                    ...customFields,
+                  },
+                },
+              }
             );
             result.summary.updated++;
           }
         } else {
           await Customer.create({
             ...input,
+            customFields,
             organizationId: organization._id,
           });
           result.summary.created++;
