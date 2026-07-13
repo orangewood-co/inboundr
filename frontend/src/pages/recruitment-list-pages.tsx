@@ -48,7 +48,7 @@ function StatusBadge({ status }: { status: string }) {
     rejected: "border-rose-200 bg-rose-50 text-rose-700",
     paused: "border-amber-200 bg-amber-50 text-amber-700",
   }
-  return <Badge variant="outline" className={classes[status] ?? ""}>{status}</Badge>
+  return <Badge variant="outline" className={`capitalize ${classes[status] ?? ""}`}>{status}</Badge>
 }
 
 function ActivityList({ items }: { items: Activity[] }) {
@@ -211,7 +211,7 @@ export function RecruitmentJobsPage() {
       <RecruitmentPageTitle title="Jobs" description="Every role and its current status." action={canManageOrganization ? <Button asChild><Link to="/recruitment/jobs/new">Create Job</Link></Button> : undefined} />
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-xs"><SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="h-9 border-transparent bg-muted/60 pl-9 shadow-none transition-colors placeholder:text-muted-foreground/70 hover:bg-muted focus-visible:border-input focus-visible:bg-background" placeholder="Search jobs…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{(["draft","open","paused","closed","archived"] as JobStatus[]).map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
+        <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full capitalize sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{(["draft","open","paused","closed","archived"] as JobStatus[]).map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
         {loading ? <ListSkeleton rows={7} columns={5} /> : error ? <ErrorState message={error} onRetry={() => void load()} /> : !jobs.length ? <EmptyState icon={BriefcaseBusinessIcon} title="No Matching Jobs" description="Create your first role or broaden the current filters." action={canManageOrganization ? <Button asChild size="sm"><Link to="/recruitment/jobs/new">Create Job</Link></Button> : undefined} /> : (
@@ -296,7 +296,7 @@ export function RecruitmentApplicantsPage() {
         <div className="relative w-full sm:max-w-xs"><SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="h-9 border-transparent bg-muted/60 pl-9 shadow-none transition-colors placeholder:text-muted-foreground/70 hover:bg-muted focus-visible:border-input focus-visible:bg-background" placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Select value={jobId} onValueChange={setJobId}><SelectTrigger size="sm" className="w-full sm:w-52"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Jobs</SelectItem>{jobs.map((job) => <SelectItem key={job._id} value={job._id}>{job.title}</SelectItem>)}</SelectContent></Select>
-          <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["active","hired","rejected","withdrawn","archived"].map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
+          <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full capitalize sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["active","hired","rejected","withdrawn","archived"].map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
         </div>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
