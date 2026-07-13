@@ -1,5 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCorners,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, CirclePlusIcon, Code2Icon, CopyIcon, ExternalLinkIcon, GripVerticalIcon, MapPinIcon, PencilIcon, Share2Icon, Trash2Icon, UsersRoundIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,6 +33,7 @@ import { Switch } from "@/components/ui/switch"
 import { getEmbedOrigin } from "@/lib/env"
 import { useEntitlements } from "@/lib/entitlements"
 import { JOB_TRANSITIONS, careersUrl, entity, initials, recruitmentApi, type Application, type JobStatus, type RecruitmentJob, type RecruitmentSettings, type RecruitmentStage } from "@/lib/recruitment"
+import { cn } from "@/lib/utils"
 
 const COLORS = ["#64748b", "#3b82f6", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444"]
 const DEFAULT_STAGES: RecruitmentStage[] = [
@@ -229,6 +244,122 @@ export function RecruitmentJobFormPage({ edit = false }: { edit?: boolean }) {
   )
 }
 
+function PipelineCardContent({
+  application,
+  stages,
+  busy,
+  dragging = false,
+  onMove,
+  dragHandle,
+}: {
+  application: Application
+  stages: RecruitmentStage[]
+  busy: boolean
+  dragging?: boolean
+  onMove?: (stageId: string) => void
+  dragHandle?: ReactNode
+}) {
+  const candidate = entity(application.candidateId)
+  return (
+    <article className={cn(
+      "rounded-xl border bg-card p-4 shadow-xs transition-all",
+      dragging ? "rotate-1 border-primary/40 shadow-xl" : "hover:border-border hover:shadow-sm",
+    )}>
+      <div className="flex items-start gap-3">
+        {dragHandle}
+        <Link to="/recruitment/applications/$applicationId" params={{ applicationId: application._id }} className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">{initials(candidate?.fullName ?? "C")}</div>
+          <div className="min-w-0"><p className="truncate text-sm font-semibold">{candidate?.fullName ?? "Candidate"}</p><p className="truncate text-xs text-muted-foreground">{candidate?.headline || candidate?.email}</p></div>
+        </Link>
+      </div>
+      {onMove && <div className="mt-4"><Select value={application.stageId} disabled={busy} onValueChange={onMove}><SelectTrigger size="sm" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{stages.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent></Select></div>}
+    </article>
+  )
+}
+
+function DraggablePipelineCard({
+  application,
+  stages,
+  busy,
+  onMove,
+}: {
+  application: Application
+  stages: RecruitmentStage[]
+  busy: boolean
+  onMove: (stageId: string) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: application._id,
+    data: { application },
+    disabled: busy,
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform) }}
+      className={cn(isDragging && "opacity-20")}
+    >
+      <PipelineCardContent
+        application={application}
+        stages={stages}
+        busy={busy}
+        onMove={onMove}
+        dragHandle={
+          <button
+            type="button"
+            className="mt-1 flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:cursor-grabbing"
+            aria-label={`Drag ${entity(application.candidateId)?.fullName ?? "applicant"} to another stage`}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVerticalIcon className="size-4" />
+          </button>
+        }
+      />
+    </div>
+  )
+}
+
+function PipelineColumn({
+  stage,
+  applications,
+  stages,
+  busyId,
+  onMove,
+}: {
+  stage: RecruitmentStage
+  applications: Application[]
+  stages: RecruitmentStage[]
+  busyId: string
+  onMove: (application: Application, stageId: string) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `stage:${stage.id}`, data: { stageId: stage.id } })
+  return (
+    <section className="w-[300px] shrink-0">
+      <div className="mb-3 flex items-center gap-2 px-1"><span className="size-2.5 rounded-full" style={{ background: stage.color ?? "#64748b" }} /><h2 className="text-sm font-semibold">{stage.name}</h2><Badge variant="secondary" className="ml-auto">{applications.length}</Badge></div>
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "min-h-60 space-y-3 rounded-2xl border border-transparent bg-muted/70 p-2.5 transition-colors",
+          isOver && "border-primary/50 bg-primary/5 ring-2 ring-primary/15",
+        )}
+      >
+        {!applications.length
+          ? <div className={cn("flex h-28 items-center justify-center rounded-xl border border-dashed text-xs text-muted-foreground transition-colors", isOver && "border-primary/50 text-primary")}>{isOver ? `Drop in ${stage.name}` : "No applicants"}</div>
+          : applications.map((application) => (
+            <DraggablePipelineCard
+              key={application._id}
+              application={application}
+              stages={stages}
+              busy={busyId === application._id}
+              onMove={(stageId) => onMove(application, stageId)}
+            />
+          ))}
+      </div>
+    </section>
+  )
+}
+
 export function RecruitmentJobDetailPage() {
   const { canManageOrganization } = useEntitlements()
   const { jobId } = useParams({ strict: false }) as { jobId: string }
@@ -236,7 +367,12 @@ export function RecruitmentJobDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState("")
+  const [activeApplicationId, setActiveApplicationId] = useState("")
   const [settings, setSettings] = useState<RecruitmentSettings | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor),
+  )
   const load = useCallback(async () => {
     setError("")
     try {
@@ -252,15 +388,44 @@ export function RecruitmentJobDetailPage() {
     void load()
   }, [load])
   async function move(application: Application, stageId: string) {
+    if (application.stageId === stageId || busy) return
+    const previous = data
     setBusy(application._id)
-    try { await recruitmentApi.moveApplication(application._id, stageId); await load(); toast.success("Applicant moved") }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Unable to move applicant") } finally { setBusy("") }
+    setData((current) => {
+      if (!current) return current
+      const updated = { ...application, stageId }
+      const applications = current.applications.map((item) => item._id === application._id ? updated : item)
+      const byStage = Object.fromEntries(current.job.stages.map((stage) => [
+        stage.id,
+        applications.filter((item) => item.stageId === stage.id),
+      ]))
+      return { ...current, applications, byStage }
+    })
+    try {
+      await recruitmentApi.moveApplication(application._id, stageId)
+      toast.success(`Applicant moved to ${stages.find((stage) => stage.id === stageId)?.name ?? "the new stage"}`)
+    } catch (e) {
+      setData(previous)
+      toast.error(e instanceof Error ? e.message : "Unable to move applicant")
+    } finally {
+      setBusy("")
+    }
+  }
+  function handleDragStart(event: DragStartEvent) {
+    setActiveApplicationId(String(event.active.id))
+  }
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveApplicationId("")
+    const stageId = event.over?.data.current?.stageId as string | undefined
+    const application = data?.applications.find((item) => item._id === String(event.active.id))
+    if (stageId && application) void move(application, stageId)
   }
   async function transition(status: JobStatus) {
     if (!data || !canManageOrganization) return
     try { await recruitmentApi.changeJobStatus(jobId, status); await load(); toast.success(`Job is now ${status}`) } catch (e) { toast.error(e instanceof Error ? e.message : "Unable to update job") }
   }
-  const stages = useMemo(() => [...(data?.job.stages ?? [])].sort((a, b) => a.order - b.order), [data])
+  const stages = [...(data?.job.stages ?? [])].sort((a, b) => a.order - b.order)
+  const activeApplication = data?.applications.find((application) => application._id === activeApplicationId)
   return (
     <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Jobs", href: "/recruitment/jobs" }, { label: data?.job.title ?? "Pipeline" }]}>
       {loading ? <ListSkeleton rows={8} columns={4} /> : error || !data ? <ErrorState message={error || "Job not found"} onRetry={() => void load()} /> : <>
@@ -269,13 +434,24 @@ export function RecruitmentJobDetailPage() {
         {!canManageOrganization && <p className="mb-5 rounded-xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only: organization admin access is required to change this job or its ranking rubric.</p>}
         {settings?.organizationPath && data.job.publicSlug && <PublicSharePanel key={`${data.job._id}:${data.job.socialShareText}`} job={data.job} organizationPath={settings.organizationPath} onSaved={load} canManage={canManageOrganization} />}
         <RubricWorkflow jobId={jobId} className="mb-6" canManage={canManageOrganization} />
-        <div className="mb-5 flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground"><MapPinIcon className="size-4" /><span>Move applicants with each card's stage control. Every move is recorded in activity.</span></div>
-        <div className="flex gap-4 overflow-x-auto pb-5">{stages.map((stage) => { const items = data.byStage[stage.id] ?? []
-          return <section key={stage.id} className="w-[300px] shrink-0"><div className="mb-3 flex items-center gap-2 px-1"><span className="size-2.5 rounded-full" style={{ background: stage.color ?? "#64748b" }} /><h2 className="text-sm font-semibold">{stage.name}</h2><Badge variant="secondary" className="ml-auto">{items.length}</Badge></div><div className="space-y-3 rounded-2xl bg-muted/70 p-2.5 min-h-60">
-            {!items.length ? <div className="flex h-28 items-center justify-center rounded-xl border border-dashed text-xs text-muted-foreground">No applicants</div> : items.map((application) => { const candidate = entity(application.candidateId)
-              return <article key={application._id} className="rounded-xl border bg-card p-4 shadow-xs transition-shadow hover:shadow-sm"><Link to="/recruitment/applications/$applicationId" params={{ applicationId: application._id }} className="flex items-start gap-3"><div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">{initials(candidate?.fullName ?? "C")}</div><div className="min-w-0"><p className="truncate text-sm font-semibold">{candidate?.fullName ?? "Candidate"}</p><p className="truncate text-xs text-muted-foreground">{candidate?.headline || candidate?.email}</p></div></Link><div className="mt-4"><Select value={application.stageId} disabled={busy === application._id} onValueChange={(value) => void move(application, value)}><SelectTrigger size="sm" className="w-full"><SelectValue /></SelectTrigger><SelectContent>{stages.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent></Select></div></article>
-            })}</div></section> })}
-        </div>
+        <div className="mb-5 flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground"><MapPinIcon className="size-4" /><span>Drag applicants between stages or use the stage menu on each card. Every move is recorded in activity.</span></div>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragCancel={() => setActiveApplicationId("")} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-5">
+            {stages.map((stage) => (
+              <PipelineColumn
+                key={stage.id}
+                stage={stage}
+                applications={data.byStage[stage.id] ?? []}
+                stages={stages}
+                busyId={busy}
+                onMove={(application, stageId) => void move(application, stageId)}
+              />
+            ))}
+          </div>
+          <DragOverlay dropAnimation={{ duration: 180, easing: "ease-out" }}>
+            {activeApplication ? <div className="w-[280px]"><PipelineCardContent application={activeApplication} stages={stages} busy={false} dragging /></div> : null}
+          </DragOverlay>
+        </DndContext>
         {!data.applications.length && <EmptyState icon={UsersRoundIcon} title="The pipeline is ready" description="Applications added to this job will appear in the first active stage." />}
       </>}
     </RecruitmentShell>
