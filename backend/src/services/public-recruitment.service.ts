@@ -14,6 +14,7 @@ import { RecruitmentUploadSession } from "../models/recruitment-upload-session.m
 import { Organization } from "../models/organization.model";
 import {
   createPresignedUpload,
+  createPresignedViewUrl,
   deleteObject,
   getObjectMetadata,
   keyBelongsToPrefix,
@@ -126,14 +127,37 @@ function serializeJob(
   };
 }
 
+function isAbsoluteImageUrl(value: string) {
+  return /^https?:\/\//i.test(value) || value.startsWith("data:");
+}
+
+// Logo values may be internal S3 keys (the internal app resolves them through an
+// authenticated endpoint). The public site must emit a URL a browser can load.
+async function resolvePublicImageUrl(value: unknown): Promise<string | null> {
+  const raw = text(value);
+  if (!raw) return null;
+  if (isAbsoluteImageUrl(raw)) return raw;
+  try {
+    const { url } = await createPresignedViewUrl(raw);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 async function effectiveBranding(settings: any) {
-  if (!settings.inheritOrganizationBranding) return settings.branding;
+  if (!settings.inheritOrganizationBranding) {
+    return {
+      primaryColor: settings.branding?.primaryColor,
+      logoUrl: await resolvePublicImageUrl(settings.branding?.logoUrl),
+    };
+  }
   const organization = await Organization.findById(settings.organizationId)
     .select("name logoUrl preferences.primaryColor")
     .lean();
   return {
     primaryColor: organization?.preferences?.primaryColor || settings.branding?.primaryColor,
-    logoUrl: organization?.logoUrl || settings.branding?.logoUrl || null,
+    logoUrl: await resolvePublicImageUrl(organization?.logoUrl || settings.branding?.logoUrl),
   };
 }
 
@@ -159,7 +183,9 @@ export async function getPublicCareersSite(pathValue: unknown) {
     seo: {
       title: settings.seoTitle || settings.headline || `${organization?.name ?? ""} Careers`,
       description: settings.seoDescription || settings.intro.slice(0, 180),
-      image: settings.bannerUrl || branding?.logoUrl || null,
+      image: [settings.bannerUrl, branding?.logoUrl].find(
+        (value) => typeof value === "string" && isAbsoluteImageUrl(value)
+      ) ?? null,
       canonicalPath: `/careers/${settings.organizationPath}`,
     },
     share: {
