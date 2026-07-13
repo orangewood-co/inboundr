@@ -122,7 +122,7 @@ export function InternationalPhoneInput({
                     )}
                   >
                     <span className="flex w-5 shrink-0 overflow-hidden rounded-sm [&_svg]:h-auto [&_svg]:w-full">
-                      <OptionFlag title={option.label} />
+                      {OptionFlag && <OptionFlag title={option.label} />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
                     <span className="text-muted-foreground">+{option.callingCode}</span>
