@@ -22,6 +22,7 @@ import { RecruitmentAttachment } from "../models/recruitment-attachment.model";
 import { RecruitmentRankingJob } from "../models/recruitment-ranking-job.model";
 import { RecruitmentAcknowledgementDelivery } from "../models/recruitment-acknowledgement-delivery.model";
 import { Employee } from "../models/employee.model";
+import { Organization } from "../models/organization.model";
 import {
   createPresignedUpload,
   createPresignedViewUrl,
@@ -76,17 +77,6 @@ function optionalUrl(value: unknown, label: string): string | null {
   return raw.slice(0, 2000);
 }
 
-function organizationPath(value: unknown): string | null {
-  const slug = text(value).toLowerCase();
-  if (!slug) return null;
-  if (!/^[a-z0-9](?:[a-z0-9-]{1,70}[a-z0-9])?$/.test(slug)) {
-    throw new RecruitmentServiceError(
-      "Organization path must be 3-72 lowercase letters, numbers, or hyphens"
-    );
-  }
-  return slug;
-}
-
 function publicSlug(value: unknown): string | null {
   const slug = text(value)
     .toLowerCase()
@@ -136,20 +126,44 @@ function normalizeStages(value: unknown): IRecruitmentStage[] {
   return stages;
 }
 
+async function inferredOrganizationPath(organizationId: OrganizationId): Promise<string> {
+  const organization = await Organization.findById(organizationId).select("name").lean();
+  if (!organization) throw new RecruitmentServiceError("Organization not found", 404);
+  const base =
+    text(organization.name)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "organization";
+  const conflict = await RecruitmentSettings.exists({
+    organizationId: { $ne: organizationId },
+    organizationPath: base,
+  });
+  return conflict ? `${base}-${organizationId.toString().slice(-6)}` : base;
+}
+
 export async function getRecruitmentSettings(organizationId: OrganizationId) {
-  return RecruitmentSettings.findOneAndUpdate(
-    { organizationId },
-    {
-      $setOnInsert: {
-        organizationId,
-        defaultStages: DEFAULT_RECRUITMENT_STAGES,
-        defaultApplicationForm: { fields: [] },
-        publicCareersEnabled: false,
-        organizationPath: null,
+  const inferredPath = await inferredOrganizationPath(organizationId);
+  const upsert = (organizationPath: string) =>
+    RecruitmentSettings.findOneAndUpdate(
+      { organizationId },
+      {
+        $set: { organizationPath },
+        $setOnInsert: {
+          organizationId,
+          defaultStages: DEFAULT_RECRUITMENT_STAGES,
+          defaultApplicationForm: { fields: [] },
+          publicCareersEnabled: false,
+        },
       },
-    },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+  try {
+    return await upsert(inferredPath);
+  } catch (error: any) {
+    if (error?.code !== 11000) throw error;
+    return upsert(`${inferredPath.slice(0, 64)}-${organizationId.toString().slice(-6)}`);
+  }
 }
 
 export async function updateRecruitmentSettings(
@@ -163,7 +177,6 @@ export async function updateRecruitmentSettings(
     update.defaultApplicationForm = normalizeRecruitmentForm(body.defaultApplicationForm);
   }
   if ("publicCareersEnabled" in body) update.publicCareersEnabled = Boolean(body.publicCareersEnabled);
-  if ("organizationPath" in body) update.organizationPath = organizationPath(body.organizationPath);
   if ("headline" in body) update.headline = text(body.headline).slice(0, 240);
   if ("intro" in body) update.intro = text(body.intro).slice(0, 5000);
   if ("seoTitle" in body) update.seoTitle = text(body.seoTitle).slice(0, 120);

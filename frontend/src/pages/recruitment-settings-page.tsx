@@ -90,10 +90,10 @@ export function RecruitmentSettingsPage() {
         <fieldset disabled={!canManageOrganization} className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Address & publishing</h2>
-              <p className="mb-5 text-sm text-muted-foreground">Your unique path becomes the shareable careers URL.</p>
+              <h2 className="font-semibold">Publishing</h2>
+              <p className="mb-5 text-sm text-muted-foreground">Your careers URL is generated automatically from the organization name.</p>
               <div className="space-y-4">
-                <div><Label htmlFor="organization-path">Organization path</Label><div className="mt-2 flex items-center rounded-md border bg-muted/30"><span className="pl-3 text-sm text-muted-foreground">/careers/</span><Input id="organization-path" className="border-0 bg-transparent shadow-none focus-visible:ring-0" value={settings.organizationPath ?? ""} onChange={(event) => patch({ organizationPath: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") })} placeholder="acme" /></div></div>
+                {publicUrl && <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3"><span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{publicUrl}</span><Button type="button" size="sm" variant="ghost" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success("Link copied"))}><CopyIcon /> Copy</Button></div>}
                 <label className="flex items-center justify-between gap-4 rounded-xl border p-4"><span><span className="block text-sm font-medium">Publish careers site</span><span className="text-xs text-muted-foreground">Candidates can browse open roles at the public URL.</span></span><Switch checked={settings.publicCareersEnabled} onCheckedChange={(checked) => patch({ publicCareersEnabled: checked })} /></label>
               </div>
             </section>
