@@ -1,22 +1,26 @@
-import { useState, type FormEvent, type ReactNode } from "react"
+import { useState, type FormEvent } from "react"
 import { Link } from "@tanstack/react-router"
 
+import { AuthLayout } from "@/components/auth-layout"
 import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
 import { requestPasswordReset } from "@/lib/auth-client"
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
-  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitted, setIsSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
-    setMessage(null)
     setIsSubmitting(true)
 
     const result = await requestPasswordReset({
@@ -31,78 +35,86 @@ export function ForgotPasswordPage() {
       return
     }
 
-    setMessage("Check the backend console for your password reset link.")
+    setIsSubmitted(true)
+  }
+
+  if (isSubmitted) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col gap-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <svg
+                aria-hidden="true"
+                className="size-6"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold">Check Your Mail</h1>
+              <p className="text-sm text-balance text-muted-foreground">
+                If an account exists for {email}, we sent it a password reset
+                link. Open it to choose a new password.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline">
+            <Link to="/login">Back to Sign In</Link>
+          </Button>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
-    <AuthShell
-      eyebrow="Password Reset"
-      title="Recover Your Account"
-      description="Enter your email and Better Auth will create a reset link. Emails are mocked, so the link appears in the backend console."
-    >
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="name@company.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </div>
-
-        {error ? (
-          <p className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-
-        {message ? (
-          <p className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
-            {message}
-          </p>
-        ) : null}
-
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting && <Spinner data-icon="inline-start" />}
-          Send Reset Link
-        </Button>
-      </form>
-
-      <Button asChild variant="ghost" className="w-full">
-        <Link to="/login">Back to Sign In</Link>
-      </Button>
-    </AuthShell>
-  )
-}
-
-type AuthShellProps = {
-  eyebrow: string
-  title: string
-  description: string
-  children: ReactNode
-}
-
-function AuthShell({ eyebrow, title, description, children }: AuthShellProps) {
-  return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-6 sm:p-8">
-      <div className="w-full max-w-md space-y-6 rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
-        <div className="space-y-3">
-          <span className="inline-flex rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-xs font-medium text-primary">
-            {eyebrow}
-          </span>
-          <div className="space-y-2">
-            <h2 className="text-3xl font-semibold tracking-tight">{title}</h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {description}
+    <AuthLayout>
+      <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+        <FieldGroup>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h1 className="text-2xl font-bold">Forgot Your Password?</h1>
+            <p className="text-sm text-balance text-muted-foreground">
+              Enter your email and we&apos;ll send you a link to reset your
+              password.
             </p>
           </div>
-        </div>
-        {children}
-      </div>
-    </div>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="m@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </Field>
+          {error ? (
+            <p className="rounded-lg border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <Field>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Please wait…" : "Send Reset Link"}
+            </Button>
+            <FieldDescription className="text-center">
+              Remembered your password?{" "}
+              <Link to="/login" className="underline underline-offset-4">
+                Back to Sign In
+              </Link>
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </form>
+    </AuthLayout>
   )
 }
