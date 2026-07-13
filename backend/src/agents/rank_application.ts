@@ -51,7 +51,7 @@ export interface RankApplicationOutput extends z.infer<typeof rankingResultSchem
 }
 
 function modelName() {
-  return process.env.RECRUITMENT_RANKING_MODEL?.trim() || "openai/gpt-5.5-mini";
+  return process.env.RECRUITMENT_RANKING_MODEL?.trim() || "openai/gpt-5.6-luna";
 }
 
 function createModel() {
