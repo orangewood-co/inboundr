@@ -111,6 +111,63 @@ const emptyForm: EmployeeFormState = {
   allowedModules: [],
 }
 
+type RecruitmentPrefillEnvelope = {
+  version: 1
+  createdAt: number
+  applicationId: string
+  jobTitle: string
+  prefill: {
+    fullName: string
+    email: string
+    phone: string | null
+    title: string | null
+    employeeCode: string | null
+    profileImageUrl: string | null
+    startDate: string | null
+    status: EmployeeStatus
+    socials: { linkedinUrl: string | null; instagramUrl: string | null }
+    address: { line1: string; line2: string; city: string; state: string; postalCode: string; country: string }
+  }
+}
+
+function consumeRecruitmentPrefill(): { form: EmployeeFormState; source: RecruitmentPrefillEnvelope | null } {
+  const key = "recruitment.employee-prefill"
+  const raw = sessionStorage.getItem(key)
+  sessionStorage.removeItem(key)
+  if (!raw) return { form: emptyForm, source: null }
+  try {
+    const envelope = JSON.parse(raw) as RecruitmentPrefillEnvelope
+    if (envelope.version !== 1 || Date.now() - envelope.createdAt > 15 * 60_000) return { form: emptyForm, source: null }
+    const value = envelope.prefill
+    return {
+      source: envelope,
+      form: {
+        ...emptyForm,
+        fullName: value.fullName || "",
+        email: value.email || "",
+        phone: value.phone || "",
+        title: value.title || "",
+        profileImageUrl: value.profileImageUrl || "",
+        linkedinUrl: value.socials?.linkedinUrl || "",
+        instagramUrl: value.socials?.instagramUrl || "",
+        addressLine1: value.address?.line1 || "",
+        addressLine2: value.address?.line2 || "",
+        addressCity: value.address?.city || "",
+        addressState: value.address?.state || "",
+        addressPostalCode: value.address?.postalCode || "",
+        addressCountry: value.address?.country || "",
+        employeeCode: value.employeeCode || "",
+        startDate: value.startDate || "",
+        status: value.status || "active",
+        accessEnabled: false,
+        allowedModules: [],
+      },
+    }
+  } catch {
+    return { form: emptyForm, source: null }
+  }
+}
+
 function Stepper({ currentStep }: { currentStep: StepId }) {
   const currentIndex = steps.findIndex((step) => step.id === currentStep)
 
@@ -222,8 +279,9 @@ function formToPayload(form: EmployeeFormState) {
 
 export default function EmployeeNewPage() {
   const navigate = useNavigate()
+  const [recruitmentPrefill] = useState(consumeRecruitmentPrefill)
   const [step, setStep] = useState<StepId>("profile")
-  const [form, setForm] = useState<EmployeeFormState>(emptyForm)
+  const [form, setForm] = useState<EmployeeFormState>(recruitmentPrefill.form)
   const [teams, setTeams] = useState<EmployeeTeam[]>([])
   const [modules, setModules] = useState<{ key: EmployeeAccessModule; label: string }[]>([])
   const [saving, setSaving] = useState(false)
@@ -256,6 +314,8 @@ export default function EmployeeNewPage() {
   }, [])
 
   useEffect(() => {
+    // Reference lists are hydrated from the employee API on entry.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchReferenceData()
   }, [fetchReferenceData])
 
@@ -368,6 +428,7 @@ export default function EmployeeNewPage() {
           </div>
 
           <div className="rounded-3xl border bg-card p-6">
+            {recruitmentPrefill.source ? <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950"><p className="font-semibold">Prefilled from the hired {recruitmentPrefill.source.jobTitle} application</p><p className="mt-1 text-emerald-900/70">Review every field before creating the employee. Platform access remains disabled and no invitation is sent automatically.</p></div> : null}
             {step === "profile" ? (
               <section className="grid gap-5">
                 <div className="flex items-center gap-3">

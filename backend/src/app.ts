@@ -42,6 +42,8 @@ import notificationRouter from "./routes/notification.route";
 import ogRouter from "./routes/og.route";
 import formShareRouter from "./routes/form-share.route";
 import serviceManagementRouter from "./routes/service-management.route";
+import recruitmentRouter from "./routes/recruitment.route";
+import publicRecruitmentRouter from "./routes/public-recruitment.route";
 import { connectDB, disconnectDB } from "./config/database.config";
 import { ensureKnowledgeSchema } from "./db/knowledge-schema";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
@@ -60,6 +62,8 @@ import {
 import { startCallRecordingCron } from "./jobs/call-recording-cron";
 import { startDigestCron } from "./jobs/digest-cron";
 import { startPaymentReminderCron } from "./jobs/payment-reminder-cron";
+import { startRecruitmentRankingWorker } from "./services/recruitment-ranking.service";
+import { startRecruitmentAcknowledgementWorker } from "./services/recruitment-acknowledgement.service";
 
 const app: Application = express();
 
@@ -113,6 +117,7 @@ app.use("/api/v1/feedback", feedbackRouter);
 app.use("/api/v1/employees", employeeRouter);
 app.use("/api/v1/assets", assetsRouter);
 app.use("/api/v1/service-management", serviceManagementRouter);
+app.use("/api/v1/recruitment", recruitmentRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/attendance", attendanceRouter);
 app.use("/api/v1/chat", chatRouter);
@@ -126,6 +131,7 @@ app.use("/api/v1/public/forms", publicFormsRouter);
 app.use("/api/v1/public/drive", publicDriveRouter);
 app.use("/api/v1/public/attendance", publicAttendanceRouter);
 app.use("/api/v1/public/support", publicSupportRouter);
+app.use("/api/v1/public/recruitment", publicRecruitmentRouter);
 app.use("/l", publicReadLimiter, publicLinksRouter);
 app.use("/f", publicReadLimiter, formShareRouter);
 app.use("/api/v1/stats", statsRouter);
@@ -161,6 +167,8 @@ export async function initializeServices(): Promise<void> {
   startDigestCron();
   startPaymentReminderCron();
   startCallRecordingCron();
+  startRecruitmentRankingWorker();
+  startRecruitmentAcknowledgementWorker();
 }
 
 async function shutdown(): Promise<void> {

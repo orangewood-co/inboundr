@@ -34,6 +34,40 @@ html.dark body {
   background: #0a0908;
 }
 
+html.widget-theme-dark,
+html.widget-theme-dark body {
+  color-scheme: dark;
+  color: #e7e5e4;
+  background: #11100f;
+}
+
+html.widget-theme-dark [class*="bg-[#f4f1ea]"],
+html.widget-theme-dark [class*="bg-[#f8f6f1]"],
+html.widget-theme-dark [class*="bg-white"] {
+  background-color: #171513;
+}
+
+html.widget-theme-dark [class*="bg-stone-100"],
+html.widget-theme-dark [class*="bg-stone-200"] {
+  background-color: #292524;
+}
+
+html.widget-theme-dark [class*="text-stone-950"],
+html.widget-theme-dark [class*="text-stone-900"],
+html.widget-theme-dark [class*="text-stone-700"] {
+  color: #f5f5f4;
+}
+
+html.widget-theme-dark [class*="text-stone-600"],
+html.widget-theme-dark [class*="text-stone-500"] {
+  color: #a8a29e;
+}
+
+html.widget-theme-dark [class*="border-black/10"],
+html.widget-theme-dark [class*="border-stone-"] {
+  border-color: rgb(255 255 255 / 12%);
+}
+
 #root {
   height: 100%;
   overflow-y: auto;

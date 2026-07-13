@@ -8,6 +8,7 @@ import FormPage from "./pages/form-page"
 import LinkPage from "./pages/link-page"
 import NotFound from "./pages/not-found"
 import SupportPage from "./pages/support-page"
+import CareersPage from "./pages/careers-page"
 
 const path = window.location.pathname.replace(/\/+$/, "")
 const params = new URLSearchParams(window.location.search)
@@ -17,9 +18,18 @@ const linkMatch = path.match(/^\/l\/(.+)$/)
 const attendanceMatch = path.match(/^\/attendance\/(.+)$/)
 const driveMatch = path.match(/^\/d\/(.+)$/)
 const supportMatch = path.match(/^\/support\/(.+)$/)
+const careersMatch = path.match(/^\/careers\/([^/]+)(?:\/(?:jobs\/)?([^/]+))?$/)
 
 let page: React.ReactNode
-if (attendanceMatch) {
+if (careersMatch) {
+  page = (
+    <CareersPage
+      organizationPath={decodeURIComponent(careersMatch[1])}
+      jobSlug={careersMatch[2] ? decodeURIComponent(careersMatch[2]) : undefined}
+      embed={params.get("embed") === "1"}
+    />
+  )
+} else if (attendanceMatch) {
   page = <AttendancePage organizationId={attendanceMatch[1]} />
 } else if (supportMatch) {
   page = <SupportPage organizationId={supportMatch[1]} />

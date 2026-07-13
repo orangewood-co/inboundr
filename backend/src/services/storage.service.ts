@@ -6,6 +6,7 @@ import {
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -180,6 +181,23 @@ export async function createPresignedViewUrl(
   });
 
   return { url, expiresInSeconds: VIEW_EXPIRES_IN_SECONDS };
+}
+
+export async function getObjectMetadata(key: string): Promise<{
+  contentType: string;
+  size: number;
+}> {
+  const { bucket } = getStorageConfig();
+  const response = await getS3Client().send(
+    new HeadObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    })
+  );
+  return {
+    contentType: String(response.ContentType ?? "").toLowerCase(),
+    size: Number(response.ContentLength ?? 0),
+  };
 }
 
 export async function createMultipartUpload(input: PresignUploadInput): Promise<MultipartUploadSession> {

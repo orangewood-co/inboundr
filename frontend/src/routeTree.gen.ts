@@ -17,6 +17,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as RfqRouteImport } from './routes/rfq'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RecruitmentRouteImport } from './routes/recruitment'
 import { Route as ReceivablesRouteImport } from './routes/receivables'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -43,6 +44,9 @@ import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ServiceSummaryRouteImport } from './routes/service_.summary'
 import { Route as ServiceNewRouteImport } from './routes/service_.new'
 import { Route as ServiceRequestIdRouteImport } from './routes/service_.$requestId'
+import { Route as RecruitmentSettingsRouteImport } from './routes/recruitment_.settings'
+import { Route as RecruitmentJobsRouteImport } from './routes/recruitment_.jobs'
+import { Route as RecruitmentApplicantsRouteImport } from './routes/recruitment_.applicants'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
@@ -64,9 +68,13 @@ import { Route as AssetsImportRouteImport } from './routes/assets_.import'
 import { Route as AssetsIdRouteImport } from './routes/assets_.$id'
 import { Route as AdminFeedbackRouteImport } from './routes/admin_.feedback'
 import { Route as AdminFeedbackIndexRouteImport } from './routes/admin_.feedback.index'
+import { Route as RecruitmentJobsNewRouteImport } from './routes/recruitment_.jobs_.new'
+import { Route as RecruitmentJobsJobIdRouteImport } from './routes/recruitment_.jobs_.$jobId'
+import { Route as RecruitmentApplicationsApplicationIdRouteImport } from './routes/recruitment_.applications_.$applicationId'
 import { Route as EmployeesAttendanceLogsRouteImport } from './routes/employees_.attendance_.logs'
 import { Route as AdminOrganizationsIdRouteImport } from './routes/admin_.organizations.$id'
 import { Route as AdminFeedbackIdRouteImport } from './routes/admin_.feedback.$id'
+import { Route as RecruitmentJobsJobIdEditRouteImport } from './routes/recruitment_.jobs_.$jobId_.edit'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
 const SupportRoute = SupportRouteImport.update({
@@ -107,6 +115,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecruitmentRoute = RecruitmentRouteImport.update({
+  id: '/recruitment',
+  path: '/recruitment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReceivablesRoute = ReceivablesRouteImport.update({
@@ -239,6 +252,21 @@ const ServiceRequestIdRoute = ServiceRequestIdRouteImport.update({
   path: '/service/$requestId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecruitmentSettingsRoute = RecruitmentSettingsRouteImport.update({
+  id: '/recruitment_/settings',
+  path: '/recruitment/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecruitmentJobsRoute = RecruitmentJobsRouteImport.update({
+  id: '/recruitment_/jobs',
+  path: '/recruitment/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecruitmentApplicantsRoute = RecruitmentApplicantsRouteImport.update({
+  id: '/recruitment_/applicants',
+  path: '/recruitment/applicants',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsNewRoute = ProjectsNewRouteImport.update({
   id: '/projects_/new',
   path: '/projects/new',
@@ -344,6 +372,22 @@ const AdminFeedbackIndexRoute = AdminFeedbackIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminFeedbackRoute,
 } as any)
+const RecruitmentJobsNewRoute = RecruitmentJobsNewRouteImport.update({
+  id: '/recruitment_/jobs_/new',
+  path: '/recruitment/jobs/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecruitmentJobsJobIdRoute = RecruitmentJobsJobIdRouteImport.update({
+  id: '/recruitment_/jobs_/$jobId',
+  path: '/recruitment/jobs/$jobId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecruitmentApplicationsApplicationIdRoute =
+  RecruitmentApplicationsApplicationIdRouteImport.update({
+    id: '/recruitment_/applications_/$applicationId',
+    path: '/recruitment/applications/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const EmployeesAttendanceLogsRoute = EmployeesAttendanceLogsRouteImport.update({
   id: '/employees_/attendance_/logs',
   path: '/employees/attendance/logs',
@@ -359,6 +403,12 @@ const AdminFeedbackIdRoute = AdminFeedbackIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AdminFeedbackRoute,
 } as any)
+const RecruitmentJobsJobIdEditRoute =
+  RecruitmentJobsJobIdEditRouteImport.update({
+    id: '/recruitment_/jobs_/$jobId_/edit',
+    path: '/recruitment/jobs/$jobId/edit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ProjectsIdTasksTaskIdRoute = ProjectsIdTasksTaskIdRouteImport.update({
   id: '/projects_/$id_/tasks/$taskId',
   path: '/projects/$id/tasks/$taskId',
@@ -384,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
   '/receivables': typeof ReceivablesRoute
+  '/recruitment': typeof RecruitmentRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -412,6 +463,9 @@ export interface FileRoutesByFullPath {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/recruitment/applicants': typeof RecruitmentApplicantsRoute
+  '/recruitment/jobs': typeof RecruitmentJobsRoute
+  '/recruitment/settings': typeof RecruitmentSettingsRoute
   '/service/$requestId': typeof ServiceRequestIdRoute
   '/service/new': typeof ServiceNewRoute
   '/service/summary': typeof ServiceSummaryRoute
@@ -423,8 +477,12 @@ export interface FileRoutesByFullPath {
   '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
+  '/recruitment/applications/$applicationId': typeof RecruitmentApplicationsApplicationIdRoute
+  '/recruitment/jobs/$jobId': typeof RecruitmentJobsJobIdRoute
+  '/recruitment/jobs/new': typeof RecruitmentJobsNewRoute
   '/admin/feedback/': typeof AdminFeedbackIndexRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
+  '/recruitment/jobs/$jobId/edit': typeof RecruitmentJobsJobIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -442,6 +500,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
   '/receivables': typeof ReceivablesRoute
+  '/recruitment': typeof RecruitmentRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -468,6 +527,9 @@ export interface FileRoutesByTo {
   '/products/import': typeof ProductsImportRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
+  '/recruitment/applicants': typeof RecruitmentApplicantsRoute
+  '/recruitment/jobs': typeof RecruitmentJobsRoute
+  '/recruitment/settings': typeof RecruitmentSettingsRoute
   '/service/$requestId': typeof ServiceRequestIdRoute
   '/service/new': typeof ServiceNewRoute
   '/service/summary': typeof ServiceSummaryRoute
@@ -479,8 +541,12 @@ export interface FileRoutesByTo {
   '/admin/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees/attendance/logs': typeof EmployeesAttendanceLogsRoute
+  '/recruitment/applications/$applicationId': typeof RecruitmentApplicationsApplicationIdRoute
+  '/recruitment/jobs/$jobId': typeof RecruitmentJobsJobIdRoute
+  '/recruitment/jobs/new': typeof RecruitmentJobsNewRoute
   '/admin/feedback': typeof AdminFeedbackIndexRoute
   '/projects/$id/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
+  '/recruitment/jobs/$jobId/edit': typeof RecruitmentJobsJobIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -502,6 +568,7 @@ export interface FileRoutesById {
   '/products': typeof ProductsRoute
   '/projects': typeof ProjectsRoute
   '/receivables': typeof ReceivablesRoute
+  '/recruitment': typeof RecruitmentRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/rfq': typeof RfqRoute
@@ -530,6 +597,9 @@ export interface FileRoutesById {
   '/products_/import': typeof ProductsImportRoute
   '/projects_/$id': typeof ProjectsIdRoute
   '/projects_/new': typeof ProjectsNewRoute
+  '/recruitment_/applicants': typeof RecruitmentApplicantsRoute
+  '/recruitment_/jobs': typeof RecruitmentJobsRoute
+  '/recruitment_/settings': typeof RecruitmentSettingsRoute
   '/service_/$requestId': typeof ServiceRequestIdRoute
   '/service_/new': typeof ServiceNewRoute
   '/service_/summary': typeof ServiceSummaryRoute
@@ -541,8 +611,12 @@ export interface FileRoutesById {
   '/admin_/feedback/$id': typeof AdminFeedbackIdRoute
   '/admin_/organizations/$id': typeof AdminOrganizationsIdRoute
   '/employees_/attendance_/logs': typeof EmployeesAttendanceLogsRoute
+  '/recruitment_/applications_/$applicationId': typeof RecruitmentApplicationsApplicationIdRoute
+  '/recruitment_/jobs_/$jobId': typeof RecruitmentJobsJobIdRoute
+  '/recruitment_/jobs_/new': typeof RecruitmentJobsNewRoute
   '/admin_/feedback/': typeof AdminFeedbackIndexRoute
   '/projects_/$id_/tasks/$taskId': typeof ProjectsIdTasksTaskIdRoute
+  '/recruitment_/jobs_/$jobId_/edit': typeof RecruitmentJobsJobIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -565,6 +639,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/receivables'
+    | '/recruitment'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -593,6 +668,9 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/recruitment/applicants'
+    | '/recruitment/jobs'
+    | '/recruitment/settings'
     | '/service/$requestId'
     | '/service/new'
     | '/service/summary'
@@ -604,8 +682,12 @@ export interface FileRouteTypes {
     | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
+    | '/recruitment/applications/$applicationId'
+    | '/recruitment/jobs/$jobId'
+    | '/recruitment/jobs/new'
     | '/admin/feedback/'
     | '/projects/$id/tasks/$taskId'
+    | '/recruitment/jobs/$jobId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -623,6 +705,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/receivables'
+    | '/recruitment'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -649,6 +732,9 @@ export interface FileRouteTypes {
     | '/products/import'
     | '/projects/$id'
     | '/projects/new'
+    | '/recruitment/applicants'
+    | '/recruitment/jobs'
+    | '/recruitment/settings'
     | '/service/$requestId'
     | '/service/new'
     | '/service/summary'
@@ -660,8 +746,12 @@ export interface FileRouteTypes {
     | '/admin/feedback/$id'
     | '/admin/organizations/$id'
     | '/employees/attendance/logs'
+    | '/recruitment/applications/$applicationId'
+    | '/recruitment/jobs/$jobId'
+    | '/recruitment/jobs/new'
     | '/admin/feedback'
     | '/projects/$id/tasks/$taskId'
+    | '/recruitment/jobs/$jobId/edit'
   id:
     | '__root__'
     | '/'
@@ -682,6 +772,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/receivables'
+    | '/recruitment'
     | '/register'
     | '/reset-password'
     | '/rfq'
@@ -710,6 +801,9 @@ export interface FileRouteTypes {
     | '/products_/import'
     | '/projects_/$id'
     | '/projects_/new'
+    | '/recruitment_/applicants'
+    | '/recruitment_/jobs'
+    | '/recruitment_/settings'
     | '/service_/$requestId'
     | '/service_/new'
     | '/service_/summary'
@@ -721,8 +815,12 @@ export interface FileRouteTypes {
     | '/admin_/feedback/$id'
     | '/admin_/organizations/$id'
     | '/employees_/attendance_/logs'
+    | '/recruitment_/applications_/$applicationId'
+    | '/recruitment_/jobs_/$jobId'
+    | '/recruitment_/jobs_/new'
     | '/admin_/feedback/'
     | '/projects_/$id_/tasks/$taskId'
+    | '/recruitment_/jobs_/$jobId_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -744,6 +842,7 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRoute
   ProjectsRoute: typeof ProjectsRoute
   ReceivablesRoute: typeof ReceivablesRoute
+  RecruitmentRoute: typeof RecruitmentRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RfqRoute: typeof RfqRoute
@@ -767,12 +866,19 @@ export interface RootRouteChildren {
   ProductsImportRoute: typeof ProductsImportRoute
   ProjectsIdRoute: typeof ProjectsIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
+  RecruitmentApplicantsRoute: typeof RecruitmentApplicantsRoute
+  RecruitmentJobsRoute: typeof RecruitmentJobsRoute
+  RecruitmentSettingsRoute: typeof RecruitmentSettingsRoute
   ServiceRequestIdRoute: typeof ServiceRequestIdRoute
   ServiceNewRoute: typeof ServiceNewRoute
   ServiceSummaryRoute: typeof ServiceSummaryRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
   EmployeesAttendanceLogsRoute: typeof EmployeesAttendanceLogsRoute
+  RecruitmentApplicationsApplicationIdRoute: typeof RecruitmentApplicationsApplicationIdRoute
+  RecruitmentJobsJobIdRoute: typeof RecruitmentJobsJobIdRoute
+  RecruitmentJobsNewRoute: typeof RecruitmentJobsNewRoute
   ProjectsIdTasksTaskIdRoute: typeof ProjectsIdTasksTaskIdRoute
+  RecruitmentJobsJobIdEditRoute: typeof RecruitmentJobsJobIdEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -831,6 +937,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recruitment': {
+      id: '/recruitment'
+      path: '/recruitment'
+      fullPath: '/recruitment'
+      preLoaderRoute: typeof RecruitmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/receivables': {
@@ -1015,6 +1128,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServiceRequestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recruitment_/settings': {
+      id: '/recruitment_/settings'
+      path: '/recruitment/settings'
+      fullPath: '/recruitment/settings'
+      preLoaderRoute: typeof RecruitmentSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recruitment_/jobs': {
+      id: '/recruitment_/jobs'
+      path: '/recruitment/jobs'
+      fullPath: '/recruitment/jobs'
+      preLoaderRoute: typeof RecruitmentJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recruitment_/applicants': {
+      id: '/recruitment_/applicants'
+      path: '/recruitment/applicants'
+      fullPath: '/recruitment/applicants'
+      preLoaderRoute: typeof RecruitmentApplicantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects_/new': {
       id: '/projects_/new'
       path: '/projects/new'
@@ -1162,6 +1296,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackIndexRouteImport
       parentRoute: typeof AdminFeedbackRoute
     }
+    '/recruitment_/jobs_/new': {
+      id: '/recruitment_/jobs_/new'
+      path: '/recruitment/jobs/new'
+      fullPath: '/recruitment/jobs/new'
+      preLoaderRoute: typeof RecruitmentJobsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recruitment_/jobs_/$jobId': {
+      id: '/recruitment_/jobs_/$jobId'
+      path: '/recruitment/jobs/$jobId'
+      fullPath: '/recruitment/jobs/$jobId'
+      preLoaderRoute: typeof RecruitmentJobsJobIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recruitment_/applications_/$applicationId': {
+      id: '/recruitment_/applications_/$applicationId'
+      path: '/recruitment/applications/$applicationId'
+      fullPath: '/recruitment/applications/$applicationId'
+      preLoaderRoute: typeof RecruitmentApplicationsApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/employees_/attendance_/logs': {
       id: '/employees_/attendance_/logs'
       path: '/employees/attendance/logs'
@@ -1182,6 +1337,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/feedback/$id'
       preLoaderRoute: typeof AdminFeedbackIdRouteImport
       parentRoute: typeof AdminFeedbackRoute
+    }
+    '/recruitment_/jobs_/$jobId_/edit': {
+      id: '/recruitment_/jobs_/$jobId_/edit'
+      path: '/recruitment/jobs/$jobId/edit'
+      fullPath: '/recruitment/jobs/$jobId/edit'
+      preLoaderRoute: typeof RecruitmentJobsJobIdEditRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/projects_/$id_/tasks/$taskId': {
       id: '/projects_/$id_/tasks/$taskId'
@@ -1281,6 +1443,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRoute,
   ProjectsRoute: ProjectsRoute,
   ReceivablesRoute: ReceivablesRoute,
+  RecruitmentRoute: RecruitmentRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RfqRoute: RfqRoute,
@@ -1304,12 +1467,20 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsImportRoute: ProductsImportRoute,
   ProjectsIdRoute: ProjectsIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
+  RecruitmentApplicantsRoute: RecruitmentApplicantsRoute,
+  RecruitmentJobsRoute: RecruitmentJobsRoute,
+  RecruitmentSettingsRoute: RecruitmentSettingsRoute,
   ServiceRequestIdRoute: ServiceRequestIdRoute,
   ServiceNewRoute: ServiceNewRoute,
   ServiceSummaryRoute: ServiceSummaryRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
   EmployeesAttendanceLogsRoute: EmployeesAttendanceLogsRoute,
+  RecruitmentApplicationsApplicationIdRoute:
+    RecruitmentApplicationsApplicationIdRoute,
+  RecruitmentJobsJobIdRoute: RecruitmentJobsJobIdRoute,
+  RecruitmentJobsNewRoute: RecruitmentJobsNewRoute,
   ProjectsIdTasksTaskIdRoute: ProjectsIdTasksTaskIdRoute,
+  RecruitmentJobsJobIdEditRoute: RecruitmentJobsJobIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

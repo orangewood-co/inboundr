@@ -16,6 +16,10 @@ import {
 } from "../middleware/auth.middleware";
 import { getOrganizationContextForUser } from "../services/organization.service";
 import { createPresignedUpload, createPresignedViewUrl, keyBelongsToPrefix } from "../services/storage.service";
+import {
+  BRANDING_ALLOWED_MIME_TYPES,
+  BRANDING_MAX_FILE_SIZE,
+} from "../config/upload-constraints.config";
 
 const DEFAULT_ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -35,8 +39,6 @@ const SUPPORT_AUDIO_MIME_TYPES = [
 ];
 const SUPPORT_ALLOWED_MIME_TYPES = [...DEFAULT_ALLOWED_MIME_TYPES, ...SUPPORT_AUDIO_MIME_TYPES];
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
-const BRANDING_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
-const BRANDING_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const AVATAR_ALLOWED_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"];
 const AVATAR_MAX_FILE_SIZE = 2 * 1024 * 1024;
 const IMAGE_UPLOAD_SCOPES = ["branding", "letterhead", "employee", "attendance"] as const;
@@ -66,7 +68,7 @@ function validateUploadBasics(input: ReturnType<typeof normalizeUploadRequest>, 
 function allowedMimeTypesForScope(scope: string): string[] {
   if (scope === "employee" || scope === "attendance") return AVATAR_ALLOWED_MIME_TYPES;
   if (scope === "support") return SUPPORT_ALLOWED_MIME_TYPES;
-  return IMAGE_UPLOAD_SCOPES.includes(scope as any) ? BRANDING_ALLOWED_MIME_TYPES : DEFAULT_ALLOWED_MIME_TYPES;
+  return IMAGE_UPLOAD_SCOPES.includes(scope as any) ? [...BRANDING_ALLOWED_MIME_TYPES] : DEFAULT_ALLOWED_MIME_TYPES;
 }
 
 function validateFeedbackUpload(input: ReturnType<typeof normalizeUploadRequest>): string | null {

@@ -261,6 +261,8 @@ export async function listEmployeeModules(_req: Request, res: Response): Promise
           ? "Quotation"
           : key === "service_management"
             ? "Service Management"
+            : key === "recruitment"
+              ? "Recruitment"
             : key.charAt(0).toUpperCase() + key.slice(1),
     })),
   });

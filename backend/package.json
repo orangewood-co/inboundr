@@ -46,6 +46,7 @@
     "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0",
     "libphonenumber-js": "^1.13.7",
+    "mammoth": "^1.12.0",
     "mongodb": "^7.2.0",
     "mongoose": "^9.4.1",
     "openai": "^6.33.0",

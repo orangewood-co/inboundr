@@ -43,6 +43,7 @@ jobs:
       - name: Build embed
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
         run: bun run build:embed
 
       - name: Upload dist artifact

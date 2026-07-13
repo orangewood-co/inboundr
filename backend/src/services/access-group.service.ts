@@ -88,12 +88,14 @@ export async function ensureDefaultAccessGroups(
           organizationId: orgId,
           name: DEFAULT_ACCESS_GROUP_NAMES.members,
           description: "Default group for workspace members.",
-          moduleAccess: DEFAULT_MEMBERS_MODULES,
           allModules: false,
           canManageOrganization: false,
           isDefault: true,
           defaultKey: "members",
           status: "active",
+        },
+        $addToSet: {
+          moduleAccess: { $each: DEFAULT_MEMBERS_MODULES },
         },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true, session }

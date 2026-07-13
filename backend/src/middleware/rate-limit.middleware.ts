@@ -65,6 +65,24 @@ export const publicWriteLimiter = createLimiter({
   message: "Too many requests. Please try again later.",
 });
 
+export const recruitmentPublicReadLimiter = createLimiter({
+  windowMs: MINUTE,
+  limit: 120,
+  message: "Too many careers requests. Please try again later.",
+});
+
+export const recruitmentResumeUploadLimiter = createLimiter({
+  windowMs: 15 * MINUTE,
+  limit: 10,
+  message: "Too many resume upload requests. Please try again later.",
+});
+
+export const recruitmentApplicationSubmitLimiter = createLimiter({
+  windowMs: 60 * MINUTE,
+  limit: 5,
+  message: "Too many application attempts. Please try again later.",
+});
+
 /** Contact form sends two SES emails per request, so keep it very tight. */
 export const contactLimiter = createLimiter({
   windowMs: 60 * MINUTE,
@@ -95,6 +113,25 @@ export const aiChatLimiter = createLimiter({
     const userId = (req as AuthenticatedRequest).user?.id;
     return userId ? `user:${userId}` : ipKeyGenerator(req.ip ?? "");
   },
+});
+
+const authenticatedUserKey: Options["keyGenerator"] = (req: Request) => {
+  const userId = (req as AuthenticatedRequest).user?.id;
+  return userId ? `user:${userId}` : ipKeyGenerator(req.ip ?? "");
+};
+
+export const recruitmentRubricGenerationLimiter = createLimiter({
+  windowMs: 60 * MINUTE,
+  limit: 10,
+  message: "Too many rubric generation requests. Please try again later.",
+  keyGenerator: authenticatedUserKey,
+});
+
+export const recruitmentRerankLimiter = createLimiter({
+  windowMs: 60 * MINUTE,
+  limit: 30,
+  message: "Too many recruitment ranking requests. Please try again later.",
+  keyGenerator: authenticatedUserKey,
 });
 
 // Public support chat limiters, matching the limits previously enforced
