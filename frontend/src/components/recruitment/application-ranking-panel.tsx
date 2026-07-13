@@ -122,7 +122,7 @@ export function ApplicationRankingPanel({ applicationId, jobId, canManage = fals
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold">AI-assisted ranking</h2>
+              <h2 className="font-semibold">AI-Assisted Ranking</h2>
               <Badge variant="outline" className="capitalize">{statusCopy[status].label}</Badge>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{statusCopy[status].description}</p>
@@ -136,7 +136,7 @@ export function ApplicationRankingPanel({ applicationId, jobId, canManage = fals
             onClick={() => void queue(status === "failed" || status === "manual_review" ? "retry" : "rerank")}
           >
             {busy ? <Spinner /> : <RefreshCwIcon />}
-            {status === "failed" || status === "manual_review" ? "Retry ranking" : result ? "Rerank" : "Queue ranking"}
+            {status === "failed" || status === "manual_review" ? "Retry Ranking" : result ? "Rerank" : "Queue Ranking"}
           </Button>
         )}
       </div>
@@ -152,7 +152,7 @@ export function ApplicationRankingPanel({ applicationId, jobId, canManage = fals
 
       {error && !state ? (
         <div className="p-6 text-sm text-destructive">
-          {error} <Button variant="link" size="sm" onClick={() => void load()}>Try again</Button>
+          {error} <Button variant="link" size="sm" onClick={() => void load()}>Try Again</Button>
         </div>
       ) : !state ? (
         <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Spinner /> Loading ranking…</div>
@@ -183,13 +183,13 @@ export function ApplicationRankingPanel({ applicationId, jobId, canManage = fals
                 <Badge variant="outline">{result.model}</Badge>
                 <Badge variant="outline">{result.promptVersion}</Badge>
               </div>
-              <h3 className="mt-4 text-sm font-semibold">Assessment rationale</h3>
+              <h3 className="mt-4 text-sm font-semibold">Assessment Rationale</h3>
               <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{result.rationale}</p>
             </div>
           </div>
 
           <div className="mt-6 space-y-3">
-            <h3 className="font-semibold">Weighted criterion breakdown</h3>
+            <h3 className="font-semibold">Weighted Criterion Breakdown</h3>
             {result.criterionScores.map((item) => {
               const criterion = criteriaById.get(item.criterionId)
               return (
@@ -228,7 +228,7 @@ export function ApplicationRankingPanel({ applicationId, jobId, canManage = fals
 
           {!!result.missingRequirements.length && (
             <div className="mt-5 rounded-xl border border-amber-500/25 bg-amber-500/8 p-4">
-              <h3 className="flex items-center gap-2 font-semibold"><AlertCircleIcon className="size-4 text-amber-600" /> Missing or unverified requirements</h3>
+              <h3 className="flex items-center gap-2 font-semibold"><AlertCircleIcon className="size-4 text-amber-600" /> Missing or Unverified Requirements</h3>
               <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
                 {result.missingRequirements.map((requirement, index) => <li key={index}>• {requirement}</li>)}
               </ul>

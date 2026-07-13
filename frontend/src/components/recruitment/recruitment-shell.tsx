@@ -9,7 +9,7 @@ const nav = [
   { href: "/recruitment", label: "Overview", icon: LayoutDashboardIcon },
   { href: "/recruitment/jobs", label: "Jobs", icon: BriefcaseBusinessIcon },
   { href: "/recruitment/applicants", label: "Applicants", icon: UsersRoundIcon },
-  { href: "/recruitment/settings", label: "Careers site", icon: Settings2Icon },
+  { href: "/recruitment/settings", label: "Careers Site", icon: Settings2Icon },
 ]
 
 export function RecruitmentShell({
@@ -53,7 +53,7 @@ export function RecruitmentShell({
 }
 
 export function RecruitmentPageTitle({
-  eyebrow = "Recruitment workspace",
+  eyebrow = "Recruitment",
   title,
   description,
   action,

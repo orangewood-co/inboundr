@@ -207,7 +207,7 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold">AI ranking rubric</h2>
+              <h2 className="font-semibold">AI Ranking Rubric</h2>
               {rubrics?.approved && <Badge variant="outline">Approved v{rubrics.approved.version}</Badge>}
             </div>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -217,7 +217,7 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
         </div>
         {rubrics?.approved && canManage && (
           <Button variant="outline" size="sm" onClick={() => setConfirmAction("rerank")} disabled={Boolean(busy) || batchActive}>
-            <RefreshCwIcon /> Rerank all
+            <RefreshCwIcon /> Rerank All
           </Button>
         )}
       </div>
@@ -226,7 +226,7 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
 
       {error ? (
         <div className="p-6 text-sm text-destructive">
-          {error} <Button variant="link" size="sm" onClick={() => void load()}>Try again</Button>
+          {error} <Button variant="link" size="sm" onClick={() => void load()}>Try Again</Button>
         </div>
       ) : !rubrics ? (
         <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Spinner /> Loading rubric…</div>
@@ -234,13 +234,13 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
         <div className="p-6">
           <div className="rounded-xl border border-dashed p-6 text-center">
             <SparklesIcon className="mx-auto size-6 text-muted-foreground" />
-            <h3 className="mt-3 font-medium">{rubrics.approved ? "Create a new rubric version" : "Start with a structured draft"}</h3>
+            <h3 className="mt-3 font-medium">{rubrics.approved ? "Create a New Rubric Version" : "Start with a Structured Draft"}</h3>
             <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
               AI proposes job-related criteria only. A human must inspect and approve the draft before ranking can use it.
             </p>
             {canManage && <Button className="mt-4" onClick={() => rubrics.items.length ? setConfirmAction("regenerate") : void generate()} disabled={Boolean(busy)}>
               {busy === "generate" ? <Spinner /> : <SparklesIcon />}
-              {rubrics.items.length ? "Generate new version" : "Generate from description"}
+              {rubrics.items.length ? "Generate New Version" : "Generate from Description"}
             </Button>}
           </div>
         </div>
@@ -315,10 +315,10 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
             </Button>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="outline" onClick={() => void saveDraft()} disabled={Boolean(busy)}>
-                {busy === "save" && <Spinner />} Save draft
+                {busy === "save" && <Spinner />} Save Draft
               </Button>
               <Button onClick={() => setConfirmAction("approve")} disabled={Boolean(busy) || Math.abs(weightTotal - 100) > 0.01}>
-                <CheckCircle2Icon /> Approve & freeze
+                <CheckCircle2Icon /> Approve & Freeze
               </Button>
             </div>
           </div>}
@@ -392,7 +392,7 @@ export function RubricWorkflow({ jobId, className = "", canManage = false }: { j
               onClick={() => confirmAction === "approve" ? void approve() : confirmAction === "rerank" ? void rerankAll() : void generate(true)}
             >
               {busy && <Spinner />}
-              {confirmAction === "approve" ? "Approve & freeze" : confirmAction === "rerank" ? "Queue reranking" : "Regenerate draft"}
+              {confirmAction === "approve" ? "Approve & Freeze" : confirmAction === "rerank" ? "Queue Reranking" : "Regenerate Draft"}
             </Button>
           </DialogFooter>
         </DialogContent>

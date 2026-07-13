@@ -78,13 +78,13 @@ export function RecruitmentSettingsPage() {
 
   const publicUrl = settings.organizationPath ? careersUrl(settings.organizationPath) : ""
   return (
-    <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Careers site" }]}>
+    <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Careers Site" }]}>
       <div className="mx-auto max-w-5xl">
         <RecruitmentPageTitle
-          eyebrow="Public presence"
-          title="Careers site"
-          description="Shape the story candidates see before they choose a role."
-          action={publicUrl ? <div className="flex gap-2"><Button variant="outline" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success("Link copied"))}><CopyIcon /> Copy link</Button><Button variant="outline" asChild><a href={publicUrl} target="_blank" rel="noreferrer"><ExternalLinkIcon /> Preview</a></Button></div> : undefined}
+          eyebrow="Recruitment"
+          title="Careers Site"
+          description="Configure your public careers page."
+          action={publicUrl ? <div className="flex gap-2"><Button variant="outline" onClick={() => void navigator.clipboard.writeText(publicUrl).then(() => toast.success("Link copied"))}><CopyIcon /> Copy Link</Button><Button variant="outline" asChild><a href={publicUrl} target="_blank" rel="noreferrer"><ExternalLinkIcon /> Preview</a></Button></div> : undefined}
         />
         {!canManageOrganization && <p className="mb-5 rounded-xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only: organization admin access is required to change careers-site settings.</p>}
         <fieldset disabled={!canManageOrganization} className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -98,7 +98,7 @@ export function RecruitmentSettingsPage() {
               </div>
             </section>
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Story & visual identity</h2>
+              <h2 className="font-semibold">Story & Visual Identity</h2>
               <p className="mb-5 text-sm text-muted-foreground">Use a wide JPG, PNG, WebP, or SVG image up to 2MB.</p>
               <div className="grid gap-4">
                 <div><Label>Headline</Label><Input className="mt-2" value={settings.headline} onChange={(event) => patch({ headline: event.target.value })} placeholder="Build the future with us" /></div>
@@ -109,7 +109,7 @@ export function RecruitmentSettingsPage() {
               </div>
             </section>
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Search & sharing</h2>
+              <h2 className="font-semibold">Search & Sharing</h2>
               <p className="mb-5 text-sm text-muted-foreground">Customize how the careers page appears in search results and social previews.</p>
               <div className="grid gap-4">
                 <div><Label>SEO title</Label><Input className="mt-2" maxLength={120} value={settings.seoTitle} onChange={(event) => patch({ seoTitle: event.target.value })} placeholder={settings.headline || "Company careers"} /><p className="mt-1 text-right text-xs text-muted-foreground">{settings.seoTitle.length}/120</p></div>
@@ -118,16 +118,16 @@ export function RecruitmentSettingsPage() {
               </div>
             </section>
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <div className="flex items-start justify-between"><div><h2 className="font-semibold">Social links</h2><p className="text-sm text-muted-foreground">Give candidates a path to learn more.</p></div><Button size="sm" variant="outline" onClick={() => patch({ socialLinks: [...settings.socialLinks, { label: "", url: "" }] })}><PlusIcon /> Add</Button></div>
+              <div className="flex items-start justify-between"><div><h2 className="font-semibold">Social Links</h2><p className="text-sm text-muted-foreground">Give candidates a path to learn more.</p></div><Button size="sm" variant="outline" onClick={() => patch({ socialLinks: [...settings.socialLinks, { label: "", url: "" }] })}><PlusIcon /> Add</Button></div>
               <div className="mt-5 space-y-3">{settings.socialLinks.length === 0 ? <p className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">No social links yet.</p> : settings.socialLinks.map((link, index) => <div key={index} className="grid gap-2 sm:grid-cols-[160px_1fr_auto]"><Input aria-label={`Social link ${index + 1} label`} value={link.label} onChange={(event) => patch({ socialLinks: settings.socialLinks.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item) })} placeholder="LinkedIn" /><Input aria-label={`Social link ${index + 1} URL`} type="url" value={link.url} onChange={(event) => patch({ socialLinks: settings.socialLinks.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item) })} placeholder="https://…" /><Button size="icon" variant="ghost" aria-label="Remove social link" onClick={() => patch({ socialLinks: settings.socialLinks.filter((_, itemIndex) => itemIndex !== index) })}><Trash2Icon /></Button></div>)}</div>
             </section>
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Candidate privacy & consent</h2>
+              <h2 className="font-semibold">Candidate Privacy & Consent</h2>
               <p className="mb-5 text-sm text-muted-foreground">Publishing requires both a consent version and consent text.</p>
               <div className="grid gap-4"><div><Label>Privacy policy URL</Label><Input className="mt-2" type="url" value={settings.privacyPolicyUrl ?? ""} onChange={(event) => patch({ privacyPolicyUrl: event.target.value || null })} placeholder="https://…" /></div><div><Label>Consent version</Label><Input className="mt-2" value={settings.consent.version} onChange={(event) => patch({ consent: { ...settings.consent, version: event.target.value } })} placeholder="2026-07" /></div><div><Label>Consent text</Label><textarea className="mt-2 min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" value={settings.consent.text} onChange={(event) => patch({ consent: { ...settings.consent, text: event.target.value } })} placeholder="I agree that…" /></div></div>
             </section>
           </div>
-          <aside><div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-xs"><p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Candidate view</p>{settings.bannerUrl ? <img src={settings.bannerUrl} alt="" className="mt-4 aspect-[16/7] w-full rounded-xl object-cover" /> : <div className="mt-4 aspect-[16/7] rounded-xl bg-gradient-to-br from-amber-100 to-orange-50" />}<h3 className="mt-4 text-xl font-semibold">{settings.headline || "Your careers headline"}</h3><p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">{settings.intro || "Your introduction will appear here."}</p><Button className="mt-6 w-full" onClick={() => void save()} disabled={saving}>{saving && <Spinner />} Save settings</Button></div></aside>
+          <aside><div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-xs"><p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Candidate View</p>{settings.bannerUrl ? <img src={settings.bannerUrl} alt="" className="mt-4 aspect-[16/7] w-full rounded-xl object-cover" /> : <div className="mt-4 aspect-[16/7] rounded-xl bg-gradient-to-br from-amber-100 to-orange-50" />}<h3 className="mt-4 text-xl font-semibold">{settings.headline || "Your careers headline"}</h3><p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">{settings.intro || "Your introduction will appear here."}</p><Button className="mt-6 w-full" onClick={() => void save()} disabled={saving}>{saving && <Spinner />} Save Settings</Button></div></aside>
         </fieldset>
       </div>
     </RecruitmentShell>
