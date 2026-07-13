@@ -29,9 +29,13 @@ export interface IRecruitmentBanner {
   uploadedAt: Date;
 }
 
+export const HEADER_BRAND_DISPLAYS = ["logo_and_name", "logo_only", "name_only"] as const;
+export type HeaderBrandDisplay = (typeof HEADER_BRAND_DISPLAYS)[number];
+
 export interface IRecruitmentSettings extends Document<Types.ObjectId> {
   organizationId: Types.ObjectId;
   organizationPath: string | null;
+  headerBrandDisplay: HeaderBrandDisplay;
   headline: string;
   intro: string;
   seoTitle: string;
@@ -103,6 +107,11 @@ const recruitmentSettingsSchema = new Schema<IRecruitmentSettings>(
       trim: true,
       lowercase: true,
       maxlength: 72,
+    },
+    headerBrandDisplay: {
+      type: String,
+      enum: HEADER_BRAND_DISPLAYS,
+      default: "logo_and_name",
     },
     headline: { type: String, default: "", trim: true, maxlength: 240 },
     intro: { type: String, default: "", trim: true, maxlength: 5000 },

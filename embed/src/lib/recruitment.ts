@@ -34,6 +34,7 @@ export type CareersSite = {
   organizationPath: string
   organizationName: string
   website: string
+  headerBrandDisplay: "logo_and_name" | "logo_only" | "name_only"
   headline: string
   intro: string
   seoTitle: string

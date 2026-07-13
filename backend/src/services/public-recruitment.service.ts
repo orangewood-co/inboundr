@@ -171,6 +171,7 @@ export async function getPublicCareersSite(pathValue: unknown) {
     organizationPath: settings.organizationPath,
     organizationName: organization?.name ?? "",
     website: organization?.website ?? "",
+    headerBrandDisplay: settings.headerBrandDisplay ?? "logo_and_name",
     headline: settings.headline,
     intro: settings.intro,
     seoTitle: settings.seoTitle,

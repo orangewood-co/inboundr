@@ -85,14 +85,16 @@ function ErrorPage({ message }: { message: string }) {
   return <main className="flex min-h-screen items-center justify-center bg-[#f4f1ea] p-6"><div className="max-w-md rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm"><BriefcaseBusinessIcon className="mx-auto size-8 text-stone-400" /><h1 className="mt-4 font-display text-2xl font-semibold">This careers page is unavailable</h1><p className="mt-2 text-sm leading-6 text-stone-600">{message}</p><button type="button" className="mt-6 rounded-full bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white active:scale-[.97]" onClick={() => window.location.reload()}>Try again</button></div></main>
 }
 
-function LogoTile() {
-  return <span className="flex size-9 items-center justify-center rounded-lg bg-stone-950 text-white"><Building2Icon className="size-4" /></span>
-}
-
 function Header({ site, embed }: { site: CareersSite; embed: boolean }) {
   const [logoFailed, setLogoFailed] = useState(false)
   const hideBrokenLogo = useCallback(() => setLogoFailed(true), [])
-  return <header className="border-b border-black/10 bg-[#f4f1ea]/95 backdrop-blur"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4"><a href={publicCareersPath(site.organizationPath)} className="flex items-center gap-3 font-display font-semibold text-stone-950">{site.branding.logoUrl && !logoFailed ? <img src={site.branding.logoUrl} alt="" className="size-9 rounded-lg object-contain" onError={hideBrokenLogo} /> : <LogoTile />}<span>{site.organizationName}</span></a>{!embed && site.website && <a href={site.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-950">Company site <ExternalLinkIcon className="size-3.5" /></a>}</div></header>
+  const display = site.headerBrandDisplay ?? "logo_and_name"
+  const logoAvailable = Boolean(site.branding.logoUrl) && !logoFailed
+  // A logo-only header still needs an accessible, visible brand when the logo
+  // is missing or fails to load, so fall back to the organization name.
+  const showLogo = display !== "name_only" && logoAvailable
+  const showName = display !== "logo_only" || !logoAvailable
+  return <header className="border-b border-white/10 bg-stone-950"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4"><a href={publicCareersPath(site.organizationPath)} className="flex items-center gap-3 font-display font-semibold text-white">{showLogo && <img src={site.branding.logoUrl!} alt={showName ? "" : site.organizationName} className="size-9 rounded-lg bg-white object-contain p-0.5" onError={hideBrokenLogo} />}{showName && <span>{site.organizationName}</span>}</a>{!embed && site.website && <a href={site.website} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-stone-400 transition-colors hover:text-white">Company site <ExternalLinkIcon className="size-3.5" /></a>}</div></header>
 }
 
 function CareersListing({ site, jobs, embed, onNavigate }: { site: CareersSite; jobs: CareersJob[]; embed: boolean; onNavigate?: (path: string) => void }) {

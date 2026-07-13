@@ -165,6 +165,7 @@ export interface RecruitmentApplicationForm {
 
 export interface RecruitmentSettings {
   organizationPath: string | null
+  headerBrandDisplay: "logo_and_name" | "logo_only" | "name_only"
   headline: string
   intro: string
   seoTitle: string

@@ -177,6 +177,13 @@ export async function updateRecruitmentSettings(
     update.defaultApplicationForm = normalizeRecruitmentForm(body.defaultApplicationForm);
   }
   if ("publicCareersEnabled" in body) update.publicCareersEnabled = Boolean(body.publicCareersEnabled);
+  if ("headerBrandDisplay" in body) {
+    const display = text(body.headerBrandDisplay);
+    if (!["logo_and_name", "logo_only", "name_only"].includes(display)) {
+      throw new RecruitmentServiceError("Header brand display is invalid");
+    }
+    update.headerBrandDisplay = display;
+  }
   if ("headline" in body) update.headline = text(body.headline).slice(0, 240);
   if ("intro" in body) update.intro = text(body.intro).slice(0, 5000);
   if ("seoTitle" in body) update.seoTitle = text(body.seoTitle).slice(0, 120);
