@@ -54,8 +54,8 @@ export function ApplicationFormBuilder({
   return (
     <section className="rounded-2xl border bg-card p-6 shadow-xs">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div><h2 className="font-semibold">Application form</h2><p className="text-sm text-muted-foreground">This form belongs to this job and does not create a generic Form record.</p></div>
-        <Button type="button" size="sm" variant="outline" onClick={() => onChange({ schemaVersion: 1, fields: [...fields, newApplicationField()] })}><PlusIcon /> Add question</Button>
+        <div><h2 className="font-semibold">Application Form</h2><p className="text-sm text-muted-foreground">This form belongs to this job and does not create a generic Form record.</p></div>
+        <Button type="button" size="sm" variant="outline" onClick={() => onChange({ schemaVersion: 1, fields: [...fields, newApplicationField()] })}><PlusIcon /> Add Question</Button>
       </div>
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
         {LOCKED.map((field) => <div key={field.label} className="flex items-center gap-3 rounded-xl border bg-muted/30 px-4 py-3"><span className="flex size-8 items-center justify-center rounded-lg bg-background"><LockIcon className="size-3.5 text-muted-foreground" /></span><span className="min-w-0"><span className="block text-sm font-medium">{field.label}</span><span className="text-xs text-muted-foreground">{field.type} · Required</span></span></div>)}

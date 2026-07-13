@@ -59,6 +59,7 @@ export type CareersJob = {
   salaryMin: number | null
   salaryMax: number | null
   salaryCurrency: string
+  salaryPeriod: "hour" | "month" | "year"
   salaryVisible: boolean
   publishedAt: string
   applicationDeadline: string | null

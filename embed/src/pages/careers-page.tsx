@@ -71,9 +71,10 @@ function Meta({ site, job }: { site: CareersSite; job?: CareersJob }) {
 function formatSalary(job: CareersJob) {
   if (!job.salaryVisible || (job.salaryMin === null && job.salaryMax === null)) return null
   const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency: job.salaryCurrency, maximumFractionDigits: 0 })
-  if (job.salaryMin !== null && job.salaryMax !== null) return `${formatter.format(job.salaryMin)} – ${formatter.format(job.salaryMax)}`
-  if (job.salaryMin !== null) return `From ${formatter.format(job.salaryMin)}`
-  return `Up to ${formatter.format(job.salaryMax!)}`
+  const period = job.salaryPeriod === "hour" ? "hour" : job.salaryPeriod === "month" ? "month" : "year"
+  if (job.salaryMin !== null && job.salaryMax !== null) return `${formatter.format(job.salaryMin)} – ${formatter.format(job.salaryMax)} per ${period}`
+  if (job.salaryMin !== null) return `From ${formatter.format(job.salaryMin)} per ${period}`
+  return `Up to ${formatter.format(job.salaryMax!)} per ${period}`
 }
 
 function Loading() {

@@ -361,6 +361,10 @@ function jobFields(body: Record<string, unknown>) {
   if (!/^[A-Z]{3}$/.test(salaryCurrency)) {
     throw new RecruitmentServiceError("Salary currency must be a 3-letter currency code");
   }
+  const salaryPeriod = text(body.salaryPeriod) || "year";
+  if (!["hour", "month", "year"].includes(salaryPeriod)) {
+    throw new RecruitmentServiceError("Salary period is invalid");
+  }
   return {
     title: text(body.title),
     department: text(body.department),
@@ -373,6 +377,7 @@ function jobFields(body: Record<string, unknown>) {
     salaryMin,
     salaryMax,
     salaryCurrency,
+    salaryPeriod: salaryPeriod as "hour" | "month" | "year",
     salaryVisible: Boolean(body.salaryVisible),
     hiringManagerIds: Array.isArray(body.hiringManagerIds)
       ? body.hiringManagerIds.map((id) => objectId(id, "Hiring manager id"))

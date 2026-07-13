@@ -124,6 +124,7 @@ export interface RecruitmentJob {
   salaryMin: number | null
   salaryMax: number | null
   salaryCurrency: string
+  salaryPeriod: "hour" | "month" | "year"
   salaryVisible: boolean
   publicSlug: string | null
   seoTitle: string

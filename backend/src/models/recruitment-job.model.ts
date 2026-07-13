@@ -20,6 +20,7 @@ export interface IRecruitmentJob extends Document<Types.ObjectId> {
   salaryMin: number | null;
   salaryMax: number | null;
   salaryCurrency: string;
+  salaryPeriod: "hour" | "month" | "year";
   salaryVisible: boolean;
   publicSlug: string | null;
   seoTitle: string;
@@ -66,6 +67,7 @@ const recruitmentJobSchema = new Schema<IRecruitmentJob>(
     salaryMin: { type: Number, default: null, min: 0 },
     salaryMax: { type: Number, default: null, min: 0 },
     salaryCurrency: { type: String, default: "INR", trim: true, uppercase: true, maxlength: 3 },
+    salaryPeriod: { type: String, enum: ["hour", "month", "year"], default: "year" },
     salaryVisible: { type: Boolean, default: false },
     publicSlug: { type: String, default: null, trim: true },
     seoTitle: { type: String, default: "", trim: true, maxlength: 120 },

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, CirclePlusIcon, Code2Icon, CopyIcon, ExternalLinkIcon, GripVerticalIcon, MapPinIcon, PencilIcon, Share2Icon, Trash2Icon, UsersRoundIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ChevronDownIcon, CirclePlusIcon, Code2Icon, CopyIcon, ExternalLinkIcon, GripVerticalIcon, MapPinIcon, PencilIcon, Share2Icon, Trash2Icon, UsersRoundIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { ApplicationFormBuilder } from "@/components/recruitment/application-form-builder"
 import { RecruitmentPageTitle, RecruitmentShell } from "@/components/recruitment/recruitment-shell"
 import { RubricWorkflow } from "@/components/recruitment/rubric-workflow"
+import { DatePicker } from "@/components/date-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -28,8 +30,8 @@ const DEFAULT_STAGES: RecruitmentStage[] = [
   { id: "rejected", name: "Rejected", order: 5, color: COLORS[5], isTerminal: true, terminalOutcome: "rejected" },
 ]
 
-type FormState = Pick<RecruitmentJob, "title" | "department" | "location" | "employmentType" | "workplaceType" | "description" | "requirements" | "openings" | "stages" | "salaryMin" | "salaryMax" | "salaryCurrency" | "salaryVisible" | "publicSlug" | "seoTitle" | "seoDescription" | "socialShareText" | "applicationDeadline" | "publicApplicationForm">
-const EMPTY: FormState = { title: "", department: "", location: "", employmentType: "Full-time", workplaceType: "hybrid", description: "", requirements: "", openings: 1, stages: DEFAULT_STAGES, salaryMin: null, salaryMax: null, salaryCurrency: "INR", salaryVisible: false, publicSlug: null, seoTitle: "", seoDescription: "", socialShareText: "", applicationDeadline: null, publicApplicationForm: { schemaVersion: 1, fields: [] } }
+type FormState = Pick<RecruitmentJob, "title" | "department" | "location" | "employmentType" | "workplaceType" | "description" | "requirements" | "openings" | "stages" | "salaryMin" | "salaryMax" | "salaryCurrency" | "salaryPeriod" | "salaryVisible" | "publicSlug" | "seoTitle" | "seoDescription" | "socialShareText" | "applicationDeadline" | "publicApplicationForm">
+const EMPTY: FormState = { title: "", department: "", location: "", employmentType: "Full Time", workplaceType: "hybrid", description: "", requirements: "", openings: 1, stages: DEFAULT_STAGES, salaryMin: null, salaryMax: null, salaryCurrency: "INR", salaryPeriod: "year", salaryVisible: false, publicSlug: null, seoTitle: "", seoDescription: "", socialShareText: "", applicationDeadline: null, publicApplicationForm: { schemaVersion: 1, fields: [] } }
 
 function escapeHtmlAttribute(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -81,6 +83,14 @@ function slugStage(value: string) {
   return `${value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "stage"}-${Date.now().toString(36)}`
 }
 
+function jobSlug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 120) || null
+}
+
+function defaultSocialCopy(title: string) {
+  return title.trim() ? `We're hiring a ${title.trim()}. Explore the role and apply today.` : ""
+}
+
 export function RecruitmentJobFormPage({ edit = false }: { edit?: boolean }) {
   const { canManageOrganization } = useEntitlements()
   const { jobId = "" } = useParams({ strict: false }) as { jobId?: string }
@@ -93,7 +103,15 @@ export function RecruitmentJobFormPage({ edit = false }: { edit?: boolean }) {
   useEffect(() => {
     void recruitmentApi.settings().then(({ settings: value }) => setSettings(value)).catch(() => undefined)
     if (!edit || !jobId) return
-    void recruitmentApi.job(jobId).then(({ job }) => setForm({ ...job, applicationDeadline: job.applicationDeadline ? job.applicationDeadline.slice(0, 10) : null, publicApplicationForm: { schemaVersion: 1, fields: job.publicApplicationForm?.fields ?? [] } })).catch((e) => setError(e instanceof Error ? e.message : "Unable to load job")).finally(() => setLoading(false))
+    void recruitmentApi.job(jobId).then(({ job }) => setForm({
+      ...job,
+      salaryPeriod: job.salaryPeriod ?? "year",
+      seoTitle: job.seoTitle || job.title,
+      seoDescription: job.seoDescription || job.description.slice(0, 320),
+      socialShareText: job.socialShareText || defaultSocialCopy(job.title),
+      applicationDeadline: job.applicationDeadline ? job.applicationDeadline.slice(0, 10) : null,
+      publicApplicationForm: { schemaVersion: 1, fields: job.publicApplicationForm?.fields ?? [] },
+    })).catch((e) => setError(e instanceof Error ? e.message : "Unable to load job")).finally(() => setLoading(false))
   }, [edit, jobId])
   const updateStage = (index: number, update: Partial<RecruitmentStage>) => setForm((current) => ({ ...current, stages: current.stages.map((stage, i) => i === index ? { ...stage, ...update } : stage) }))
   const reorder = (index: number, direction: -1 | 1) => setForm((current) => {
@@ -102,6 +120,28 @@ export function RecruitmentJobFormPage({ edit = false }: { edit?: boolean }) {
     ;[stages[index], stages[target]] = [stages[target], stages[index]]
     return { ...current, stages: stages.map((stage, order) => ({ ...stage, order })) }
   })
+  function updateTitle(title: string) {
+    setForm((current) => ({
+      ...current,
+      title,
+      publicSlug: !edit || !current.publicSlug || current.publicSlug === jobSlug(current.title)
+        ? jobSlug(title)
+        : current.publicSlug,
+      seoTitle: !current.seoTitle || current.seoTitle === current.title ? title : current.seoTitle,
+      socialShareText: !current.socialShareText || current.socialShareText === defaultSocialCopy(current.title)
+        ? defaultSocialCopy(title)
+        : current.socialShareText,
+    }))
+  }
+  function updateDescription(description: string) {
+    setForm((current) => ({
+      ...current,
+      description,
+      seoDescription: !current.seoDescription || current.seoDescription === current.description.slice(0, 320)
+        ? description.slice(0, 320)
+        : current.seoDescription,
+    }))
+  }
   async function save() {
     if (!canManageOrganization) return
     if (!form.title.trim()) { toast.error("Job title is required"); return }
@@ -135,47 +175,54 @@ export function RecruitmentJobFormPage({ edit = false }: { edit?: boolean }) {
   return (
     <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Jobs", href: "/recruitment/jobs" }, { label: edit ? "Edit" : "New" }]}>
       <div className="mx-auto max-w-5xl">
-        <RecruitmentPageTitle title={edit ? "Edit job" : "Create a job"} description="Define the role and tune the pipeline to match how your team actually hires." />
+        <RecruitmentPageTitle title={edit ? "Edit Job" : "Create a Job"} description="Define the role and tune the pipeline to match how your team actually hires." />
         {!canManageOrganization && <p className="mb-5 rounded-xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only: organization admin access is required to create or change jobs, forms, stages, and rubrics.</p>}
         <fieldset disabled={!canManageOrganization} className="grid gap-6 lg:grid-cols-[1fr_330px]">
           <div className="space-y-6">
-            <section className="rounded-2xl border bg-card p-6 shadow-xs"><h2 className="font-semibold">Role details</h2><p className="mb-5 text-sm text-muted-foreground">The shared brief reviewers will use throughout this hire.</p>
-              <div className="grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="title">Job title</Label><Input id="title" className="mt-2" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Senior Product Designer" /></div>
+            <section className="rounded-2xl border bg-card p-6 shadow-xs"><h2 className="font-semibold">Role Details</h2><p className="mb-5 text-sm text-muted-foreground">The shared brief reviewers will use throughout this hire.</p>
+              <div className="grid gap-4 sm:grid-cols-2"><div className="sm:col-span-2"><Label htmlFor="title">Job title</Label><Input id="title" className="mt-2" value={form.title} onChange={(e) => updateTitle(e.target.value)} placeholder="Senior Product Designer" /></div>
                 <div><Label>Department</Label><Input className="mt-2" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Product" /></div>
                 <div><Label>Location</Label><Input className="mt-2" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Bengaluru" /></div>
-                <div><Label>Employment type</Label><Input className="mt-2" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })} /></div>
+                <div><Label>Employment type</Label><Select value={form.employmentType} onValueChange={(employmentType) => setForm({ ...form, employmentType })}><SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Full Time">Full Time</SelectItem><SelectItem value="Contract">Contract</SelectItem><SelectItem value="Intern">Intern</SelectItem></SelectContent></Select></div>
                 <div><Label>Workplace</Label><Select value={form.workplaceType ?? "none"} onValueChange={(value) => setForm({ ...form, workplaceType: value === "none" ? null : value as FormState["workplaceType"] })}><SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Not specified</SelectItem><SelectItem value="onsite">On-site</SelectItem><SelectItem value="hybrid">Hybrid</SelectItem><SelectItem value="remote">Remote</SelectItem></SelectContent></Select></div>
                 <div><Label>Openings</Label><Input type="number" min={1} max={10000} className="mt-2" value={form.openings} onChange={(e) => setForm({ ...form, openings: Number(e.target.value) })} /></div>
-                <div><Label>Public slug</Label><Input className="mt-2" value={form.publicSlug ?? ""} onChange={(e) => setForm({ ...form, publicSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") || null })} placeholder="senior-product-designer" /></div>
-                <div><Label>Application deadline</Label><Input type="date" className="mt-2" value={form.applicationDeadline ?? ""} onChange={(e) => setForm({ ...form, applicationDeadline: e.target.value || null })} /></div>
-                <div className="sm:col-span-2"><Label>Description</Label><textarea className="mt-2 min-h-36 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What this person will own and why the role matters…" /></div>
+                <DatePicker label="Application deadline" value={form.applicationDeadline ?? ""} onChange={(value) => setForm({ ...form, applicationDeadline: value || null })} placeholder="Select a deadline" />
+                <div className="sm:col-span-2"><Label>Description</Label><textarea className="mt-2 min-h-36 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" value={form.description} onChange={(e) => updateDescription(e.target.value)} placeholder="What this person will own and why the role matters…" /></div>
                 <div className="sm:col-span-2"><Label>Requirements</Label><textarea className="mt-2 min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} placeholder="Experience, skills, and qualities…" /></div>
               </div>
             </section>
             {edit && jobId && <RubricWorkflow jobId={jobId} canManage={canManageOrganization} />}
             <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Compensation</h2><p className="mb-5 text-sm text-muted-foreground">Salary is only returned by the public API when visibility is enabled.</p>
-              <div className="grid gap-4 sm:grid-cols-[120px_1fr_1fr]">
+              <h2 className="font-semibold">Compensation</h2><p className="mb-5 text-sm text-muted-foreground">Set the range and whether it is paid hourly, monthly, or annually.</p>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[120px_160px_1fr_1fr]">
                 <div><Label>Currency</Label><Input className="mt-2 uppercase" maxLength={3} value={form.salaryCurrency} onChange={(event) => setForm({ ...form, salaryCurrency: event.target.value.toUpperCase().replace(/[^A-Z]/g, "") })} placeholder="INR" /></div>
+                <div><Label>Pay period</Label><Select value={form.salaryPeriod} onValueChange={(salaryPeriod: FormState["salaryPeriod"]) => setForm({ ...form, salaryPeriod })}><SelectTrigger className="mt-2 w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Per Hour</SelectItem><SelectItem value="month">Per Month</SelectItem><SelectItem value="year">Per Annum</SelectItem></SelectContent></Select></div>
                 <div><Label>Minimum salary</Label><Input className="mt-2" type="number" min={0} value={form.salaryMin ?? ""} onChange={(event) => setForm({ ...form, salaryMin: event.target.value === "" ? null : event.target.valueAsNumber })} /></div>
                 <div><Label>Maximum salary</Label><Input className="mt-2" type="number" min={0} value={form.salaryMax ?? ""} onChange={(event) => setForm({ ...form, salaryMax: event.target.value === "" ? null : event.target.valueAsNumber })} /></div>
               </div>
               <label className="mt-4 flex items-center justify-between gap-4 rounded-xl border p-4"><span><span className="block text-sm font-medium">Show salary publicly</span><span className="text-xs text-muted-foreground">Display this range on the careers listing and job page.</span></span><Switch checked={form.salaryVisible} onCheckedChange={(checked) => setForm({ ...form, salaryVisible: checked })} /></label>
             </section>
-            <section className="rounded-2xl border bg-card p-6 shadow-xs">
-              <h2 className="font-semibold">Search & sharing</h2><p className="mb-5 text-sm text-muted-foreground">Leave fields blank to use the job title and description automatically.</p>
-              <div className="grid gap-4">
-                <div><Label>SEO title</Label><Input className="mt-2" maxLength={120} value={form.seoTitle} onChange={(event) => setForm({ ...form, seoTitle: event.target.value })} placeholder={form.title || "Job title"} /><p className="mt-1 text-right text-xs text-muted-foreground">{form.seoTitle.length}/120</p></div>
-                <div><Label>SEO description</Label><textarea className="mt-2 min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" maxLength={320} value={form.seoDescription} onChange={(event) => setForm({ ...form, seoDescription: event.target.value })} placeholder="A concise description for search engines." /><p className="mt-1 text-right text-xs text-muted-foreground">{form.seoDescription.length}/320</p></div>
-                <div><Label>Social share text</Label><textarea className="mt-2 min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" maxLength={500} value={form.socialShareText} onChange={(event) => setForm({ ...form, socialShareText: event.target.value })} placeholder="A compelling message for shared links." /><p className="mt-1 text-right text-xs text-muted-foreground">{form.socialShareText.length}/500</p></div>
-              </div>
-            </section>
+            <Collapsible className="group rounded-2xl border bg-card shadow-xs">
+              <CollapsibleTrigger asChild>
+                <button type="button" className="flex w-full items-center justify-between gap-4 p-6 text-left">
+                  <span><span className="block font-semibold">Search & Sharing</span><span className="mt-1 block text-sm text-muted-foreground">Automatically prepared from the job title and description. Expand only when you want custom copy.</span></span>
+                  <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid gap-4 border-t px-6 pt-5 pb-6">
+                  <div><Label>SEO title</Label><Input className="mt-2" maxLength={120} value={form.seoTitle} onChange={(event) => setForm({ ...form, seoTitle: event.target.value })} placeholder={form.title || "Job title"} /><p className="mt-1 text-right text-xs text-muted-foreground">{form.seoTitle.length}/120</p></div>
+                  <div><Label>SEO description</Label><textarea className="mt-2 min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" maxLength={320} value={form.seoDescription} onChange={(event) => setForm({ ...form, seoDescription: event.target.value })} placeholder="A concise description for search engines." /><p className="mt-1 text-right text-xs text-muted-foreground">{form.seoDescription.length}/320</p></div>
+                  <div><Label>Social share text</Label><textarea className="mt-2 min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50" maxLength={500} value={form.socialShareText} onChange={(event) => setForm({ ...form, socialShareText: event.target.value })} placeholder="A compelling message for shared links." /><p className="mt-1 text-right text-xs text-muted-foreground">{form.socialShareText.length}/500</p></div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
             <ApplicationFormBuilder value={form.publicApplicationForm} onChange={(publicApplicationForm) => setForm({ ...form, publicApplicationForm })} />
-            <section className="rounded-2xl border bg-card p-6 shadow-xs"><div className="flex items-start justify-between"><div><h2 className="font-semibold">Hiring stages</h2><p className="text-sm text-muted-foreground">Terminal stages set the application's final outcome.</p></div><Button variant="outline" size="sm" onClick={() => setForm({ ...form, stages: [...form.stages, { id: slugStage("stage"), name: "New stage", order: form.stages.length, color: COLORS[form.stages.length % COLORS.length], isTerminal: false, terminalOutcome: null }] })}><CirclePlusIcon /> Add stage</Button></div>
+            <section className="rounded-2xl border bg-card p-6 shadow-xs"><div className="flex items-start justify-between"><div><h2 className="font-semibold">Hiring Stages</h2><p className="text-sm text-muted-foreground">Terminal stages set the application's final outcome.</p></div><Button variant="outline" size="sm" onClick={() => setForm({ ...form, stages: [...form.stages, { id: slugStage("stage"), name: "New stage", order: form.stages.length, color: COLORS[form.stages.length % COLORS.length], isTerminal: false, terminalOutcome: null }] })}><CirclePlusIcon /> Add Stage</Button></div>
               <div className="mt-5 space-y-2">{form.stages.map((stage, index) => <div key={stage.id} className="grid items-center gap-2 rounded-xl border p-3 sm:grid-cols-[auto_1fr_150px_auto]"><GripVerticalIcon className="size-4 text-muted-foreground" /><Input value={stage.name} onChange={(e) => updateStage(index, { name: e.target.value })} /><Select value={stage.terminalOutcome ?? "active"} onValueChange={(value) => updateStage(index, { isTerminal: value !== "active", terminalOutcome: value === "active" ? null : value as "hired" | "rejected" })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active stage</SelectItem><SelectItem value="hired">Hired outcome</SelectItem><SelectItem value="rejected">Rejected outcome</SelectItem></SelectContent></Select><div className="flex"><Button size="icon-sm" variant="ghost" disabled={index === 0} onClick={() => reorder(index, -1)}><ArrowUpIcon /></Button><Button size="icon-sm" variant="ghost" disabled={index === form.stages.length - 1} onClick={() => reorder(index, 1)}><ArrowDownIcon /></Button><Button size="icon-sm" variant="ghost" disabled={form.stages.length <= 1} onClick={() => setForm({ ...form, stages: form.stages.filter((_, i) => i !== index).map((item, order) => ({ ...item, order })) })}><Trash2Icon /></Button></div></div>)}</div>
             </section>
           </div>
-          <aside><div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-xs"><p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">Before publishing</p><ul className="mt-4 space-y-3 text-sm text-muted-foreground"><li>• Set a public slug and candidate deadline.</li><li>• Confirm every custom question and condition.</li><li>• Review salary visibility and social preview copy.</li></ul>{settings?.organizationPath && form.publicSlug && <Button className="mt-5 w-full" variant="outline" asChild><a href={careersUrl(settings.organizationPath, form.publicSlug)} target="_blank" rel="noreferrer"><ExternalLinkIcon /> Public preview</a></Button>}<div className="mt-3 grid gap-2"><Button onClick={() => void save()} disabled={saving}>{saving && <Spinner />} {edit ? "Save changes" : "Create draft"}</Button><Button variant="ghost" asChild><Link to={edit ? "/recruitment/jobs/$jobId" : "/recruitment/jobs"} params={edit ? { jobId } : {}}>Cancel</Link></Button></div></div></aside>
+          <aside><div className="sticky top-24 rounded-2xl border bg-card p-5 shadow-xs"><p className="text-sm font-semibold text-muted-foreground">Before Publishing</p><ul className="mt-4 space-y-3 text-sm text-muted-foreground"><li>• Choose a candidate deadline.</li><li>• Confirm every custom question and condition.</li><li>• Review salary visibility and social preview copy.</li></ul>{settings?.organizationPath && form.publicSlug && <Button className="mt-5 w-full" variant="outline" asChild><a href={careersUrl(settings.organizationPath, form.publicSlug)} target="_blank" rel="noreferrer"><ExternalLinkIcon /> Public Preview</a></Button>}<div className="mt-3 grid gap-2"><Button onClick={() => void save()} disabled={saving}>{saving && <Spinner />} {edit ? "Save Changes" : "Create Draft"}</Button><Button variant="ghost" asChild><Link to={edit ? "/recruitment/jobs/$jobId" : "/recruitment/jobs"} params={edit ? { jobId } : {}}>Cancel</Link></Button></div></div></aside>
         </fieldset>
       </div>
     </RecruitmentShell>

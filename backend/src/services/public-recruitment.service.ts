@@ -100,6 +100,7 @@ function serializeJob(
     salaryMin: job.salaryVisible ? job.salaryMin : null,
     salaryMax: job.salaryVisible ? job.salaryMax : null,
     salaryCurrency: job.salaryCurrency,
+    salaryPeriod: job.salaryPeriod ?? "year",
     salaryVisible: Boolean(job.salaryVisible),
     publishedAt: job.publishedAt,
     applicationDeadline: job.applicationDeadline,
