@@ -69,6 +69,10 @@ function parsePositiveInt(value: unknown, fallback: number, max?: number): numbe
   return max ? Math.min(max, normalized) : normalized;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function normalizeCustomerInput(body: Record<string, unknown>): Record<string, string | number | null> {
   const input: Record<string, string | number | null> = {};
 
@@ -155,11 +159,16 @@ export const listCustomers = async (
     const limit = parsePositiveInt(req.query.limit, 20, 50);
     const skip = (page - 1) * limit;
     const search = String(req.query.search ?? "").trim();
+    const email = String(req.query.email ?? "").trim();
 
     const filter = {
       organizationId: organization._id,
       isArchived: { $ne: true },
-      ...(search
+      ...(email
+        ? {
+          email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
+        }
+        : search
         ? {
           $or: SEARCH_FIELDS.map((field) => ({
             [field]: { $regex: search, $options: "i" },

@@ -43,10 +43,16 @@ import {
   customerFieldValue,
   fetchCustomerSettings,
   formatCustomerFieldValue,
-  SPECIAL_DISCOUNT_FIELD_ID,
   type CustomerFieldDefinition,
   type CustomerFieldValues,
 } from "@/lib/customer-fields"
+import {
+  createEmptyCustomerForm,
+  customerFormToPayload,
+  customerToForm,
+  validateCustomerPayload,
+  type CustomerFormState,
+} from "@/lib/customer-form"
 
 import { API_ORIGIN } from "@/lib/env"
 const API_BASE = `${API_ORIGIN}/api/v1/customers`
@@ -63,67 +69,6 @@ interface Customer {
   customFields: CustomerFieldValues
   createdAt: string
   updatedAt: string
-}
-
-type CustomerFormState = {
-  name: string
-  company: string
-  email: string
-  contactNumber: string
-  address: string
-  notes: string
-  fieldValues: CustomerFieldValues
-}
-
-function customerToForm(
-  customer: Customer,
-  fieldDefinitions: CustomerFieldDefinition[],
-): CustomerFormState {
-  return {
-    name: customer.name ?? "",
-    company: customer.company ?? "",
-    email: customer.email ?? "",
-    contactNumber: customer.contactNumber ?? "",
-    address: customer.address ?? "",
-    notes: customer.notes ?? "",
-    fieldValues: Object.fromEntries(
-      activeCustomerFields(fieldDefinitions).map((field) => [
-        field.id,
-        customerFieldValue(customer, field),
-      ]),
-    ),
-  }
-}
-
-function formToPayload(form: CustomerFormState, fieldDefinitions: CustomerFieldDefinition[]) {
-  const discountField = fieldDefinitions.find(
-    (field) => field.id === SPECIAL_DISCOUNT_FIELD_ID && field.isActive,
-  )
-  const customFields = Object.fromEntries(
-    activeCustomerFields(fieldDefinitions)
-      .filter((field) => !field.isSystem)
-      .map((field) => [field.id, form.fieldValues[field.id] ?? null]),
-  )
-  const discountValue = discountField
-    ? Number(form.fieldValues[SPECIAL_DISCOUNT_FIELD_ID] ?? 0)
-    : undefined
-
-  return {
-    name: form.name.trim(),
-    company: form.company.trim(),
-    email: form.email.trim(),
-    contactNumber: form.contactNumber.trim(),
-    address: form.address.trim(),
-    notes: form.notes.trim() || null,
-    customFields,
-    ...(discountField
-      ? {
-          specialDiscountPercentage: Number.isFinite(discountValue)
-            ? discountValue
-            : 0,
-        }
-      : {}),
-  }
 }
 
 function DetailSkeleton() {
@@ -155,15 +100,7 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState<CustomerFormState>({
-    name: "",
-    company: "",
-    email: "",
-    contactNumber: "",
-    address: "",
-    notes: "",
-    fieldValues: {},
-  })
+  const [form, setForm] = useState<CustomerFormState>(createEmptyCustomerForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
@@ -210,16 +147,10 @@ export default function CustomerDetailPage() {
   async function saveCustomer() {
     if (!customer) return
 
-    const payload = formToPayload(form, fieldDefinitions)
-    if (!payload.name || !payload.company || !payload.email) {
-      setSaveError("Name, company, and email are required")
-      return
-    }
-    if (
-      payload.specialDiscountPercentage !== undefined &&
-      (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100)
-    ) {
-      setSaveError("Special discount must be between 0 and 100")
+    const payload = customerFormToPayload(form, fieldDefinitions)
+    const validationError = validateCustomerPayload(payload)
+    if (validationError) {
+      setSaveError(validationError)
       return
     }
 

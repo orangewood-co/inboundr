@@ -7,6 +7,7 @@ import {
   DownloadIcon,
   Edit3Icon,
   EyeIcon,
+  PlusIcon,
   RefreshCwIcon,
   SearchIcon,
   UploadIcon,
@@ -56,10 +57,16 @@ import {
   activeCustomerFields,
   customerFieldValue,
   formatCustomerFieldValue,
-  SPECIAL_DISCOUNT_FIELD_ID,
   type CustomerFieldDefinition,
   type CustomerFieldValues,
 } from "@/lib/customer-fields"
+import {
+  createEmptyCustomerForm,
+  customerFormToPayload,
+  customerToForm,
+  validateCustomerPayload,
+  type CustomerFormState,
+} from "@/lib/customer-form"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -92,77 +99,6 @@ interface CustomersResponse {
   limit: number
   totalPages: number
   fieldDefinitions: CustomerFieldDefinition[]
-}
-
-type CustomerFormState = {
-  name: string
-  company: string
-  email: string
-  contactNumber: string
-  address: string
-  notes: string
-  fieldValues: CustomerFieldValues
-}
-
-const emptyForm: CustomerFormState = {
-  name: "",
-  company: "",
-  email: "",
-  contactNumber: "",
-  address: "",
-  notes: "",
-  fieldValues: {},
-}
-
-function customerToForm(
-  customer: Customer,
-  fieldDefinitions: CustomerFieldDefinition[],
-): CustomerFormState {
-  return {
-    name: customer.name ?? "",
-    company: customer.company ?? "",
-    email: customer.email ?? "",
-    contactNumber: customer.contactNumber ?? "",
-    address: customer.address ?? "",
-    notes: customer.notes ?? "",
-    fieldValues: Object.fromEntries(
-      activeCustomerFields(fieldDefinitions).map((field) => [
-        field.id,
-        customerFieldValue(customer, field),
-      ]),
-    ),
-  }
-}
-
-function formToPayload(form: CustomerFormState, fieldDefinitions: CustomerFieldDefinition[]) {
-  const discountField = fieldDefinitions.find(
-    (field) => field.id === SPECIAL_DISCOUNT_FIELD_ID && field.isActive,
-  )
-  const customFields = Object.fromEntries(
-    activeCustomerFields(fieldDefinitions)
-      .filter((field) => !field.isSystem)
-      .map((field) => [field.id, form.fieldValues[field.id] ?? null]),
-  )
-  const discountValue = discountField
-    ? Number(form.fieldValues[SPECIAL_DISCOUNT_FIELD_ID] ?? 0)
-    : undefined
-
-  return {
-    name: form.name.trim(),
-    company: form.company.trim(),
-    email: form.email.trim(),
-    contactNumber: form.contactNumber.trim(),
-    address: form.address.trim(),
-    notes: form.notes.trim() || null,
-    customFields,
-    ...(discountField
-      ? {
-          specialDiscountPercentage: Number.isFinite(discountValue)
-            ? discountValue
-            : 0,
-        }
-      : {}),
-  }
 }
 
 function CustomerForm({
@@ -344,7 +280,7 @@ export default function CustomersPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetMode, setSheetMode] = useState<"view" | "edit">("view")
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
-  const [form, setForm] = useState<CustomerFormState>(emptyForm)
+  const [form, setForm] = useState<CustomerFormState>(createEmptyCustomerForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false)
@@ -420,16 +356,10 @@ export default function CustomersPage() {
   async function saveCustomer() {
     if (!editingCustomer) return
 
-    const payload = formToPayload(form, fieldDefinitions)
-    if (!payload.name || !payload.company || !payload.email) {
-      setSaveError("Name, company, and email are required")
-      return
-    }
-    if (
-      payload.specialDiscountPercentage !== undefined &&
-      (payload.specialDiscountPercentage < 0 || payload.specialDiscountPercentage > 100)
-    ) {
-      setSaveError("Special discount must be between 0 and 100")
+    const payload = customerFormToPayload(form, fieldDefinitions)
+    const validationError = validateCustomerPayload(payload)
+    if (validationError) {
+      setSaveError(validationError)
       return
     }
 
@@ -539,6 +469,13 @@ export default function CustomersPage() {
                   </TooltipTrigger>
                   <TooltipContent>Bulk import customers from CSV or Excel</TooltipContent>
                 </Tooltip>
+                <Button
+                  size="sm"
+                  onClick={() => void navigate({ to: "/customers/new" })}
+                >
+                  <PlusIcon className="size-4" />
+                  Add Customer
+                </Button>
               </>
             }
           />
@@ -570,7 +507,18 @@ export default function CustomersPage() {
               description={
                 debouncedSearch
                   ? "Try a customer name, company, email, phone number, or address fragment."
-                  : "Customer records created by your organization’s workflows will appear here."
+                  : "Add your first customer manually or import a list to build your shared directory."
+              }
+              action={
+                debouncedSearch ? undefined : (
+                  <Button
+                    size="sm"
+                    onClick={() => void navigate({ to: "/customers/new" })}
+                  >
+                    <PlusIcon className="size-4" />
+                    Add Customer
+                  </Button>
+                )
               }
             />
           ) : (

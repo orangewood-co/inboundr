@@ -55,6 +55,7 @@ import { Route as FormsSlugRouteImport } from './routes/forms.$slug'
 import { Route as EmployeesNewRouteImport } from './routes/employees_.new'
 import { Route as EmployeesAttendanceRouteImport } from './routes/employees_.attendance'
 import { Route as EmployeesIdRouteImport } from './routes/employees_.$id'
+import { Route as CustomersNewRouteImport } from './routes/customers_.new'
 import { Route as CustomersImportRouteImport } from './routes/customers_.import'
 import { Route as CustomersIdRouteImport } from './routes/customers_.$id'
 import { Route as AssetsSettingsRouteImport } from './routes/assets_.settings'
@@ -298,6 +299,11 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
   path: '/employees/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CustomersNewRoute = CustomersNewRouteImport.update({
+  id: '/customers_/new',
+  path: '/customers/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustomersImportRoute = CustomersImportRouteImport.update({
   id: '/customers_/import',
   path: '/customers/import',
@@ -393,6 +399,7 @@ export interface FileRoutesByFullPath {
   '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
+  '/customers/new': typeof CustomersNewRoute
   '/employees/$id': typeof EmployeesIdRoute
   '/employees/attendance': typeof EmployeesAttendanceRoute
   '/employees/new': typeof EmployeesNewRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/assets/settings': typeof AssetsSettingsRoute
   '/customers/$id': typeof CustomersIdRoute
   '/customers/import': typeof CustomersImportRoute
+  '/customers/new': typeof CustomersNewRoute
   '/employees/$id': typeof EmployeesIdRoute
   '/employees/attendance': typeof EmployeesAttendanceRoute
   '/employees/new': typeof EmployeesNewRoute
@@ -509,6 +517,7 @@ export interface FileRoutesById {
   '/assets_/settings': typeof AssetsSettingsRoute
   '/customers_/$id': typeof CustomersIdRoute
   '/customers_/import': typeof CustomersImportRoute
+  '/customers_/new': typeof CustomersNewRoute
   '/employees_/$id': typeof EmployeesIdRoute
   '/employees_/attendance': typeof EmployeesAttendanceRoute
   '/employees_/new': typeof EmployeesNewRoute
@@ -571,6 +580,7 @@ export interface FileRouteTypes {
     | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
+    | '/customers/new'
     | '/employees/$id'
     | '/employees/attendance'
     | '/employees/new'
@@ -626,6 +636,7 @@ export interface FileRouteTypes {
     | '/assets/settings'
     | '/customers/$id'
     | '/customers/import'
+    | '/customers/new'
     | '/employees/$id'
     | '/employees/attendance'
     | '/employees/new'
@@ -686,6 +697,7 @@ export interface FileRouteTypes {
     | '/assets_/settings'
     | '/customers_/$id'
     | '/customers_/import'
+    | '/customers_/new'
     | '/employees_/$id'
     | '/employees_/attendance'
     | '/employees_/new'
@@ -747,6 +759,7 @@ export interface RootRouteChildren {
   AssetsSettingsRoute: typeof AssetsSettingsRoute
   CustomersIdRoute: typeof CustomersIdRoute
   CustomersImportRoute: typeof CustomersImportRoute
+  CustomersNewRoute: typeof CustomersNewRoute
   EmployeesIdRoute: typeof EmployeesIdRoute
   EmployeesAttendanceRoute: typeof EmployeesAttendanceRoute
   EmployeesNewRoute: typeof EmployeesNewRoute
@@ -1086,6 +1099,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/customers_/new': {
+      id: '/customers_/new'
+      path: '/customers/new'
+      fullPath: '/customers/new'
+      preLoaderRoute: typeof CustomersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/customers_/import': {
       id: '/customers_/import'
       path: '/customers/import'
@@ -1276,6 +1296,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsSettingsRoute: AssetsSettingsRoute,
   CustomersIdRoute: CustomersIdRoute,
   CustomersImportRoute: CustomersImportRoute,
+  CustomersNewRoute: CustomersNewRoute,
   EmployeesIdRoute: EmployeesIdRoute,
   EmployeesAttendanceRoute: EmployeesAttendanceRoute,
   EmployeesNewRoute: EmployeesNewRoute,

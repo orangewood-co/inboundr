@@ -11,6 +11,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/chat": "AI Chat",
   "/customers": "Customers",
   "/customers/import": "Import Customers",
+  "/customers/new": "New Customer",
   "/drive": "Drive",
   "/emails": "Inbox",
   "/employees": "Employees",
