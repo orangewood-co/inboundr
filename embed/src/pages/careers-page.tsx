@@ -169,7 +169,7 @@ function ApplicationForm({ site, job }: { site: CareersSite; job: CareersJob }) 
     const allowed = field?.allowedMimeTypes?.length
       ? field.allowedMimeTypes
       : ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
-    if (!field?.multiple && selected.length > 1) { setError(`“${field.label}” accepts one file.`); return }
+    if (!field?.multiple && selected.length > 1) { setError(`“${field?.label ?? "Resume"}” accepts one file.`); return }
     const invalid = selected.find((file) => {
       const mime = inferFileMimeType(file)
       return !mime || !allowed.includes(mime) || file.size <= 0 || file.size > maxBytes
@@ -308,7 +308,7 @@ export default function CareersPage({ organizationPath, jobSlug, embed }: { orga
       if (cancelled) return
       setSite((siteResult as { careers: CareersSite }).careers)
       if ("job" in contentResult) setJob(contentResult.job)
-      else setJobs(contentResult.items)
+      else if ("items" in contentResult) setJobs(contentResult.items)
     }).catch((reason) => !cancelled && setError(reason instanceof Error ? reason.message : "Careers page unavailable")).finally(() => !cancelled && setLoading(false))
     return () => { cancelled = true }
   }, [tasks])
