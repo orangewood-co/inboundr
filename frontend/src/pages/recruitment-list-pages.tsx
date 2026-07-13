@@ -209,9 +209,9 @@ export function RecruitmentJobsPage() {
   return (
     <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Jobs" }]}>
       <RecruitmentPageTitle title="Jobs" description="Every role and its current status." action={canManageOrganization ? <Button asChild><Link to="/recruitment/jobs/new">Create Job</Link></Button> : undefined} />
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row">
-        <div className="relative flex-1"><SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search role, department, location…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{(["draft","open","paused","closed","archived"] as JobStatus[]).map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-xs"><SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="h-9 border-transparent bg-muted/60 pl-9 shadow-none transition-colors placeholder:text-muted-foreground/70 hover:bg-muted focus-visible:border-input focus-visible:bg-background" placeholder="Search jobs…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{(["draft","open","paused","closed","archived"] as JobStatus[]).map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
         {loading ? <ListSkeleton rows={7} columns={5} /> : error ? <ErrorState message={error} onRetry={() => void load()} /> : !jobs.length ? <EmptyState icon={BriefcaseBusinessIcon} title="No Matching Jobs" description="Create your first role or broaden the current filters." action={canManageOrganization ? <Button asChild size="sm"><Link to="/recruitment/jobs/new">Create Job</Link></Button> : undefined} /> : (
@@ -292,10 +292,12 @@ export function RecruitmentApplicantsPage() {
   return (
     <RecruitmentShell breadcrumbs={[{ label: "Recruitment", href: "/recruitment" }, { label: "Applicants" }]}>
       <RecruitmentPageTitle title="Applicants" description="All applications across jobs." />
-      <div className="mb-4 grid gap-3 rounded-xl border bg-card p-3 md:grid-cols-[1fr_220px_180px]">
-        <div className="relative"><SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-        <Select value={jobId} onValueChange={setJobId}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All jobs</SelectItem>{jobs.map((job) => <SelectItem key={job._id} value={job._id}>{job.title}</SelectItem>)}</SelectContent></Select>
-        <Select value={status} onValueChange={setStatus}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{["active","hired","rejected","withdrawn","archived"].map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-xs"><SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><Input className="h-9 border-transparent bg-muted/60 pl-9 shadow-none transition-colors placeholder:text-muted-foreground/70 hover:bg-muted focus-visible:border-input focus-visible:bg-background" placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Select value={jobId} onValueChange={setJobId}><SelectTrigger size="sm" className="w-full sm:w-52"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Jobs</SelectItem>{jobs.map((job) => <SelectItem key={job._id} value={job._id}>{job.title}</SelectItem>)}</SelectContent></Select>
+          <Select value={status} onValueChange={setStatus}><SelectTrigger size="sm" className="w-full sm:w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Statuses</SelectItem>{["active","hired","rejected","withdrawn","archived"].map((item) => <SelectItem key={item} value={item} className="capitalize">{item}</SelectItem>)}</SelectContent></Select>
+        </div>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
         {loading ? <ListSkeleton rows={8} columns={5} /> : error ? <ErrorState message={error} onRetry={() => void load()} /> : !visible.length ? <EmptyState icon={UsersRoundIcon} title="No Matching Applicants" description="Applications will appear here when candidates enter a job pipeline." /> : (
