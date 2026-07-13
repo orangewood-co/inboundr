@@ -178,6 +178,16 @@
   }
 }
 
+@layer components {
+  .international-phone-input {
+    @apply flex h-9 w-full items-center rounded-md border border-input bg-transparent shadow-xs transition-[border-color,box-shadow] dark:bg-input/30;
+  }
+
+  .international-phone-input:focus-within {
+    @apply border-ring ring-3 ring-ring/50;
+  }
+}
+
 @keyframes pro-badge-pop {
   0% {
     transform: scale(1) rotate(0deg);

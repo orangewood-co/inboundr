@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { CustomerFieldInput } from "@/components/customer-field-input"
+import { InternationalPhoneInput } from "@/components/international-phone-input"
 import { ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
@@ -23,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
@@ -334,19 +335,13 @@ export default function CustomerNewPage() {
                         autoComplete="email"
                         required
                       />
-                      <FieldDescription>
-                        We will warn you before creating another active customer with this email.
-                      </FieldDescription>
                     </Field>
                     <Field>
                       <FieldLabel htmlFor="customer-phone">Contact number</FieldLabel>
-                      <Input
+                      <InternationalPhoneInput
                         id="customer-phone"
-                        type="tel"
                         value={form.contactNumber}
-                        onChange={(event) => updateForm("contactNumber", event.target.value)}
-                        placeholder="+91 98765 43210"
-                        autoComplete="tel"
+                        onChange={(value) => updateForm("contactNumber", value)}
                       />
                     </Field>
                   </div>
