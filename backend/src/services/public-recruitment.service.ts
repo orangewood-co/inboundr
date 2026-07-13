@@ -393,11 +393,12 @@ export async function presignPublicResume(
 }
 
 async function verifyTurnstile(tokenValue: unknown, ip: string) {
-  const bypass =
-    process.env.NODE_ENV !== "production" &&
-    process.env.RECRUITMENT_TURNSTILE_LOCAL_BYPASS === "true";
-  if (bypass) return;
   const secret = process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY?.trim();
+  const isProduction = process.env.NODE_ENV === "production";
+  const localBypass =
+    !isProduction &&
+    (!secret || process.env.RECRUITMENT_TURNSTILE_LOCAL_BYPASS === "true");
+  if (localBypass) return;
   if (!secret) {
     throw new RecruitmentServiceError("Application verification is unavailable", 503);
   }
