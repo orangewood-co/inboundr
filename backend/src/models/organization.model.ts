@@ -94,6 +94,7 @@ export interface IOrganizationLetterhead {
 
 export interface IOrganization extends Document {
   name: string;
+  description: string;
   ownerUserId: string;
   status: OrganizationStatus;
   isPro: boolean;
@@ -230,6 +231,7 @@ const organizationLetterheadSchema = new Schema<IOrganizationLetterhead>(
 const organizationSchema = new Schema<IOrganization>(
   {
     name: { type: String, required: true, trim: true },
+    description: { type: String, default: "", trim: true, maxlength: 2000 },
     ownerUserId: { type: String, required: true, unique: true, index: true },
     status: {
       type: String,

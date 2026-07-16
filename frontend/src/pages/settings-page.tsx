@@ -162,6 +162,7 @@ type InvoiceTemplateId = (typeof INVOICE_TEMPLATE_OPTIONS)[number]["id"]
 interface Organization {
   _id: string
   name: string
+  description: string
   defaultContact: {
     name: string
     email: string
@@ -260,6 +261,7 @@ interface PresignedUpload {
 
 const emptyOrganizationForm: OrganizationFormState = {
   name: "",
+  description: "",
   defaultContact: {
     name: "",
     email: "",
@@ -539,6 +541,7 @@ function OrganizationTab() {
 
     setForm({
       name: organization.name ?? "",
+      description: organization.description ?? "",
       defaultContact: {
         name: organization.defaultContact?.name ?? "",
         email: organization.defaultContact?.email ?? "",
@@ -982,6 +985,22 @@ function OrganizationTab() {
                   <Label htmlFor="website">Website</Label>
                   <Input id="website" value={form.website} onChange={(event) => updateForm("website", event.target.value)} placeholder="https://example.com" />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="organizationDescription">Organization description</Label>
+                <textarea
+                  id="organizationDescription"
+                  rows={4}
+                  maxLength={2000}
+                  value={form.description}
+                  onChange={(event) => updateForm("description", event.target.value)}
+                  placeholder="Describe your organization, what it does, and who it serves."
+                  className="flex w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <p className="text-right text-xs text-muted-foreground">
+                  {form.description.length.toLocaleString()} / 2,000
+                </p>
               </div>
 
               <div className="space-y-3">

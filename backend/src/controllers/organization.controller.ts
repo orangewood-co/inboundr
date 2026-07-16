@@ -189,6 +189,14 @@ function normalizeHexColor(value: unknown): string {
   return "#f5b400";
 }
 
+function normalizeOrganizationDescription(value: unknown): string {
+  const description = stringValue(value);
+  if (description.length > 2000) {
+    throw validationError("Organization description must be 2,000 characters or fewer");
+  }
+  return description;
+}
+
 function normalizeOrganizationInput(body: Record<string, unknown>) {
   const defaultContact = body.defaultContact as Record<string, unknown> | undefined;
   const preferences = body.preferences as Record<string, unknown> | undefined;
@@ -196,6 +204,9 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
 
   return {
     ...(body.name !== undefined ? { name: stringValue(body.name) } : {}),
+    ...(body.description !== undefined
+      ? { description: normalizeOrganizationDescription(body.description) }
+      : {}),
     ...(body.website !== undefined ? { website: stringValue(body.website) } : {}),
     ...(body.logoUrl !== undefined ? { logoUrl: stringValue(body.logoUrl) } : {}),
     ...(body.address !== undefined ? { address: stringValue(body.address) } : {}),
