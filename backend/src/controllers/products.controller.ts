@@ -330,8 +330,8 @@ export const importProducts = async (
       return;
     }
 
-    if (products.length > 1000) {
-      res.status(400).json({ error: "Import is limited to 1000 rows at a time" });
+    if (products.length > 5000) {
+      res.status(400).json({ error: "Import is limited to 5000 rows at a time" });
       return;
     }
 

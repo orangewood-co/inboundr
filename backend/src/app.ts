@@ -86,6 +86,7 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 // they are mounted before the global JSON body parser.
 app.use("/api/v1/telephony", telephonyRouter);
 
+app.use("/api/v1/products/import", express.json({ limit: "1mb" }));
 app.use(express.json());
 
 app.get("/health", (req: Request, res: Response) => {
