@@ -66,8 +66,17 @@ export async function processEmailForRFQ(
 
     console.log(`Email ${messageId} classified as RFQ: ${reason}`);
 
+    const organization = await Organization.findById(organizationId)
+      .select("name description")
+      .lean();
+
+    const currentOrganizationContext = {
+      name: organization?.name ?? "",
+      description: organization?.description ?? "",
+    };
+
     const { customer, queryProducts, searchResults } =
-      await generateRFQ(emailBody, organizationId);
+      await generateRFQ(currentOrganizationContext, emailBody, organizationId);
 
     await RFQ.updateOne(
       { _id: rfqDoc._id },

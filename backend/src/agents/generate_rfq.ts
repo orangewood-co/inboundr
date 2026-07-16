@@ -29,6 +29,11 @@ const customer = z.object({
   address: z.string().nullable().describe("Address of the company."),
 });
 
+const organizationContext = z.object({
+  name: z.string().describe("The name of the organization."),
+  description: z.string().describe("The description of the organization.").nullable(),
+});
+
 const queryProduct = z.object({
   name: z.string(),
   quantity: z.number().default(1),
@@ -86,6 +91,7 @@ const MAX_SEARCH_VARIANTS = 6;
 
 const State = new StateSchema({
   emailBody: z.string(),
+  organizationContext: organizationContext,
   organizationId: z.string().nullable(),
   customer: customer,
   queryProducts: z.array(queryProduct),
@@ -152,12 +158,13 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
   const response = await model.withStructuredOutput(extractedProducts).invoke([
     new SystemMessage(
       `You are a product support agent.
-       You work for Bombay Tools Supplying Agency Pvt. Ltd.
+       You work for ${state.organizationContext.name}.
+       ${state.organizationContext.description ? `${state.organizationContext.description}` : ""}
 
        You are given a email from a potential customer asking for a quote for the products they are interested in.
        Your task is to identify the products from the email and return the products details in the structured output format.
        
-       Pay attention to the product make and specification if given and include them in the product nam
+       Pay attention to the product make and specification if given and include them in the product name.
        `
 
     ),
@@ -535,12 +542,12 @@ const graph = new StateGraph(State)
   .addEdge("searchProducts", END)
   .compile();
 
-export async function generateRFQ(emailBody: string, organizationId?: string): Promise<{
+export async function generateRFQ(currentOrganizationContext: z.infer<typeof organizationContext>, emailBody: string, organizationId?: string): Promise<{
   customer: z.infer<typeof customer>;
   queryProducts: z.infer<typeof queryProduct>[];
   searchResults: z.infer<typeof searchResult>[];
 }> {
-  const result = await graph.invoke({ emailBody, organizationId: organizationId ?? null });
+  const result = await graph.invoke({ emailBody, organizationContext: currentOrganizationContext, organizationId: organizationId ?? null });
   return {
     customer: result.customer,
     queryProducts: result.queryProducts,
