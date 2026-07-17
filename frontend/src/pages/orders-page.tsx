@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/format"
+import type { CatalogAdjustment } from "@/lib/catalog"
 import { getAvatarColor } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -57,6 +58,8 @@ interface RFQSavedQuoteProduct {
   gstRate: number | null
   discountPercent?: number | null
   calibrationCharges?: number | null
+  tax?: { code: string | null; rate: number | null; label: string }
+  adjustments?: CatalogAdjustment[]
   deliveryTimeline?: string | null
   lineStatus?: "quoted" | "regretted"
   regretReason?: string | null
@@ -478,9 +481,11 @@ export function OrdersPage() {
                             {product.brand && product.code && <span>·</span>}
                             {product.code && <span className="font-mono">{product.code}</span>}
                             {(product.brand || product.code) && product.hsnCode && <span>·</span>}
-                            {product.hsnCode && <span>HSN: <span className="font-medium">{product.hsnCode}</span></span>}
-                            {product.gstRate != null && <span>· GST: <span className="font-medium">{product.gstRate}%</span></span>}
-                            {product.calibrationCharges != null && <span>· Calibration: <span className="font-medium">{formatPrice(product.calibrationCharges)}</span></span>}
+                            {(product.tax?.code ?? product.hsnCode) && <span>{product.tax?.label ?? "Tax"}: <span className="font-medium">{product.tax?.code ?? product.hsnCode}</span></span>}
+                            {(product.tax?.rate ?? product.gstRate) != null && <span>· {product.tax?.label ?? "Tax"}: <span className="font-medium">{product.tax?.rate ?? product.gstRate}%</span></span>}
+                            {(product.adjustments ?? []).map((adjustment) => (
+                              <span key={adjustment.id}>· {adjustment.label}: <span className="font-medium">{formatPrice(adjustment.amount ?? adjustment.value)}</span></span>
+                            ))}
                             {product.deliveryTimeline && <span>· Delivery: <span className="font-medium">{product.deliveryTimeline}</span></span>}
                             </div>
                           )}

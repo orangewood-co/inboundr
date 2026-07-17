@@ -58,7 +58,15 @@ Contact No: 9585223382`
 try {
        await connectDB();
 
-       const { customer, queryProducts, searchResults } = await generateRFQ(EMAIL_RAW_TEXT);
+       const { customer, queryProducts, searchResults } = await generateRFQ(
+         {
+           name: process.env.ORGANIZATION_NAME || "Organization",
+           description: process.env.ORGANIZATION_DESCRIPTION || "",
+           searchInstructions: "",
+         },
+         EMAIL_RAW_TEXT,
+         process.env.ORGANIZATION_ID
+       );
 
        console.log("FINAL SEARCH RESULTS:", JSON.stringify(searchResults, null, 2));
        console.log("CUSTOMER:", JSON.stringify(customer, null, 2));

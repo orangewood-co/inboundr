@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { CatalogAdjustment } from "./catalog"
 
 export type InvoiceArtifact = {
   type: "invoice"
@@ -17,6 +18,9 @@ export type ProductArtifact = {
     hsnCode: string | null
     gstRate: number | null
     calibrationCharges: number | null
+    tax?: { code: string | null; rate: number | null; label: string }
+    defaultAdjustments?: CatalogAdjustment[]
+    attributes?: Record<string, string | number | boolean | null>
     link: string | null
     isTopSeller: boolean
   }

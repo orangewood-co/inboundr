@@ -11,6 +11,7 @@ import {
   PackagePlusIcon,
   RefreshCwIcon,
   SearchIcon,
+  Settings2Icon,
   TagIcon,
   TableIcon,
   UploadIcon,
@@ -42,6 +43,14 @@ import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { PageToolbar } from "@/components/page-header"
 import { API_ORIGIN } from "@/lib/env"
 import { formatNumber } from "@/lib/format"
+import { ProductSettingsSheet } from "@/components/product-settings-sheet"
+import {
+  formatCatalogMoney,
+  legacyCalibrationAdjustment,
+  type CatalogAdjustment,
+  type CatalogAttributeValue,
+  type ProductSettings,
+} from "@/lib/catalog"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 
@@ -65,6 +74,10 @@ interface Product {
   is_top_seller: boolean | null
   addedtime: string | null
   addeduser: string | null
+  category?: string | null
+  tags?: string[]
+  attributes?: Record<string, CatalogAttributeValue>
+  defaultAdjustments?: CatalogAdjustment[]
 }
 
 interface ProductsResponse {
@@ -97,6 +110,10 @@ type ProductFormState = {
   is_top_seller: boolean
   addedtime: string
   addeduser: string
+  category: string
+  tags: string
+  attributes: Record<string, string | boolean>
+  adjustmentValues: Record<string, string>
 }
 
 const emptyForm: ProductFormState = {
@@ -114,6 +131,10 @@ const emptyForm: ProductFormState = {
   is_top_seller: false,
   addedtime: "",
   addeduser: "",
+  category: "",
+  tags: "",
+  attributes: {},
+  adjustmentValues: {},
 }
 
 const numericFields: Array<keyof ProductFormState> = [
@@ -123,16 +144,6 @@ const numericFields: Array<keyof ProductFormState> = [
   "maxupsell",
   "calibrationcharges",
 ]
-
-function toCurrency(value: Product["unitprice"]) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return "Price pending"
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(number)
-}
 
 function toPercent(value: Product["gstrate"]) {
   const number = Number(value)
@@ -163,12 +174,23 @@ function productToForm(product: Product): ProductFormState {
     is_top_seller: Boolean(product.is_top_seller),
     addedtime: toDateInput(product.addedtime),
     addeduser: product.addeduser ?? "",
+    category: product.category ?? "",
+    tags: (product.tags ?? []).join(", "),
+    attributes: Object.fromEntries(
+      Object.entries(product.attributes ?? {}).map(([key, value]) => [key, typeof value === "boolean" ? value : String(value ?? "")])
+    ),
+    adjustmentValues: Object.fromEntries(
+      (product.defaultAdjustments ?? legacyCalibrationAdjustment(product.calibrationcharges)).map((item) => [item.code, String(item.value)])
+    ),
   }
 }
 
-function formToPayload(form: ProductFormState) {
-  return Object.fromEntries(
+function formToPayload(form: ProductFormState, settings: ProductSettings | null) {
+  const legacyPayload = Object.fromEntries(
     Object.entries(form).map(([key, value]) => {
+      if (key === "attributes" || key === "adjustmentValues" || key === "tags" || key === "category") {
+        return [key, undefined]
+      }
       if (key === "is_top_seller") {
         return [key, Boolean(value)]
       }
@@ -184,19 +206,45 @@ function formToPayload(form: ProductFormState) {
       return [key, stringValue.trim() === "" ? null : stringValue.trim()]
     })
   )
+  const definitions = settings?.fieldDefinitions.filter((field) => field.isActive) ?? []
+  const attributes = Object.fromEntries(definitions.map((field) => {
+    const value = form.attributes[field.key]
+    if (field.type === "number") return [field.key, value === "" ? null : Number(value)]
+    return [field.key, value]
+  }))
+  const defaultAdjustments = (settings?.adjustmentDefinitions ?? [])
+    .filter((item) => item.isActive)
+    .map((item) => ({
+      id: item.id,
+      code: item.code,
+      label: item.label,
+      type: item.type,
+      value: Number(form.adjustmentValues[item.code] || 0),
+      taxable: item.taxable,
+    }))
+    .filter((item) => item.value > 0)
+  return {
+    ...legacyPayload,
+    category: form.category.trim() || null,
+    tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean),
+    attributes,
+    defaultAdjustments,
+  }
 }
 
 function ProductForm({
   form,
   onChange,
+  settings,
 }: {
   form: ProductFormState
   onChange: (field: keyof ProductFormState, value: string | boolean) => void
+  settings: ProductSettings | null
 }) {
   return (
     <div className="grid gap-5 px-5 pb-5">
       <div className="grid gap-2">
-        <Label htmlFor="productdescription">Product description</Label>
+        <Label htmlFor="productdescription">{settings?.terminology.singular ?? "Product"} description</Label>
         <textarea
           id="productdescription"
           rows={4}
@@ -209,11 +257,11 @@ function ProductForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="productcode">Product code</Label>
+          <Label htmlFor="productcode">{settings?.terminology.skuLabel ?? "SKU"}</Label>
           <Input id="productcode" value={form.productcode} onChange={(event) => onChange("productcode", event.target.value)} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="brand">Brand</Label>
+          <Label htmlFor="brand">{settings?.terminology.manufacturerLabel ?? "Manufacturer"}</Label>
           <Input id="brand" value={form.brand} onChange={(event) => onChange("brand", event.target.value)} />
         </div>
       </div>
@@ -232,13 +280,13 @@ function ProductForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="unitprice">Unit price</Label>
           <Input id="unitprice" type="number" value={form.unitprice} onChange={(event) => onChange("unitprice", event.target.value)} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="gstrate">GST rate</Label>
+          <Label htmlFor="gstrate">{settings?.terminology.taxRateLabel ?? "Tax rate"}</Label>
           <Input id="gstrate" type="number" value={form.gstrate} onChange={(event) => onChange("gstrate", event.target.value)} />
         </div>
         <div className="grid gap-2">
@@ -256,15 +304,87 @@ function ProductForm({
           <Label htmlFor="maxupsell">Max upsell</Label>
           <Input id="maxupsell" type="number" value={form.maxupsell} onChange={(event) => onChange("maxupsell", event.target.value)} />
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="calibrationcharges">Calibration charges</Label>
-          <Input id="calibrationcharges" type="number" value={form.calibrationcharges} onChange={(event) => onChange("calibrationcharges", event.target.value)} />
-        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="hsncode">HSN code</Label>
+          <Label htmlFor="category">Category</Label>
+          <Input id="category" value={form.category} onChange={(event) => onChange("category", event.target.value)} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="tags">Tags</Label>
+          <Input id="tags" value={form.tags} onChange={(event) => onChange("tags", event.target.value)} placeholder="retail, seasonal" />
+        </div>
+      </div>
+
+      {(settings?.fieldDefinitions ?? []).filter((field) => field.isActive).length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {settings!.fieldDefinitions.filter((field) => field.isActive).map((field) => (
+            <div className="grid gap-2" key={field.id}>
+              <Label htmlFor={`attribute-${field.key}`}>{field.label}{field.required ? " *" : ""}</Label>
+              {field.type === "boolean" ? (
+                <Switch
+                  id={`attribute-${field.key}`}
+                  checked={form.attributes[field.key] === true}
+                  onCheckedChange={(checked) => onChange("attributes", {
+                    ...form.attributes,
+                    [field.key]: checked,
+                  } as never)}
+                />
+              ) : field.type === "select" ? (
+                <select
+                  id={`attribute-${field.key}`}
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                  value={String(form.attributes[field.key] ?? "")}
+                  onChange={(event) => onChange("attributes", {
+                    ...form.attributes,
+                    [field.key]: event.target.value,
+                  } as never)}
+                >
+                  <option value="">Select an option</option>
+                  {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              ) : (
+                <Input
+                  id={`attribute-${field.key}`}
+                  type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+                  value={String(form.attributes[field.key] ?? "")}
+                  onChange={(event) => onChange("attributes", {
+                    ...form.attributes,
+                    [field.key]: event.target.value,
+                  } as never)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(settings?.adjustmentDefinitions ?? []).filter((item) => item.isActive).length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {settings!.adjustmentDefinitions.filter((item) => item.isActive).map((item) => (
+            <div className="grid gap-2" key={item.id}>
+              <Label htmlFor={`adjustment-${item.code}`}>
+                {item.label} ({item.type === "percentage" ? "%" : settings?.currency})
+              </Label>
+              <Input
+                id={`adjustment-${item.code}`}
+                type="number"
+                min="0"
+                value={form.adjustmentValues[item.code] ?? ""}
+                onChange={(event) => onChange("adjustmentValues", {
+                  ...form.adjustmentValues,
+                  [item.code]: event.target.value,
+                } as never)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+        <Label htmlFor="hsncode">{settings?.terminology.taxCodeLabel ?? "Tax code"}</Label>
           <Input id="hsncode" value={form.hsncode} onChange={(event) => onChange("hsncode", event.target.value)} />
         </div>
         <div className="grid gap-2">
@@ -320,6 +440,9 @@ function DashboardView({
   onViewCatalog,
   onAddProduct,
   onBulkImport,
+  currency,
+  onOpenSettings,
+  terminology,
 }: {
   stats: ProductStats | null
   statsLoading: boolean
@@ -328,16 +451,23 @@ function DashboardView({
   onViewCatalog: () => void
   onAddProduct: () => void
   onBulkImport: () => void
+  currency: string
+  onOpenSettings: () => void
+  terminology: ProductSettings["terminology"] | undefined
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       <div className="flex items-center justify-between border-b px-6 py-4">
         <div>
-          <h1 className="text-lg font-semibold">Products</h1>
+          <h1 className="text-lg font-semibold">{terminology?.plural ?? "Products"}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Manage your product catalog, add new items, and track inventory stats.
+            Manage your {terminology?.singular.toLowerCase() ?? "product"} catalog, add new items, and track catalog stats.
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={onOpenSettings}>
+          <Settings2Icon className="size-4" />
+          Catalog settings
+        </Button>
       </div>
 
       <div className="space-y-6 p-6 animate-in fade-in-0 duration-300">
@@ -357,7 +487,7 @@ function DashboardView({
           />
           <StatCard
             label="Avg. Unit Price"
-            value={stats?.avgUnitPrice ? toCurrency(stats.avgUnitPrice) : "—"}
+            value={stats?.avgUnitPrice ? formatCatalogMoney(stats.avgUnitPrice, currency) : "—"}
             icon={IndianRupeeIcon}
             loading={statsLoading}
           />
@@ -481,7 +611,7 @@ function DashboardView({
                         {product.brand || "—"}
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
-                        {toCurrency(product.unitprice)}
+                        {formatCatalogMoney(product.unitprice, currency)}
                       </td>
                     </tr>
                   ))}
@@ -512,6 +642,8 @@ export default function ProductsPage() {
   const [form, setForm] = useState<ProductFormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [settings, setSettings] = useState<ProductSettings | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -549,6 +681,9 @@ export default function ProductsPage() {
   useEffect(() => {
     void fetchStats()
     void fetchRecentProducts()
+    void fetch(`${API_BASE}/settings`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => setSettings(value as ProductSettings | null))
   }, [fetchStats, fetchRecentProducts])
 
   const fetchProducts = useCallback(async () => {
@@ -602,7 +737,16 @@ export default function ProductsPage() {
 
   function openCreateSheet() {
     setEditingProduct(null)
-    setForm({ ...emptyForm, addedtime: new Date().toISOString().slice(0, 10) })
+    setForm({
+      ...emptyForm,
+      addedtime: new Date().toISOString().slice(0, 10),
+      attributes: Object.fromEntries(
+        (settings?.fieldDefinitions ?? []).filter((field) => field.isActive).map((field) => [field.key, ""])
+      ),
+      adjustmentValues: Object.fromEntries(
+        (settings?.adjustmentDefinitions ?? []).filter((item) => item.isActive).map((item) => [item.code, String(item.defaultValue || "")])
+      ),
+    })
     setSaveError(null)
     setSheetOpen(true)
   }
@@ -627,7 +771,7 @@ export default function ProductsPage() {
         method: editingProduct ? "PUT" : "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formToPayload(form)),
+        body: JSON.stringify(formToPayload(form, settings)),
       })
 
       let payload = await response.json().catch(() => null)
@@ -645,7 +789,7 @@ export default function ProductsPage() {
               method: "PUT",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(formToPayload(form)),
+              body: JSON.stringify(formToPayload(form, settings)),
             })
             payload = await response.json().catch(() => null)
           }
@@ -683,12 +827,15 @@ export default function ProductsPage() {
               onViewCatalog={() => setView("table")}
               onAddProduct={openCreateSheet}
               onBulkImport={openImportPage}
+              currency={settings?.currency ?? "INR"}
+              onOpenSettings={() => setSettingsOpen(true)}
+              terminology={settings?.terminology}
             />
           ) : (
             <>
               <PageToolbar
                 icon={BoxIcon}
-                title="Products"
+                title={settings?.terminology.plural ?? "Products"}
                 count={loading ? null : total}
                 leading={
                   <Tooltip>
@@ -707,6 +854,15 @@ export default function ProductsPage() {
                 }
                 actions={
                   <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                          <Settings2Icon className="size-4" />
+                          Settings
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Configure catalog fields and matching</TooltipContent>
+                    </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -749,7 +905,7 @@ export default function ProductsPage() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search brand, product code, HSN, description..."
+                    placeholder={`Search ${settings?.terminology.manufacturerLabel ?? "manufacturer"}, ${settings?.terminology.skuLabel ?? "SKU"}, ${settings?.terminology.taxCodeLabel ?? "tax code"}, description...`}
                     className="pl-10"
                   />
                 </div>
@@ -786,11 +942,11 @@ export default function ProductsPage() {
                   <table className="w-full min-w-[980px] text-sm">
                     <thead>
                       <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        <th className="px-5 py-2.5">Code</th>
-                        <th className="px-5 py-2.5">Product</th>
-                        <th className="px-5 py-2.5">Brand</th>
+                        <th className="px-5 py-2.5">{settings?.terminology.skuLabel ?? "SKU"}</th>
+                        <th className="px-5 py-2.5">{settings?.terminology.singular ?? "Product"}</th>
+                        <th className="px-5 py-2.5">{settings?.terminology.manufacturerLabel ?? "Manufacturer"}</th>
                         <th className="px-5 py-2.5">Price</th>
-                        <th className="px-5 py-2.5">GST</th>
+                        <th className="px-5 py-2.5">{settings?.terminology.taxRateLabel ?? "Tax"}</th>
                         <th className="px-5 py-2.5">Margin</th>
                         <th className="w-10 px-3 py-2.5" />
                       </tr>
@@ -819,7 +975,7 @@ export default function ProductsPage() {
                             </div>
                           </td>
                           <td className="px-5 py-3.5 align-top font-medium">{product.brand || "-"}</td>
-                          <td className="px-5 py-3.5 align-top font-semibold">{toCurrency(product.unitprice)}</td>
+                          <td className="px-5 py-3.5 align-top font-semibold">{formatCatalogMoney(product.unitprice, settings?.currency ?? "INR")}</td>
                           <td className="px-5 py-3.5 align-top">{toPercent(product.gstrate)}</td>
                           <td className="px-5 py-3.5 align-top">
                             <div className="space-y-0.5 text-xs">
@@ -895,6 +1051,7 @@ export default function ProductsPage() {
           <Separator />
           <ProductForm
             form={form}
+            settings={settings}
             onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }) as ProductFormState)}
           />
           {saveError && (
@@ -913,6 +1070,15 @@ export default function ProductsPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {settingsOpen && (
+        <ProductSettingsSheet
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          settings={settings}
+          endpoint={`${API_BASE}/settings`}
+          onSaved={setSettings}
+        />
+      )}
 
     </>
   )

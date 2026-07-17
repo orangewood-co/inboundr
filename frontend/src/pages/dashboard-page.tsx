@@ -72,6 +72,7 @@ import { CopyableText } from "@/components/copy-button"
 import { openDownload } from "@/lib/downloads"
 import { StatusBadge, type StatusTone } from "@/components/status-badge"
 import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/format"
+import type { CatalogAdjustment } from "@/lib/catalog"
 import { getAvatarColor } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -171,6 +172,9 @@ interface RFQSearchMatch {
   hsnCode: string | null
   gstRate: number | null
   calibrationCharges?: number | null
+  tax?: { code: string | null; rate: number | null; label: string }
+  attributes?: Record<string, string | number | boolean | null>
+  defaultAdjustments?: CatalogAdjustment[]
   isTopSeller?: boolean
   score: number
   matchReasons: string[]
@@ -197,6 +201,8 @@ interface RFQSavedQuoteProduct {
   gstRate: number | null
   discountPercent?: number
   calibrationCharges?: number | null
+  tax?: { code: string | null; rate: number | null; label: string }
+  adjustments?: CatalogAdjustment[]
   deliveryTimeline?: string | null
   lineStatus?: "quoted" | "regretted"
   regretReason?: string | null
@@ -276,6 +282,8 @@ interface CatalogProduct {
   hsncode: string | null
   gstrate: number | string | null
   calibrationcharges: number | string | null
+  defaultAdjustments?: CatalogAdjustment[]
+  attributes?: Record<string, string | number | boolean | null>
   is_top_seller?: boolean | null
 }
 
@@ -302,6 +310,7 @@ interface ManualProduct {
   gstRate: string
   calibrationCharges: string
   deliveryTimeline: string
+  adjustments?: CatalogAdjustment[]
   source: "catalog" | "custom"
 }
 
@@ -315,6 +324,7 @@ interface ProductOverride {
   quantity?: string
   discountPercent?: string
   calibrationCharges?: string
+  adjustments?: CatalogAdjustment[]
   deliveryTimeline?: string
 }
 
@@ -614,6 +624,7 @@ function catalogProductToManual(product: CatalogProduct, query?: RFQSearchResult
     hsnCode: product.hsncode ?? "",
     gstRate: numberInputValue(product.gstrate),
     calibrationCharges: numberInputValue(product.calibrationcharges),
+    adjustments: product.defaultAdjustments,
     deliveryTimeline: "",
     source: "catalog",
   }
@@ -638,6 +649,7 @@ function searchMatchToManual(
     hsnCode: match.hsnCode ?? "",
     gstRate: numberInputValue(match.gstRate),
     calibrationCharges: numberInputValue(match.calibrationCharges),
+    adjustments: match.defaultAdjustments,
     deliveryTimeline: "",
     source: "catalog",
   }
@@ -1068,6 +1080,7 @@ export function DashboardPage() {
             quantity: String(product.quantity),
             discountPercent: product.discountPercent ? String(product.discountPercent) : "",
             calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+            adjustments: product.adjustments,
             deliveryTimeline: product.deliveryTimeline ?? "",
           }
           matched = true
@@ -1090,6 +1103,7 @@ export function DashboardPage() {
           hsnCode: product.hsnCode ?? "",
           gstRate: product.gstRate != null ? String(product.gstRate) : "",
           calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+          adjustments: product.adjustments,
           deliveryTimeline: product.deliveryTimeline ?? "",
           source: product.productId !== "0" ? "catalog" : "custom",
         })
@@ -1715,6 +1729,7 @@ export function DashboardPage() {
       hsnCode: product.hsnCode.trim() || null,
       gstRate: product.gstRate.trim() === "" ? null : Number(product.gstRate),
       calibrationCharges: product.calibrationCharges?.trim() ? Number(product.calibrationCharges) : null,
+      adjustments: product.adjustments,
       deliveryTimeline: product.deliveryTimeline?.trim() || null,
     }))
     const regrettedSelections = Object.values(regrettedLines).map((line) => ({

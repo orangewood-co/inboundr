@@ -16,13 +16,16 @@ import {
 } from "./pdf-branding.service";
 
 type QuoteRFQ = Pick<IRFQ, "_id" | "customer" | "quoteNumber" | "createdAt">;
-type QuoteReply = Pick<IRFQReply, "subject" | "selectedProducts" | "generatedAt">;
+type QuoteReply = Pick<
+  IRFQReply,
+  "subject" | "selectedProducts" | "generatedAt" | "specialDiscountPercentage"
+>;
 
-function money(value: number | null | undefined): string {
+function money(value: number | null | undefined, currency: string): string {
   if (value == null) return "-";
-  return new Intl.NumberFormat("en-IN", {
+  return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: "INR",
+    currency,
     maximumFractionDigits: 2,
   }).format(value);
 }
@@ -44,13 +47,31 @@ function baseUnitPrice(product: IRFQReplyProduct): number | null {
 
 function lineSubtotal(product: IRFQReplyProduct): number | null {
   if (product.price == null) return null;
-  return product.price * product.quantity;
+  return product.price * product.quantity
+    + (product.adjustments ?? []).reduce((sum, adjustment) => sum + (adjustment.amount ?? 0), 0);
 }
 
-function lineTax(product: IRFQReplyProduct): number {
-  const subtotal = lineSubtotal(product);
-  if (subtotal == null || product.gstRate == null) return 0;
-  return subtotal * (product.gstRate / 100);
+function lineTax(product: IRFQReplyProduct, specialDiscountPercentage = 0): number {
+  if (product.price == null) return 0;
+  const base = product.price * product.quantity;
+  const discountedBase = base * (1 - normalizeDiscount(specialDiscountPercentage) / 100);
+  const taxableBase = discountedBase
+    + (product.adjustments ?? [])
+      .filter((adjustment) => adjustment.taxable)
+      .reduce((sum, adjustment) => sum + (adjustment.amount ?? 0), 0);
+  const taxRate = product.tax?.rate ?? product.gstRate;
+  return taxRate == null ? 0 : taxableBase * (taxRate / 100);
+}
+
+function lineNetTotal(product: IRFQReplyProduct, specialDiscountPercentage = 0): number | null {
+  if (product.price == null) return null;
+  const base = product.price * product.quantity;
+  const discountedBase = base * (1 - normalizeDiscount(specialDiscountPercentage) / 100);
+  const adjustments = (product.adjustments ?? []).reduce(
+    (sum, adjustment) => sum + (adjustment.amount ?? 0),
+    0
+  );
+  return discountedBase + adjustments + lineTax(product, specialDiscountPercentage);
 }
 
 function renderPdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
@@ -63,7 +84,13 @@ function renderPdfBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
   });
 }
 
-function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], startY: number): number {
+function drawQuoteItems(
+  doc: PDFKit.PDFDocument,
+  products: IRFQReplyProduct[],
+  startY: number,
+  currency: string,
+  specialDiscountPercentage: number
+): number {
   let y = drawPdfSectionTitle(doc, "Quoted Items", startY);
   y = ensurePdfRoom(doc, y, 30);
 
@@ -82,14 +109,19 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
     const discount = normalizeDiscount(product.discountPercent);
     const hasDiscount = discount > 0 && product.price != null;
     y = ensurePdfRoom(doc, y, hasDiscount ? 58 : 46);
-    const subtotal = lineSubtotal(product);
+    const subtotal = lineNetTotal(product, specialDiscountPercentage);
     const description = product.description || product.code || product.queryName;
-    const meta = [product.brand, product.code, product.hsnCode ? `HSN ${product.hsnCode}` : null]
+    const taxCode = product.tax?.code ?? product.hsnCode;
+    const taxRate = product.tax?.rate ?? product.gstRate;
+    const adjustmentText = (product.adjustments ?? []).map(
+      (adjustment) => `${adjustment.label} ${money(adjustment.amount ?? 0, currency)}`
+    ).join(" · ");
+    const meta = [product.brand, product.code, taxCode ? `${product.tax?.label ?? "Tax"} ${taxCode}` : null]
       .filter(Boolean)
       .join(" · ");
     const pricingMeta = hasDiscount
-      ? `Price ${money(baseUnitPrice(product))} · Discount ${discount}% · Net ${money(product.price)}`
-      : null;
+      ? `Price ${money(baseUnitPrice(product), currency)} · Discount ${discount}% · Net ${money(product.price, currency)}`
+      : adjustmentText || null;
 
     doc
       .moveTo(PDF_PAGE.margin, y - 5)
@@ -110,9 +142,9 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
       .fillColor(PDF_COLORS.text)
       .fontSize(9)
       .text(String(product.quantity), PDF_PAGE.margin + 270, y, { width: 40, align: "right" })
-      .text(money(product.price), PDF_PAGE.margin + 320, y, { width: 70, align: "right" })
-      .text(product.gstRate == null ? "-" : `${product.gstRate}%`, PDF_PAGE.margin + 400, y, { width: 40, align: "right" })
-      .text(money(subtotal), PDF_PAGE.width - PDF_PAGE.margin - 82, y, { width: 82, align: "right" });
+      .text(money(product.price, currency), PDF_PAGE.margin + 320, y, { width: 70, align: "right" })
+      .text(taxRate == null ? "-" : `${taxRate}%`, PDF_PAGE.margin + 400, y, { width: 40, align: "right" })
+      .text(money(subtotal, currency), PDF_PAGE.width - PDF_PAGE.margin - 82, y, { width: 82, align: "right" });
 
     y += hasDiscount ? 50 : 38;
   });
@@ -120,18 +152,31 @@ function drawQuoteItems(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], s
   return y + 8;
 }
 
-function drawTotals(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], startY: number): number {
+function drawTotals(
+  doc: PDFKit.PDFDocument,
+  products: IRFQReplyProduct[],
+  startY: number,
+  currency: string,
+  specialDiscountPercentage: number
+): number {
   const subtotal = products.reduce((sum, product) => sum + (lineSubtotal(product) ?? 0), 0);
-  const tax = products.reduce((sum, product) => sum + lineTax(product), 0);
-  const total = subtotal + tax;
+  const discount = normalizeDiscount(specialDiscountPercentage);
+  const discountAmount = products.reduce(
+    (sum, product) => sum + (product.price ?? 0) * product.quantity * discount / 100,
+    0
+  );
+  const tax = products.reduce((sum, product) => sum + lineTax(product, discount), 0);
+  const total = subtotal - discountAmount + tax;
   const x = PDF_PAGE.width - PDF_PAGE.margin - 220;
-  let y = ensurePdfRoom(doc, startY, 86);
+  let y = ensurePdfRoom(doc, startY, discount > 0 ? 106 : 86);
 
-  doc.roundedRect(x, y, 220, 78, 8).fillAndStroke(PDF_COLORS.soft, PDF_COLORS.border);
+  const boxHeight = discount > 0 ? 98 : 78;
+  doc.roundedRect(x, y, 220, boxHeight, 8).fillAndStroke(PDF_COLORS.soft, PDF_COLORS.border);
   const rows: Array<[string, string]> = [
-    ["Subtotal", money(subtotal)],
-    ["Estimated GST", money(tax)],
-    ["Total", money(total)],
+    ["Subtotal", money(subtotal, currency)],
+    ...(discount > 0 ? [[`Discount (${discount}%)`, `-${money(discountAmount, currency)}`] as [string, string]] : []),
+    ["Estimated tax", money(tax, currency)],
+    ["Total", money(total, currency)],
   ];
   rows.forEach(([label, value], index) => {
     const rowY = y + 12 + index * 20;
@@ -143,7 +188,7 @@ function drawTotals(doc: PDFKit.PDFDocument, products: IRFQReplyProduct[], start
       .text(value, x + 110, rowY, { width: 96, align: "right" });
   });
 
-  return y + 98;
+  return y + boxHeight + 20;
 }
 
 export function createRFQQuotePdfDocument(options: {
@@ -152,8 +197,9 @@ export function createRFQQuotePdfDocument(options: {
   organization: PdfOrganizationBranding;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;
+  currency?: string;
 }): PDFKit.PDFDocument {
-  const { rfq, reply, organization, paymentTerms, deliveryTerms } = options;
+  const { rfq, reply, organization, paymentTerms, deliveryTerms, currency = "INR" } = options;
   const quoteNumber = rfq.quoteNumber || String(rfq._id);
   const doc = createBrandedPdfDocument({
     title: `Quote ${quoteNumber}`,
@@ -182,8 +228,20 @@ export function createRFQQuotePdfDocument(options: {
     y = drawPdfTextBlock(doc, rfq.customer.address, y, { color: PDF_COLORS.muted });
   }
 
-  y = drawQuoteItems(doc, reply.selectedProducts, y);
-  y = drawTotals(doc, reply.selectedProducts, y);
+  y = drawQuoteItems(
+    doc,
+    reply.selectedProducts,
+    y,
+    currency,
+    reply.specialDiscountPercentage ?? 0
+  );
+  y = drawTotals(
+    doc,
+    reply.selectedProducts,
+    y,
+    currency,
+    reply.specialDiscountPercentage ?? 0
+  );
 
   if (paymentTerms) {
     y = drawPdfSectionTitle(doc, "Payment Terms", y);
@@ -205,6 +263,7 @@ export function renderRFQQuotePdfBuffer(options: {
   organization: PdfOrganizationBranding;
   paymentTerms?: string | null;
   deliveryTerms?: string | null;
+  currency?: string;
 }): Promise<Buffer> {
   return renderPdfBuffer(createRFQQuotePdfDocument(options));
 }

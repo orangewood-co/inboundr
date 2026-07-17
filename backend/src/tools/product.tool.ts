@@ -30,6 +30,17 @@ const addProductSchema = z.object({
   unit: z.string().optional().nullable(),
   is_top_seller: z.boolean().optional(),
   addeduser: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional(),
+  attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  defaultAdjustments: z.array(z.object({
+    id: z.string(),
+    code: z.string(),
+    label: z.string(),
+    type: z.enum(["fixed", "percentage"]),
+    value: z.number().min(0),
+    taxable: z.boolean(),
+  })).optional(),
 });
 
 async function ensureProductModuleAccess(context: ProductToolContext): Promise<void> {
@@ -70,6 +81,15 @@ function serializeProduct(product: {
   calibrationcharges: number | string | null;
   productlink: string | null;
   is_top_seller?: boolean | null;
+  attributes?: Record<string, string | number | boolean | null>;
+  default_adjustments?: Array<{
+    id: string;
+    code: string;
+    label: string;
+    type: "fixed" | "percentage";
+    value: number;
+    taxable: boolean;
+  }>;
 }) {
   return {
     id: product.id,
@@ -81,6 +101,13 @@ function serializeProduct(product: {
     gstRate: product.gstrate == null ? null : Number(product.gstrate),
     calibrationCharges:
       product.calibrationcharges == null ? null : Number(product.calibrationcharges),
+    tax: {
+      code: product.hsncode,
+      rate: product.gstrate == null ? null : Number(product.gstrate),
+      label: "Tax",
+    },
+    attributes: product.attributes ?? {},
+    defaultAdjustments: product.default_adjustments ?? [],
     link: product.productlink,
     isTopSeller: Boolean(product.is_top_seller),
   };
@@ -116,6 +143,9 @@ export function createProductTools(context: ProductToolContext) {
             hsnCode: product.hsnCode,
             gstRate: product.gstRate,
             calibrationCharges: product.calibrationCharges,
+            tax: product.tax,
+            attributes: product.attributes,
+            defaultAdjustments: product.defaultAdjustments,
             link: product.link,
             isTopSeller: product.isTopSeller,
             score: product.score,

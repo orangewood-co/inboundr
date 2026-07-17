@@ -8,7 +8,10 @@
     "email:dev": "email dev --dir src/emails",
     "start": "bun src/server.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate:catalog:postgres": "bun src/scripts/run-product-postgres-migration.ts",
+    "migrate:catalog:mongo": "bun src/scripts/migrate-generic-products-rfqs.ts",
+    "migrate:catalog": "bun run migrate:catalog:postgres && bun run migrate:catalog:mongo"
   },
   "devDependencies": {
     "@react-email/ui": "^6.0.8",

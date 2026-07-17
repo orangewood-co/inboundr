@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   AlertCircleIcon,
@@ -31,26 +31,13 @@ import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
 import { formatNumber } from "@/lib/format"
+import type { ProductAdjustmentDefinition, ProductSettings } from "@/lib/catalog"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const UNMAPPED_COLUMN = "__unmapped__"
 
 type ImportStep = "upload" | "mapping" | "review" | "complete"
 type ImportMode = "skip" | "update"
-type ProductImportField =
-  | "brand"
-  | "maxdiscount"
-  | "productdescription"
-  | "productcode"
-  | "unitprice"
-  | "hsncode"
-  | "gstrate"
-  | "productlink"
-  | "maxupsell"
-  | "calibrationcharges"
-  | "unit"
-  | "is_top_seller"
-  | "addedtime"
-  | "addeduser"
+type ProductImportField = string
 
 type ImportMapping = Record<ProductImportField, string>
 
@@ -72,15 +59,18 @@ type ImportResult = {
   skipped: Array<{ row: number; productcode: string; reason: string }>
 }
 
-const importFields: Array<{
+type ImportField = {
   key: ProductImportField
   label: string
   required?: boolean
   aliases: string[]
-}> = [
+  adjustment?: ProductAdjustmentDefinition
+}
+
+const baseImportFields: ImportField[] = [
   { key: "productdescription", label: "Product description", required: true, aliases: ["productdescription", "product description", "description", "product", "item description", "name"] },
   { key: "productcode", label: "Product code", required: true, aliases: ["productcode", "product code", "code", "sku", "item code", "part number"] },
-  { key: "brand", label: "Brand", required: true, aliases: ["brand", "make", "manufacturer"] },
+  { key: "brand", label: "Manufacturer", aliases: ["brand", "make", "manufacturer"] },
   { key: "unitprice", label: "Unit price", aliases: ["unitprice", "unit price", "price", "rate", "mrp", "selling price"] },
   { key: "gstrate", label: "GST rate", aliases: ["gstrate", "gst rate", "gst", "tax", "tax rate"] },
   { key: "hsncode", label: "HSN code", aliases: ["hsncode", "hsn code", "hsn"] },
@@ -111,15 +101,15 @@ function stringifyCell(value: unknown) {
   return String(value).trim()
 }
 
-function createEmptyMapping(): ImportMapping {
-  return Object.fromEntries(importFields.map((field) => [field.key, UNMAPPED_COLUMN])) as ImportMapping
+function createEmptyMapping(fields: ImportField[]): ImportMapping {
+  return Object.fromEntries(fields.map((field) => [field.key, UNMAPPED_COLUMN])) as ImportMapping
 }
 
-function suggestMapping(headers: string[]): ImportMapping {
+function suggestMapping(headers: string[], fields: ImportField[]): ImportMapping {
   const normalizedHeaders = headers.map((header) => ({ header, normalized: normalizeHeader(header) }))
 
   return Object.fromEntries(
-    importFields.map((field) => {
+    fields.map((field) => {
       const match = normalizedHeaders.find(({ normalized }) =>
         field.aliases.some((alias) => normalized === normalizeHeader(alias))
       )
@@ -152,31 +142,59 @@ async function parseImportFile(file: File): Promise<ParsedImportFile> {
   return { fileName: file.name, headers, rows }
 }
 
-function buildImportProducts(file: ParsedImportFile | null, mapping: ImportMapping) {
+function buildImportProducts(file: ParsedImportFile | null, mapping: ImportMapping, fields: ImportField[]) {
   if (!file) return []
 
   return file.rows.map((row) =>
-    Object.fromEntries(
-      importFields
-        .filter((field) => mapping[field.key] !== UNMAPPED_COLUMN)
-        .map((field) => [field.key, row[mapping[field.key]] ?? ""])
-    )
+    fields
+      .filter((field) => mapping[field.key] !== UNMAPPED_COLUMN)
+      .map((field) => [field.key, row[mapping[field.key]] ?? ""] as const)
+      .reduce<Record<string, unknown>>((product, [key, value]) => {
+      if (String(key).startsWith("attribute:")) {
+        product.attributes = {
+          ...(product.attributes as Record<string, unknown> | undefined),
+          [String(key).slice("attribute:".length)]: value,
+        }
+      } else if (String(key).startsWith("adjustment:")) {
+        const definition = fields.find((field) => field.key === key)?.adjustment
+        if (definition) {
+          const number = Number(value)
+          product.defaultAdjustments = [
+            ...((product.defaultAdjustments as unknown[] | undefined) ?? []),
+            {
+              id: definition.id,
+              code: definition.code,
+              label: definition.label,
+              type: definition.type,
+              value: Number.isFinite(number) ? number : 0,
+              taxable: definition.taxable,
+            },
+          ]
+        }
+      } else {
+        product[String(key)] = value
+      }
+      return product
+      }, {})
   )
 }
 
-function getImportValidationErrors(file: ParsedImportFile | null, mapping: ImportMapping) {
+function getImportValidationErrors(file: ParsedImportFile | null, mapping: ImportMapping, fields: ImportField[]) {
   const errors: string[] = []
   if (!file) return ["Upload a CSV or Excel file to continue."]
 
-  for (const field of importFields.filter((item) => item.required)) {
+  for (const field of fields.filter((item) => item.required)) {
     if (mapping[field.key] === UNMAPPED_COLUMN) {
       errors.push(`${field.label} must be mapped.`)
     }
   }
 
-  buildImportProducts(file, mapping).forEach((product, index) => {
-    for (const field of importFields.filter((item) => item.required)) {
-      if (!String(product[field.key] ?? "").trim()) {
+  buildImportProducts(file, mapping, fields).forEach((product, index) => {
+    for (const field of fields.filter((item) => item.required)) {
+      const value = field.key.startsWith("attribute:")
+        ? (product.attributes as Record<string, unknown> | undefined)?.[field.key.slice("attribute:".length)]
+        : product[field.key]
+      if (!String(value ?? "").trim()) {
         errors.push(`Row ${index + 2} is missing ${field.label}.`)
       }
     }
@@ -231,18 +249,76 @@ function Stepper({ currentStep }: { currentStep: ImportStep }) {
 
 export default function ProductsImportPage() {
   const navigate = useNavigate()
+  const [settings, setSettings] = useState<ProductSettings | null>(null)
+  const importFields = useMemo<ImportField[]>(() => [
+    ...baseImportFields.filter((field) => field.key !== "calibrationcharges").map((field) => {
+      if (field.key === "productcode") {
+        return {
+          ...field,
+          label: settings?.terminology.skuLabel ?? field.label,
+          aliases: [...field.aliases, settings?.terminology.skuLabel ?? ""].filter(Boolean),
+        }
+      }
+      if (field.key === "brand") {
+        return {
+          ...field,
+          label: settings?.terminology.manufacturerLabel ?? field.label,
+          aliases: [...field.aliases, settings?.terminology.manufacturerLabel ?? ""].filter(Boolean),
+        }
+      }
+      if (field.key === "hsncode") {
+        return {
+          ...field,
+          label: settings?.terminology.taxCodeLabel ?? field.label,
+          aliases: [...field.aliases, settings?.terminology.taxCodeLabel ?? ""].filter(Boolean),
+        }
+      }
+      if (field.key === "gstrate") {
+        return {
+          ...field,
+          label: settings?.terminology.taxRateLabel ?? field.label,
+          aliases: [...field.aliases, settings?.terminology.taxRateLabel ?? ""].filter(Boolean),
+        }
+      }
+      return field
+    }),
+    ...(settings?.fieldDefinitions ?? []).filter((field) => field.isActive).map((field) => ({
+      key: `attribute:${field.key}`,
+      label: field.label,
+      required: field.required,
+      aliases: [field.key, field.label, ...field.importAliases],
+    })),
+    ...(settings?.adjustmentDefinitions ?? []).filter((item) => item.isActive).map((item) => ({
+      key: `adjustment:${item.code}`,
+      label: item.label,
+      aliases: [item.code, item.label, `${item.label} charges`],
+      adjustment: item,
+    })),
+  ], [settings])
   const [step, setStep] = useState<ImportStep>("upload")
   const [parsedFile, setParsedFile] = useState<ParsedImportFile | null>(null)
-  const [mapping, setMapping] = useState<ImportMapping>(() => createEmptyMapping())
+  const [mapping, setMapping] = useState<ImportMapping>(() => createEmptyMapping(baseImportFields))
   const [mode, setMode] = useState<ImportMode>("skip")
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
 
-  const validationErrors = useMemo(() => getImportValidationErrors(parsedFile, mapping), [parsedFile, mapping])
+  const validationErrors = useMemo(
+    () => getImportValidationErrors(parsedFile, mapping, importFields),
+    [parsedFile, mapping, importFields]
+  )
   const previewRows = parsedFile?.rows.slice(0, 8) ?? []
   const mappedCount = importFields.filter((field) => mapping[field.key] !== UNMAPPED_COLUMN).length
+
+  useEffect(() => {
+    void fetch(`${API_BASE}/settings`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => {
+        const nextSettings = value as ProductSettings | null
+        setSettings(nextSettings)
+      })
+  }, [])
 
   async function handleFile(file: File | null) {
     if (!file) return
@@ -253,11 +329,11 @@ export default function ProductsImportPage() {
     try {
       const parsed = await parseImportFile(file)
       setParsedFile(parsed)
-      setMapping(suggestMapping(parsed.headers))
+      setMapping(suggestMapping(parsed.headers, importFields))
       setStep("mapping")
     } catch (err) {
       setParsedFile(null)
-      setMapping(createEmptyMapping())
+      setMapping(createEmptyMapping(importFields))
       setError(err instanceof Error ? err.message : "Unable to parse import file")
       setStep("upload")
     } finally {
@@ -267,7 +343,7 @@ export default function ProductsImportPage() {
 
   function resetFile() {
     setParsedFile(null)
-    setMapping(createEmptyMapping())
+    setMapping(createEmptyMapping(importFields))
     setError(null)
     setResult(null)
     setStep("upload")
@@ -285,7 +361,7 @@ export default function ProductsImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode,
-          products: buildImportProducts(parsedFile, mapping),
+          products: buildImportProducts(parsedFile, mapping, importFields),
         }),
       })
       const payload = await response.json().catch(() => null)
@@ -319,7 +395,7 @@ export default function ProductsImportPage() {
                   Back to Products
                 </Link>
               </Button>
-              <h1 className="text-2xl font-semibold tracking-tight">Import Products</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Import {settings?.terminology.plural ?? "Products"}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Upload a product spreadsheet, match columns, review validation, and import into the catalog.
               </p>

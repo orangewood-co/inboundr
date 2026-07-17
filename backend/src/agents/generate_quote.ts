@@ -37,8 +37,8 @@ You write quotation email replies to customers who have asked for prices.
 
 Hard rules:
 - Output plain text only. No HTML, no markdown, no asterisks, no bullets using "*". Use "-" or numbered lines if a list is needed.
-- All amounts are in Indian Rupees and must be shown with the "Rs." prefix (e.g. "Rs. 1,250.00"). Do not use any other currency symbol.
-- Use ONLY the numbers provided in the "Products to quote" and "Pricing summary" blocks of the prompt. Never recompute, round differently, or invent prices, GST, discounts, or totals.
+- Use the currency named in the prompt for every amount.
+- Use ONLY the numbers provided in the "Products to quote" and "Pricing summary" blocks of the prompt. Never recompute, round differently, or invent prices, taxes, adjustments, discounts, or totals.
 - For any line whose unit price is "Price on request", do NOT make up a number. Mark it clearly as "Price on request" in the line, and exclude it from the totals (the totals block already excludes it).
 - When a product line includes a line discount, show the original unit price, discount percentage, and net unit price separately. When no line discount is provided, do not mention discount for that line.
 - Address the customer by first name where possible. Keep tone professional, courteous, and concise.
@@ -46,8 +46,8 @@ Hard rules:
 - Body structure:
   1) Greeting referencing the customer.
   2) One short line thanking them for the enquiry and confirming the quote below.
-  3) An itemised table-like list of products. For each item include: serial number, product description, brand, product code, HSN code, GST rate, quantity, unit price, line total. Use aligned plain-text columns or a clean numbered list — pick whichever renders cleanly in plain text.
-  4) Pricing summary: subtotal, discount (only if non-zero), GST total, grand total. Use the exact values from the "Pricing summary" block.
+  3) An itemised list. For each item include its description, manufacturer, code, tax information, quantity, unit price, adjustments, and line total when supplied.
+  4) Pricing summary: subtotal, discount (only if non-zero), tax total, grand total. Use the exact values from the "Pricing summary" block.
   5) Payment terms — use the quote payment terms verbatim.
   6) Delivery terms — use the quote delivery terms verbatim.
   7) A short closing line inviting questions.
@@ -77,6 +77,7 @@ export interface QuoteInput {
   organizationContactName?: string | null;
   organizationContactEmail?: string | null;
   organizationContactPhone?: string | null;
+  currency?: string | null;
   quotePaymentTerms?: string | null;
   quoteDeliveryTerms?: string | null;
   originalSubject: string;
@@ -91,6 +92,14 @@ export interface QuoteInput {
     hsnCode: string | null;
     gstRate: number | null;
     discountPercent?: number | null;
+    tax?: { code: string | null; rate: number | null; label: string };
+    adjustments?: Array<{
+      label: string;
+      type: "fixed" | "percentage";
+      value: number;
+      amount?: number;
+      taxable: boolean;
+    }>;
   }[];
 }
 
@@ -105,6 +114,8 @@ interface PricedLine {
   discountText: string | null;
   netUnitPriceText: string | null;
   gstRateText: string;
+  taxLabel: string;
+  adjustmentsText: string | null;
   lineTotalText: string;
   hasPrice: boolean;
 }
@@ -118,15 +129,20 @@ interface PricingSummary {
   gstTotal: number;
   grandTotal: number;
   hasAnyMissingPrice: boolean;
+  currency: string;
 }
 
-const INR = new Intl.NumberFormat("en-IN", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function formatINR(n: number): string {
-  return `Rs. ${INR.format(n)}`;
+function formatMoney(n: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return `${currency} ${n.toFixed(2)}`;
+  }
 }
 
 function normalizeDiscount(value: number | null | undefined): number {
@@ -142,13 +158,28 @@ function resolveBasePrice(price: number | null, basePrice: number | null | undef
   return price;
 }
 
+function adjustmentAmount(
+  adjustment: NonNullable<QuoteInput["products"][number]["adjustments"]>[number],
+  quantity: number,
+  unitPrice: number
+): number {
+  if (typeof adjustment.amount === "number" && Number.isFinite(adjustment.amount)) {
+    return adjustment.amount;
+  }
+  return adjustment.type === "percentage"
+    ? unitPrice * quantity * adjustment.value / 100
+    : adjustment.value * quantity;
+}
+
 function computePricing(input: QuoteInput): PricingSummary {
+  const currency = input.currency?.trim().toUpperCase() || "INR";
   const discountPercentage =
     typeof input.specialDiscountPercentage === "number" && input.specialDiscountPercentage > 0
       ? input.specialDiscountPercentage
       : 0;
 
   let subtotal = 0;
+  let discountAmount = 0;
   let gstTotal = 0;
   let hasAnyMissingPrice = false;
 
@@ -163,6 +194,15 @@ function computePricing(input: QuoteInput): PricingSummary {
     const hasPrice = typeof p.price === "number" && Number.isFinite(p.price) && (p.price > 0 || hasLineDiscount);
     const quantity = p.quantity > 0 ? p.quantity : 1;
     const gstRate = typeof p.gstRate === "number" ? p.gstRate : 0;
+    const taxRate = typeof p.tax?.rate === "number" ? p.tax.rate : gstRate;
+    const adjustmentTotal = (p.adjustments ?? []).reduce(
+      (sum, adjustment) => sum + adjustmentAmount(adjustment, quantity, p.price ?? 0),
+      0
+    );
+    const taxableAdjustments = (p.adjustments ?? []).filter((item) => item.taxable).reduce(
+      (sum, adjustment) => sum + adjustmentAmount(adjustment, quantity, p.price ?? 0),
+      0
+    );
 
     let lineSubtotal = 0;
     let lineGst = 0;
@@ -172,10 +212,11 @@ function computePricing(input: QuoteInput): PricingSummary {
       lineSubtotal = (p.price as number) * quantity;
       const summaryDiscount = lineSubtotal * (discountPercentage / 100);
       const lineAfterSummaryDiscount = lineSubtotal - summaryDiscount;
-      lineGst = lineAfterSummaryDiscount * (gstRate / 100);
-      lineTotal = lineAfterSummaryDiscount + lineGst;
+      lineGst = (lineAfterSummaryDiscount + taxableAdjustments) * (taxRate / 100);
+      lineTotal = lineAfterSummaryDiscount + adjustmentTotal + lineGst;
 
-      subtotal += lineSubtotal;
+      subtotal += lineSubtotal + adjustmentTotal;
+      discountAmount += summaryDiscount;
       gstTotal += lineGst;
     } else {
       hasAnyMissingPrice = true;
@@ -189,17 +230,22 @@ function computePricing(input: QuoteInput): PricingSummary {
       hsnCode: p.hsnCode || "N/A",
       quantity,
       unitPriceText: hasPrice
-        ? formatINR(hasLineDiscount ? (basePrice as number) : (p.price as number))
+        ? formatMoney(hasLineDiscount ? (basePrice as number) : (p.price as number), currency)
         : "Price on request",
       discountText: hasLineDiscount ? `${discount}%` : null,
-      netUnitPriceText: hasLineDiscount ? formatINR(p.price as number) : null,
-      gstRateText: typeof p.gstRate === "number" ? `${p.gstRate}%` : "N/A",
-      lineTotalText: hasPrice ? formatINR(lineTotal) : "Price on request",
+      netUnitPriceText: hasLineDiscount ? formatMoney(p.price as number, currency) : null,
+      gstRateText: typeof p.tax?.rate === "number"
+        ? `${p.tax.rate}%`
+        : typeof p.gstRate === "number" ? `${p.gstRate}%` : "N/A",
+      taxLabel: p.tax?.label || "Tax",
+      adjustmentsText: (p.adjustments ?? []).length > 0
+        ? (p.adjustments ?? []).map((item) => `${item.label}: ${formatMoney(adjustmentAmount(item, quantity, p.price ?? 0), currency)}`).join(", ")
+        : null,
+      lineTotalText: hasPrice ? formatMoney(lineTotal, currency) : "Price on request",
       hasPrice,
     };
   });
 
-  const discountAmount = subtotal * (discountPercentage / 100);
   const subtotalAfterDiscount = subtotal - discountAmount;
   const grandTotal = subtotalAfterDiscount + gstTotal;
 
@@ -212,6 +258,7 @@ function computePricing(input: QuoteInput): PricingSummary {
     gstTotal,
     grandTotal,
     hasAnyMissingPrice,
+    currency,
   };
 }
 
@@ -227,10 +274,10 @@ function renderProductLines(pricing: PricingSummary): string {
       return `${l.index}. ${l.description}
    Brand: ${l.brand}
    Code: ${l.code}
-   HSN Code: ${l.hsnCode}
+   Tax Code: ${l.hsnCode}
    Quantity: ${l.quantity}
    Unit Price: ${l.unitPriceText}${discountLines}
-   GST Rate: ${l.gstRateText}
+   ${l.taxLabel} Rate: ${l.gstRateText}${l.adjustmentsText ? `\n   Adjustments: ${l.adjustmentsText}` : ""}
    Line Total: ${l.lineTotalText}`;
     })
     .join("\n\n");
@@ -238,15 +285,15 @@ function renderProductLines(pricing: PricingSummary): string {
 
 function renderPricingSummary(pricing: PricingSummary): string {
   const lines: string[] = [];
-  lines.push(`Subtotal: ${formatINR(pricing.subtotal)}`);
+  lines.push(`Subtotal: ${formatMoney(pricing.subtotal, pricing.currency)}`);
   if (pricing.discountPercentage > 0) {
     lines.push(
-      `Discount (${pricing.discountPercentage}%): -${formatINR(pricing.discountAmount)}`
+      `Discount (${pricing.discountPercentage}%): -${formatMoney(pricing.discountAmount, pricing.currency)}`
     );
-    lines.push(`Subtotal after discount: ${formatINR(pricing.subtotalAfterDiscount)}`);
+    lines.push(`Subtotal after discount: ${formatMoney(pricing.subtotalAfterDiscount, pricing.currency)}`);
   }
-  lines.push(`GST total: ${formatINR(pricing.gstTotal)}`);
-  lines.push(`Grand total: ${formatINR(pricing.grandTotal)}`);
+  lines.push(`Tax total: ${formatMoney(pricing.gstTotal, pricing.currency)}`);
+  lines.push(`Grand total: ${formatMoney(pricing.grandTotal, pricing.currency)}`);
   if (pricing.hasAnyMissingPrice) {
     lines.push(
       `Note: One or more items are "Price on request" and are NOT included in the totals above.`
@@ -278,10 +325,11 @@ export async function generateQuoteReply(
 - Original subject: ${input.originalSubject}
 
 Organization:
-- Name: ${input.organizationName || "Bombay Tools Supplying Agency Pvt. Ltd. (BTSA)"}
-- Contact name: ${input.organizationContactName || "BTSA Sales Team"}
+- Name: ${input.organizationName || "Organization"}
+- Contact name: ${input.organizationContactName || "Sales Team"}
 - Contact email: ${input.organizationContactEmail || "N/A"}
 - Contact phone: ${input.organizationContactPhone || "N/A"}
+- Currency: ${input.currency?.trim().toUpperCase() || "INR"}
 - Payment terms: ${input.quotePaymentTerms || "Payment terms as per discussion."}
 - Delivery terms: ${input.quoteDeliveryTerms || "Delivery timeline to be confirmed on order."}
 

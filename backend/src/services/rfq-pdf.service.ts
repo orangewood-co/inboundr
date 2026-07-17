@@ -48,6 +48,7 @@ type PdfRFQ = {
       price: number | null;
       hsnCode: string | null;
       gstRate: number | null;
+      tax?: { code: string | null; rate: number | null; label: string };
       isTopSeller?: boolean;
       score: number;
       matchReasons: string[];
@@ -61,11 +62,11 @@ function statusLabel(value: string): string {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function money(value: number | null | undefined): string {
+function money(value: number | null | undefined, currency: string): string {
   if (value == null) return "-";
-  return new Intl.NumberFormat("en-IN", {
+  return new Intl.NumberFormat(undefined, {
     style: "currency",
-    currency: "INR",
+    currency,
     maximumFractionDigits: 2,
   }).format(value);
 }
@@ -109,7 +110,12 @@ function drawRequestedProducts(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number):
   return currentY + 12;
 }
 
-function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): number {
+function drawSearchResults(
+  doc: PDFKit.PDFDocument,
+  rfq: PdfRFQ,
+  y: number,
+  currency: string
+): number {
   const searchResults = rfq.searchResults ?? [];
   if (searchResults.length === 0) return y;
   let currentY = drawPdfSectionTitle(doc, "Product Matches", y);
@@ -152,18 +158,18 @@ function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): num
         })
         .font("Helvetica")
         .fillColor(PDF_COLORS.muted)
-        .text([match.brand, match.code, match.isTopSeller ? "Top seller" : null, match.hsnCode ? `HSN ${match.hsnCode}` : null].filter(Boolean).join(" · ") || "-", PDF_PAGE.margin + 12, currentY + 14, {
+        .text([match.brand, match.code, match.isTopSeller ? "Featured" : null, (match.tax?.code ?? match.hsnCode) ? `${match.tax?.label ?? "Tax"} ${match.tax?.code ?? match.hsnCode}` : null].filter(Boolean).join(" · ") || "-", PDF_PAGE.margin + 12, currentY + 14, {
           width: 300,
           height: 12,
           ellipsis: true,
         })
-        .text(money(match.price), PDF_PAGE.width - PDF_PAGE.margin - 130, currentY, {
+        .text(money(match.price, currency), PDF_PAGE.width - PDF_PAGE.margin - 130, currentY, {
           width: 70,
           height: 12,
           align: "right",
         })
-        .text(`${Math.round(match.score * 100)}%`, PDF_PAGE.width - PDF_PAGE.margin - 52, currentY, {
-          width: 52,
+        .text(`Score ${Math.round(match.score)}`, PDF_PAGE.width - PDF_PAGE.margin - 72, currentY, {
+          width: 72,
           height: 12,
           align: "right",
         });
@@ -179,8 +185,9 @@ function drawSearchResults(doc: PDFKit.PDFDocument, rfq: PdfRFQ, y: number): num
 export function createRFQPdfDocument(options: {
   rfq: PdfRFQ;
   organization: PdfOrganizationBranding;
+  currency?: string;
 }): PDFKit.PDFDocument {
-  const { rfq, organization } = options;
+  const { rfq, organization, currency = "INR" } = options;
   const email = rfq.emailId;
   const subject = email?.subject || "RFQ";
   const doc = createBrandedPdfDocument({
@@ -215,14 +222,19 @@ export function createRFQPdfDocument(options: {
 
   y = drawCustomer(doc, rfq, y);
   y = drawRequestedProducts(doc, rfq, y);
-  y = drawSearchResults(doc, rfq, y);
+  y = drawSearchResults(doc, rfq, y, currency);
 
   drawPdfFooter(doc, subject);
   return doc;
 }
 
-export function streamRFQPdf(rfq: PdfRFQ, organization: PdfOrganizationBranding, res: Response): void {
-  const doc = createRFQPdfDocument({ rfq, organization });
+export function streamRFQPdf(
+  rfq: PdfRFQ,
+  organization: PdfOrganizationBranding,
+  res: Response,
+  currency = "INR"
+): void {
+  const doc = createRFQPdfDocument({ rfq, organization, currency });
   const subject = rfq.emailId?.subject || `rfq_${String(rfq._id)}`;
   streamPdfDocument(doc, `rfq_${safePdfFilename(subject, String(rfq._id))}`, res);
 }

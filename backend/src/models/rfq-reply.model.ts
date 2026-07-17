@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Document, type Types } from "mongoose";
+import { rfqAdjustmentSchema, type IRFQAdjustment, type IRFQTax } from "./rfq.model";
 
 export interface IRFQReplyProduct {
   queryName: string;
@@ -12,6 +13,9 @@ export interface IRFQReplyProduct {
   hsnCode: string | null;
   gstRate: number | null;
   discountPercent: number;
+  tax: IRFQTax;
+  attributes: Record<string, string | number | boolean | null>;
+  adjustments: IRFQAdjustment[];
 }
 
 export interface IRFQReply extends Document {
@@ -20,6 +24,7 @@ export interface IRFQReply extends Document {
   gmailAccountId: Types.ObjectId;
   rfqId: Types.ObjectId;
   selectedProducts: IRFQReplyProduct[];
+  specialDiscountPercentage: number;
   paymentTermTemplateId: string | null;
   paymentTermName: string | null;
   paymentTerms: string;
@@ -51,6 +56,16 @@ const rfqReplyProductSchema = new Schema<IRFQReplyProduct>(
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },
     discountPercent: { type: Number, default: 0 },
+    tax: {
+      code: { type: String, default: null },
+      rate: { type: Number, default: null },
+      label: { type: String, default: "Tax" },
+    },
+    attributes: { type: Map, of: Schema.Types.Mixed, default: () => new Map() },
+    adjustments: {
+      type: [rfqAdjustmentSchema],
+      default: [],
+    },
   },
   { _id: false }
 );
@@ -77,6 +92,7 @@ const rfqReplySchema = new Schema<IRFQReply>(
       unique: true,
     },
     selectedProducts: { type: [rfqReplyProductSchema], default: [] },
+    specialDiscountPercentage: { type: Number, default: 0, min: 0, max: 100 },
     paymentTermTemplateId: { type: String, default: null, trim: true },
     paymentTermName: { type: String, default: null, trim: true },
     paymentTerms: { type: String, default: "", trim: true },

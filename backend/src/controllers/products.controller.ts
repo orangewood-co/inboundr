@@ -2,7 +2,15 @@ import { Pool } from "pg";
 import type { Request, Response } from "express";
 import type { DatabaseConfig, Product } from "../types";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
-import { searchProductRecords } from "../services/product.service";
+import {
+  searchProductRecords,
+  serializeProductRecord,
+} from "../services/product.service";
+import {
+  adjustmentsFromDefinitions,
+  getOrCreateProductSettings,
+  normalizeProductAttributes,
+} from "../services/product-settings.service";
 
 type ProductInput = Omit<
   Product,
@@ -46,6 +54,11 @@ const PRODUCT_COLUMNS = [
   "calibrationcharges",
   "unit",
   "is_top_seller",
+  "category",
+  "tags",
+  "attributes",
+  "default_adjustments",
+  "pricing_policy",
   "addedtime",
   "addeduser",
 ] as const;
@@ -63,6 +76,11 @@ const EDITABLE_COLUMNS = [
   "calibrationcharges",
   "unit",
   "is_top_seller",
+  "category",
+  "tags",
+  "attributes",
+  "default_adjustments",
+  "pricing_policy",
   "addedtime",
   "addeduser",
 ] as const;
@@ -74,6 +92,9 @@ const SEARCH_COLUMNS = [
   "hsncode",
   "unit",
   "addeduser",
+  "category",
+  "attributes",
+  "tags",
 ] as const;
 
 const dbConfig: DatabaseConfig = {
@@ -102,11 +123,30 @@ function parseProductId(value: unknown): string | null {
 }
 
 function normalizeProductInput(body: Record<string, unknown>): ProductInput {
+  const aliases: Record<string, string> = {
+    manufacturer: "brand",
+    description: "productdescription",
+    name: "productdescription",
+    sku: "productcode",
+    unitPrice: "unitprice",
+    taxCode: "hsncode",
+    taxRate: "gstrate",
+    url: "productlink",
+    isFeatured: "is_top_seller",
+    defaultAdjustments: "default_adjustments",
+    pricingPolicy: "pricing_policy",
+    createdAt: "addedtime",
+    createdBy: "addeduser",
+  };
+  const source = { ...body };
+  for (const [canonical, legacy] of Object.entries(aliases)) {
+    if (canonical in source && !(legacy in source)) source[legacy] = source[canonical];
+  }
   const input: Record<string, unknown> = {};
 
   for (const column of EDITABLE_COLUMNS) {
-    if (column in body) {
-      input[column] = column === "is_top_seller" ? parseBoolean(body[column]) : body[column] === "" ? null : body[column];
+    if (column in source) {
+      input[column] = column === "is_top_seller" ? parseBoolean(source[column]) : source[column] === "" ? null : source[column];
     }
   }
 
@@ -123,11 +163,13 @@ function normalizeImportProductInput(body: Record<string, unknown>): Partial<Pro
     }
   }
 
-  if (!("addedtime" in input) || input.addedtime === null) {
-    input.addedtime = new Date();
-  } else {
+  if ("addedtime" in input && input.addedtime !== null) {
     const parsedDate = new Date(String(input.addedtime));
-    input.addedtime = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    if (Number.isNaN(parsedDate.getTime())) {
+      delete input.addedtime;
+    } else {
+      input.addedtime = parsedDate;
+    }
   }
 
   return input as Partial<ProductInput>;
@@ -147,7 +189,6 @@ function parseBoolean(value: unknown): boolean {
 function validateRequiredProductFields(input: Partial<ProductInput>): string | null {
   if (!input.productdescription) return "Product description is required";
   if (!input.productcode) return "Product code is required";
-  if (!input.brand) return "Brand is required";
   return null;
 }
 
@@ -196,7 +237,7 @@ export const listProducts = async (
 
     const total = parseInt(totalResult.rows[0]?.count ?? "0", 10);
     res.json({
-      products: productsResult.rows,
+      products: productsResult.rows.map(serializeProductRecord),
       total,
       page,
       limit,
@@ -261,7 +302,7 @@ export const getProduct = async (
       return;
     }
 
-    res.json(product);
+    res.json(serializeProductRecord(product));
   } catch (err) {
     console.error("Error fetching product:", err);
     res.status(500).json({ error: "Failed to fetch product" });
@@ -275,6 +316,14 @@ export const createProduct = async (
   try {
     const organizationId = (req as OrganizationRequest).organization._id.toString();
     const input = normalizeProductInput(req.body ?? {});
+    const settings = await getOrCreateProductSettings((req as OrganizationRequest).organization._id);
+    input.attributes = normalizeProductAttributes(
+      req.body?.attributes ?? {},
+      settings.fieldDefinitions
+    ) as ProductInput["attributes"];
+    if (!("default_adjustments" in input) && !("defaultAdjustments" in (req.body ?? {}))) {
+      input.default_adjustments = adjustmentsFromDefinitions(settings.adjustmentDefinitions) as ProductInput["default_adjustments"];
+    }
     const validationError = validateRequiredProductFields(input);
 
     if (validationError) {
@@ -282,18 +331,11 @@ export const createProduct = async (
       return;
     }
 
-    const columns = ["id", "organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
-    const values = columns
-      .filter((column) => column !== "id")
-      .map((column) =>
+    const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+    const values = columns.map((column) =>
         column === "organization_id" ? organizationId : input[column as keyof ProductInput]
-      );
-    let placeholderIndex = 0;
-    const placeholders = columns.map((column) =>
-      column === "id"
-        ? "(SELECT COALESCE(MAX(id), 0) + 1 FROM products)"
-        : `$${++placeholderIndex}`
     );
+    const placeholders = columns.map((_, index) => `$${index + 1}`);
 
     const result = await pool.query<Product>(
       `INSERT INTO products (${columns.join(", ")})
@@ -302,7 +344,7 @@ export const createProduct = async (
       values
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(result.rows[0] ? serializeProductRecord(result.rows[0]) : null);
   } catch (err) {
     console.error("Error creating product:", err);
     res.status(500).json({ error: "Failed to create product" });
@@ -317,6 +359,7 @@ export const importProducts = async (
 
   try {
     const organizationId = (req as OrganizationRequest).organization._id.toString();
+    const settings = await getOrCreateProductSettings((req as OrganizationRequest).organization._id);
     const mode = req.body?.mode as ImportMode;
     const products = Array.isArray(req.body?.products) ? req.body.products : [];
 
@@ -351,6 +394,8 @@ export const importProducts = async (
 
     for (const [index, rawProduct] of products.entries()) {
       const rowNumber = index + 2;
+      const savepoint = `product_import_${index}`;
+      await client.query(`SAVEPOINT ${savepoint}`);
 
       try {
         if (!rawProduct || typeof rawProduct !== "object" || Array.isArray(rawProduct)) {
@@ -358,6 +403,10 @@ export const importProducts = async (
         }
 
         const input = normalizeImportProductInput(rawProduct as Record<string, unknown>);
+        input.attributes = normalizeProductAttributes(
+          (rawProduct as Record<string, unknown>).attributes ?? {},
+          settings.fieldDefinitions
+        ) as ProductInput["attributes"];
         const validationError = validateRequiredProductFields(input);
         if (validationError) {
           throw new Error(validationError);
@@ -378,13 +427,30 @@ export const importProducts = async (
             productcode: String(input.productcode),
             reason: "Product code already exists",
           });
+          await client.query(`RELEASE SAVEPOINT ${savepoint}`);
           continue;
         }
 
         if (existing.rows[0] && mode === "update") {
           const columns = EDITABLE_COLUMNS.filter((column) => column in input);
           const values = columns.map((column) => input[column]);
-          const assignments = columns.map((column, assignmentIndex) => `${column} = $${assignmentIndex + 1}`);
+          const assignments = columns.map((column, assignmentIndex) => {
+            const placeholder = `$${assignmentIndex + 1}`;
+            if (column === "attributes" || column === "pricing_policy") {
+              return `${column} = COALESCE(${column}, '{}'::jsonb) || ${placeholder}::jsonb`;
+            }
+            if (column === "default_adjustments") {
+              return `${column} = COALESCE((
+                SELECT jsonb_agg(existing_adjustment)
+                FROM jsonb_array_elements(COALESCE(${column}, '[]'::jsonb)) AS existing_adjustment
+                WHERE existing_adjustment->>'code' NOT IN (
+                  SELECT incoming_adjustment->>'code'
+                  FROM jsonb_array_elements(${placeholder}::jsonb) AS incoming_adjustment
+                )
+              ), '[]'::jsonb) || ${placeholder}::jsonb`;
+            }
+            return `${column} = ${placeholder}`;
+          });
           values.push(existing.rows[0].id, organizationId);
 
           await client.query(
@@ -394,21 +460,18 @@ export const importProducts = async (
             values
           );
           result.summary.updated += 1;
+          await client.query(`RELEASE SAVEPOINT ${savepoint}`);
           continue;
         }
 
-        const columns = ["id", "organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
-        const values = columns
-          .filter((column) => column !== "id")
-          .map((column) =>
+        if (!("default_adjustments" in input) && !("defaultAdjustments" in (rawProduct as Record<string, unknown>))) {
+          input.default_adjustments = adjustmentsFromDefinitions(settings.adjustmentDefinitions) as ProductInput["default_adjustments"];
+        }
+        const columns = ["organization_id", ...EDITABLE_COLUMNS.filter((column) => column in input)];
+        const values = columns.map((column) =>
             column === "organization_id" ? organizationId : input[column as keyof ProductInput]
-          );
-        let placeholderIndex = 0;
-        const placeholders = columns.map((column) =>
-          column === "id"
-            ? "(SELECT COALESCE(MAX(id), 0) + 1 FROM products)"
-            : `$${++placeholderIndex}`
         );
+        const placeholders = columns.map((_, placeholderIndex) => `$${placeholderIndex + 1}`);
 
         await client.query(
           `INSERT INTO products (${columns.join(", ")})
@@ -416,7 +479,10 @@ export const importProducts = async (
           values
         );
         result.summary.created += 1;
+        await client.query(`RELEASE SAVEPOINT ${savepoint}`);
       } catch (err) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        await client.query(`RELEASE SAVEPOINT ${savepoint}`);
         result.summary.failed += 1;
         result.errors.push({
           row: rowNumber,
@@ -449,6 +515,10 @@ export const updateProduct = async (
     }
 
     const input = normalizeProductInput(req.body ?? {});
+    const settings = await getOrCreateProductSettings((req as OrganizationRequest).organization._id);
+    if ("attributes" in (req.body ?? {})) {
+      input.attributes = normalizeProductAttributes(req.body.attributes, settings.fieldDefinitions) as ProductInput["attributes"];
+    }
     const columns = EDITABLE_COLUMNS.filter((column) => column in input);
 
     if (columns.length === 0) {
@@ -486,7 +556,7 @@ export const updateProduct = async (
       return;
     }
 
-    res.json(product);
+    res.json(serializeProductRecord(product));
   } catch (err) {
     console.error("Error updating product:", err);
     res.status(500).json({ error: "Failed to update product" });

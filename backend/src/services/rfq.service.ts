@@ -73,6 +73,7 @@ export async function processEmailForRFQ(
     const currentOrganizationContext = {
       name: organization?.name ?? "",
       description: organization?.description ?? "",
+      searchInstructions: "",
     };
 
     const { customer, queryProducts, searchResults } =

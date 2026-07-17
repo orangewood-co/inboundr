@@ -69,6 +69,7 @@ type SelectedRFQProduct = {
     quantity?: unknown
     discountPercent?: unknown
     calibrationCharges?: unknown
+    adjustments?: unknown
     deliveryTimeline?: unknown
   }
 };
@@ -85,6 +86,8 @@ type ManualQuoteProduct = {
   hsnCode?: unknown;
   gstRate?: unknown;
   calibrationCharges?: unknown;
+  adjustments?: unknown;
+  attributes?: unknown;
   deliveryTimeline?: unknown;
 };
 type RegrettedRFQLine = {
@@ -126,6 +129,55 @@ function discountPercent(value: unknown): number {
   const number = nullableNumber(value);
   if (number == null) return 0;
   return Math.min(100, Math.max(0, number));
+}
+
+function quoteAdjustments(
+  value: unknown,
+  quantity: number,
+  unitPrice: number | null,
+  legacyCalibration?: unknown
+) {
+  const source = Array.isArray(value) ? value : [];
+  const normalized = source.flatMap((raw, index) => {
+    const item = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    const label = nullableString(item.label);
+    const code = nullableString(item.code) ?? `adjustment_${index + 1}`;
+    const type = item.type === "percentage" ? "percentage" as const : "fixed" as const;
+    const adjustmentValue = nullableNumber(item.value);
+    if (!label || adjustmentValue == null || adjustmentValue < 0) return [];
+    const amount = type === "percentage"
+      ? (unitPrice ?? 0) * quantity * adjustmentValue / 100
+      : adjustmentValue * quantity;
+    return [{
+      id: nullableString(item.id) ?? code,
+      code,
+      label,
+      type,
+      value: adjustmentValue,
+      amount,
+      taxable: item.taxable === true,
+    }];
+  });
+  const calibration = nullableNumber(legacyCalibration);
+  if (normalized.length === 0 && calibration != null && calibration > 0) {
+    normalized.push({
+      id: "legacy.calibration",
+      code: "calibration",
+      label: "Calibration",
+      type: "fixed",
+      value: calibration,
+      amount: calibration * quantity,
+      taxable: false,
+    });
+  }
+  return normalized;
+}
+
+function productAttributes(value: unknown): Record<string, string | number | boolean | null> {
+  if (value instanceof Map) return Object.fromEntries(value.entries());
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? { ...(value as Record<string, string | number | boolean | null>) }
+    : {};
 }
 
 function pricesEqual(a: number | null | undefined, b: number | null | undefined): boolean {
@@ -292,6 +344,13 @@ function resolveManualProduct(product: ManualQuoteProduct, previous?: IRFQ["save
   const discount = discountPercent(product.discountPercent);
   const basePrice = resolveSubmittedBasePrice(nullableNumber(product.price), discount, previous);
   const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
+  const resolvedQuantity = quantity ?? 1;
+  const adjustments = quoteAdjustments(
+    product.adjustments,
+    resolvedQuantity,
+    finalPrice,
+    product.calibrationCharges
+  );
 
   if (!queryName || !quantity || (!description && !code)) {
     throw new Error("Manual products require a name, quantity, and description or code");
@@ -300,7 +359,7 @@ function resolveManualProduct(product: ManualQuoteProduct, previous?: IRFQ["save
   return {
     searchResultIndex: indexNumber(product.searchResultIndex),
     queryName,
-    quantity,
+    quantity: resolvedQuantity,
     productId: nullableProductId(product.productId) ?? "0",
     brand: nullableString(product.brand),
     description,
@@ -311,6 +370,13 @@ function resolveManualProduct(product: ManualQuoteProduct, previous?: IRFQ["save
     gstRate: nullableNumber(product.gstRate),
     discountPercent: discount,
     calibrationCharges: nullableNumber(product.calibrationCharges),
+    tax: {
+      code: nullableString(product.hsnCode),
+      rate: nullableNumber(product.gstRate),
+      label: "Tax",
+    },
+    attributes: productAttributes(product.attributes),
+    adjustments,
     deliveryTimeline: nullableString(product.deliveryTimeline),
     lineStatus: "quoted" as const,
     regretReason: null,
@@ -357,11 +423,18 @@ function resolveSelectedProducts(
     );
     const basePrice = resolveSubmittedBasePrice(overridePrice ?? match.price, discount, previous);
     const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
+    const quantity = positiveNumber(overrides.quantity) ?? sr.query.quantity;
+    const adjustments = quoteAdjustments(
+      overrides.adjustments ?? match.defaultAdjustments,
+      quantity,
+      finalPrice,
+      overrides.calibrationCharges ?? match.calibrationCharges
+    );
 
     return {
       searchResultIndex: sel.searchResultIndex,
       queryName: sr.query.name,
-      quantity: positiveNumber(overrides.quantity) ?? sr.query.quantity,
+      quantity,
       productId: match.id,
       brand: nullableString(overrides.brand) ?? match.brand,
       description: nullableString(overrides.description) ?? match.description,
@@ -372,6 +445,13 @@ function resolveSelectedProducts(
       gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
       discountPercent: discount,
       calibrationCharges: nullableNumber(overrides.calibrationCharges) ?? match.calibrationCharges,
+      tax: {
+        code: nullableString(overrides.hsnCode) ?? match.tax?.code ?? match.hsnCode,
+        rate: nullableNumber(overrides.gstRate) ?? match.tax?.rate ?? match.gstRate,
+        label: match.tax?.label ?? "Tax",
+      },
+      attributes: productAttributes(match.attributes),
+      adjustments,
       deliveryTimeline: nullableString(overrides.deliveryTimeline),
       lineStatus: "quoted" as const,
       regretReason: null,
@@ -400,6 +480,9 @@ function resolveSelectedProducts(
       gstRate: null,
       discountPercent: 0,
       calibrationCharges: null,
+      tax: { code: null, rate: null, label: "Tax" },
+      attributes: {},
+      adjustments: [],
       deliveryTimeline: null,
       lineStatus: "regretted" as const,
       regretReason: nullableString(line.regretReason) ?? "Not available in catalog",
@@ -699,7 +782,12 @@ export const downloadRFQPdf = async (
       return;
     }
 
-    streamRFQPdf(rfq as any, await resolveOrganizationPdfBranding(organization), res);
+    streamRFQPdf(
+      rfq as any,
+      await resolveOrganizationPdfBranding(organization),
+      res,
+      organization.preferences?.pricing || "INR"
+    );
   } catch (err) {
     console.error("Error rendering RFQ PDF:", err);
     res.status(500).json({ error: "Failed to render RFQ PDF" });
@@ -846,6 +934,7 @@ export const generateQuote = async (
       organizationContactName: organization.defaultContact?.name,
       organizationContactEmail: organization.defaultContact?.email,
       organizationContactPhone: organization.defaultContact?.phoneNumber,
+      currency: organization.preferences?.pricing || "INR",
       quotePaymentTerms: paymentTerms.paymentTerms,
       quoteDeliveryTerms: deliveryTerms.deliveryTerms,
       originalSubject: email?.subject || "",
@@ -859,6 +948,13 @@ export const generateQuote = async (
         price: p.price,
         hsnCode: p.hsnCode,
         gstRate: p.gstRate,
+        tax: p.tax ?? { code: p.hsnCode, rate: p.gstRate, label: "Tax" },
+        adjustments: p.adjustments ?? quoteAdjustments(
+          [],
+          p.quantity,
+          p.price,
+          p.calibrationCharges
+        ),
         discountPercent: p.discountPercent ?? 0,
       })),
     });
@@ -892,6 +988,9 @@ export const generateQuote = async (
         gmailAccountId: rfq.gmailAccountId,
         rfqId: rfq._id,
         selectedProducts: quotedProducts,
+        specialDiscountPercentage: customerDiscountEnabled
+          ? savedCustomer?.specialDiscountPercentage ?? 0
+          : 0,
         paymentTermTemplateId: paymentTerms.paymentTermTemplateId,
         paymentTermName: paymentTerms.paymentTermName,
         paymentTerms: paymentTerms.paymentTerms ?? "",
@@ -1019,6 +1118,7 @@ export const sendQuoteReply = async (
         organization: await resolveOrganizationPdfBranding(organization),
         paymentTerms,
         deliveryTerms,
+        currency: organization.preferences?.pricing || "INR",
       });
       const gmailMessageId = await sendQuoteOnGmailThread({
         account,

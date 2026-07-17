@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import type { DatabaseConfig } from "../types";
 
-const STOP_WORDS = new Set([
+const DEFAULT_STOP_WORDS = new Set([
   "a",
   "an",
   "and",
@@ -22,41 +22,14 @@ const STOP_WORDS = new Set([
   "with",
 ]);
 
-const TOKEN_ALIASES = new Map<string, string[]>([
-  ["analog", ["analogue"]],
-  ["analogue", ["analog"]],
-  ["digimatic", ["digital"]],
-  ["digital", ["digimatic"]],
-  ["mic", ["micrometer"]],
-  ["mics", ["micrometer"]],
-  ["mike", ["micrometer"]],
-  ["micrometer", ["mike"]],
-]);
-
-const PRODUCT_FAMILY_ANCHOR_ALIASES = new Map<string, string[]>([
-  ["caliper", ["caliper", "calipers", "calliper", "callipers", "vernier"]],
-  ["calipers", ["caliper", "calipers", "calliper", "callipers", "vernier"]],
-  ["calliper", ["caliper", "calipers", "calliper", "callipers", "vernier"]],
-  ["callipers", ["caliper", "calipers", "calliper", "callipers", "vernier"]],
-  ["vernier", ["caliper", "calipers", "calliper", "callipers", "vernier"]],
-  ["mic", ["micrometer", "micrometers"]],
-  ["mics", ["micrometer", "micrometers"]],
-  ["mike", ["micrometer", "micrometers"]],
-  ["micrometer", ["micrometer", "micrometers"]],
-  ["micrometers", ["micrometer", "micrometers"]],
-]);
-
-const NON_BRAND_TOKENS = new Set([
-  "analog",
-  "analogue",
-  "depth",
-  "digital",
-  "digimatic",
-  "inside",
-  "outside",
-  ...PRODUCT_FAMILY_ANCHOR_ALIASES.keys(),
-  ...[...PRODUCT_FAMILY_ANCHOR_ALIASES.values()].flat(),
-]);
+export interface ProductSearchProfile {
+  synonyms?: Record<string, string[]>;
+  stopWords?: string[];
+  matchThreshold?: number;
+  ambiguityGap?: number;
+  taxLabel?: string;
+  searchableAttributeKeys?: string[];
+}
 
 export type ProductMatchStatus = "matched" | "ambiguous" | "no_match";
 
@@ -69,6 +42,16 @@ export interface ProductSearchMatch {
   hsnCode: string | null;
   gstRate: number | null;
   calibrationCharges: number | null;
+  tax: { code: string | null; rate: number | null; label: string };
+  attributes: Record<string, string | number | boolean | null>;
+  defaultAdjustments: Array<{
+    id: string;
+    code: string;
+    label: string;
+    type: "fixed" | "percentage";
+    value: number;
+    taxable: boolean;
+  }>;
   link: string | null;
   isTopSeller: boolean;
   score: number;
@@ -96,6 +79,8 @@ interface RankedProductRow {
   hsncode: string | null;
   gstrate: string | number | null;
   calibrationcharges: string | number | null;
+  attributes: Record<string, string | number | boolean | null> | null;
+  default_adjustments: ProductSearchMatch["defaultAdjustments"] | null;
   productlink: string | null;
   is_top_seller: boolean | null;
   rank_score: string | number;
@@ -126,6 +111,8 @@ const TEXT_SEARCH_SQL = `
       p.hsncode,
       p.gstrate,
       p.calibrationcharges,
+      p.attributes,
+      p.default_adjustments,
       p.productlink,
       COALESCE(p.is_top_seller, false) AS is_top_seller,
       CASE
@@ -184,6 +171,12 @@ const TEXT_SEARCH_SQL = `
         WHERE lower(COALESCE(p.productdescription, '')) LIKE '%' || token || '%'
            OR lower(COALESCE(p.brand, '')) LIKE '%' || token || '%'
            OR lower(COALESCE(p.productcode, '')) LIKE '%' || token || '%'
+           OR lower(COALESCE(p.category, '')) LIKE '%' || token || '%'
+           OR EXISTS (
+             SELECT 1 FROM unnest($15::text[]) AS attribute_key
+             WHERE lower(COALESCE(p.attributes ->> attribute_key, '')) LIKE '%' || token || '%'
+           )
+           OR lower(COALESCE(array_to_string(p.tags, ' '), '')) LIKE '%' || token || '%'
       ), 0) AS token_score,
       COALESCE((
         SELECT COUNT(*) * 28
@@ -207,6 +200,8 @@ const TEXT_SEARCH_SQL = `
           FROM unnest($13::text[]) AS anchor_token
           WHERE lower(COALESCE(p.productdescription, '')) LIKE '%' || anchor_token || '%'
              OR lower(COALESCE(p.productcode, '')) LIKE '%' || anchor_token || '%'
+             OR lower(COALESCE(p.brand, '')) LIKE '%' || anchor_token || '%'
+             OR lower(COALESCE(p.category, '')) LIKE '%' || anchor_token || '%'
         )
       )
       AND
@@ -218,6 +213,12 @@ const TEXT_SEARCH_SQL = `
           WHERE lower(COALESCE(p.productdescription, '')) LIKE '%' || text_token || '%'
              OR lower(COALESCE(p.brand, '')) LIKE '%' || text_token || '%'
              OR lower(COALESCE(p.productcode, '')) LIKE '%' || text_token || '%'
+             OR lower(COALESCE(p.category, '')) LIKE '%' || text_token || '%'
+             OR EXISTS (
+               SELECT 1 FROM unnest($15::text[]) AS attribute_key
+               WHERE lower(COALESCE(p.attributes ->> attribute_key, '')) LIKE '%' || text_token || '%'
+             )
+             OR lower(COALESCE(array_to_string(p.tags, ' '), '')) LIKE '%' || text_token || '%'
         )
         OR EXISTS (
           SELECT 1
@@ -292,6 +293,8 @@ const TEXT_SEARCH_SQL = `
     hsncode,
     gstrate,
     calibrationcharges,
+    attributes,
+    default_adjustments,
     productlink,
     is_top_seller,
     rank_score,
@@ -304,9 +307,11 @@ const TEXT_SEARCH_SQL = `
 
 export class TextProductSearcher {
   private pool: Pool;
+  private profile: ProductSearchProfile;
 
-  constructor(dbConfig: DatabaseConfig) {
+  constructor(dbConfig: DatabaseConfig, profile: ProductSearchProfile = {}) {
     this.pool = new Pool(dbConfig);
+    this.profile = profile;
   }
 
   async searchProduct(
@@ -346,6 +351,7 @@ export class TextProductSearcher {
         parts.textTokens,
         parts.requiredAnchorTokens,
         Boolean(options.topSellerOnly),
+        this.profile.searchableAttributeKeys ?? [],
       ]);
 
       const matches = result.rows.map((row) => ({
@@ -357,6 +363,14 @@ export class TextProductSearcher {
         hsnCode: row.hsncode,
         gstRate: toNumberOrNull(row.gstrate),
         calibrationCharges: toNumberOrNull(row.calibrationcharges),
+        tax: {
+          code: row.hsncode,
+          rate: toNumberOrNull(row.gstrate),
+          label: this.profile.taxLabel || "Tax",
+        },
+        attributes: row.attributes ?? {},
+        defaultAdjustments:
+          row.default_adjustments ?? legacyCalibrationAdjustment(row.calibrationcharges),
         link: row.productlink,
         isTopSeller: Boolean(row.is_top_seller),
         score: Number(row.rank_score),
@@ -386,7 +400,7 @@ export class TextProductSearcher {
     const dimensionTokens = extractDimensionTokens(normalizedQuery);
     const baseSearchTokens = unique(
       rawTokens.filter((token) => {
-        if (STOP_WORDS.has(token)) {
+        if (DEFAULT_STOP_WORDS.has(token) || this.profile.stopWords?.includes(token)) {
           return false;
         }
 
@@ -400,7 +414,7 @@ export class TextProductSearcher {
     const searchTokens = unique([
       ...baseSearchTokens,
       ...dimensionTokens,
-      ...expandTokenAliases(baseSearchTokens),
+      ...expandTokenAliases(baseSearchTokens, this.profile.synonyms),
     ]);
     const codeLikeTokens = unique(
       searchTokens.filter((token) => isCodeLikeSearchToken(token))
@@ -408,9 +422,7 @@ export class TextProductSearcher {
     const textTokens = unique(
       searchTokens.filter((token) => /[a-z]/.test(token) && !isDimensionToken(token) && !isCodeLikeSearchToken(token))
     );
-    const brandTokens = textTokens.filter(
-      (token) => /^[a-z][a-z-]{3,}$/.test(token) && !NON_BRAND_TOKENS.has(token)
-    );
+    const brandTokens = textTokens.filter((token) => /^[a-z][a-z0-9-]{1,}$/.test(token));
     const normalizedCodeHints = extractNormalizedCodeHints(normalizedQuery);
     const requiredAnchorTokens = extractProductFamilyAnchorTokens(searchTokens);
 
@@ -442,11 +454,11 @@ export class TextProductSearcher {
       return 50;
     }
 
-    return 35;
+    return this.profile.matchThreshold ?? 35;
   }
 
   private resolveStatus(matches: ProductSearchMatch[]): ProductMatchStatus {
-    return resolveProductMatchStatus(matches);
+    return resolveProductMatchStatus(matches, this.profile.ambiguityGap);
   }
 }
 
@@ -474,10 +486,10 @@ export function normalizeProductSearchText(input: string): string {
     .replace(/[:"'`,;]/g, " ")
     .replace(/[()]/g, " ")
     .replace(
-      /\b(\d+(?:\.\d+)?)\s*[-/]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|inch|in)\b/g,
+      /\b(\d+(?:\.\d+)?)\s*[-/]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|inch|in|ft|kg|g|l|ml|oz|lb|v|w|kw)\b/g,
       "$1-$2$3"
     )
-    .replace(/\b(\d+(?:\.\d+)?)\s+(mm|cm|m|inch|in)\b/g, "$1$2")
+    .replace(/\b(\d+(?:\.\d+)?)\s+(mm|cm|m|inch|in|ft|kg|g|l|ml|oz|lb|v|w|kw)\b/g, "$1$2")
     .replace(/\s+-\s+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -488,8 +500,8 @@ function normalizeText(input: string): string {
 }
 
 export function extractDimensionTokens(input: string): string[] {
-  const matches = input.match(/\b\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?(?:mm|cm|m|inch|in)\b/g) ?? [];
-  const linkedUnitLists = [...input.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:&|and|,)\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|inch|in)\b/g)].flatMap(
+  const matches = input.match(/\b\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?(?:mm|cm|m|inch|in|ft|kg|g|l|ml|oz|lb|v|w|kw)\b/g) ?? [];
+  const linkedUnitLists = [...input.matchAll(/\b(\d+(?:\.\d+)?)\s*(?:&|and|,)\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|inch|in|ft|kg|g|l|ml|oz|lb|v|w|kw)\b/g)].flatMap(
     (match) => {
       const firstValue = match[1];
       const secondValue = match[2];
@@ -515,15 +527,14 @@ export function extractDimensionTokens(input: string): string[] {
     if (
       !Number.isFinite(startValue) ||
       !Number.isFinite(endValue) ||
-      startValue > endValue ||
-      (startValue !== 0 && endValue > 100)
+      startValue > endValue
     ) {
       return [];
     }
 
     const start = formatDimensionNumber(startValue);
     const end = formatDimensionNumber(endValue);
-    return [`${start}-${end}mm`, `${start}-${end}`];
+    return [`${start}-${end}`];
   });
 
   return unique([...matches.map((match) => match.replace(/\s+/g, "")), ...linkedUnitLists, ...inferredMetricRanges]);
@@ -534,18 +545,24 @@ export function isCodeLikeSearchToken(token: string): boolean {
 }
 
 export function extractProductFamilyAnchorTokens(tokens: string[]): string[] {
-  return unique(tokens.flatMap((token) => PRODUCT_FAMILY_ANCHOR_ALIASES.get(token) ?? []));
+  return unique(tokens.filter((token) =>
+    token.length >= 3
+    && /[a-z]/.test(token)
+    && !DEFAULT_STOP_WORDS.has(token)
+    && !isDimensionToken(token)
+    && !isCodeLikeSearchToken(token)
+  )).slice(0, 4);
 }
 
 export function productMatchesAnchorTokens(
-  product: Pick<ProductSearchMatch, "description" | "code">,
+  product: Pick<ProductSearchMatch, "description" | "code"> & { brand?: string | null },
   anchorTokens: string[]
 ): boolean {
   if (anchorTokens.length === 0) {
     return true;
   }
 
-  const searchableText = `${product.description ?? ""} ${product.code ?? ""}`.toLowerCase();
+  const searchableText = `${product.description ?? ""} ${product.code ?? ""} ${product.brand ?? ""}`.toLowerCase();
   return anchorTokens.some((anchorToken) => searchableText.includes(anchorToken));
 }
 
@@ -591,7 +608,10 @@ export function getNormalizedCodeMatchReason(
   return null;
 }
 
-export function resolveProductMatchStatus(matches: ProductSearchMatch[]): ProductMatchStatus {
+export function resolveProductMatchStatus(
+  matches: ProductSearchMatch[],
+  ambiguityGap: number = 30
+): ProductMatchStatus {
   if (matches.length === 0) {
     return "no_match";
   }
@@ -605,19 +625,22 @@ export function resolveProductMatchStatus(matches: ProductSearchMatch[]): Produc
     return "matched";
   }
 
-  if (topMatch.score >= 120 && topMatch.score - secondMatch.score >= 30) {
+  if (topMatch.score >= 120 && topMatch.score - secondMatch.score >= ambiguityGap) {
     return "matched";
   }
 
   return "ambiguous";
 }
 
-function expandTokenAliases(tokens: string[]): string[] {
-  return tokens.flatMap((token) => TOKEN_ALIASES.get(token) ?? []);
+function expandTokenAliases(
+  tokens: string[],
+  synonyms: Record<string, string[]> = {}
+): string[] {
+  return tokens.flatMap((token) => synonyms[token] ?? []);
 }
 
 function isDimensionToken(token: string): boolean {
-  return /^\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?(?:mm|cm|m|inch|in)$/.test(token);
+  return /^\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?(?:mm|cm|m|inch|in|ft|kg|g|l|ml|oz|lb|v|w|kw)$/.test(token);
 }
 
 function formatDimensionNumber(value: number): string {
@@ -635,4 +658,20 @@ function toNumberOrNull(value: string | number | null): number | null {
 
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function legacyCalibrationAdjustment(
+  value: string | number | null
+): ProductSearchMatch["defaultAdjustments"] {
+  const amount = toNumberOrNull(value);
+  return amount != null && amount > 0
+    ? [{
+        id: "legacy.calibration",
+        code: "calibration",
+        label: "Calibration",
+        type: "fixed",
+        value: amount,
+        taxable: false,
+      }]
+    : [];
 }

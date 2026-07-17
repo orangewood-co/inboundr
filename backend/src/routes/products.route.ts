@@ -15,6 +15,10 @@ import {
   requireOrganization,
   requireOrganizationAdmin,
 } from "../middleware/auth.middleware";
+import {
+  getProductSettings,
+  updateProductSettings,
+} from "../controllers/product-settings.controller";
 
 const router = Router();
 
@@ -25,6 +29,8 @@ router.use(requireEmployeeModule("products"));
 router.get("/", listProducts);
 router.get("/stats", getProductStats);
 router.get("/matches", listProductMatches);
+router.get("/settings", getProductSettings);
+router.put("/settings", requireOrganizationAdmin(), updateProductSettings);
 router.post("/import", requireOrganizationAdmin(), importProducts);
 router.get("/:id", getProduct);
 router.post("/", requireOrganizationAdmin(), createProduct);

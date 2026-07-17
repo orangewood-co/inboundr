@@ -11,6 +11,25 @@ export interface IRFQCustomer {
 export interface IRFQProduct {
   name: string;
   quantity: number;
+  code: string | null;
+  manufacturer: string | null;
+  specifications: Record<string, string>;
+}
+
+export interface IRFQTax {
+  code: string | null;
+  rate: number | null;
+  label: string;
+}
+
+export interface IRFQAdjustment {
+  id: string;
+  code: string;
+  label: string;
+  type: "fixed" | "percentage";
+  value: number;
+  amount?: number;
+  taxable: boolean;
 }
 
 export interface IRFQSearchMatch {
@@ -22,6 +41,9 @@ export interface IRFQSearchMatch {
   hsnCode: string | null;
   gstRate: number | null;
   calibrationCharges: number | null;
+  tax: IRFQTax;
+  attributes: Record<string, string | number | boolean | null>;
+  defaultAdjustments: IRFQAdjustment[];
   link: string | null;
   isTopSeller: boolean;
   score: number;
@@ -51,6 +73,9 @@ export interface IRFQSavedQuoteProduct {
   gstRate: number | null;
   discountPercent?: number;
   calibrationCharges: number | null;
+  tax: IRFQTax;
+  attributes: Record<string, string | number | boolean | null>;
+  adjustments: IRFQAdjustment[];
   deliveryTimeline: string | null;
   lineStatus: "quoted" | "regretted";
   regretReason: string | null;
@@ -85,6 +110,19 @@ export interface IRFQ extends Document {
   updatedAt: Date;
 }
 
+export const rfqAdjustmentSchema = new Schema<IRFQAdjustment>(
+  {
+    id: { type: String, required: true },
+    code: { type: String, required: true },
+    label: { type: String, required: true },
+    type: { type: String, enum: ["fixed", "percentage"], default: "fixed" },
+    value: { type: Number, default: 0 },
+    amount: { type: Number, default: 0 },
+    taxable: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const rfqSearchMatchSchema = new Schema<IRFQSearchMatch>(
   {
     id: { type: String, required: true },
@@ -95,6 +133,16 @@ const rfqSearchMatchSchema = new Schema<IRFQSearchMatch>(
     hsnCode: { type: String, default: null },
     gstRate: { type: Number, default: null },
     calibrationCharges: { type: Number, default: null },
+    tax: {
+      code: { type: String, default: null },
+      rate: { type: Number, default: null },
+      label: { type: String, default: "Tax" },
+    },
+    attributes: { type: Map, of: Schema.Types.Mixed, default: () => new Map() },
+    defaultAdjustments: {
+      type: [rfqAdjustmentSchema],
+      default: [],
+    },
     link: { type: String, default: null },
     isTopSeller: { type: Boolean, default: false },
     score: { type: Number, required: true },
@@ -137,6 +185,16 @@ const rfqSavedQuoteProductSchema = new Schema<IRFQSavedQuoteProduct>(
     gstRate: { type: Number, default: null },
     discountPercent: { type: Number, default: 0 },
     calibrationCharges: { type: Number, default: null },
+    tax: {
+      code: { type: String, default: null },
+      rate: { type: Number, default: null },
+      label: { type: String, default: "Tax" },
+    },
+    attributes: { type: Map, of: Schema.Types.Mixed, default: () => new Map() },
+    adjustments: {
+      type: [rfqAdjustmentSchema],
+      default: [],
+    },
     deliveryTimeline: { type: String, default: null },
     lineStatus: {
       type: String,
@@ -187,6 +245,9 @@ const rfqSchema = new Schema<IRFQ>(
         {
           name: { type: String, required: true },
           quantity: { type: Number, required: true },
+          code: { type: String, default: null },
+          manufacturer: { type: String, default: null },
+          specifications: { type: Map, of: String, default: () => new Map() },
         },
       ],
       default: [],

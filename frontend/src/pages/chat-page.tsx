@@ -235,21 +235,20 @@ function ProductArtifactPanel({ artifact }: { artifact: ProductArtifact }) {
                 : formatMoney(product.price)
             }
           />
-          <PanelValue icon={TagIcon} label="HSN Code" value={product.hsnCode} />
+          <PanelValue icon={TagIcon} label={`${product.tax?.label ?? "Tax"} Code`} value={product.tax?.code ?? product.hsnCode} />
           <PanelValue
             icon={TagIcon}
-            label="GST Rate"
-            value={product.gstRate == null ? "-" : `${product.gstRate}%`}
+            label={`${product.tax?.label ?? "Tax"} Rate`}
+            value={(product.tax?.rate ?? product.gstRate) == null ? "-" : `${product.tax?.rate ?? product.gstRate}%`}
           />
-          <PanelValue
-            icon={IndianRupeeIcon}
-            label="Calibration Charges"
-            value={
-              product.calibrationCharges == null
-                ? "-"
-                : formatMoney(product.calibrationCharges)
-            }
-          />
+          {(product.defaultAdjustments ?? []).map((adjustment) => (
+            <PanelValue
+              key={adjustment.id}
+              icon={IndianRupeeIcon}
+              label={adjustment.label}
+              value={formatMoney(adjustment.value)}
+            />
+          ))}
           <PanelValue
             icon={ExternalLinkIcon}
             label="Product Link"

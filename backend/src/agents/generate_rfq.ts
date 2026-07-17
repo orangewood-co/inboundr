@@ -15,6 +15,8 @@ import {
   type ProductSearchMatch,
 } from "../utils/product-search";
 import { Customer } from "../models/customer.model";
+import { Types } from "mongoose";
+import { getOrCreateProductSettings } from "../services/product-settings.service";
 
 const model = new ChatOpenRouter({
   model: "deepseek/deepseek-v4-flash",
@@ -32,11 +34,15 @@ const customer = z.object({
 const organizationContext = z.object({
   name: z.string().describe("The name of the organization."),
   description: z.string().describe("The description of the organization.").nullable(),
+  searchInstructions: z.string().default(""),
 });
 
 const queryProduct = z.object({
   name: z.string(),
   quantity: z.number().default(1),
+  code: z.string().nullable().default(null),
+  manufacturer: z.string().nullable().default(null),
+  specifications: z.record(z.string(), z.string()).default({}),
 });
 
 const searchMatch = z.object({
@@ -47,6 +53,20 @@ const searchMatch = z.object({
   price: z.number().nullable(),
   hsnCode: z.string().nullable(),
   gstRate: z.number().nullable(),
+  tax: z.object({
+    code: z.string().nullable(),
+    rate: z.number().nullable(),
+    label: z.string(),
+  }),
+  attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  defaultAdjustments: z.array(z.object({
+    id: z.string(),
+    code: z.string(),
+    label: z.string(),
+    type: z.enum(["fixed", "percentage"]),
+    value: z.number(),
+    taxable: z.boolean(),
+  })),
   link: z.string().nullable(),
   isTopSeller: z.boolean().default(false),
   score: z.number(),
@@ -104,7 +124,8 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
   const response = await model.withStructuredOutput(customer).invoke([
     new SystemMessage(
        `You are a customer support agent.
-        You work for Bombay Tools Supplying Agency Pvt. Ltd.
+       You work for ${state.organizationContext.name}.
+       ${state.organizationContext.description ?? ""}
 
         You are given a email from a potential customer asking for a quote for the products they are interested in.
         Your task is to identify the customer from the email and return the customer details in the structured output format.`
@@ -164,7 +185,8 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
        You are given a email from a potential customer asking for a quote for the products they are interested in.
        Your task is to identify the products from the email and return the products details in the structured output format.
        
-       Pay attention to the product make and specification if given and include them in the product name.
+       Extract each requested catalog item separately. Preserve an exact SKU/model/part number,
+       manufacturer, quantity, and named specifications when provided. Keep a readable summary in name.
        `
 
     ),
@@ -181,19 +203,41 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
 const searchProducts: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Search Products");
 
-  const searcher = new TextProductSearcher(getDatabaseConfigFromEnv());
+  if (!state.organizationId) {
+    throw new Error("Organization context is required for product search");
+  }
+  const settings = await getOrCreateProductSettings(new Types.ObjectId(state.organizationId));
+  const rawSynonyms = settings.search.synonyms;
+  const synonyms = rawSynonyms instanceof Map
+    ? Object.fromEntries(rawSynonyms.entries())
+    : { ...(rawSynonyms as Record<string, string[]>) };
+  const searcher = new TextProductSearcher(getDatabaseConfigFromEnv(), {
+    synonyms,
+    stopWords: settings.search.stopWords,
+    matchThreshold: settings.search.matchThreshold,
+    ambiguityGap: settings.search.ambiguityGap,
+    taxLabel: settings.terminology.taxRateLabel,
+    searchableAttributeKeys: settings.fieldDefinitions
+      .filter((field) => field.isActive && field.searchable)
+      .map((field) => field.key),
+  });
 
   try {
     const searchResults = [];
 
     for (const product of state.queryProducts) {
-      if (!state.organizationId) {
-        throw new Error("Organization context is required for product search");
-      }
-
-      const expansion = await expandProductSearchQuery(product);
-      const searchQueries = buildProductSearchQueries(product.name, expansion);
-      const originalAnchorTokens = getAnchorTokensForSearchText(product.name);
+      const requestedSearchText = [
+        product.name,
+        product.manufacturer,
+        product.code,
+        ...Object.entries(product.specifications).flatMap(([key, value]) => [key, value]),
+      ].filter(isNonEmptyString).join(" ");
+      const expansion = await expandProductSearchQuery(
+        product,
+        state.organizationContext.searchInstructions || settings.search.instructions
+      );
+      const searchQueries = buildProductSearchQueries(requestedSearchText, expansion);
+      const originalAnchorTokens = getAnchorTokensForSearchText(requestedSearchText);
       const candidateGroups = await Promise.all(
         searchQueries.map((searchQuery) =>
           searcher.searchProduct({ ...product, name: searchQuery }, state.organizationId!, SEARCH_CANDIDATE_LIMIT)
@@ -229,23 +273,21 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
   }
 };
 
-async function expandProductSearchQuery(product: QueryProduct): Promise<AiSearchExpansion | null> {
+async function expandProductSearchQuery(
+  product: QueryProduct,
+  organizationInstructions: string
+): Promise<AiSearchExpansion | null> {
   try {
     const response = await model.withStructuredOutput(aiSearchExpansion).invoke([
       new SystemMessage(
-        `You improve industrial tools catalog search queries.
+        `You improve a business catalog search query.
 
 Return corrected and expanded search terms for a buyer's product request.
-Preserve exact model numbers, catalogue codes, dimensions, ranges, units, and brand names.
-Fix obvious typos such as ":itutoyo" -> "Mitutoyo".
-Expand common wording such as "mike" or "mic" -> "micrometer" and "digimatic" -> "digital".
+Preserve exact SKU, model, part number, manufacturer, dimensions, ranges, units, and specifications.
 Do not invent a product. Do not return product ids. Only return terms useful for database search.
-Every alternate query must keep the product family words from the buyer request, such as "caliper", "vernier", or "micrometer".
-Do not return bare dimension-only alternate queries such as "150mm", "300mm", or "0-50mm".
-
-Examples:
-- "Micrometer - 0-50 mm" should include "micrometer 0-50mm" and may include "depth micrometer 0-50mm".
-- ":itutoyo 0/25 Digimatic Mike 293/340" should include brand "Mitutoyo", product type "digital micrometer", range "0-25mm", and code hints like "293340" and "293-340".`
+Every alternate query must preserve the requested item type or an exact code.
+Organization-specific guidance:
+${organizationInstructions || "No additional guidance."}`
       ),
       new HumanMessage(`Product request: ${product.name}\nQuantity: ${product.quantity}`),
     ]);
@@ -388,9 +430,9 @@ async function rerankProductMatches(
         `You rerank real catalog candidates for an RFQ product search.
 
 Use only the provided candidates. Return candidate ids in best-match order.
-Prefer matches with the same brand, product family, dimensions/range, units, catalogue/model code, and clear synonyms.
-Prefer top seller candidates only when their product relevance is otherwise close.
-Penalize candidates with conflicting product type, range, or brand.
+Prefer matches with the same manufacturer, item type, specifications, units, SKU/model/part number, and clear synonyms.
+Prefer featured candidates only when their relevance is otherwise close.
+Penalize conflicting item type, specification, code, or manufacturer.
 If several candidates are close variants, keep them ranked but use lower confidence.`
       ),
       new HumanMessage(

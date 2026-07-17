@@ -15,6 +15,21 @@ export interface Product {
   is_top_seller: boolean;
   addedtime: Date;
   addeduser: string;
+  category?: string | null;
+  tags?: string[];
+  attributes?: Record<string, string | number | boolean | null>;
+  default_adjustments?: Array<{
+    id: string;
+    code: string;
+    label: string;
+    type: "fixed" | "percentage";
+    value: number;
+    taxable: boolean;
+  }>;
+  pricing_policy?: {
+    maxDiscountPercent?: number | null;
+    maxMarkupPercent?: number | null;
+  };
   embedding?: number[];
   embedding_model?: string;
   embedding_updated_at?: Date;
