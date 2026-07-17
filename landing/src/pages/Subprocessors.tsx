@@ -9,8 +9,8 @@ const categories = [
     items: [
       {
         name: "Amazon Web Services (AWS)",
-        purpose: "Cloud infrastructure, compute, and hosting services",
-        location: "United States",
+        purpose: "Cloud compute, file storage, transactional email (SES), and content delivery",
+        location: "India (ap-south-1)",
         href: "https://aws.amazon.com",
       },
     ],
@@ -33,15 +33,51 @@ const categories = [
     items: [
       {
         name: "OpenAI",
-        purpose: "AI language model services",
+        purpose: "AI language models, document embeddings, voice calls, and transcription",
         location: "United States",
         href: "https://openai.com",
       },
       {
-        name: "Anthropic",
-        purpose: "AI language model services",
+        name: "OpenRouter",
+        purpose: "AI model gateway that routes requests to model providers",
         location: "United States",
-        href: "https://anthropic.com",
+        href: "https://openrouter.ai",
+      },
+    ],
+  },
+  {
+    label: "Communications",
+    description: "Services that connect Inboundr to your email and phone channels.",
+    items: [
+      {
+        name: "Google",
+        purpose: "Sign-in with Google, Gmail inbox sync and sending, and mailbox change notifications (Cloud Pub/Sub)",
+        location: "United States",
+        href: "https://cloud.google.com",
+      },
+      {
+        name: "Vobiz",
+        purpose: "Cloud telephony — phone numbers, call routing, and call recordings",
+        location: "India",
+        href: "https://vobiz.ai",
+      },
+    ],
+  },
+  {
+    label: "Analytics & Security",
+    description: "Product analytics and abuse prevention.",
+    items: [
+      {
+        name: "PostHog",
+        purpose: "Product analytics and usage insights",
+        location: "European Union",
+        href: "https://posthog.com",
+      },
+      {
+        name: "Cloudflare",
+        purpose: "Bot protection (Turnstile) on public forms",
+        location: "United States",
+        href: "https://www.cloudflare.com",
       },
     ],
   },
@@ -56,7 +92,7 @@ export default function Subprocessors() {
         title="Subprocessors"
         description="The third-party services we rely on to deliver Inboundr."
       >
-        <p className="mt-3 text-sm text-text-dim">Last updated: May 27, 2026</p>
+        <p className="mt-3 text-sm text-text-dim">Last updated: July 17, 2026</p>
       </PageHeader>
 
       <section className="border-y border-border px-6 py-20 sm:py-28 lg:px-8">
