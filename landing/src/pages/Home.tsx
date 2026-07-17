@@ -230,7 +230,7 @@ export default function Home() {
       </section>
 
       {/* ── Scroll-reveal ── */}
-      <section id="about" className="grid-lines border-y border-border px-6 py-24 sm:py-36 lg:px-8">
+      <section id="about" className="border-y border-border px-6 py-24 sm:py-36 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <p className="label mb-10 text-green-bright">What is Inboundr?</p>
           <h2 className="text-3xl font-bold leading-snug tracking-[-0.02em] sm:text-4xl lg:text-[3.25rem] lg:leading-[1.15]">

@@ -55,7 +55,6 @@ Structure follows Tailwind's 4px spacing scale. Conventions:
 There is no shadow-based elevation. Surfaces are flat and separated by 1px borders. Depth comes from texture, applied via utilities:
 
 - `noise` — an SVG fractal-noise overlay at 0.3 opacity with `mix-blend-mode: overlay`; applied to hero sections, banners, and colored cards.
-- `grid-lines` — a faint 80px grid (`rgba(255,255,255,0.025)` lines) for page headers.
 - Radial green washes, for example `bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]`, glow at the top of headers.
 - An animated aurora background (`animate-aurora`, 60s linear loop) sits behind the home hero only.
 

@@ -90,7 +90,7 @@ export default function Invoices() {
     <>
       <title>Invoices — Inboundr</title>
       {/* ── Hero ── */}
-      <section className="noise grid-lines relative overflow-hidden">
+      <section className="noise relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(62,207,142,0.1),transparent)]" />
         <div className="relative mx-auto max-w-4xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
           <FadeIn>

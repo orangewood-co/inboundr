@@ -44,7 +44,7 @@ export default function PressRelease() {
 
       <article>
         {/* Header band */}
-        <header className="noise grid-lines relative overflow-hidden">
+        <header className="noise relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]" />
           <div className="relative mx-auto max-w-3xl px-6 pb-16 pt-24 sm:pb-20 sm:pt-32 lg:px-8">
             <FadeIn>
