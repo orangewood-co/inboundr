@@ -197,6 +197,15 @@ function validateRequiredProductFields(input: Partial<ProductInput>): string | n
   return null;
 }
 
+const SORTABLE_COLUMNS = [
+  "productcode",
+  "productdescription",
+  "brand",
+  "unitprice",
+  "gstrate",
+  "addedtime",
+] as const;
+
 export const listProducts = async (
   req: Request,
   res: Response
@@ -207,19 +216,42 @@ export const listProducts = async (
     const limit = parsePositiveInt(req.query.limit, 20, 50);
     const offset = (page - 1) * limit;
     const search = String(req.query.search ?? "").trim();
-    const values: unknown[] = [organizationId];
+    const brand = String(req.query.brand ?? "").trim();
+    const category = String(req.query.category ?? "").trim();
+    const topSeller = parseBoolean(req.query.topSeller);
+    const requestedSort = String(req.query.sortBy ?? "").trim();
+    const sortBy = (SORTABLE_COLUMNS as readonly string[]).includes(requestedSort)
+      ? requestedSort
+      : null;
+    const sortOrder =
+      String(req.query.sortOrder ?? "").trim().toLowerCase() === "asc" ? "ASC" : "DESC";
+    const orderClause = sortBy
+      ? `ORDER BY ${sortBy} ${sortOrder} NULLS LAST, id DESC`
+      : "ORDER BY addedtime DESC NULLS LAST, id DESC";
+    const whereValues: unknown[] = [organizationId];
 
     let whereClause = "WHERE organization_id = $1";
     if (search) {
-      values.push(`%${search.toLowerCase()}%`);
-      const searchParam = values.length;
+      whereValues.push(`%${search.toLowerCase()}%`);
+      const searchParam = whereValues.length;
       const searchConditions = SEARCH_COLUMNS.map(
         (column) => `lower(COALESCE(${column}::text, '')) LIKE $${searchParam}`
       );
       whereClause += ` AND (${searchConditions.join(" OR ")})`;
     }
+    if (brand) {
+      whereValues.push(brand);
+      whereClause += ` AND brand = $${whereValues.length}`;
+    }
+    if (category) {
+      whereValues.push(category);
+      whereClause += ` AND category = $${whereValues.length}`;
+    }
+    if (topSeller) {
+      whereClause += " AND is_top_seller = TRUE";
+    }
 
-    values.push(limit, offset);
+    const values = [...whereValues, limit, offset];
     const limitParam = values.length - 1;
     const offsetParam = values.length;
 
@@ -228,7 +260,7 @@ export const listProducts = async (
         `SELECT ${PRODUCT_COLUMNS.join(", ")}
          FROM products
          ${whereClause}
-         ORDER BY addedtime DESC NULLS LAST, id DESC
+         ${orderClause}
          LIMIT $${limitParam} OFFSET $${offsetParam}`,
         values
       ),
@@ -236,7 +268,7 @@ export const listProducts = async (
         `SELECT COUNT(*)::text AS count
          FROM products
          ${whereClause}`,
-        values.slice(0, search ? 2 : 1)
+        whereValues
       ),
     ]);
 
@@ -565,6 +597,71 @@ export const updateProduct = async (
     }
     console.error("Error updating product:", err);
     res.status(500).json({ error: "Failed to update product" });
+  }
+};
+
+export const deleteProduct = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+    const id = parseProductId(req.params.id);
+    if (id === null) {
+      res.status(400).json({ error: "Invalid product id" });
+      return;
+    }
+
+    const result = await pool.query<{ id: string }>(
+      `DELETE FROM products
+       WHERE id = $1 AND organization_id = $2
+       RETURNING id::text AS id`,
+      [id, organizationId]
+    );
+
+    if (!result.rows[0]) {
+      res.status(404).json({ error: "Product not found" });
+      return;
+    }
+
+    res.json({ success: true, id: result.rows[0].id });
+  } catch (err) {
+    console.error("Error deleting product:", err);
+    res.status(500).json({ error: "Failed to delete product" });
+  }
+};
+
+export const getProductFacets = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+
+    const [brandsResult, categoriesResult] = await Promise.all([
+      pool.query<{ brand: string }>(
+        `SELECT DISTINCT brand
+         FROM products
+         WHERE organization_id = $1 AND brand IS NOT NULL AND brand <> ''
+         ORDER BY brand ASC`,
+        [organizationId]
+      ),
+      pool.query<{ category: string }>(
+        `SELECT DISTINCT category
+         FROM products
+         WHERE organization_id = $1 AND category IS NOT NULL AND category <> ''
+         ORDER BY category ASC`,
+        [organizationId]
+      ),
+    ]);
+
+    res.json({
+      brands: brandsResult.rows.map((row) => row.brand),
+      categories: categoriesResult.rows.map((row) => row.category),
+    });
+  } catch (err) {
+    console.error("Error fetching product facets:", err);
+    res.status(500).json({ error: "Failed to fetch product facets" });
   }
 };
 

@@ -49,6 +49,7 @@ import { Route as RecruitmentJobsRouteImport } from './routes/recruitment_.jobs'
 import { Route as RecruitmentApplicantsRouteImport } from './routes/recruitment_.applicants'
 import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
+import { Route as ProductsSettingsRouteImport } from './routes/products_.settings'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as LinksIdRouteImport } from './routes/links.$id'
@@ -277,6 +278,11 @@ const ProjectsIdRoute = ProjectsIdRouteImport.update({
   path: '/projects/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsSettingsRoute = ProductsSettingsRouteImport.update({
+  id: '/products_/settings',
+  path: '/products/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsImportRoute = ProductsImportRouteImport.update({
   id: '/products_/import',
   path: '/products/import',
@@ -461,6 +467,7 @@ export interface FileRoutesByFullPath {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
+  '/products/settings': typeof ProductsSettingsRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
   '/recruitment/applicants': typeof RecruitmentApplicantsRoute
@@ -525,6 +532,7 @@ export interface FileRoutesByTo {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products/import': typeof ProductsImportRoute
+  '/products/settings': typeof ProductsSettingsRoute
   '/projects/$id': typeof ProjectsIdRoute
   '/projects/new': typeof ProjectsNewRoute
   '/recruitment/applicants': typeof RecruitmentApplicantsRoute
@@ -595,6 +603,7 @@ export interface FileRoutesById {
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
   '/products_/import': typeof ProductsImportRoute
+  '/products_/settings': typeof ProductsSettingsRoute
   '/projects_/$id': typeof ProjectsIdRoute
   '/projects_/new': typeof ProjectsNewRoute
   '/recruitment_/applicants': typeof RecruitmentApplicantsRoute
@@ -666,6 +675,7 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products/import'
+    | '/products/settings'
     | '/projects/$id'
     | '/projects/new'
     | '/recruitment/applicants'
@@ -730,6 +740,7 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products/import'
+    | '/products/settings'
     | '/projects/$id'
     | '/projects/new'
     | '/recruitment/applicants'
@@ -799,6 +810,7 @@ export interface FileRouteTypes {
     | '/links/$id'
     | '/links/create'
     | '/products_/import'
+    | '/products_/settings'
     | '/projects_/$id'
     | '/projects_/new'
     | '/recruitment_/applicants'
@@ -864,6 +876,7 @@ export interface RootRouteChildren {
   EmployeesNewRoute: typeof EmployeesNewRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProductsImportRoute: typeof ProductsImportRoute
+  ProductsSettingsRoute: typeof ProductsSettingsRoute
   ProjectsIdRoute: typeof ProjectsIdRoute
   ProjectsNewRoute: typeof ProjectsNewRoute
   RecruitmentApplicantsRoute: typeof RecruitmentApplicantsRoute
@@ -1161,6 +1174,13 @@ declare module '@tanstack/react-router' {
       path: '/projects/$id'
       fullPath: '/projects/$id'
       preLoaderRoute: typeof ProjectsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products_/settings': {
+      id: '/products_/settings'
+      path: '/products/settings'
+      fullPath: '/products/settings'
+      preLoaderRoute: typeof ProductsSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products_/import': {
@@ -1465,6 +1485,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesNewRoute: EmployeesNewRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProductsImportRoute: ProductsImportRoute,
+  ProductsSettingsRoute: ProductsSettingsRoute,
   ProjectsIdRoute: ProjectsIdRoute,
   ProjectsNewRoute: ProjectsNewRoute,
   RecruitmentApplicantsRoute: RecruitmentApplicantsRoute,

@@ -1,21 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
+  ArrowDownIcon,
   ArrowLeftIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
   BoxIcon,
   CalendarPlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   Edit3Icon,
+  FilterXIcon,
   IndianRupeeIcon,
+  MoreHorizontalIcon,
   PackagePlusIcon,
   RefreshCwIcon,
   SearchIcon,
   Settings2Icon,
+  StarIcon,
   TagIcon,
   TableIcon,
+  Trash2Icon,
   UploadIcon,
 } from "lucide-react"
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from "@tanstack/react-table"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
@@ -26,6 +40,28 @@ import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -33,6 +69,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CopyableText } from "@/components/copy-button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -43,7 +87,6 @@ import { EmptyState, ErrorState, ListSkeleton } from "@/components/list-states"
 import { PageToolbar } from "@/components/page-header"
 import { API_ORIGIN } from "@/lib/env"
 import { formatNumber } from "@/lib/format"
-import { ProductSettingsSheet } from "@/components/product-settings-sheet"
 import {
   formatCatalogMoney,
   legacyCalibrationAdjustment,
@@ -53,6 +96,7 @@ import {
 } from "@/lib/catalog"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
+const ALL_FILTER = "__all__"
 
 function getInitialListSearch(): string {
   return new URLSearchParams(window.location.search).get("search") ?? ""
@@ -93,6 +137,11 @@ interface ProductStats {
   uniqueBrands: number
   avgUnitPrice: number
   recentlyAdded: number
+}
+
+interface ProductFacets {
+  brands: string[]
+  categories: string[]
 }
 
 type ProductFormState = {
@@ -466,7 +515,7 @@ function DashboardView({
         </div>
         <Button variant="outline" size="sm" onClick={onOpenSettings}>
           <Settings2Icon className="size-4" />
-          Catalog settings
+          Catalog Settings
         </Button>
       </div>
 
@@ -625,6 +674,36 @@ function DashboardView({
   )
 }
 
+function SortableHeader({
+  label,
+  sorted,
+  onToggle,
+}: {
+  label: string
+  sorted: false | "asc" | "desc"
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={cn(
+        "inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium uppercase tracking-wider transition-colors hover:text-foreground",
+        sorted ? "text-foreground" : "text-muted-foreground"
+      )}
+    >
+      {label}
+      {sorted === "asc" ? (
+        <ArrowUpIcon className="size-3.5" />
+      ) : sorted === "desc" ? (
+        <ArrowDownIcon className="size-3.5" />
+      ) : (
+        <ArrowUpDownIcon className="size-3.5 opacity-50" />
+      )}
+    </button>
+  )
+}
+
 export default function ProductsPage() {
   const navigate = useNavigate()
   const initialSearch = getInitialListSearch()
@@ -635,6 +714,11 @@ export default function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState(initialSearch)
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch.trim())
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [brandFilter, setBrandFilter] = useState<string>(ALL_FILTER)
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_FILTER)
+  const [topSellerOnly, setTopSellerOnly] = useState(false)
+  const [facets, setFacets] = useState<ProductFacets>({ brands: [], categories: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -643,7 +727,8 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [settings, setSettings] = useState<ProductSettings | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
@@ -678,13 +763,28 @@ export default function ProductsPage() {
     }
   }, [])
 
+  const fetchFacets = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/facets`, { credentials: "include" })
+      if (!res.ok) throw new Error("Failed to fetch facets")
+      const data: ProductFacets = await res.json()
+      setFacets({
+        brands: Array.isArray(data.brands) ? data.brands : [],
+        categories: Array.isArray(data.categories) ? data.categories : [],
+      })
+    } catch {
+      setFacets({ brands: [], categories: [] })
+    }
+  }, [])
+
   useEffect(() => {
     void fetchStats()
     void fetchRecentProducts()
+    void fetchFacets()
     void fetch(`${API_BASE}/settings`, { credentials: "include" })
       .then((response) => response.ok ? response.json() : null)
       .then((value) => setSettings(value as ProductSettings | null))
-  }, [fetchStats, fetchRecentProducts])
+  }, [fetchStats, fetchRecentProducts, fetchFacets])
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
@@ -696,6 +796,14 @@ export default function ProductsPage() {
         limit: String(PAGE_LIMIT),
       })
       if (debouncedSearch) params.set("search", debouncedSearch)
+      if (brandFilter !== ALL_FILTER) params.set("brand", brandFilter)
+      if (categoryFilter !== ALL_FILTER) params.set("category", categoryFilter)
+      if (topSellerOnly) params.set("topSeller", "true")
+      const sort = sorting[0]
+      if (sort) {
+        params.set("sortBy", sort.id)
+        params.set("sortOrder", sort.desc ? "desc" : "asc")
+      }
 
       const response = await fetch(`${API_BASE}?${params}`, {
         credentials: "include",
@@ -711,7 +819,7 @@ export default function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, page])
+  }, [debouncedSearch, page, sorting, brandFilter, categoryFilter, topSellerOnly])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -735,6 +843,16 @@ export default function ProductsPage() {
     return `${start}-${end}`
   }, [page, total])
 
+  const hasActiveFilters =
+    brandFilter !== ALL_FILTER || categoryFilter !== ALL_FILTER || topSellerOnly
+
+  function resetFilters() {
+    setBrandFilter(ALL_FILTER)
+    setCategoryFilter(ALL_FILTER)
+    setTopSellerOnly(false)
+    setPage(1)
+  }
+
   function openCreateSheet() {
     setEditingProduct(null)
     setForm({
@@ -753,6 +871,10 @@ export default function ProductsPage() {
 
   function openImportPage() {
     void navigate({ to: "/products/import" })
+  }
+
+  function openSettingsPage() {
+    void navigate({ to: "/products/settings" })
   }
 
   function openEditSheet(product: Product) {
@@ -806,12 +928,177 @@ export default function ProductsPage() {
       }
       void fetchStats()
       void fetchRecentProducts()
+      void fetchFacets()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Unable to save product")
     } finally {
       setSaving(false)
     }
   }
+
+  async function deleteProduct() {
+    if (!deleteTarget) return
+    setDeleting(true)
+
+    try {
+      const response = await fetch(`${API_BASE}/${deleteTarget.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Unable to delete product")
+      }
+
+      toast.success("Product deleted")
+      setDeleteTarget(null)
+      if (editingProduct?.id === deleteTarget.id) {
+        setSheetOpen(false)
+        setEditingProduct(null)
+      }
+      if (view === "table") {
+        await fetchProducts()
+      }
+      void fetchStats()
+      void fetchRecentProducts()
+      void fetchFacets()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to delete product")
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const columns = useMemo<ColumnDef<Product>[]>(() => [
+    {
+      id: "productcode",
+      accessorKey: "productcode",
+      header: settings?.terminology.skuLabel ?? "SKU",
+      enableSorting: true,
+      cell: ({ row }) => {
+        const product = row.original
+        return (
+          <div>
+            <CopyableText value={product.productcode || ''} label="Product code copied">
+              <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
+                {product.productcode || `#${product.id}`}
+              </span>
+            </CopyableText>
+            {product.is_top_seller && (
+              <span className="mt-1.5 block w-fit rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                Top seller
+              </span>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      id: "productdescription",
+      accessorKey: "productdescription",
+      header: settings?.terminology.singular ?? "Product",
+      enableSorting: true,
+      cell: ({ row }) => {
+        const product = row.original
+        return (
+          <div className="max-w-xl">
+            <p className="line-clamp-2 whitespace-normal font-medium leading-5">
+              {product.productdescription || "Untitled product"}
+            </p>
+            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <CopyableText value={product.hsncode || ''} label="HSN code copied"><span>{product.hsncode || "No HSN"}</span></CopyableText>
+              <span className="text-border">/</span>
+              <span>{product.unit || "Unit not set"}</span>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: "brand",
+      accessorKey: "brand",
+      header: settings?.terminology.manufacturerLabel ?? "Manufacturer",
+      enableSorting: true,
+      cell: ({ row }) => <span className="font-medium">{row.original.brand || "-"}</span>,
+    },
+    {
+      id: "unitprice",
+      accessorKey: "unitprice",
+      header: "Price",
+      enableSorting: true,
+      cell: ({ row }) => (
+        <span className="font-semibold">
+          {formatCatalogMoney(row.original.unitprice, settings?.currency ?? "INR")}
+        </span>
+      ),
+    },
+    {
+      id: "gstrate",
+      accessorKey: "gstrate",
+      header: settings?.terminology.taxRateLabel ?? "Tax",
+      enableSorting: true,
+      cell: ({ row }) => toPercent(row.original.gstrate),
+    },
+    {
+      id: "margin",
+      header: "Margin",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="space-y-0.5 text-xs">
+          <p>
+            Discount <span className="font-semibold text-foreground">{toPercent(row.original.maxdiscount)}</span>
+          </p>
+          <p>
+            Upsell <span className="font-semibold text-foreground">{toPercent(row.original.maxupsell)}</span>
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
+              <MoreHorizontalIcon className="size-4" />
+              <span className="sr-only">Product actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEditSheet(row.original)}>
+              <Edit3Icon className="size-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDeleteTarget(row.original)}
+            >
+              <Trash2Icon className="size-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ], [settings])
+
+  const table = useReactTable({
+    data: products,
+    columns,
+    state: { sorting },
+    manualSorting: true,
+    manualPagination: true,
+    manualFiltering: true,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPage(1)
+    },
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+  })
 
   return (
     <>
@@ -828,7 +1115,7 @@ export default function ProductsPage() {
               onAddProduct={openCreateSheet}
               onBulkImport={openImportPage}
               currency={settings?.currency ?? "INR"}
-              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenSettings={openSettingsPage}
               terminology={settings?.terminology}
             />
           ) : (
@@ -856,7 +1143,7 @@ export default function ProductsPage() {
                   <>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                        <Button variant="outline" size="sm" onClick={openSettingsPage}>
                           <Settings2Icon className="size-4" />
                           Settings
                         </Button>
@@ -899,8 +1186,8 @@ export default function ProductsPage() {
                 }
               />
 
-              <div className="flex items-center gap-4 border-b px-4 py-3">
-                <div className="relative max-w-xl flex-1">
+              <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+                <div className="relative max-w-md flex-1 basis-64">
                   <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={search}
@@ -909,7 +1196,73 @@ export default function ProductsPage() {
                     className="pl-10"
                   />
                 </div>
-                <span className="shrink-0 text-sm text-muted-foreground">
+                {facets.brands.length > 0 && (
+                  <Select
+                    value={brandFilter}
+                    onValueChange={(value) => {
+                      setBrandFilter(value)
+                      setPage(1)
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="w-44">
+                      <SelectValue placeholder="All Brands" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_FILTER}>
+                        All {settings?.terminology.manufacturerLabel ?? "Manufacturer"}s
+                      </SelectItem>
+                      {facets.brands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {facets.categories.length > 0 && (
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={(value) => {
+                      setCategoryFilter(value)
+                      setPage(1)
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="w-44">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_FILTER}>All Categories</SelectItem>
+                      {facets.categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button
+                  variant={topSellerOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setTopSellerOnly((current) => !current)
+                    setPage(1)
+                  }}
+                >
+                  <StarIcon className="size-4" />
+                  Top Sellers
+                </Button>
+                {hasActiveFilters && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" className="size-8" onClick={resetFilters}>
+                        <FilterXIcon className="size-4" />
+                        <span className="sr-only">Clear filters</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Clear filters</TooltipContent>
+                  </Tooltip>
+                )}
+                <span className="ml-auto shrink-0 text-sm text-muted-foreground">
                   Showing <span className="font-semibold text-foreground">{visibleRange}</span> of{" "}
                   <span className="font-semibold text-foreground">{formatNumber(total)}</span>
                 </span>
@@ -922,14 +1275,25 @@ export default function ProductsPage() {
               ) : products.length === 0 ? (
                 <EmptyState
                   icon={BoxIcon}
-                  title={debouncedSearch ? "No Products Match That Search" : "No Products in the Catalog Yet"}
+                  title={
+                    debouncedSearch || hasActiveFilters
+                      ? "No Products Match That Search"
+                      : "No Products in the Catalog Yet"
+                  }
                   description={
-                    debouncedSearch
-                      ? "Try a product code, brand, HSN code, or a shorter description fragment."
+                    debouncedSearch || hasActiveFilters
+                      ? "Try a product code, brand, HSN code, a shorter description fragment, or clear the filters."
                       : "Add the first catalog item and it will appear in this table immediately."
                   }
                   action={
-                    debouncedSearch ? undefined : (
+                    debouncedSearch || hasActiveFilters ? (
+                      hasActiveFilters ? (
+                        <Button variant="outline" size="sm" onClick={resetFilters}>
+                          <FilterXIcon className="size-4" />
+                          Clear Filters
+                        </Button>
+                      ) : undefined
+                    ) : (
                       <Button size="sm" onClick={openCreateSheet}>
                         <PackagePlusIcon className="size-4" />
                         New Product
@@ -939,69 +1303,52 @@ export default function ProductsPage() {
                 />
               ) : (
                 <div className="flex-1 overflow-auto animate-in fade-in-0 duration-300">
-                  <table className="w-full min-w-[980px] text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        <th className="px-5 py-2.5">{settings?.terminology.skuLabel ?? "SKU"}</th>
-                        <th className="px-5 py-2.5">{settings?.terminology.singular ?? "Product"}</th>
-                        <th className="px-5 py-2.5">{settings?.terminology.manufacturerLabel ?? "Manufacturer"}</th>
-                        <th className="px-5 py-2.5">Price</th>
-                        <th className="px-5 py-2.5">{settings?.terminology.taxRateLabel ?? "Tax"}</th>
-                        <th className="px-5 py-2.5">Margin</th>
-                        <th className="w-10 px-3 py-2.5" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {products.map((product) => (
-                        <tr key={product.id} className="group border-b last:border-0 transition-colors hover:bg-muted/30">
-                          <td className="px-5 py-3.5 align-top">
-                            <CopyableText value={product.productcode || ''} label="Product code copied">
-                              <span className="inline-flex rounded-md border bg-muted/40 px-2 py-0.5 font-mono text-xs font-bold">
-                                {product.productcode || `#${product.id}`}
-                              </span>
-                            </CopyableText>
-                            {product.is_top_seller && (
-                              <span className="mt-1.5 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                                Top seller
-                              </span>
-                            )}
-                          </td>
-                          <td className="max-w-xl px-5 py-3.5 align-top">
-                            <p className="line-clamp-2 font-medium leading-5">{product.productdescription || "Untitled product"}</p>
-                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              <CopyableText value={product.hsncode || ''} label="HSN code copied"><span>{product.hsncode || "No HSN"}</span></CopyableText>
-                              <span className="text-border">/</span>
-                              <span>{product.unit || "Unit not set"}</span>
-                            </div>
-                          </td>
-                          <td className="px-5 py-3.5 align-top font-medium">{product.brand || "-"}</td>
-                          <td className="px-5 py-3.5 align-top font-semibold">{formatCatalogMoney(product.unitprice, settings?.currency ?? "INR")}</td>
-                          <td className="px-5 py-3.5 align-top">{toPercent(product.gstrate)}</td>
-                          <td className="px-5 py-3.5 align-top">
-                            <div className="space-y-0.5 text-xs">
-                              <p>
-                                Discount <span className="font-semibold text-foreground">{toPercent(product.maxdiscount)}</span>
-                              </p>
-                              <p>
-                                Upsell <span className="font-semibold text-foreground">{toPercent(product.maxupsell)}</span>
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3.5 align-top">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon-sm" className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" onClick={() => openEditSheet(product)}>
-                                  <Edit3Icon className="size-4" />
-                                  <span className="sr-only">Edit product</span>
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Edit product</TooltipContent>
-                            </Tooltip>
-                          </td>
-                        </tr>
+                  <Table className="min-w-[980px]">
+                    <TableHeader>
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id} className="bg-muted/40 hover:bg-muted/40">
+                          {headerGroup.headers.map((header) => (
+                            <TableHead
+                              key={header.id}
+                              className={cn(
+                                "px-5 py-2.5",
+                                header.column.id === "actions" && "w-10 px-3"
+                              )}
+                            >
+                              {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                                <SortableHeader
+                                  label={String(header.column.columnDef.header ?? "")}
+                                  sorted={header.column.getIsSorted()}
+                                  onToggle={header.column.getToggleSortingHandler() ?? (() => undefined)}
+                                />
+                              ) : (
+                                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                </span>
+                              )}
+                            </TableHead>
+                          ))}
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableHeader>
+                    <TableBody>
+                      {table.getRowModel().rows.map((row) => (
+                        <TableRow key={row.id} className="hover:bg-muted/30">
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              className={cn(
+                                "px-5 py-3.5 align-top",
+                                cell.column.id === "actions" && "px-3"
+                              )}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
 
@@ -1060,6 +1407,17 @@ export default function ProductsPage() {
             </div>
           )}
           <SheetFooter className="flex-row justify-end border-t bg-muted/30">
+            {editingProduct && (
+              <Button
+                variant="ghost"
+                className="mr-auto text-destructive hover:text-destructive"
+                onClick={() => setDeleteTarget(editingProduct)}
+                disabled={saving}
+              >
+                <Trash2Icon className="size-4" />
+                Delete
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
               Cancel
             </Button>
@@ -1070,16 +1428,35 @@ export default function ProductsPage() {
           </SheetFooter>
         </SheetContent>
       </Sheet>
-      {settingsOpen && (
-        <ProductSettingsSheet
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          settings={settings}
-          endpoint={`${API_BASE}/settings`}
-          onSaved={setSettings}
-        />
-      )}
 
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && !deleting && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Product</DialogTitle>
+            <DialogDescription>
+              This permanently removes{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.productdescription || "this product"}
+              </span>
+              {deleteTarget?.productcode ? (
+                <>
+                  {" "}(<span className="font-mono">{deleteTarget.productcode}</span>)
+                </>
+              ) : null}{" "}
+              from the catalog. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => void deleteProduct()} disabled={deleting}>
+              {deleting && <Spinner data-icon="inline-start" />}
+              Delete Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
