@@ -1,20 +1,11 @@
 import { useRef } from "react"
-import { Link } from "react-router-dom"
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
 import { ArrowUpRight } from "lucide-react"
 import { AuroraBackground } from "@/components/AuroraBackground"
 import { FadeIn } from "@/components/FadeIn"
 import { CtaSection } from "@/components/CtaSection"
 import { Faq } from "@/components/Faq"
-
-const features = [
-  { num: "01", text: "AI reads inbound leads", to: "/product/ai-crm" },
-  { num: "02", text: "AI replies instantly", to: "/product/auto-reply" },
-  { num: "03", text: "AI generates quotes", to: "/product/quotes" },
-  { num: "04", text: "AI follows up", to: "/product/follow-ups" },
-  { num: "05", text: "AI calls leads", to: "/product/calls" },
-  { num: "06", text: "AI chats on website & WhatsApp", to: "/features" },
-]
+import { ProcessSteps } from "@/components/ProcessSteps"
 
 const faqs = [
   {
@@ -174,28 +165,14 @@ export default function Home() {
       <section id="features" className="border-y border-border">
         <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:px-8">
           <FadeIn>
-            <p className="label mb-10 text-text-muted">
+            <p className="label mb-4 text-text-muted">
               What it does
             </p>
+            <h2 className="mb-12 text-balance text-2xl font-bold tracking-[-0.02em] text-text sm:text-3xl">
+              From first message to closed deal.
+            </h2>
           </FadeIn>
-          <div className="space-y-0">
-            {features.map((f, i) => (
-              <FadeIn key={f.num} delay={i * 0.06}>
-                <Link
-                  to={f.to}
-                  className="group flex items-baseline gap-6 border-b border-border py-5 transition-colors duration-200 hover:border-text/15 sm:gap-8"
-                >
-                  <span className="shrink-0 font-mono text-xs text-text-dim transition-colors duration-200 group-hover:text-gold">
-                    {f.num}
-                  </span>
-                  <span className="text-xl font-medium tracking-[-0.01em] text-text-muted transition-[color,translate] duration-200 ease-out group-hover:translate-x-1 group-hover:text-text sm:text-2xl lg:text-3xl">
-                    {f.text}
-                  </span>
-                  <ArrowUpRight className="ml-auto size-5 shrink-0 self-center -translate-x-1.5 text-text-dim opacity-0 transition-[opacity,translate,color] duration-200 ease-out group-hover:translate-x-0 group-hover:text-text group-hover:opacity-100" />
-                </Link>
-              </FadeIn>
-            ))}
-          </div>
+          <ProcessSteps />
         </div>
       </section>
 
