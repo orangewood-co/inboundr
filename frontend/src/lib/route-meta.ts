@@ -29,6 +29,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/orders": "Orders",
   "/products": "Products",
   "/products/import": "Import Products",
+  "/products/settings": "Catalog Settings",
   "/projects": "Projects",
   "/projects/new": "New Project",
   "/register": "Register",
