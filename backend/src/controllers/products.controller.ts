@@ -186,6 +186,11 @@ function parseBoolean(value: unknown): boolean {
   return false;
 }
 
+function clientErrorStatus(err: unknown): number | null {
+  const statusCode = (err as { statusCode?: unknown })?.statusCode;
+  return typeof statusCode === "number" && statusCode >= 400 && statusCode < 500 ? statusCode : null;
+}
+
 function validateRequiredProductFields(input: Partial<ProductInput>): string | null {
   if (!input.productdescription) return "Product description is required";
   if (!input.productcode) return "Product code is required";
@@ -346,6 +351,11 @@ export const createProduct = async (
 
     res.status(201).json(result.rows[0] ? serializeProductRecord(result.rows[0]) : null);
   } catch (err) {
+    const clientStatus = clientErrorStatus(err);
+    if (clientStatus) {
+      res.status(clientStatus).json({ error: err instanceof Error ? err.message : "Invalid product input" });
+      return;
+    }
     console.error("Error creating product:", err);
     res.status(500).json({ error: "Failed to create product" });
   }
@@ -438,16 +448,6 @@ export const importProducts = async (
             const placeholder = `$${assignmentIndex + 1}`;
             if (column === "attributes" || column === "pricing_policy") {
               return `${column} = COALESCE(${column}, '{}'::jsonb) || ${placeholder}::jsonb`;
-            }
-            if (column === "default_adjustments") {
-              return `${column} = COALESCE((
-                SELECT jsonb_agg(existing_adjustment)
-                FROM jsonb_array_elements(COALESCE(${column}, '[]'::jsonb)) AS existing_adjustment
-                WHERE existing_adjustment->>'code' NOT IN (
-                  SELECT incoming_adjustment->>'code'
-                  FROM jsonb_array_elements(${placeholder}::jsonb) AS incoming_adjustment
-                )
-              ), '[]'::jsonb) || ${placeholder}::jsonb`;
             }
             return `${column} = ${placeholder}`;
           });
@@ -558,6 +558,11 @@ export const updateProduct = async (
 
     res.json(serializeProductRecord(product));
   } catch (err) {
+    const clientStatus = clientErrorStatus(err);
+    if (clientStatus) {
+      res.status(clientStatus).json({ error: err instanceof Error ? err.message : "Invalid product input" });
+      return;
+    }
     console.error("Error updating product:", err);
     res.status(500).json({ error: "Failed to update product" });
   }
