@@ -2,6 +2,11 @@
 
 Inboundr is AI-native sales infrastructure for turning inbound inquiries into revenue. It replies to leads, generates quotes, follows up, initiates calls, and helps close deals automatically.
 
+## For Agents
+
+- /design.md
+  Design system spec for the Inboundr marketing site: colors, typography, layout, motion, components, and voice. Read this before building on-brand UI.
+
 ## Core Pages
 
 - /
