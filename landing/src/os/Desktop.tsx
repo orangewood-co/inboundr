@@ -14,6 +14,7 @@ import BootScreen from "./BootScreen"
 import LockScreen from "./LockScreen"
 import BsodScreen from "./BsodScreen"
 import Toasts from "./Toasts"
+import Clippy from "./Clippy"
 import ContextMenu, { type ContextMenuItem, type ContextMenuState } from "./ContextMenu"
 import { clearIconPositions } from "./iconLayout"
 import "./os.css"
@@ -24,6 +25,12 @@ const WALLPAPER_KEY = "inboundr-os-wallpaper"
 const ANIMATIONS_KEY = "inboundr-os-animations"
 const NOTIFICATIONS_KEY = "inboundr-os-notifications"
 const TOAST_DURATION = 7000
+
+const KONAMI = [
+  "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+  "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight",
+  "b", "a",
+]
 
 /** Ambient toasts after landing on the desktop: the OS quietly sells the product. */
 const AMBIENT_TOASTS: Array<{ delay: number; title: string; message: string }> = [
@@ -94,6 +101,7 @@ export default function Desktop() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [sortKey, setSortKey] = useState(0)
+  const [waveKey, setWaveKey] = useState(0)
   const [toasts, setToasts] = useState<OsToast[]>([])
   const [notificationsEnabled, setNotificationsState] = useState<boolean>(loadNotifications)
   const toastId = useRef(0)
@@ -165,6 +173,32 @@ export default function Desktop() {
       window.setTimeout(() => notify(toast.title, toast.message), toast.delay),
     )
     return () => timers.forEach((id) => window.clearTimeout(id))
+  }, [phase, notify])
+
+  // Konami code: icons do a wave, leads become infinite.
+  useEffect(() => {
+    if (phase !== "desktop") return
+    let progress = 0
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+        return
+      }
+      const expected = KONAMI[progress]
+      const key = expected.length === 1 ? e.key.toLowerCase() : e.key
+      if (key === expected) {
+        progress++
+        if (progress === KONAMI.length) {
+          progress = 0
+          setWaveKey((k) => k + 1)
+          notify("Cheat activated", "Infinite leads. (Results may vary. Book a demo.)")
+        }
+      } else {
+        progress = key === KONAMI[0] ? 1 : 0
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
   }, [phase, notify])
 
   const context = useMemo<OsContextValue>(
@@ -249,6 +283,7 @@ export default function Desktop() {
             onLaunch={open}
             refreshKey={refreshKey}
             sortKey={sortKey}
+            waveKey={waveKey}
             onDesktopMenu={(x, y) => openContextMenu(x, y, desktopMenuItems)}
             onIconMenu={openContextMenu}
           />
@@ -294,6 +329,9 @@ export default function Desktop() {
 
         {/* Toast notifications */}
         {phase === "desktop" && <Toasts toasts={toasts} onDismiss={dismissToast} />}
+
+        {/* He appears once per session. He is always right. */}
+        {phase === "desktop" && <Clippy />}
 
         {/* Brightness dim — above the desktop, below lock and boot. */}
         {brightness < 100 && (

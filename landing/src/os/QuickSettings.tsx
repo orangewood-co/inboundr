@@ -1,9 +1,36 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { Image, Lock, Moon, Sun, Volume2, VolumeX, Wifi, Zap } from "lucide-react"
 import { useOs } from "./context"
 
 const EASE = [0.25, 1, 0.5, 1] as const
+
+/**
+ * The only sound in the entire OS: a startup-chime-style arpeggio when the
+ * volume slider hits 100. Synthesized so we don't ship anyone's copyrighted
+ * nostalgia.
+ */
+function playChime() {
+  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!Ctx) return
+  const ctx = new Ctx()
+  const notes = [523.25, 392.0, 587.33, 783.99] // C5 G4 D5 G5 — vaguely triumphant
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = "sine"
+    osc.frequency.value = freq
+    const t = ctx.currentTime + i * 0.16
+    gain.gain.setValueAtTime(0, t)
+    gain.gain.linearRampToValueAtTime(0.18, t + 0.03)
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(t)
+    osc.stop(t + 1)
+  })
+  window.setTimeout(() => ctx.close(), 2200)
+}
 
 function Slider({
   value,
@@ -39,9 +66,20 @@ function Slider({
 }
 
 export default function QuickSettings({ onClose }: { onClose: () => void }) {
-  const { brightness, setBrightness, animations, setAnimations, openApp, sleep } = useOs()
+  const { brightness, setBrightness, animations, setAnimations, openApp, sleep, notify } = useOs()
   const [volume, setVolume] = useState(65)
+  const chimed = useRef(false)
   const reduceMotion = useReducedMotion()
+
+  const onVolumeChange = (value: number) => {
+    setVolume(value)
+    if (value >= 100 && !chimed.current) {
+      chimed.current = true
+      playChime()
+      notify("Volume: 100%", "That's the only sound this OS makes. Enjoy.")
+    }
+    if (value < 100) chimed.current = false
+  }
 
   return (
     <motion.div
@@ -103,7 +141,7 @@ export default function QuickSettings({ onClose }: { onClose: () => void }) {
           value={volume}
           min={0}
           max={100}
-          onChange={setVolume}
+          onChange={onVolumeChange}
           label="Volume"
           icon={volume === 0 ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
         />

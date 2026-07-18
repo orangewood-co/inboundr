@@ -64,6 +64,8 @@ interface DesktopIconsProps {
   refreshKey: number
   /** Bumps to clear the saved layout and re-grid ("Sort icons"). */
   sortKey: number
+  /** Bumps to make the icons do a wave (Konami code). */
+  waveKey: number
 }
 
 export default function DesktopIcons({
@@ -72,6 +74,7 @@ export default function DesktopIcons({
   onIconMenu,
   refreshKey,
   sortKey,
+  waveKey,
 }: DesktopIconsProps) {
   const { isMobile, animations, wallpaper } = useOs()
   const onLightWallpaper = wallpaperTone(wallpaper) === "light"
@@ -109,6 +112,19 @@ export default function DesktopIcons({
     setLastSortKey(sortKey)
     setPositions({})
   }
+
+  // Konami wave: briefly animate every icon, staggered left-to-right.
+  const [waving, setWaving] = useState(false)
+  const [lastWaveKey, setLastWaveKey] = useState(waveKey)
+  if (waveKey !== lastWaveKey) {
+    setLastWaveKey(waveKey)
+    setWaving(true)
+  }
+  useLayoutEffect(() => {
+    if (!waving) return
+    const id = window.setTimeout(() => setWaving(false), 1600)
+    return () => window.clearTimeout(id)
+  }, [waving])
 
   useLayoutEffect(() => {
     const el = rootRef.current
@@ -350,8 +366,16 @@ export default function DesktopIcons({
                 ])
               }}
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.45, ease: [0.25, 1, 0.5, 1], delay: 0.15 + i * 0.045 }}
+              animate={
+                waving && !reduceMotion
+                  ? { opacity: 1, y: [0, -16, 0], scale: 1 }
+                  : { opacity: 1, y: 0, scale: 1 }
+              }
+              transition={
+                waving && !reduceMotion
+                  ? { duration: 0.5, ease: "easeInOut", delay: slot.col * 0.09 + slot.row * 0.05 }
+                  : { duration: 0.45, ease: [0.25, 1, 0.5, 1], delay: 0.15 + i * 0.045 }
+              }
               className={`pointer-events-auto absolute flex h-[88px] w-[84px] flex-col items-center justify-center gap-1.5 rounded-md border transition-colors duration-150 ${
                 isSelected
                   ? "border-green-bright/40 bg-green-bright/15"

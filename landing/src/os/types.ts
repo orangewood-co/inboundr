@@ -12,6 +12,10 @@ export type AppId =
   | "photos"
   | "trash"
   | "terminal"
+  | "calculator"
+  | "taskmanager"
+  | "minesweeper"
+  | "paint"
 
 /** Deep-link payload for the Reader app (used by Explorer and the Start menu). */
 export interface ReaderPayload {
