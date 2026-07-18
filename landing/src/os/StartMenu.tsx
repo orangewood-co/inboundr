@@ -15,6 +15,15 @@ interface RecommendedDoc {
   payload: ReaderPayload
 }
 
+/** Clicking the account button promotes you. Keep clicking. */
+const GUEST_TITLES: Array<{ name: string; org: string }> = [
+  { name: "Guest", org: "Inboundr" },
+  { name: "Administrator", org: "Self-appointed" },
+  { name: "Head of Revenue", org: "Effective immediately" },
+  { name: "CEO", org: "Of this browser tab" },
+  { name: "Linus", org: "He is watching" },
+]
+
 const RECOMMENDED: RecommendedDoc[] = [
   ...pressReleases.slice(0, 2).map((release) => ({
     title: release.title,
@@ -39,6 +48,8 @@ export default function StartMenu({
   const reduceMotion = useReducedMotion()
   const [query, setQuery] = useState("")
   const [powerOpen, setPowerOpen] = useState(false)
+  const [guestIdx, setGuestIdx] = useState(0)
+  const guest = GUEST_TITLES[guestIdx]
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -150,14 +161,16 @@ export default function StartMenu({
       <div className="relative -mx-6 flex items-center justify-between rounded-b-xl border-t border-white/[0.08] bg-black/20 px-6 py-3">
         <button
           type="button"
+          title="Switch account"
+          onClick={() => setGuestIdx((i) => (i + 1) % GUEST_TITLES.length)}
           className="flex items-center gap-3 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-white/[0.08]"
         >
           <span className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-green">
             <img src="/mark.png" alt="" className="size-5 object-contain" />
           </span>
           <span className="text-left">
-            <span className="block text-[12.5px] font-medium leading-tight">Guest</span>
-            <span className="block text-[10.5px] leading-tight text-text-dim">Inboundr</span>
+            <span className="block text-[12.5px] font-medium leading-tight">{guest.name}</span>
+            <span className="block text-[10.5px] leading-tight text-text-dim">{guest.org}</span>
           </span>
         </button>
 

@@ -74,7 +74,7 @@ function WallpaperPreview({ id }: { id: string }) {
 }
 
 function SystemPage() {
-  const { brightness, setBrightness, animations, setAnimations } = useOs()
+  const { brightness, setBrightness, animations, setAnimations, notificationsEnabled, setNotificationsEnabled, notify } = useOs()
   const fill = ((brightness - 30) / 70) * 100
   return (
     <div className="space-y-2.5">
@@ -105,7 +105,14 @@ function SystemPage() {
       </SettingRow>
 
       <SettingRow title="Notifications" note="Only the ones that close deals">
-        <Toggle checked={true} onChange={() => {}} label="Notifications" />
+        <Toggle
+          checked={notificationsEnabled}
+          onChange={(enabled) => {
+            setNotificationsEnabled(enabled)
+            if (enabled) notify("Notifications on", "You won't miss a single deal.")
+          }}
+          label="Notifications"
+        />
       </SettingRow>
 
       <SettingRow title="Focus mode" note="Permanently on. We don't do distractions." >

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useOs } from "../context"
 
 const STORAGE_KEY = "inboundr-os-notepad"
 
@@ -12,11 +13,14 @@ A few things to try:
 - Beat our high score in Tetris (good luck)
 - Right-click the desktop, it does what you'd hope
 - There's something worth watching in Videos
+- The Terminal answers to 'help'. Mostly.
+- Do not type the word "crash" in here. Alone. Ever.
 
 Anything you type here stays in your browser. Really.
 `
 
 export default function NotepadApp() {
+  const { crash } = useOs()
   const [text, setText] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) ?? WELCOME
@@ -43,7 +47,12 @@ export default function NotepadApp() {
     <div className="flex h-full flex-col bg-base">
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value
+          setText(next)
+          // The word "crash", alone in the note. You asked for it.
+          if (next.trim().toLowerCase() === "crash") crash()
+        }}
         spellCheck={false}
         aria-label="Notepad"
         className="min-h-0 w-full flex-1 resize-none bg-transparent p-5 font-mono text-[13px] leading-relaxed text-text outline-none placeholder:text-text-dim"

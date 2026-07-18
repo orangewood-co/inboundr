@@ -1,4 +1,4 @@
-import { BookOpen, Film, FolderClosed, Gamepad2, Image, Info, Settings, StickyNote, Trash2 } from "lucide-react"
+import { BookOpen, Film, FolderClosed, Gamepad2, Image, Info, Settings, SquareTerminal, StickyNote, Trash2 } from "lucide-react"
 import type { AppId, OsApp } from "../types"
 import AboutApp from "./About"
 import ReaderApp from "./Reader"
@@ -9,6 +9,7 @@ import SettingsApp from "./Settings"
 import MediaPlayerApp from "./MediaPlayer"
 import PhotosApp from "./Photos"
 import TrashApp from "./Trash"
+import TerminalApp from "./Terminal"
 
 export const APPS: OsApp[] = [
   {
@@ -83,6 +84,15 @@ export const APPS: OsApp[] = [
     defaultSize: { w: 720, h: 540 },
     minSize: { w: 400, h: 360 },
     component: SettingsApp,
+  },
+  {
+    id: "terminal",
+    name: "Terminal",
+    tagline: "For the curious",
+    icon: SquareTerminal,
+    defaultSize: { w: 620, h: 420 },
+    minSize: { w: 360, h: 260 },
+    component: TerminalApp,
   },
   {
     id: "trash",

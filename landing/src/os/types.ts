@@ -11,6 +11,7 @@ export type AppId =
   | "videos"
   | "photos"
   | "trash"
+  | "terminal"
 
 /** Deep-link payload for the Reader app (used by Explorer and the Start menu). */
 export interface ReaderPayload {
