@@ -70,15 +70,6 @@ function WallpaperPreview({ id }: { id: string }) {
   if (wallpaper?.type === "image" && wallpaper.src) {
     return <img src={wallpaper.src} alt="" className="h-full w-full object-cover" draggable={false} />
   }
-  if (id === "radial") {
-    return <div className="h-full w-full bg-base [background-image:radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(47,93,80,0.5),transparent)]" />
-  }
-  if (id === "aurora") {
-    return <div className="h-full w-full bg-base opacity-50 blur-[5px] [background-image:repeating-linear-gradient(100deg,#3ecf8e_10%,#efc554_18%,#5ddba5_26%,#2f5d50_34%)]" />
-  }
-  if (id === "noise") {
-    return <div className="noise h-full w-full overflow-hidden bg-surface" />
-  }
   return <div className="h-full w-full bg-base" />
 }
 

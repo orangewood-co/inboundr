@@ -9,13 +9,13 @@ export interface OsWallpaper {
 
 export const WALLPAPERS: OsWallpaper[] = [
   { id: "bloom", name: "Bloom", note: "the InboundrOS default", type: "image", src: "/os/wallpapers/bloom.png" },
-  { id: "radial", name: "Glow", note: "a green wash up top", type: "css" },
-  { id: "aurora", name: "Aurora", note: "the home hero, unleashed", type: "css" },
-  { id: "noise", name: "Grain", note: "dark with texture", type: "css" },
-  { id: "base", name: "Plain", note: "just the dark", type: "css" },
+  { id: "furry-green", name: "Furry Green", note: "the fuzzy wordmark", type: "image", src: "/os/wallpapers/inboundr-furry-green.png" },
+  { id: "furry-white", name: "Furry White", note: "fuzzy, but minimal", type: "image", src: "/os/wallpapers/inboundr-furry-white.jpg" },
+  { id: "ltt-1", name: "Linus Ten", note: "he is watching", type: "image", src: "/os/wallpapers/linus-tech-tips-1.png" },
+  { id: "ltt-2", name: "Linus Bliss", note: "a familiar hill", type: "image", src: "/os/wallpapers/linus-tech-tips-2.png" },
 ]
 
-export const DEFAULT_WALLPAPER = "bloom"
+export const DEFAULT_WALLPAPER = "furry-white"
 
 export function isWallpaperId(id: string): boolean {
   return WALLPAPERS.some((w) => w.id === id)
