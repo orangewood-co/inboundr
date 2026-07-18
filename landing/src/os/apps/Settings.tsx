@@ -187,10 +187,10 @@ function PersonalizationPage() {
 
 const SPECS: Array<{ label: string; value: string }> = [
   { label: "Device name", value: "INBOUNDR-PC" },
-  { label: "Processor", value: "Inboundr AI Core @ 5 min response time" },
-  { label: "Installed RAM", value: "Unlimited follow-ups (7.9 GB usable)" },
-  { label: "Storage", value: "Every lead ever, deduplicated" },
-  { label: "Graphics", value: "Instrument Serif Italic (gold edition)" },
+  { label: "Processor", value: "5x AMD EPYC 9965" },
+  { label: "Installed RAM", value: "512 GB DDR5" },
+  { label: "Storage", value: "1.2 Petabyte" },
+  { label: "Graphics", value: "Nvidia H200" },
   { label: "System type", value: "64-bit revenue engine, browser-based" },
 ]
 
