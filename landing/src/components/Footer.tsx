@@ -68,7 +68,12 @@ export default function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 text-[12px] text-text-dim sm:flex-row">
-          <span>&copy; {new Date().getFullYear()} Inboundr</span>
+          <span>
+            &copy; {new Date().getFullYear()} Inboundr &middot;{" "}
+            <Link to="/os" className="transition-colors duration-200 hover:text-gold">
+              InboundrOS
+            </Link>
+          </span>
           <div className="flex gap-5">
             <a href="#" className="transition-colors duration-200 hover:text-text" aria-label="X">
               <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor">

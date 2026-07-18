@@ -205,6 +205,11 @@ export function useTetris(cols: number): TetrisGame {
   // Keyboard controls.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Don't hijack keys while the user is typing somewhere (e.g. the OS Notepad).
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+        return
+      }
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault()

@@ -30,12 +30,15 @@ const Invoices = lazy(() => import("./pages/Invoices"))
 const Support = lazy(() => import("./pages/Support"))
 const Assets = lazy(() => import("./pages/Assets"))
 const NotFound = lazy(() => import("./pages/NotFound"))
+const OsDesktop = lazy(() => import("./os/Desktop"))
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <Suspense>
         <Routes>
+          {/* Fullscreen, outside the marketing Layout (no header/footer). */}
+          <Route path="os" element={<OsDesktop />} />
           <Route element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="product/ai-crm" element={<AiCrm />} />
