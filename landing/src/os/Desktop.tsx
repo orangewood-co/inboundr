@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { AnimatePresence } from "motion/react"
-import { Image, Info, Monitor, RefreshCw, StickyNote } from "lucide-react"
+import { Image, Info, LayoutGrid, Monitor, RefreshCw, StickyNote } from "lucide-react"
 import { OsContext, type OsContextValue } from "./context"
 import type { AppId } from "./types"
 import { DEFAULT_WALLPAPER, isWallpaperId } from "./wallpapers"
@@ -13,6 +13,7 @@ import WallpaperLayer from "./WallpaperLayer"
 import BootScreen from "./BootScreen"
 import LockScreen from "./LockScreen"
 import ContextMenu, { type ContextMenuItem, type ContextMenuState } from "./ContextMenu"
+import { clearIconPositions } from "./iconLayout"
 import "./os.css"
 
 type Phase = "boot" | "lock" | "desktop"
@@ -61,6 +62,7 @@ export default function Desktop() {
   const [animations, setAnimationsState] = useState<boolean>(loadAnimations)
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [sortKey, setSortKey] = useState(0)
 
   const setWallpaper = useCallback((id: string) => {
     setWallpaperState(id)
@@ -119,6 +121,16 @@ export default function Desktop() {
       action: () => setRefreshKey((k) => k + 1),
     },
     {
+      id: "sort",
+      label: "Sort icons",
+      icon: LayoutGrid,
+      action: () => {
+        clearIconPositions()
+        setSortKey((k) => k + 1)
+        setRefreshKey((k) => k + 1)
+      },
+    },
+    {
       id: "new-note",
       label: "New note",
       icon: StickyNote,
@@ -156,6 +168,7 @@ export default function Desktop() {
           <DesktopIcons
             onLaunch={open}
             refreshKey={refreshKey}
+            sortKey={sortKey}
             onDesktopMenu={(x, y) => openContextMenu(x, y, desktopMenuItems)}
             onIconMenu={openContextMenu}
           />
