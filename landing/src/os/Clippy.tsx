@@ -1,29 +1,43 @@
 import { useEffect, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { OS_TASKBAR_HEIGHT } from "./useWindowManager"
+import { useOs } from "./context"
+import { wallpaperTone } from "./wallpapers"
 
 const APPEAR_AFTER_MS = 50_000
 
 /** A hand-drawn paperclip. He has seen things. */
-function Paperclip() {
+function Paperclip({ onLight }: { onLight: boolean }) {
+  const wire = onLight ? "#4b5158" : "#c9cdd4"
+  const face = onLight ? "#1a1d1b" : "#e8ebe9"
   return (
-    <svg viewBox="0 0 48 64" className="h-16 w-12" aria-hidden>
+    <svg
+      viewBox="0 0 48 64"
+      className={`h-16 w-12 ${
+        onLight
+          ? "drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]"
+          : "drop-shadow-[0_2px_5px_rgba(0,0,0,0.55)]"
+      }`}
+      aria-hidden
+    >
       <path
         d="M16 46 V14 a8 8 0 0 1 16 0 v28 a14 14 0 0 1 -28 0 V18"
         fill="none"
-        stroke="#c9cdd4"
+        stroke={wire}
         strokeWidth="5"
         strokeLinecap="round"
       />
-      <circle cx="20" cy="20" r="2.6" fill="#1a1d1b" />
-      <circle cx="29" cy="20" r="2.6" fill="#1a1d1b" />
-      <path d="M21 28 q3.5 3 8 0" fill="none" stroke="#1a1d1b" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="20" cy="20" r="2.6" fill={face} />
+      <circle cx="29" cy="20" r="2.6" fill={face} />
+      <path d="M21 28 q3.5 3 8 0" fill="none" stroke={face} strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   )
 }
 
 export default function Clippy() {
   const reduceMotion = useReducedMotion()
+  const { wallpaper } = useOs()
+  const onLight = wallpaperTone(wallpaper) === "light"
   const [visible, setVisible] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
@@ -63,7 +77,7 @@ export default function Clippy() {
             animate={reduceMotion ? undefined : { rotate: [0, -6, 5, -3, 0] }}
             transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 2.4 }}
           >
-            <Paperclip />
+            <Paperclip onLight={onLight} />
           </motion.div>
         </motion.div>
       )}
