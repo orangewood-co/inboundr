@@ -1,11 +1,22 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { motion, useReducedMotion } from "motion/react"
-import { ExternalLink, Info } from "lucide-react"
+import { ExternalLink, Folder, Info, type LucideIcon } from "lucide-react"
 import { APPS } from "./apps/registry"
 import type { AppId } from "./types"
 import { OS_TASKBAR_HEIGHT } from "./useWindowManager"
 import type { ContextMenuItem } from "./ContextMenu"
 import { useOs } from "./context"
+
+interface DesktopEntry {
+  id: string
+  name: string
+  tagline: string
+  icon: LucideIcon
+  /** Folder shortcuts get the Explorer folder look instead of an app glyph. */
+  isFolder?: boolean
+  appId: AppId
+  payload?: unknown
+}
 
 interface Marquee {
   x0: number
@@ -15,7 +26,7 @@ interface Marquee {
 }
 
 interface DesktopIconsProps {
-  onLaunch: (appId: AppId) => void
+  onLaunch: (appId: AppId, payload?: unknown) => void
   onDesktopMenu: (x: number, y: number) => void
   onIconMenu: (x: number, y: number, items: ContextMenuItem[]) => void
   /** Bumps to replay the icon entrance stagger ("Refresh"). */
@@ -32,12 +43,29 @@ export default function DesktopIcons({
   const systemReduceMotion = useReducedMotion()
   const reduceMotion = systemReduceMotion || !animations
   const rootRef = useRef<HTMLDivElement>(null)
-  const iconRefs = useRef(new Map<AppId, HTMLButtonElement>())
-  const [selected, setSelected] = useState<Set<AppId>>(new Set())
+  const iconRefs = useRef(new Map<string, HTMLButtonElement>())
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [marquee, setMarquee] = useState<Marquee | null>(null)
   const marqueeState = useRef<{ pointerId: number; x0: number; y0: number } | null>(null)
 
-  const icons = APPS.filter((app) => !app.desktopHidden)
+  const icons: DesktopEntry[] = [
+    ...APPS.filter((app) => !app.desktopHidden).map((app) => ({
+      id: app.id as string,
+      name: app.name,
+      tagline: app.tagline,
+      icon: app.icon,
+      appId: app.id,
+    })),
+    {
+      id: "memes-folder",
+      name: "Memes",
+      tagline: "Curated by engineering",
+      icon: Folder,
+      isFolder: true,
+      appId: "explorer",
+      payload: { location: "memes" },
+    },
+  ]
 
   /* ------------------------------ marquee select ----------------------------- */
 
@@ -62,10 +90,10 @@ export default function DesktopIcons({
     const right = Math.max(rect.x0, rect.x1)
     const top = Math.min(rect.y0, rect.y1)
     const bottom = Math.max(rect.y0, rect.y1)
-    const next = new Set<AppId>()
-    for (const [appId, el] of iconRefs.current) {
+    const next = new Set<string>()
+    for (const [entryId, el] of iconRefs.current) {
       const r = el.getBoundingClientRect()
-      if (r.left < right && r.right > left && r.top < bottom && r.bottom > top) next.add(appId)
+      if (r.left < right && r.right > left && r.top < bottom && r.bottom > top) next.add(entryId)
     }
     setSelected(next)
   }
@@ -95,35 +123,36 @@ export default function DesktopIcons({
       }}
     >
       <div className="pointer-events-none absolute left-2 top-2 grid grid-flow-col grid-rows-[repeat(auto-fill,92px)] gap-1 sm:left-4 sm:top-4">
-        {icons.map((app, i) => {
-          const isSelected = selected.has(app.id)
+        {icons.map((entry, i) => {
+          const isSelected = selected.has(entry.id)
+          const launch = () => onLaunch(entry.appId, entry.payload)
           return (
             <motion.button
-              key={`${refreshKey}-${app.id}`}
+              key={`${refreshKey}-${entry.id}`}
               ref={(el) => {
-                if (el) iconRefs.current.set(app.id, el)
-                else iconRefs.current.delete(app.id)
+                if (el) iconRefs.current.set(entry.id, el)
+                else iconRefs.current.delete(entry.id)
               }}
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 if (isMobile) {
-                  onLaunch(app.id)
+                  launch()
                 } else {
-                  setSelected(new Set([app.id]))
+                  setSelected(new Set([entry.id]))
                 }
               }}
-              onDoubleClick={() => onLaunch(app.id)}
+              onDoubleClick={launch}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onLaunch(app.id)
+                if (e.key === "Enter") launch()
               }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                setSelected(new Set([app.id]))
+                setSelected(new Set([entry.id]))
                 onIconMenu(e.clientX, e.clientY, [
-                  { id: "open", label: `Open ${app.name}`, icon: ExternalLink, action: () => onLaunch(app.id) },
-                  { id: "about", label: app.tagline, icon: Info, disabled: true, separatorBefore: true },
+                  { id: "open", label: `Open ${entry.name}`, icon: ExternalLink, action: launch },
+                  { id: "about", label: entry.tagline, icon: Info, disabled: true, separatorBefore: true },
                 ])
               }}
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.9 }}
@@ -135,12 +164,14 @@ export default function DesktopIcons({
                   : "border-transparent hover:border-white/10 hover:bg-white/[0.06]"
               }`}
             >
-              <app.icon
-                className="size-8 text-text drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+              <entry.icon
+                className={`size-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)] ${
+                  entry.isFolder ? "fill-green/40 text-green-bright" : "text-text"
+                }`}
                 strokeWidth={1.25}
               />
               <span className="max-w-full truncate px-1 text-[11px] font-medium text-text [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
-                {app.name}
+                {entry.name}
               </span>
             </motion.button>
           )

@@ -9,6 +9,7 @@ export type AppId =
   | "tetris"
   | "settings"
   | "videos"
+  | "photos"
   | "trash"
 
 /** Deep-link payload for the Reader app (used by Explorer and the Start menu). */

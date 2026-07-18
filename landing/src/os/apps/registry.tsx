@@ -1,4 +1,4 @@
-import { BookOpen, Film, FolderClosed, Gamepad2, Info, Settings, StickyNote, Trash2 } from "lucide-react"
+import { BookOpen, Film, FolderClosed, Gamepad2, Image, Info, Settings, StickyNote, Trash2 } from "lucide-react"
 import type { AppId, OsApp } from "../types"
 import AboutApp from "./About"
 import ReaderApp from "./Reader"
@@ -7,6 +7,7 @@ import NotepadApp from "./Notepad"
 import TetrisApp from "./Tetris"
 import SettingsApp from "./Settings"
 import MediaPlayerApp from "./MediaPlayer"
+import PhotosApp from "./Photos"
 import TrashApp from "./Trash"
 
 export const APPS: OsApp[] = [
@@ -45,6 +46,16 @@ export const APPS: OsApp[] = [
     defaultSize: { w: 760, h: 480 },
     minSize: { w: 420, h: 340 },
     component: MediaPlayerApp,
+  },
+  {
+    id: "photos",
+    name: "Photos",
+    tagline: "The memes folder",
+    icon: Image,
+    defaultSize: { w: 640, h: 520 },
+    minSize: { w: 360, h: 300 },
+    component: PhotosApp,
+    desktopHidden: true,
   },
   {
     id: "notepad",

@@ -16,7 +16,9 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { pressReleases } from "@/data/press"
 import { blogPosts } from "@/data/blog"
+import { MEMES } from "../memes"
 import { useOs } from "../context"
+import type { AppProps } from "../types"
 
 type LocationId =
   | "home"
@@ -29,16 +31,37 @@ type LocationId =
   | "legal"
   | "team"
   | "documents"
+  | "memes"
+
+export interface ExplorerPayload {
+  location: string
+}
+
+function isExplorerPayload(payload: unknown): payload is ExplorerPayload {
+  return typeof payload === "object" && payload !== null && "location" in payload
+}
 
 interface FsFile {
   id: string
   name: string
   meta: string
   icon?: LucideIcon
-  action?: { type: "reader"; kind: "press" | "blog"; slug: string } | { type: "link"; to: string }
+  /** Thumbnail image; rendered instead of the icon in grid view. */
+  thumb?: string
+  action?:
+    | { type: "reader"; kind: "press" | "blog"; slug: string }
+    | { type: "link"; to: string }
+    | { type: "photos"; index: number }
 }
 
 const FOLDER_FILES: Record<string, FsFile[]> = {
+  memes: MEMES.map((meme, i) => ({
+    id: `meme-${meme.name}`,
+    name: meme.name,
+    meta: "certified fresh",
+    thumb: meme.src,
+    action: { type: "photos", index: i },
+  })),
   press: pressReleases.map((release) => ({
     id: `press-${release.slug}`,
     name: `${release.slug}.pdf`,
@@ -69,6 +92,7 @@ const FOLDER_FILES: Record<string, FsFile[]> = {
 }
 
 const FOLDERS: Array<{ id: LocationId; name: string }> = [
+  { id: "memes", name: "Memes" },
   { id: "press", name: "Press" },
   { id: "blog", name: "Blog" },
   { id: "legal", name: "Legal" },
@@ -131,6 +155,11 @@ const TRAIL: Record<LocationId, Array<{ id: LocationId; label: string }>> = {
     { id: "drive-c", label: "Local Disk (C:)" },
     { id: "documents", label: "Documents" },
   ],
+  memes: [
+    { id: "thispc", label: "This PC" },
+    { id: "drive-c", label: "Local Disk (C:)" },
+    { id: "memes", label: "Memes" },
+  ],
 }
 
 function parentOf(location: LocationId): LocationId | null {
@@ -165,7 +194,7 @@ function ToolbarButton({
   )
 }
 
-export default function ExplorerApp() {
+export default function ExplorerApp({ payload }: AppProps) {
   const { openApp } = useOs()
   const [history, setHistory] = useState<LocationId[]>(["home"])
   const [index, setIndex] = useState(0)
@@ -180,6 +209,18 @@ export default function ExplorerApp() {
     setIndex(index + 1)
     setSelected(null)
   }
+
+  // Desktop shortcuts deep-link a location by (re-)sending payload.
+  const [lastPayload, setLastPayload] = useState<unknown>(undefined)
+  if (payload !== lastPayload) {
+    setLastPayload(payload)
+    if (isExplorerPayload(payload) && payload.location in TRAIL && payload.location !== location) {
+      const target = payload.location as LocationId
+      setHistory([...history.slice(0, index + 1), target])
+      setIndex(index + 1)
+      setSelected(null)
+    }
+  }
   const back = () => index > 0 && (setIndex(index - 1), setSelected(null))
   const forward = () => index < history.length - 1 && (setIndex(index + 1), setSelected(null))
   const up = () => {
@@ -191,6 +232,8 @@ export default function ExplorerApp() {
     if (!file.action) return
     if (file.action.type === "reader") {
       openApp("reader", { kind: file.action.kind, slug: file.action.slug })
+    } else if (file.action.type === "photos") {
+      openApp("photos", { index: file.action.index })
     } else {
       window.open(file.action.to, "_blank", "noopener")
     }
@@ -248,7 +291,19 @@ export default function ExplorerApp() {
               : "border-transparent hover:border-white/10 hover:bg-white/[0.05]"
           }`}
         >
-          <Icon className={`size-9 ${inert ? "text-text-dim" : "text-text-muted"}`} strokeWidth={1.25} />
+          {file.thumb ? (
+            <span className="flex h-16 w-full items-center justify-center overflow-hidden rounded border border-white/[0.08] bg-black/40">
+              <img
+                src={file.thumb}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                className="h-full w-full object-cover"
+              />
+            </span>
+          ) : (
+            <Icon className={`size-9 ${inert ? "text-text-dim" : "text-text-muted"}`} strokeWidth={1.25} />
+          )}
           <span className="w-full break-all font-mono text-[11px] leading-tight">{file.name}</span>
           <span className="text-[10px] text-text-dim">{file.meta}</span>
         </button>
@@ -265,7 +320,17 @@ export default function ExplorerApp() {
           isSelected ? "bg-green-bright/10" : "hover:bg-white/[0.05]"
         }`}
       >
-        <Icon className={`size-4 shrink-0 ${inert ? "text-text-dim" : "text-text-muted"}`} strokeWidth={1.5} />
+        {file.thumb ? (
+          <img
+            src={file.thumb}
+            alt=""
+            loading="lazy"
+            draggable={false}
+            className="size-5 shrink-0 rounded-sm border border-white/[0.08] object-cover"
+          />
+        ) : (
+          <Icon className={`size-4 shrink-0 ${inert ? "text-text-dim" : "text-text-muted"}`} strokeWidth={1.5} />
+        )}
         <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{file.name}</span>
         <span className="shrink-0 text-[10.5px] text-text-dim">{file.meta}</span>
       </button>
