@@ -1,14 +1,25 @@
 import type { ComponentType } from "react"
 import type { LucideIcon } from "lucide-react"
 
-export type AppId = "about" | "reader" | "files" | "notepad" | "tetris" | "wallpaper" | "trash"
+export type AppId =
+  | "about"
+  | "reader"
+  | "explorer"
+  | "notepad"
+  | "tetris"
+  | "settings"
+  | "videos"
+  | "trash"
 
-export type WallpaperId = "base" | "radial" | "aurora" | "noise"
-
-/** Deep-link payload for the Reader app (used by the Files app). */
+/** Deep-link payload for the Reader app (used by Explorer and the Start menu). */
 export interface ReaderPayload {
   kind: "press" | "blog"
   slug: string
+}
+
+/** Deep-link payload for the Settings app. */
+export interface SettingsPayload {
+  page: "system" | "personalization" | "about"
 }
 
 export interface AppProps {
@@ -25,5 +36,8 @@ export interface OsApp {
   tagline: string
   icon: LucideIcon
   defaultSize: { w: number; h: number }
+  minSize: { w: number; h: number }
   component: ComponentType<AppProps>
+  /** Apps hidden from the desktop grid (still in Start / taskbar). */
+  desktopHidden?: boolean
 }

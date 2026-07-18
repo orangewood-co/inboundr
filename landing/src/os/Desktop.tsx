@@ -1,80 +1,41 @@
-import { useEffect, useMemo, useState } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { AuroraBackground } from "@/components/AuroraBackground"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { AnimatePresence } from "motion/react"
+import { Image, Info, Monitor, RefreshCw, StickyNote } from "lucide-react"
 import { OsContext, type OsContextValue } from "./context"
-import type { AppId, WallpaperId } from "./types"
+import type { AppId } from "./types"
+import { DEFAULT_WALLPAPER, isWallpaperId } from "./wallpapers"
 import { useWindowManager } from "./useWindowManager"
 import OsWindow from "./OsWindow"
 import Taskbar from "./Taskbar"
 import DesktopIcons from "./DesktopIcons"
+import WallpaperLayer from "./WallpaperLayer"
+import BootScreen from "./BootScreen"
+import LockScreen from "./LockScreen"
+import ContextMenu, { type ContextMenuItem, type ContextMenuState } from "./ContextMenu"
+import "./os.css"
+
+type Phase = "boot" | "lock" | "desktop"
 
 const WALLPAPER_KEY = "inboundr-os-wallpaper"
-const WALLPAPERS: WallpaperId[] = ["base", "radial", "aurora", "noise"]
+const ANIMATIONS_KEY = "inboundr-os-animations"
 
-function loadWallpaper(): WallpaperId {
+function loadWallpaper(): string {
   try {
     const stored = localStorage.getItem(WALLPAPER_KEY)
-    if (stored && WALLPAPERS.includes(stored as WallpaperId)) return stored as WallpaperId
+    if (stored && isWallpaperId(stored)) return stored
   } catch {
     // localStorage unavailable; fall through to the default.
   }
-  return "radial"
+  return DEFAULT_WALLPAPER
 }
 
-function WallpaperLayer({ id }: { id: WallpaperId }) {
-  if (id === "aurora") {
-    return (
-      <AuroraBackground showRadialGradient={false} className="absolute inset-0" aria-hidden>
-        <></>
-      </AuroraBackground>
-    )
+function loadAnimations(): boolean {
+  try {
+    return localStorage.getItem(ANIMATIONS_KEY) !== "off"
+  } catch {
+    return true
   }
-  if (id === "radial") {
-    return (
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(47,93,80,0.35),transparent)]"
-      />
-    )
-  }
-  if (id === "noise") {
-    return <div aria-hidden className="noise absolute inset-0 overflow-hidden bg-surface" />
-  }
-  return null
-}
-
-function BootOverlay({ onDone }: { onDone: () => void }) {
-  const reduceMotion = useReducedMotion()
-
-  useEffect(() => {
-    const id = window.setTimeout(onDone, reduceMotion ? 400 : 1300)
-    return () => window.clearTimeout(id)
-  }, [onDone, reduceMotion])
-
-  return (
-    <motion.div
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-      className="absolute inset-0 z-[9500] flex flex-col items-center justify-center gap-3 bg-base"
-    >
-      <motion.p
-        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="font-display text-4xl italic text-gold sm:text-5xl"
-      >
-        InboundrOS
-      </motion.p>
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.4 }}
-        className="label-sm text-text-dim"
-      >
-        Booting up
-      </motion.p>
-    </motion.div>
-  )
 }
 
 function useIsMobile(): boolean {
@@ -92,27 +53,41 @@ function useIsMobile(): boolean {
 
 export default function Desktop() {
   const wm = useWindowManager()
+  const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const [wallpaper, setWallpaperState] = useState<WallpaperId>(loadWallpaper)
-  const [booting, setBooting] = useState(true)
+  const [phase, setPhase] = useState<Phase>("boot")
+  const [wallpaper, setWallpaperState] = useState<string>(loadWallpaper)
+  const [brightness, setBrightness] = useState(100)
+  const [animations, setAnimationsState] = useState<boolean>(loadAnimations)
+  const [menu, setMenu] = useState<ContextMenuState | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const setWallpaper = (id: WallpaperId) => {
+  const setWallpaper = useCallback((id: string) => {
     setWallpaperState(id)
     try {
       localStorage.setItem(WALLPAPER_KEY, id)
     } catch {
       // Fine — the choice just won't survive a reload.
     }
-  }
+  }, [])
 
-  // Greet larger screens with the About window so the desktop isn't bare.
-  const { open } = wm
-  useEffect(() => {
-    if (booting) return
-    if (window.matchMedia("(min-width: 640px)").matches) open("about")
-    // Run exactly once, after boot completes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booting])
+  const setAnimations = useCallback((enabled: boolean) => {
+    setAnimationsState(enabled)
+    try {
+      localStorage.setItem(ANIMATIONS_KEY, enabled ? "on" : "off")
+    } catch {
+      // Non-fatal.
+    }
+  }, [])
+
+  const { open, reset } = wm
+
+  const sleep = useCallback(() => setPhase("lock"), [])
+  const restart = useCallback(() => {
+    reset()
+    setPhase("boot")
+  }, [reset])
+  const shutdown = useCallback(() => navigate("/"), [navigate])
 
   const context = useMemo<OsContextValue>(
     () => ({
@@ -120,10 +95,56 @@ export default function Desktop() {
       closeWindow: wm.close,
       wallpaper,
       setWallpaper,
+      brightness,
+      setBrightness,
+      animations,
+      setAnimations,
       isMobile,
+      sleep,
+      restart,
+      shutdown,
     }),
-    [open, wm.close, wallpaper, isMobile],
+    [open, wm.close, wallpaper, setWallpaper, brightness, animations, setAnimations, isMobile, sleep, restart, shutdown],
   )
+
+  const openContextMenu = useCallback((x: number, y: number, items: ContextMenuItem[]) => {
+    setMenu({ x, y, items })
+  }, [])
+
+  const desktopMenuItems: ContextMenuItem[] = [
+    {
+      id: "refresh",
+      label: "Refresh",
+      icon: RefreshCw,
+      action: () => setRefreshKey((k) => k + 1),
+    },
+    {
+      id: "new-note",
+      label: "New note",
+      icon: StickyNote,
+      action: () => open("notepad"),
+    },
+    {
+      id: "wallpaper",
+      label: "Change wallpaper",
+      icon: Image,
+      separatorBefore: true,
+      action: () => open("settings", { page: "personalization" }),
+    },
+    {
+      id: "display",
+      label: "Display settings",
+      icon: Monitor,
+      action: () => open("settings", { page: "system" }),
+    },
+    {
+      id: "about",
+      label: "About InboundrOS",
+      icon: Info,
+      separatorBefore: true,
+      action: () => open("settings", { page: "about" }),
+    },
+  ]
 
   return (
     <OsContext.Provider value={context}>
@@ -131,36 +152,70 @@ export default function Desktop() {
       <div className="fixed inset-0 overflow-hidden bg-base text-text">
         <WallpaperLayer id={wallpaper} />
 
-        <DesktopIcons onLaunch={open} />
+        {phase === "desktop" && (
+          <DesktopIcons
+            onLaunch={open}
+            refreshKey={refreshKey}
+            onDesktopMenu={(x, y) => openContextMenu(x, y, desktopMenuItems)}
+            onIconMenu={openContextMenu}
+          />
+        )}
 
         {/* Windows layer must not block clicks on the desktop icons beneath it. */}
-        <div className="pointer-events-none absolute inset-0">
+        <div className="pointer-events-none absolute inset-0 z-10">
           <AnimatePresence>
-            {wm.windows.map((win) => (
-              <OsWindow
-                key={win.id}
-                win={win}
-                focused={win.id === wm.focusedId}
-                mobile={isMobile}
-                onClose={() => wm.close(win.id)}
-                onFocus={() => wm.focus(win.id)}
-                onMinimize={() => wm.minimize(win.id)}
-                onToggleMaximize={() => wm.toggleMaximize(win.id)}
-                onMove={(x, y) => wm.move(win.id, x, y)}
-              />
-            ))}
+            {phase === "desktop" &&
+              wm.windows.map((win) => (
+                <OsWindow
+                  key={win.id}
+                  win={win}
+                  focused={win.id === wm.focusedId}
+                  mobile={isMobile}
+                  onClose={() => wm.close(win.id)}
+                  onFocus={() => wm.focus(win.id)}
+                  onMinimize={() => wm.minimize(win.id)}
+                  onToggleMaximize={() => wm.toggleMaximize(win.id)}
+                  onSetMaximized={(maximized) => wm.setMaximized(win.id, maximized)}
+                  onMove={(x, y) => wm.move(win.id, x, y)}
+                  onResize={(x, y, w, h) => wm.resize(win.id, x, y, w, h)}
+                />
+              ))}
           </AnimatePresence>
         </div>
 
-        <Taskbar
-          windows={wm.windows}
-          focusedId={wm.focusedId}
-          onLaunch={open}
-          onFocus={wm.focus}
-          onMinimize={wm.minimize}
-        />
+        {phase === "desktop" && (
+          <Taskbar
+            windows={wm.windows}
+            focusedId={wm.focusedId}
+            onLaunch={open}
+            onFocus={wm.focus}
+            onMinimize={wm.minimize}
+            onMinimizeAll={wm.minimizeAll}
+          />
+        )}
 
-        <AnimatePresence>{booting && <BootOverlay onDone={() => setBooting(false)} />}</AnimatePresence>
+        {/* Desktop / icon context menu */}
+        <AnimatePresence>
+          {menu && phase === "desktop" && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
+        </AnimatePresence>
+
+        {/* Brightness dim — above the desktop, below lock and boot. */}
+        {brightness < 100 && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-[9300] bg-black"
+            style={{ opacity: ((100 - brightness) / 100) * 0.75 }}
+          />
+        )}
+
+        <AnimatePresence>
+          {phase === "lock" && (
+            <LockScreen wallpaper={wallpaper} onUnlock={() => setPhase("desktop")} />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {phase === "boot" && <BootScreen onDone={() => setPhase("lock")} />}
+        </AnimatePresence>
       </div>
     </OsContext.Provider>
   )

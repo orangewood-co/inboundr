@@ -1,0 +1,123 @@
+/* Styles specific to InboundrOS (the /os route). */
+
+/* Windows-style boot spinner: dots orbiting with staggered delays. */
+@keyframes os-orbit {
+  0% {
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.4, 0.1, 0.6, 0.9);
+  }
+  50% {
+    transform: rotate(220deg);
+    animation-timing-function: cubic-bezier(0.4, 0.1, 0.6, 0.9);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.os-spinner {
+  position: relative;
+}
+
+.os-spinner span {
+  position: absolute;
+  inset: 0;
+  animation: os-orbit 2s linear infinite;
+  animation-delay: calc(var(--i) * 0.14s);
+  opacity: calc(1 - var(--i) * 0.12);
+}
+
+.os-spinner span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 12%;
+  height: 12%;
+  margin-left: -6%;
+  border-radius: 9999px;
+  background: #edf2ec;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-spinner span {
+    animation-duration: 4s;
+  }
+}
+
+/* Acrylic / mica surfaces. */
+.os-acrylic {
+  background: rgba(10, 15, 12, 0.78);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+}
+
+.os-mica {
+  background: rgba(14, 19, 16, 0.86);
+  backdrop-filter: blur(48px) saturate(1.25);
+  -webkit-backdrop-filter: blur(48px) saturate(1.25);
+}
+
+/* Window elevation, Win11-flavored. */
+.os-window-shadow {
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.os-window-shadow-focused {
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.65),
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(62, 207, 142, 0.08);
+}
+
+/* Range inputs (brightness / volume) in the quick settings + Settings app. */
+.os-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    #3ecf8e 0%,
+    #3ecf8e var(--fill, 50%),
+    rgba(255, 255, 255, 0.14) var(--fill, 50%),
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  outline-offset: 6px;
+  cursor: pointer;
+}
+
+.os-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #edf2ec;
+  border: 4px solid #0e1310;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.os-slider::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #edf2ec;
+  border: 4px solid #0e1310;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+/* Thin, unobtrusive scrollbars inside OS app content. */
+.os-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.os-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

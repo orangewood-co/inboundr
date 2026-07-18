@@ -1,20 +1,31 @@
-import { BookOpen, FolderOpen, Gamepad2, Image, Info, StickyNote, Trash2 } from "lucide-react"
+import { BookOpen, Film, FolderClosed, Gamepad2, Info, Settings, StickyNote, Trash2 } from "lucide-react"
 import type { AppId, OsApp } from "../types"
 import AboutApp from "./About"
 import ReaderApp from "./Reader"
-import FilesApp from "./Files"
+import ExplorerApp from "./Explorer"
 import NotepadApp from "./Notepad"
 import TetrisApp from "./Tetris"
-import WallpaperApp from "./Wallpaper"
+import SettingsApp from "./Settings"
+import MediaPlayerApp from "./MediaPlayer"
 import TrashApp from "./Trash"
 
 export const APPS: OsApp[] = [
   {
+    id: "explorer",
+    name: "File Explorer",
+    tagline: "This PC & documents",
+    icon: FolderClosed,
+    defaultSize: { w: 720, h: 500 },
+    minSize: { w: 420, h: 320 },
+    component: ExplorerApp,
+  },
+  {
     id: "about",
-    name: "About",
+    name: "About Inboundr",
     tagline: "Who we are",
     icon: Info,
     defaultSize: { w: 560, h: 620 },
+    minSize: { w: 360, h: 320 },
     component: AboutApp,
   },
   {
@@ -22,23 +33,26 @@ export const APPS: OsApp[] = [
     name: "Reader",
     tagline: "Press & blog",
     icon: BookOpen,
-    defaultSize: { w: 620, h: 560 },
+    defaultSize: { w: 640, h: 560 },
+    minSize: { w: 380, h: 320 },
     component: ReaderApp,
   },
   {
-    id: "files",
-    name: "Files",
-    tagline: "Company documents",
-    icon: FolderOpen,
-    defaultSize: { w: 560, h: 460 },
-    component: FilesApp,
+    id: "videos",
+    name: "Videos",
+    tagline: "Watch the good stuff",
+    icon: Film,
+    defaultSize: { w: 760, h: 480 },
+    minSize: { w: 420, h: 340 },
+    component: MediaPlayerApp,
   },
   {
     id: "notepad",
     name: "Notepad",
     tagline: "Scratch space",
     icon: StickyNote,
-    defaultSize: { w: 480, h: 420 },
+    defaultSize: { w: 500, h: 420 },
+    minSize: { w: 320, h: 260 },
     component: NotepadApp,
   },
   {
@@ -46,23 +60,26 @@ export const APPS: OsApp[] = [
     name: "Tetris",
     tagline: "You've earned a break",
     icon: Gamepad2,
-    defaultSize: { w: 420, h: 620 },
+    defaultSize: { w: 420, h: 640 },
+    minSize: { w: 300, h: 420 },
     component: TetrisApp,
   },
   {
-    id: "wallpaper",
-    name: "Wallpaper",
+    id: "settings",
+    name: "Settings",
     tagline: "Make it yours",
-    icon: Image,
-    defaultSize: { w: 440, h: 440 },
-    component: WallpaperApp,
+    icon: Settings,
+    defaultSize: { w: 720, h: 540 },
+    minSize: { w: 400, h: 360 },
+    component: SettingsApp,
   },
   {
     id: "trash",
-    name: "Trash",
+    name: "Recycle Bin",
     tagline: "Things we left behind",
     icon: Trash2,
-    defaultSize: { w: 520, h: 380 },
+    defaultSize: { w: 540, h: 400 },
+    minSize: { w: 360, h: 280 },
     component: TrashApp,
   },
 ]

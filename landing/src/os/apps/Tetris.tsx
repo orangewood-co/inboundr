@@ -33,7 +33,7 @@ function TouchButton({
       type="button"
       aria-label={label}
       onClick={onPress}
-      className="flex h-9 flex-1 items-center justify-center border border-border text-text-muted transition-colors duration-200 hover:bg-surface hover:text-text active:bg-surface-raised"
+      className="flex h-9 flex-1 items-center justify-center rounded-md border border-white/[0.08] text-text-muted transition-colors duration-200 hover:bg-white/[0.06] hover:text-text active:bg-white/[0.12]"
     >
       {children}
     </button>
@@ -123,7 +123,7 @@ export default function TetrisApp({ focused }: AppProps) {
             <button
               type="button"
               onClick={status === "over" ? actions.restart : actions.togglePause}
-              className="border border-border px-5 py-2 text-[13px] font-semibold transition-colors duration-200 hover:border-white/20 hover:bg-surface"
+              className="rounded-md border border-white/[0.12] px-5 py-2 text-[13px] font-semibold transition-colors duration-200 hover:border-white/25 hover:bg-white/[0.06]"
             >
               {status === "over" ? "Play again" : "Resume"}
             </button>

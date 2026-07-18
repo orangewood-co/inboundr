@@ -9,6 +9,8 @@ export interface OsWindowState {
   y: number
   w: number
   h: number
+  minW: number
+  minH: number
   z: number
   minimized: boolean
   maximized: boolean
@@ -26,8 +28,12 @@ type Action =
   | { type: "CLOSE"; id: number }
   | { type: "FOCUS"; id: number }
   | { type: "MINIMIZE"; id: number }
+  | { type: "MINIMIZE_ALL" }
   | { type: "TOGGLE_MAXIMIZE"; id: number }
+  | { type: "SET_MAXIMIZED"; id: number; maximized: boolean }
   | { type: "MOVE"; id: number; x: number; y: number }
+  | { type: "RESIZE"; id: number; x: number; y: number; w: number; h: number }
+  | { type: "RESET" }
 
 const TASKBAR_H = 52
 
@@ -63,7 +69,7 @@ function reducer(state: ManagerState, action: Action): ManagerState {
       const app = getApp(action.appId)
       const w = Math.min(app.defaultSize.w, action.viewport.w - 24)
       const h = Math.min(app.defaultSize.h, action.viewport.h - TASKBAR_H - 24)
-      // Cascade new windows from the upper-left third of the desktop.
+      // Cascade new windows around the center of the desktop.
       const offset = (state.nextId % 6) * 28
       const { x, y } = clampPosition(
         Math.round((action.viewport.w - w) / 2) + offset - 70,
@@ -84,6 +90,8 @@ function reducer(state: ManagerState, action: Action): ManagerState {
             y,
             w,
             h,
+            minW: app.minSize.w,
+            minH: app.minSize.h,
             z: state.nextZ,
             minimized: false,
             maximized: false,
@@ -113,6 +121,11 @@ function reducer(state: ManagerState, action: Action): ManagerState {
           win.id === action.id ? { ...win, minimized: true } : win,
         ),
       }
+    case "MINIMIZE_ALL":
+      return {
+        ...state,
+        windows: state.windows.map((win) => ({ ...win, minimized: true })),
+      }
     case "TOGGLE_MAXIMIZE":
       return {
         ...state,
@@ -123,6 +136,16 @@ function reducer(state: ManagerState, action: Action): ManagerState {
             : win,
         ),
       }
+    case "SET_MAXIMIZED":
+      return {
+        ...state,
+        nextZ: state.nextZ + 1,
+        windows: state.windows.map((win) =>
+          win.id === action.id
+            ? { ...win, maximized: action.maximized, minimized: false, z: state.nextZ }
+            : win,
+        ),
+      }
     case "MOVE":
       return {
         ...state,
@@ -130,6 +153,17 @@ function reducer(state: ManagerState, action: Action): ManagerState {
           win.id === action.id ? { ...win, x: action.x, y: action.y } : win,
         ),
       }
+    case "RESIZE":
+      return {
+        ...state,
+        windows: state.windows.map((win) =>
+          win.id === action.id
+            ? { ...win, x: action.x, y: action.y, w: action.w, h: action.h }
+            : win,
+        ),
+      }
+    case "RESET":
+      return { windows: [], nextId: 1, nextZ: 1 }
     default:
       return state
   }
@@ -143,8 +177,12 @@ export interface WindowManager {
   close: (id: number) => void
   focus: (id: number) => void
   minimize: (id: number) => void
+  minimizeAll: () => void
   toggleMaximize: (id: number) => void
+  setMaximized: (id: number, maximized: boolean) => void
   move: (id: number, x: number, y: number) => void
+  resize: (id: number, x: number, y: number, w: number, h: number) => void
+  reset: () => void
 }
 
 export const OS_TASKBAR_HEIGHT = TASKBAR_H
@@ -175,8 +213,12 @@ export function useWindowManager(): WindowManager {
       close: (id) => dispatch({ type: "CLOSE", id }),
       focus: (id) => dispatch({ type: "FOCUS", id }),
       minimize: (id) => dispatch({ type: "MINIMIZE", id }),
+      minimizeAll: () => dispatch({ type: "MINIMIZE_ALL" }),
       toggleMaximize: (id) => dispatch({ type: "TOGGLE_MAXIMIZE", id }),
+      setMaximized: (id, maximized) => dispatch({ type: "SET_MAXIMIZED", id, maximized }),
       move: (id, x, y) => dispatch({ type: "MOVE", id, x, y }),
+      resize: (id, x, y, w, h) => dispatch({ type: "RESIZE", id, x, y, w, h }),
+      reset: () => dispatch({ type: "RESET" }),
     }),
     [state.windows, focusedId],
   )

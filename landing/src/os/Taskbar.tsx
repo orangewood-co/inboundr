@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react"
-import { Link } from "react-router-dom"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { LogOut } from "lucide-react"
-import { APPS, getApp } from "./apps/registry"
+import { AnimatePresence } from "motion/react"
+import { Volume2, Wifi } from "lucide-react"
+import { APPS } from "./apps/registry"
 import type { AppId } from "./types"
 import type { OsWindowState } from "./useWindowManager"
 import { OS_TASKBAR_HEIGHT } from "./useWindowManager"
-
-const EASE = [0.25, 1, 0.5, 1] as const
+import StartMenu from "./StartMenu"
+import QuickSettings from "./QuickSettings"
 
 function Clock() {
   const [now, setNow] = useState(() => new Date())
@@ -16,39 +15,59 @@ function Clock() {
     return () => window.clearInterval(id)
   }, [])
   return (
-    <div className="hidden flex-col items-end sm:flex">
-      <span className="font-mono text-[12px] leading-tight text-text">
+    <div className="flex flex-col items-end px-2">
+      <span className="font-mono text-[11.5px] leading-tight text-text">
         {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
       </span>
-      <span className="font-mono text-[10px] leading-tight text-text-dim">
-        {now.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+      <span className="hidden font-mono text-[10px] leading-tight text-text-dim sm:block">
+        {now.toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" })}
       </span>
     </div>
+  )
+}
+
+function Tooltip({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-surface-raised px-2.5 py-1 text-[11px] font-medium text-text opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+      {label}
+    </span>
   )
 }
 
 interface TaskbarProps {
   windows: OsWindowState[]
   focusedId: number | null
-  onLaunch: (appId: AppId) => void
+  onLaunch: (appId: AppId, payload?: unknown) => void
   onFocus: (id: number) => void
   onMinimize: (id: number) => void
+  onMinimizeAll: () => void
 }
 
-export default function Taskbar({ windows, focusedId, onLaunch, onFocus, onMinimize }: TaskbarProps) {
-  const [launcherOpen, setLauncherOpen] = useState(false)
-  const launcherRef = useRef<HTMLDivElement>(null)
-  const reduceMotion = useReducedMotion()
+export default function Taskbar({
+  windows,
+  focusedId,
+  onLaunch,
+  onFocus,
+  onMinimize,
+  onMinimizeAll,
+}: TaskbarProps) {
+  const [startOpen, setStartOpen] = useState(false)
+  const [quickOpen, setQuickOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!launcherOpen) return
+    if (!startOpen && !quickOpen) return
     const onPointerDown = (e: PointerEvent) => {
-      if (launcherRef.current && !launcherRef.current.contains(e.target as Node)) {
-        setLauncherOpen(false)
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setStartOpen(false)
+        setQuickOpen(false)
       }
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLauncherOpen(false)
+      if (e.key === "Escape") {
+        setStartOpen(false)
+        setQuickOpen(false)
+      }
     }
     document.addEventListener("pointerdown", onPointerDown)
     document.addEventListener("keydown", onKey)
@@ -56,109 +75,125 @@ export default function Taskbar({ windows, focusedId, onLaunch, onFocus, onMinim
       document.removeEventListener("pointerdown", onPointerDown)
       document.removeEventListener("keydown", onKey)
     }
-  }, [launcherOpen])
+  }, [startOpen, quickOpen])
+
+  const onAppClick = (appId: AppId) => {
+    const win = windows.find((w) => w.appId === appId)
+    if (!win) {
+      onLaunch(appId)
+    } else if (win.id === focusedId && !win.minimized) {
+      onMinimize(win.id)
+    } else {
+      onFocus(win.id)
+    }
+  }
 
   return (
-    <div ref={launcherRef} className="absolute inset-x-0 bottom-0 z-[9000]">
-      {/* Launcher menu */}
+    <div ref={rootRef} className="absolute inset-x-0 bottom-0 z-[9000]">
       <AnimatePresence>
-        {launcherOpen && (
-          <motion.div
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
-            transition={{ duration: 0.25, ease: EASE }}
-            className="absolute bottom-full left-2 mb-2 w-72 border border-border bg-surface"
-            role="menu"
-            aria-label="All apps"
-          >
-            <p className="border-b border-border px-4 py-3 label-sm text-text-dim">All apps</p>
-            <div className="py-1">
-              {APPS.map((app) => (
-                <button
-                  key={app.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    onLaunch(app.id)
-                    setLauncherOpen(false)
-                  }}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-surface-raised"
-                >
-                  <app.icon className="size-4 text-green-bright" strokeWidth={1.5} />
-                  <span className="flex-1 text-[13px] font-medium">{app.name}</span>
-                  <span className="font-mono text-[10px] text-text-dim">{app.tagline}</span>
-                </button>
-              ))}
-            </div>
-            <Link
-              to="/"
-              className="flex items-center gap-3 border-t border-border px-4 py-3 text-[13px] font-medium text-text-muted transition-colors duration-200 hover:bg-surface-raised hover:text-text"
-            >
-              <LogOut className="size-4" strokeWidth={1.5} />
-              Back to the website
-            </Link>
-          </motion.div>
+        {startOpen && (
+          <StartMenu
+            onClose={() => setStartOpen(false)}
+            onLaunch={(appId, payload) => onLaunch(appId, payload)}
+          />
         )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {quickOpen && <QuickSettings onClose={() => setQuickOpen(false)} />}
       </AnimatePresence>
 
       {/* Bar */}
       <div
-        className="flex items-center gap-2 border-t border-border bg-base/90 px-2 backdrop-blur-sm"
+        className="os-acrylic flex items-stretch border-t border-white/[0.06]"
         style={{ height: OS_TASKBAR_HEIGHT }}
       >
-        <button
-          type="button"
-          onClick={() => setLauncherOpen((open) => !open)}
-          aria-expanded={launcherOpen}
-          aria-label="Open the app launcher"
-          className={`flex h-9 items-center gap-2.5 px-3 transition-colors duration-200 ${
-            launcherOpen ? "bg-surface-raised" : "hover:bg-surface"
-          }`}
-        >
-          <img src="/mark.png" alt="" className="size-5 object-contain" />
-          <span className="label-sm">Start</span>
-        </button>
+        {/* Left spacer balances the tray so the icon cluster is truly centered. */}
+        <div className="hidden flex-1 sm:block" />
 
-        <div className="h-6 w-px bg-border" />
+        {/* Centered icon cluster */}
+        <div className="flex flex-1 items-center justify-center gap-0.5 overflow-x-auto px-1 sm:flex-none sm:overflow-visible">
+          {/* Start */}
+          <button
+            type="button"
+            onClick={() => {
+              setQuickOpen(false)
+              setStartOpen((open) => !open)
+            }}
+            aria-expanded={startOpen}
+            aria-label="Start"
+            className={`group relative flex size-10 shrink-0 items-center justify-center rounded-md transition-all duration-150 ${
+              startOpen ? "bg-white/[0.12]" : "hover:bg-white/[0.08]"
+            } active:scale-90`}
+          >
+            <img src="/mark.png" alt="" className="size-6 object-contain" draggable={false} />
+            <Tooltip label="Start" />
+          </button>
 
-        {/* Running apps */}
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {windows.map((win) => {
-            const app = getApp(win.appId)
-            const isFocused = win.id === focusedId && !win.minimized
+          {APPS.map((app) => {
+            const win = windows.find((w) => w.appId === app.id)
+            const isFocused = !!win && win.id === focusedId && !win.minimized
             return (
               <button
-                key={win.id}
+                key={app.id}
                 type="button"
-                onClick={() => (isFocused ? onMinimize(win.id) : onFocus(win.id))}
-                title={app.name}
-                className={`relative flex h-9 shrink-0 items-center gap-2 px-3 transition-colors duration-200 ${
-                  isFocused ? "bg-surface-raised" : "hover:bg-surface"
-                } ${win.minimized ? "opacity-60" : ""}`}
+                onClick={() => onAppClick(app.id)}
+                aria-label={app.name}
+                className={`group relative flex size-10 shrink-0 items-center justify-center rounded-md transition-all duration-150 ${
+                  isFocused ? "bg-white/[0.12]" : "hover:bg-white/[0.08]"
+                } active:scale-90`}
               >
-                <app.icon className="size-4" strokeWidth={1.5} />
-                <span className="hidden text-[12px] font-medium md:inline">{app.name}</span>
+                <app.icon
+                  className={`size-[22px] transition-colors duration-150 ${
+                    win ? "text-text" : "text-text-muted group-hover:text-text"
+                  }`}
+                  strokeWidth={1.5}
+                />
+                {/* Running indicator */}
                 <span
-                  className={`absolute inset-x-3 bottom-0 h-px ${
-                    isFocused ? "bg-green-bright" : "bg-text-dim"
+                  className={`absolute bottom-0.5 left-1/2 h-[3px] -translate-x-1/2 rounded-full transition-all duration-200 ${
+                    win
+                      ? isFocused
+                        ? "w-4 bg-green-bright"
+                        : "w-1.5 bg-text-dim"
+                      : "w-0 bg-transparent"
                   }`}
                 />
+                <Tooltip label={app.name} />
               </button>
             )
           })}
         </div>
 
-        <Clock />
+        {/* System tray */}
+        <div className="flex flex-1 items-center justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              setStartOpen(false)
+              setQuickOpen((open) => !open)
+            }}
+            aria-expanded={quickOpen}
+            aria-label="Quick settings"
+            className={`group relative mr-1 flex h-10 items-center gap-1.5 rounded-md px-2.5 transition-colors duration-150 ${
+              quickOpen ? "bg-white/[0.12]" : "hover:bg-white/[0.08]"
+            }`}
+          >
+            <Wifi className="size-4 text-text-muted" strokeWidth={1.75} />
+            <Volume2 className="size-4 text-text-muted" strokeWidth={1.75} />
+            <Tooltip label="Quick settings" />
+          </button>
 
-        <Link
-          to="/"
-          title="Back to the website"
-          aria-label="Back to the website"
-          className="flex size-9 items-center justify-center text-text-dim transition-colors duration-200 hover:bg-surface hover:text-text"
-        >
-          <LogOut className="size-4" strokeWidth={1.5} />
-        </Link>
+          <Clock />
+
+          {/* Show desktop sliver */}
+          <button
+            type="button"
+            onClick={onMinimizeAll}
+            aria-label="Show desktop"
+            title="Show desktop"
+            className="ml-1 h-full w-2 border-l border-white/[0.08] transition-colors duration-150 hover:bg-white/[0.08]"
+          />
+        </div>
       </div>
     </div>
   )

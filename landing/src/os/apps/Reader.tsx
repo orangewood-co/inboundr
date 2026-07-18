@@ -79,7 +79,7 @@ export default function ReaderApp({ payload }: AppProps) {
           <button
             type="button"
             onClick={() => setSelection(null)}
-            className="flex items-center gap-1.5 px-2 py-1 text-[13px] font-medium text-text-muted transition-colors duration-200 hover:text-text"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] font-medium text-text-muted transition-colors duration-200 hover:bg-white/[0.06] hover:text-text"
           >
             <ArrowLeft className="size-3.5" /> All articles
           </button>
@@ -138,8 +138,8 @@ export default function ReaderApp({ payload }: AppProps) {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`px-3 py-1 label-sm transition-colors duration-200 ${
-              tab === t ? "bg-surface-raised text-text" : "text-text-dim hover:text-text-muted"
+            className={`rounded-full px-3.5 py-1 text-[12px] font-semibold transition-colors duration-200 ${
+              tab === t ? "bg-white/[0.1] text-text" : "text-text-dim hover:bg-white/[0.05] hover:text-text-muted"
             }`}
           >
             {t === "press" ? "Press" : "Blog"}

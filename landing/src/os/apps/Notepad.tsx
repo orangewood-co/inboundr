@@ -8,9 +8,10 @@ This little desktop is our way of letting you poke around
 instead of scrolling another landing page.
 
 A few things to try:
-- Open Files and snoop through the press archive
+- Open File Explorer and snoop through This PC
 - Beat our high score in Tetris (good luck)
-- Change the wallpaper if this one isn't your vibe
+- Right-click the desktop, it does what you'd hope
+- There's something worth watching in Videos
 
 Anything you type here stays in your browser. Really.
 `
