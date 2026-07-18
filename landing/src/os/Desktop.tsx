@@ -160,7 +160,7 @@ export default function Desktop() {
 
   return (
     <OsContext.Provider value={context}>
-      <title>InboundrOS — Inboundr</title>
+      <title>InboundrOS</title>
       <div className="fixed inset-0 overflow-hidden bg-base text-text">
         <WallpaperLayer id={wallpaper} />
 
