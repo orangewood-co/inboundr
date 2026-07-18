@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Flag, RotateCcw } from "lucide-react"
+import { Flag } from "lucide-react"
 
 const ROWS = 9
 const COLS = 9
