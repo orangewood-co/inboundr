@@ -132,7 +132,7 @@ export default function Subprocessors() {
                 <div className="overflow-hidden border border-border">
                   <div className="noise hidden grid-cols-[1fr_1.4fr_180px] gap-0 bg-surface-raised px-6 py-3 sm:grid">
                     <span className="label-sm text-text-dim">Provider</span>
-                    <span className="label-sm text-text-dim">Purpose</span>
+                    <span className="label-sm pr-8 text-text-dim">Purpose</span>
                     <span className="label-sm text-text-dim">Location</span>
                   </div>
 
@@ -150,7 +150,7 @@ export default function Subprocessors() {
                             <ExternalLink className="size-3 opacity-0 transition group-hover:opacity-60" />
                           </a>
                         </div>
-                        <p className="text-sm text-text-muted">{item.purpose}</p>
+                        <p className="text-sm text-text-muted sm:pr-8">{item.purpose}</p>
                         <p className="text-sm text-text-dim">{item.location}</p>
                       </div>
                     </FadeIn>
