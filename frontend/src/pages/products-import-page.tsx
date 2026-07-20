@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Spinner } from "@/components/ui/spinner"
+import { Progress } from "@/components/ui/progress"
 import {
   Select,
   SelectContent,
@@ -34,6 +34,7 @@ import { formatNumber } from "@/lib/format"
 import type { ProductAdjustmentDefinition, ProductSettings } from "@/lib/catalog"
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const UNMAPPED_COLUMN = "__unmapped__"
+const IMPORT_CHUNK_SIZE = 250
 
 type ImportStep = "upload" | "mapping" | "review" | "complete"
 type ImportMode = "skip" | "update"
@@ -301,6 +302,7 @@ export default function ProductsImportPage() {
   const [mode, setMode] = useState<ImportMode>("skip")
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
 
@@ -352,28 +354,55 @@ export default function ProductsImportPage() {
   async function submitImport() {
     if (!parsedFile || validationErrors.length > 0) return
 
+    const products = buildImportProducts(parsedFile, mapping, importFields)
+    const aggregated: ImportResult = {
+      summary: { created: 0, updated: 0, skipped: 0, failed: 0, total: products.length },
+      errors: [],
+      skipped: [],
+    }
+
     setImporting(true)
     setError(null)
+    setImportProgress({ done: 0, total: products.length })
     try {
-      const response = await fetch(`${API_BASE}/import`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          products: buildImportProducts(parsedFile, mapping, importFields),
-        }),
-      })
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(payload?.error ?? "Unable to import products")
+      for (let offset = 0; offset < products.length; offset += IMPORT_CHUNK_SIZE) {
+        const chunk = products.slice(offset, offset + IMPORT_CHUNK_SIZE)
+        const response = await fetch(`${API_BASE}/import`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode, products: chunk }),
+        })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(payload?.error ?? "Unable to import products")
 
-      setResult(payload as ImportResult)
+        // Backend numbers rows per request, so shift them back to spreadsheet rows.
+        const chunkResult = payload as ImportResult
+        aggregated.summary.created += chunkResult.summary.created
+        aggregated.summary.updated += chunkResult.summary.updated
+        aggregated.summary.skipped += chunkResult.summary.skipped
+        aggregated.summary.failed += chunkResult.summary.failed
+        aggregated.errors.push(...chunkResult.errors.map((item) => ({ ...item, row: item.row + offset })))
+        aggregated.skipped.push(...chunkResult.skipped.map((item) => ({ ...item, row: item.row + offset })))
+        setImportProgress({ done: Math.min(offset + chunk.length, products.length), total: products.length })
+      }
+
+      setResult(aggregated)
       setStep("complete")
       toast.success("Product import completed")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to import products")
+      const message = err instanceof Error ? err.message : "Unable to import products"
+      const processed = aggregated.summary.created + aggregated.summary.updated + aggregated.summary.skipped + aggregated.summary.failed
+      if (processed > 0) {
+        setResult(aggregated)
+        setStep("complete")
+        setError(`${message} — the import stopped after processing ${formatNumber(processed)} of ${formatNumber(products.length)} rows.`)
+      } else {
+        setError(message)
+      }
     } finally {
       setImporting(false)
+      setImportProgress(null)
     }
   }
 
@@ -575,14 +604,28 @@ export default function ProductsImportPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t pt-5">
-                <Button variant="outline" onClick={() => setStep("mapping")} disabled={importing}>
-                  Back
-                </Button>
-                <Button onClick={() => void submitImport()} disabled={validationErrors.length > 0 || importing}>
-                  {importing && <Spinner data-icon="inline-start" />}
-                  Import Products
-                </Button>
+              <div className="space-y-4 border-t pt-5">
+                {importing && importProgress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">
+                        Importing {formatNumber(importProgress.done)} of {formatNumber(importProgress.total)} rows…
+                      </span>
+                      <span className="text-muted-foreground">
+                        {Math.round((importProgress.done / Math.max(importProgress.total, 1)) * 100)}%
+                      </span>
+                    </div>
+                    <Progress value={(importProgress.done / Math.max(importProgress.total, 1)) * 100} />
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <Button variant="outline" onClick={() => setStep("mapping")} disabled={importing}>
+                    Back
+                  </Button>
+                  <Button onClick={() => void submitImport()} disabled={validationErrors.length > 0 || importing}>
+                    Import Products
+                  </Button>
+                </div>
               </div>
             </section>
           )}

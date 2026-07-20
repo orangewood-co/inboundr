@@ -172,6 +172,19 @@ function normalizeImportProductInput(body: Record<string, unknown>): Partial<Pro
     }
   }
 
+  // Reads prefer pricing_policy over the legacy maxdiscount/maxupsell columns,
+  // so keep the canonical JSONB in sync when importing legacy fields.
+  const policyPatch: Record<string, unknown> = {};
+  if ("maxdiscount" in input) policyPatch.maxDiscountPercent = input.maxdiscount;
+  if ("maxupsell" in input) policyPatch.maxMarkupPercent = input.maxupsell;
+  if (Object.keys(policyPatch).length > 0) {
+    const existingPolicy =
+      input.pricing_policy && typeof input.pricing_policy === "object" && !Array.isArray(input.pricing_policy)
+        ? (input.pricing_policy as Record<string, unknown>)
+        : {};
+    input.pricing_policy = { ...existingPolicy, ...policyPatch };
+  }
+
   return input as Partial<ProductInput>;
 }
 
