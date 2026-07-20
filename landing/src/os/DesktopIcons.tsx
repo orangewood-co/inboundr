@@ -6,6 +6,7 @@ import type { AppId } from "./types"
 import { OS_TASKBAR_HEIGHT } from "./useWindowManager"
 import type { ContextMenuItem } from "./ContextMenu"
 import { useOs } from "./context"
+import { wallpaperTone } from "./wallpapers"
 import {
   loadIconPositions,
   saveIconPositions,
@@ -63,6 +64,8 @@ interface DesktopIconsProps {
   refreshKey: number
   /** Bumps to clear the saved layout and re-grid ("Sort icons"). */
   sortKey: number
+  /** Bumps to make the icons do a wave (Konami code). */
+  waveKey: number
 }
 
 export default function DesktopIcons({
@@ -71,8 +74,10 @@ export default function DesktopIcons({
   onIconMenu,
   refreshKey,
   sortKey,
+  waveKey,
 }: DesktopIconsProps) {
-  const { isMobile, animations } = useOs()
+  const { isMobile, animations, wallpaper } = useOs()
+  const onLightWallpaper = wallpaperTone(wallpaper) === "light"
   const systemReduceMotion = useReducedMotion()
   const reduceMotion = systemReduceMotion || !animations
   const rootRef = useRef<HTMLDivElement>(null)
@@ -107,6 +112,19 @@ export default function DesktopIcons({
     setLastSortKey(sortKey)
     setPositions({})
   }
+
+  // Konami wave: briefly animate every icon, staggered left-to-right.
+  const [waving, setWaving] = useState(false)
+  const [lastWaveKey, setLastWaveKey] = useState(waveKey)
+  if (waveKey !== lastWaveKey) {
+    setLastWaveKey(waveKey)
+    setWaving(true)
+  }
+  useLayoutEffect(() => {
+    if (!waving) return
+    const id = window.setTimeout(() => setWaving(false), 1600)
+    return () => window.clearTimeout(id)
+  }, [waving])
 
   useLayoutEffect(() => {
     const el = rootRef.current
@@ -348,21 +366,41 @@ export default function DesktopIcons({
                 ])
               }}
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.45, ease: [0.25, 1, 0.5, 1], delay: 0.15 + i * 0.045 }}
+              animate={
+                waving && !reduceMotion
+                  ? { opacity: 1, y: [0, -16, 0], scale: 1 }
+                  : { opacity: 1, y: 0, scale: 1 }
+              }
+              transition={
+                waving && !reduceMotion
+                  ? { duration: 0.5, ease: "easeInOut", delay: slot.col * 0.09 + slot.row * 0.05 }
+                  : { duration: 0.45, ease: [0.25, 1, 0.5, 1], delay: 0.15 + i * 0.045 }
+              }
               className={`pointer-events-auto absolute flex h-[88px] w-[84px] flex-col items-center justify-center gap-1.5 rounded-md border transition-colors duration-150 ${
                 isSelected
                   ? "border-green-bright/40 bg-green-bright/15"
-                  : "border-transparent hover:border-white/10 hover:bg-white/[0.06]"
+                  : onLightWallpaper
+                    ? "border-transparent hover:border-black/10 hover:bg-black/[0.06]"
+                    : "border-transparent hover:border-white/10 hover:bg-white/[0.06]"
               }`}
             >
               <entry.icon
-                className={`size-8 drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)] ${
-                  entry.isFolder ? "fill-green/40 text-green-bright" : "text-text"
+                className={`size-8 ${
+                  entry.isFolder
+                    ? "fill-green/40 text-green-bright drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+                    : onLightWallpaper
+                      ? "text-neutral-800 drop-shadow-[0_1px_3px_rgba(255,255,255,0.7)]"
+                      : "text-text drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
                 }`}
                 strokeWidth={1.25}
               />
-              <span className="max-w-full truncate px-1 text-[11px] font-medium text-text [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+              <span
+                className={`max-w-full truncate px-1 text-[11px] font-medium ${
+                  onLightWallpaper
+                    ? "text-neutral-800 [text-shadow:0_1px_3px_rgba(255,255,255,0.8)]"
+                    : "text-text [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]"
+                }`}
+              >
                 {entry.name}
               </span>
             </motion.button>

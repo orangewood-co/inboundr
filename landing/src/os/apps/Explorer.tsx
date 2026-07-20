@@ -16,7 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { pressReleases } from "@/data/press"
 import { blogPosts } from "@/data/blog"
-import { MEMES } from "../memes"
+import { AWS_BILL_INDEX, MEMES } from "../memes"
 import { useOs } from "../context"
 import type { AppProps } from "../types"
 
@@ -60,8 +60,9 @@ const FOLDER_FILES: Record<string, FsFile[]> = {
     name: meme.name,
     meta: "certified fresh",
     thumb: meme.src,
-    action: { type: "photos", index: i },
-  })),
+    action: { type: "photos" as const, index: i },
+    hidden: meme.hiddenInMemes,
+  })).filter((f) => !f.hidden),
   press: pressReleases.map((release) => ({
     id: `press-${release.slug}`,
     name: `${release.slug}.pdf`,
@@ -88,6 +89,7 @@ const FOLDER_FILES: Record<string, FsFile[]> = {
     { id: "playbook", name: "inbound-playbook-final-v37-FINAL.docx", meta: "still not final" },
     { id: "pipeline", name: "q3-pipeline.xlsx", meta: "big if true", icon: FileSpreadsheet },
     { id: "passwords", name: "definitely-not-passwords.txt", meta: "nothing to see here" },
+    { id: "aws-bill", name: "aws-bill-DO-NOT-OPEN.png", meta: "seriously, don't", action: { type: "photos", index: AWS_BILL_INDEX } },
   ],
 }
 

@@ -1,6 +1,12 @@
 import { createContext, useContext } from "react"
 import type { AppId } from "./types"
 
+export interface OsToast {
+  id: number
+  title: string
+  message?: string
+}
+
 export interface OsContextValue {
   openApp: (appId: AppId, payload?: unknown) => void
   closeWindow: (id: number) => void
@@ -12,6 +18,12 @@ export interface OsContextValue {
   /** OS-level animations toggle (Settings > System). */
   animations: boolean
   setAnimations: (enabled: boolean) => void
+  /** Toast notifications (Settings > System toggle silences them). */
+  notify: (title: string, message?: string) => void
+  notificationsEnabled: boolean
+  setNotificationsEnabled: (enabled: boolean) => void
+  /** Blue screen. Any key reboots. Use responsibly. */
+  crash: () => void
   isMobile: boolean
   /** Power actions. */
   sleep: () => void

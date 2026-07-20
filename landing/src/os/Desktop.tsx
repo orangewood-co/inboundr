@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { AnimatePresence } from "motion/react"
 import { Image, Info, LayoutGrid, Monitor, RefreshCw, StickyNote } from "lucide-react"
-import { OsContext, type OsContextValue } from "./context"
+import { OsContext, type OsContextValue, type OsToast } from "./context"
 import type { AppId } from "./types"
 import { DEFAULT_WALLPAPER, isWallpaperId } from "./wallpapers"
 import { useWindowManager } from "./useWindowManager"
@@ -12,14 +12,44 @@ import DesktopIcons from "./DesktopIcons"
 import WallpaperLayer from "./WallpaperLayer"
 import BootScreen from "./BootScreen"
 import LockScreen from "./LockScreen"
+import BsodScreen from "./BsodScreen"
+import Toasts from "./Toasts"
+import Clippy from "./Clippy"
 import ContextMenu, { type ContextMenuItem, type ContextMenuState } from "./ContextMenu"
 import { clearIconPositions } from "./iconLayout"
 import "./os.css"
 
-type Phase = "boot" | "lock" | "desktop"
+type Phase = "boot" | "lock" | "desktop" | "bsod"
 
 const WALLPAPER_KEY = "inboundr-os-wallpaper"
 const ANIMATIONS_KEY = "inboundr-os-animations"
+const NOTIFICATIONS_KEY = "inboundr-os-notifications"
+const TOAST_DURATION = 7000
+
+const KONAMI = [
+  "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+  "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight",
+  "b", "a",
+]
+
+/** Ambient toasts after landing on the desktop: the OS quietly sells the product. */
+const AMBIENT_TOASTS: Array<{ delay: number; title: string; message: string }> = [
+  {
+    delay: 25_000,
+    title: "Lead received",
+    message: "\u201CInterested in bulk pricing.\u201D Inboundr already replied.",
+  },
+  {
+    delay: 90_000,
+    title: "Storage almost full",
+    message: "D:\\Leads is at 98%. You should really follow up.",
+  },
+  {
+    delay: 180_000,
+    title: "Update available",
+    message: "InboundrOS 26H2 \u2192 26H3. Adds nothing. Ships anyway.",
+  },
+]
 
 function loadWallpaper(): string {
   try {
@@ -34,6 +64,14 @@ function loadWallpaper(): string {
 function loadAnimations(): boolean {
   try {
     return localStorage.getItem(ANIMATIONS_KEY) !== "off"
+  } catch {
+    return true
+  }
+}
+
+function loadNotifications(): boolean {
+  try {
+    return localStorage.getItem(NOTIFICATIONS_KEY) !== "off"
   } catch {
     return true
   }
@@ -63,6 +101,12 @@ export default function Desktop() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [sortKey, setSortKey] = useState(0)
+  const [waveKey, setWaveKey] = useState(0)
+  const [toasts, setToasts] = useState<OsToast[]>([])
+  const [notificationsEnabled, setNotificationsState] = useState<boolean>(loadNotifications)
+  const toastId = useRef(0)
+  const notificationsRef = useRef(notificationsEnabled)
+  notificationsRef.current = notificationsEnabled
 
   const setWallpaper = useCallback((id: string) => {
     setWallpaperState(id)
@@ -82,14 +126,80 @@ export default function Desktop() {
     }
   }, [])
 
+  const setNotificationsEnabled = useCallback((enabled: boolean) => {
+    setNotificationsState(enabled)
+    // Update immediately so a notify() in the same tick sees the new value.
+    notificationsRef.current = enabled
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, enabled ? "on" : "off")
+    } catch {
+      // Non-fatal.
+    }
+  }, [])
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  const notify = useCallback(
+    (title: string, message?: string) => {
+      if (!notificationsRef.current) return
+      const id = ++toastId.current
+      setToasts((prev) => [...prev.slice(-2), { id, title, message }])
+      window.setTimeout(() => dismissToast(id), TOAST_DURATION)
+    },
+    [dismissToast],
+  )
+
   const { open, reset } = wm
 
   const sleep = useCallback(() => setPhase("lock"), [])
   const restart = useCallback(() => {
     reset()
+    setToasts([])
     setPhase("boot")
   }, [reset])
   const shutdown = useCallback(() => navigate("/"), [navigate])
+  const crash = useCallback(() => {
+    setMenu(null)
+    setToasts([])
+    setPhase("bsod")
+  }, [])
+
+  // Ambient notifications: fire once per desktop session, staggered.
+  useEffect(() => {
+    if (phase !== "desktop") return
+    const timers = AMBIENT_TOASTS.map((toast) =>
+      window.setTimeout(() => notify(toast.title, toast.message), toast.delay),
+    )
+    return () => timers.forEach((id) => window.clearTimeout(id))
+  }, [phase, notify])
+
+  // Konami code: icons do a wave, leads become infinite.
+  useEffect(() => {
+    if (phase !== "desktop") return
+    let progress = 0
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) {
+        return
+      }
+      const expected = KONAMI[progress]
+      const key = expected.length === 1 ? e.key.toLowerCase() : e.key
+      if (key === expected) {
+        progress++
+        if (progress === KONAMI.length) {
+          progress = 0
+          setWaveKey((k) => k + 1)
+          notify("Cheat activated", "Infinite leads. (Results may vary. Book a demo.)")
+        }
+      } else {
+        progress = key === KONAMI[0] ? 1 : 0
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [phase, notify])
 
   const context = useMemo<OsContextValue>(
     () => ({
@@ -101,12 +211,16 @@ export default function Desktop() {
       setBrightness,
       animations,
       setAnimations,
+      notify,
+      notificationsEnabled,
+      setNotificationsEnabled,
+      crash,
       isMobile,
       sleep,
       restart,
       shutdown,
     }),
-    [open, wm.close, wallpaper, setWallpaper, brightness, animations, setAnimations, isMobile, sleep, restart, shutdown],
+    [open, wm.close, wallpaper, setWallpaper, brightness, animations, setAnimations, notify, notificationsEnabled, setNotificationsEnabled, crash, isMobile, sleep, restart, shutdown],
   )
 
   const openContextMenu = useCallback((x: number, y: number, items: ContextMenuItem[]) => {
@@ -160,7 +274,7 @@ export default function Desktop() {
 
   return (
     <OsContext.Provider value={context}>
-      <title>InboundrOS — Inboundr</title>
+      <title>InboundrOS</title>
       <div className="fixed inset-0 overflow-hidden bg-base text-text">
         <WallpaperLayer id={wallpaper} />
 
@@ -169,6 +283,7 @@ export default function Desktop() {
             onLaunch={open}
             refreshKey={refreshKey}
             sortKey={sortKey}
+            waveKey={waveKey}
             onDesktopMenu={(x, y) => openContextMenu(x, y, desktopMenuItems)}
             onIconMenu={openContextMenu}
           />
@@ -212,6 +327,12 @@ export default function Desktop() {
           {menu && phase === "desktop" && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
         </AnimatePresence>
 
+        {/* Toast notifications */}
+        {phase === "desktop" && <Toasts toasts={toasts} onDismiss={dismissToast} />}
+
+        {/* He appears once per session. He is always right. */}
+        {phase === "desktop" && <Clippy />}
+
         {/* Brightness dim — above the desktop, below lock and boot. */}
         {brightness < 100 && (
           <div
@@ -229,6 +350,8 @@ export default function Desktop() {
         <AnimatePresence>
           {phase === "boot" && <BootScreen onDone={() => setPhase("lock")} />}
         </AnimatePresence>
+
+        {phase === "bsod" && <BsodScreen onReboot={restart} />}
       </div>
     </OsContext.Provider>
   )

@@ -1,4 +1,4 @@
-import { BookOpen, Film, FolderClosed, Gamepad2, Image, Info, Settings, StickyNote, Trash2 } from "lucide-react"
+import { Activity, Bomb, BookOpen, Calculator, Film, FolderClosed, Gamepad2, Image, Info, Paintbrush, Settings, SquareTerminal, StickyNote, Trash2 } from "lucide-react"
 import type { AppId, OsApp } from "../types"
 import AboutApp from "./About"
 import ReaderApp from "./Reader"
@@ -9,6 +9,11 @@ import SettingsApp from "./Settings"
 import MediaPlayerApp from "./MediaPlayer"
 import PhotosApp from "./Photos"
 import TrashApp from "./Trash"
+import TerminalApp from "./Terminal"
+import CalculatorApp from "./Calculator"
+import TaskManagerApp from "./TaskManager"
+import MinesweeperApp from "./Minesweeper"
+import PaintApp from "./Paint"
 
 export const APPS: OsApp[] = [
   {
@@ -83,6 +88,53 @@ export const APPS: OsApp[] = [
     defaultSize: { w: 720, h: 540 },
     minSize: { w: 400, h: 360 },
     component: SettingsApp,
+  },
+  {
+    id: "terminal",
+    name: "Terminal",
+    tagline: "For the curious",
+    icon: SquareTerminal,
+    defaultSize: { w: 620, h: 420 },
+    minSize: { w: 360, h: 260 },
+    component: TerminalApp,
+  },
+  {
+    id: "minesweeper",
+    name: "Minesweeper",
+    tagline: "Flag the risky leads",
+    icon: Bomb,
+    defaultSize: { w: 380, h: 520 },
+    minSize: { w: 300, h: 420 },
+    component: MinesweeperApp,
+  },
+  {
+    id: "paint",
+    name: "Paint",
+    tagline: "Ship your masterpiece",
+    icon: Paintbrush,
+    defaultSize: { w: 640, h: 480 },
+    minSize: { w: 380, h: 300 },
+    component: PaintApp,
+  },
+  {
+    id: "calculator",
+    name: "Calculator",
+    tagline: "Certified for quotes",
+    icon: Calculator,
+    defaultSize: { w: 320, h: 480 },
+    minSize: { w: 260, h: 400 },
+    component: CalculatorApp,
+    desktopHidden: true,
+  },
+  {
+    id: "taskmanager",
+    name: "Task Manager",
+    tagline: "See what's really running",
+    icon: Activity,
+    defaultSize: { w: 560, h: 440 },
+    minSize: { w: 420, h: 320 },
+    component: TaskManagerApp,
+    desktopHidden: true,
   },
   {
     id: "trash",
