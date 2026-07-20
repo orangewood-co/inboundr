@@ -681,7 +681,7 @@ function SortableHeader({
 }: {
   label: string
   sorted: false | "asc" | "desc"
-  onToggle: () => void
+  onToggle: (event: unknown) => void
 }) {
   return (
     <button
