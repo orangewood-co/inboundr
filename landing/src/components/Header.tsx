@@ -18,13 +18,13 @@ export default function Header() {
     <>
       {/* ── Banner ── */}
       <div className="noise relative z-50 overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide">
-        <span className="relative z-10 text-text-muted">InboundrOS is here</span>
-        <span className="relative z-10 mx-2 text-text-dim">|</span>
+        <span className="relative z-10 text-text/90">Introducing InboundrOS</span>
+        <span className="relative z-10 mx-2 text-text/30">|</span>
         <Link
           to="/os"
-          className="relative z-10 font-medium text-text transition-colors duration-200 hover:text-gold"
+          className="relative z-10 font-medium text-gold transition-colors duration-200 hover:text-text"
         >
-          Try it <ArrowRight className="mb-px inline size-3" />
+          Explore <ArrowRight className="mb-px inline size-3" />
         </Link>
       </div>
 
