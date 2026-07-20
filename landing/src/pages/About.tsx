@@ -71,11 +71,11 @@ export default function About() {
           <FadeIn>
             <p className="label mb-10 text-text-muted">What we believe</p>
           </FadeIn>
-          <div className="grid gap-0 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {values.map((v, i) => (
-              <FadeIn key={v.title} delay={i * 0.1}>
-                <div className="border-b border-border p-8 sm:odd:border-r">
-                  <h3 className="text-lg font-semibold">{v.title}</h3>
+              <FadeIn key={v.title} delay={i * 0.1} className="h-full">
+                <div className="h-full border border-border bg-surface p-7 sm:p-8">
+                  <h3 className="text-lg font-semibold tracking-[-0.01em]">{v.title}</h3>
                   <p className="mt-3 text-sm leading-relaxed text-text-muted">{v.text}</p>
                 </div>
               </FadeIn>
