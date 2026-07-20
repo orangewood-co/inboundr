@@ -57,7 +57,7 @@ export default function About() {
         description="We believe every inbound lead deserves an instant, intelligent response — and that AI can deliver it better than a team of ten."
       />
 
-      <section className="border-y border-border px-6 py-24 sm:py-36 lg:px-8">
+      <section className="px-6 py-24 sm:py-36 lg:px-8">
         <div className="mx-auto max-w-4xl">
           <p className="label mb-10 text-gold">Our manifesto</p>
           <h2 className="text-3xl font-bold leading-snug tracking-[-0.02em] sm:text-4xl lg:text-[3.25rem] lg:leading-[1.15]">

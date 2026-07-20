@@ -11,6 +11,15 @@ interface PageHeaderProps {
 export function PageHeader({ label, title, description, children }: PageHeaderProps) {
   return (
     <section className="noise relative overflow-hidden">
+      <img
+        src="/background.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {/* Scrim: keeps text readable over the image, heaviest where the text sits */}
+      <div className="absolute inset-0 bg-gradient-to-r from-base via-base/70 to-base/30" />
+      <div className="absolute inset-0 bg-gradient-to-t from-base via-transparent to-transparent" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_35%_at_50%_0%,rgba(47,93,80,0.2),transparent)]" />
       <div className="relative mx-auto max-w-4xl px-6 pb-20 pt-24 sm:pb-28 sm:pt-32 lg:px-8">
         <FadeIn>
@@ -19,7 +28,7 @@ export function PageHeader({ label, title, description, children }: PageHeaderPr
             {title}
           </h1>
           {description && (
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-text-muted sm:text-lg">{description}</p>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-text/75 sm:text-lg">{description}</p>
           )}
           {children}
         </FadeIn>
