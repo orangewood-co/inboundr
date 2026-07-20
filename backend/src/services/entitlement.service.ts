@@ -17,6 +17,7 @@ export const FEATURE_KEYS = [
   "assets",
   "service_management",
   "recruitment",
+  "workflows",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -50,6 +51,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "assets", label: "Assets", description: "Asset register, depreciation schedules, custody, and disposal tracking." },
   { key: "service_management", label: "Service Management", description: "Service requests, visits, equipment, workflow, and service history." },
   { key: "recruitment", label: "Recruitment", description: "Jobs, candidates, application pipelines, and hiring activity." },
+  { key: "workflows", label: "Workflows", description: "Node-based automations on top of the RFQ and Orders flow." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [

@@ -1,0 +1,303 @@
+import type { LucideIcon } from "lucide-react"
+import {
+  ArchiveIcon,
+  BellIcon,
+  FileSearchIcon,
+  FileTextIcon,
+  MailCheckIcon,
+  MailIcon,
+  ShieldCheckIcon,
+  ShoppingCartIcon,
+  TimerIcon,
+} from "lucide-react"
+
+export type WorkflowNodeCategory = "trigger" | "action" | "logic"
+
+export interface WorkflowFieldOption {
+  value: string
+  label: string
+}
+
+export interface WorkflowFieldDefinition {
+  key: string
+  label: string
+  type: "text" | "textarea" | "number" | "select"
+  placeholder?: string
+  options?: WorkflowFieldOption[]
+  supportsVariables?: boolean
+  defaultValue?: string | number
+}
+
+export interface WorkflowOutputHandle {
+  id: string | null
+  label?: string
+}
+
+export interface WorkflowNodeDefinition {
+  type: string
+  label: string
+  description: string
+  category: WorkflowNodeCategory
+  icon: LucideIcon
+  hasInput: boolean
+  outputs: WorkflowOutputHandle[]
+  fields: WorkflowFieldDefinition[]
+}
+
+export const TEMPLATE_VARIABLES: Array<{ token: string; label: string }> = [
+  { token: "{{rfq.customer.name}}", label: "Customer name" },
+  { token: "{{rfq.customer.company}}", label: "Customer company" },
+  { token: "{{rfq.customer.email}}", label: "Customer email" },
+  { token: "{{rfq.subject}}", label: "Email subject" },
+  { token: "{{rfq.quoteNumber}}", label: "Quote number" },
+  { token: "{{rfq.productCount}}", label: "Product count" },
+  { token: "{{rfq.quoteTotal}}", label: "Quote total" },
+  { token: "{{rfq.link}}", label: "RFQ link" },
+  { token: "{{workflow.name}}", label: "Workflow name" },
+  { token: "{{organization.name}}", label: "Organization name" },
+]
+
+export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
+  {
+    type: "trigger.rfq_identified",
+    label: "RFQ Identified",
+    description: "Runs when an incoming email is identified as an RFQ.",
+    category: "trigger",
+    icon: FileSearchIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "trigger.rfq_draft_saved",
+    label: "Quote Drafted",
+    description: "Runs when an RFQ quote draft is saved.",
+    category: "trigger",
+    icon: FileTextIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "trigger.rfq_order_placed",
+    label: "Order Placed",
+    description: "Runs when a quote number is set and the RFQ is processed.",
+    category: "trigger",
+    icon: ShoppingCartIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "trigger.rfq_quote_sent",
+    label: "Quote Sent",
+    description: "Runs when the quote reply is sent to the customer.",
+    category: "trigger",
+    icon: MailCheckIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "trigger.rfq_archived",
+    label: "RFQ Archived",
+    description: "Runs when an RFQ is archived.",
+    category: "trigger",
+    icon: ArchiveIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "action.send_email",
+    label: "Send Email",
+    description: "Sends an email to any address.",
+    category: "action",
+    icon: MailIcon,
+    hasInput: true,
+    outputs: [{ id: null }],
+    fields: [
+      {
+        key: "to",
+        label: "To",
+        type: "text",
+        placeholder: "person@company.com",
+        supportsVariables: true,
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        type: "text",
+        placeholder: "New RFQ from {{rfq.customer.company}}",
+        supportsVariables: true,
+      },
+      {
+        key: "body",
+        label: "Body",
+        type: "textarea",
+        placeholder: "An RFQ was received from {{rfq.customer.name}}…",
+        supportsVariables: true,
+      },
+    ],
+  },
+  {
+    type: "action.request_approval",
+    label: "Request Approval",
+    description: "Emails approve/reject links and waits for the decision.",
+    category: "action",
+    icon: ShieldCheckIcon,
+    hasInput: true,
+    outputs: [
+      { id: "approved", label: "Approved" },
+      { id: "rejected", label: "Rejected" },
+    ],
+    fields: [
+      {
+        key: "to",
+        label: "Approver email",
+        type: "text",
+        placeholder: "manager@company.com",
+        supportsVariables: true,
+      },
+      {
+        key: "subject",
+        label: "Subject",
+        type: "text",
+        placeholder: "Approval needed: {{rfq.subject}}",
+        supportsVariables: true,
+      },
+      {
+        key: "message",
+        label: "Message",
+        type: "textarea",
+        placeholder: "Approve the order for {{rfq.customer.company}}?",
+        supportsVariables: true,
+      },
+    ],
+  },
+  {
+    type: "action.place_order",
+    label: "Place Order",
+    description: "Marks the RFQ as processed with a quote number.",
+    category: "action",
+    icon: ShoppingCartIcon,
+    hasInput: true,
+    outputs: [{ id: null }],
+    fields: [
+      {
+        key: "quoteNumber",
+        label: "Quote number (blank = auto)",
+        type: "text",
+        placeholder: "Auto-generated when empty",
+        supportsVariables: true,
+      },
+    ],
+  },
+  {
+    type: "action.archive_rfq",
+    label: "Archive RFQ",
+    description: "Archives the RFQ.",
+    category: "action",
+    icon: ArchiveIcon,
+    hasInput: true,
+    outputs: [{ id: null }],
+    fields: [],
+  },
+  {
+    type: "action.notify",
+    label: "Notify in App",
+    description: "Sends an in-app notification to the RFQ owner.",
+    category: "action",
+    icon: BellIcon,
+    hasInput: true,
+    outputs: [{ id: null }],
+    fields: [
+      {
+        key: "title",
+        label: "Title",
+        type: "text",
+        placeholder: "RFQ from {{rfq.customer.company}}",
+        supportsVariables: true,
+      },
+      {
+        key: "body",
+        label: "Body",
+        type: "textarea",
+        placeholder: "Optional details…",
+        supportsVariables: true,
+      },
+    ],
+  },
+  {
+    type: "logic.delay",
+    label: "Delay",
+    description: "Waits before running the next step.",
+    category: "logic",
+    icon: TimerIcon,
+    hasInput: true,
+    outputs: [{ id: null }],
+    fields: [
+      {
+        key: "amount",
+        label: "Amount",
+        type: "number",
+        placeholder: "10",
+        defaultValue: 10,
+      },
+      {
+        key: "unit",
+        label: "Unit",
+        type: "select",
+        defaultValue: "minutes",
+        options: [
+          { value: "minutes", label: "Minutes" },
+          { value: "hours", label: "Hours" },
+          { value: "days", label: "Days" },
+        ],
+      },
+    ],
+  },
+]
+
+export const NODE_DEFINITION_MAP = new Map(
+  NODE_DEFINITIONS.map((definition) => [definition.type, definition])
+)
+
+export const TRIGGER_EVENT_LABELS: Record<string, string> = {
+  "rfq.identified": "RFQ Identified",
+  "rfq.draft_saved": "Quote Drafted",
+  "rfq.order_placed": "Order Placed",
+  "rfq.quote_sent": "Quote Sent",
+  "rfq.archived": "RFQ Archived",
+}
+
+export const CATEGORY_STYLES: Record<
+  WorkflowNodeCategory,
+  { accent: string; badge: string; iconWrap: string }
+> = {
+  trigger: {
+    accent: "border-t-amber-500",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    iconWrap: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  action: {
+    accent: "border-t-sky-500",
+    badge: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    iconWrap: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  },
+  logic: {
+    accent: "border-t-violet-500",
+    badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    iconWrap: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  },
+}
+
+export function defaultConfigForNode(type: string): Record<string, unknown> {
+  const definition = NODE_DEFINITION_MAP.get(type)
+  if (!definition) return {}
+  const config: Record<string, unknown> = {}
+  for (const field of definition.fields) {
+    if (field.defaultValue !== undefined) config[field.key] = field.defaultValue
+  }
+  return config
+}

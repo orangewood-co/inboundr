@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -40,6 +41,7 @@ import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as LinksIndexRouteImport } from './routes/links.index'
 import { Route as InvoicesIndexRouteImport } from './routes/invoices.index'
 import { Route as FormsIndexRouteImport } from './routes/forms.index'
+import { Route as WorkflowsIdRouteImport } from './routes/workflows_.$id'
 import { Route as SupportTicketIdRouteImport } from './routes/support.$ticketId'
 import { Route as ServiceSummaryRouteImport } from './routes/service_.summary'
 import { Route as ServiceNewRouteImport } from './routes/service_.new'
@@ -78,6 +80,11 @@ import { Route as AdminFeedbackIdRouteImport } from './routes/admin_.feedback.$i
 import { Route as RecruitmentJobsJobIdEditRouteImport } from './routes/recruitment_.jobs_.$jobId_.edit'
 import { Route as ProjectsIdTasksTaskIdRouteImport } from './routes/projects_.$id_.tasks.$taskId'
 
+const WorkflowsRoute = WorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
@@ -232,6 +239,11 @@ const FormsIndexRoute = FormsIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => FormsRoute,
+} as any)
+const WorkflowsIdRoute = WorkflowsIdRouteImport.update({
+  id: '/workflows_/$id',
+  path: '/workflows/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SupportTicketIdRoute = SupportTicketIdRouteImport.update({
   id: '/$ticketId',
@@ -449,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
+  '/workflows': typeof WorkflowsRoute
   '/admin/feedback': typeof AdminFeedbackRouteWithChildren
   '/assets/$id': typeof AssetsIdRoute
   '/assets/import': typeof AssetsImportRoute
@@ -477,6 +490,7 @@ export interface FileRoutesByFullPath {
   '/service/new': typeof ServiceNewRoute
   '/service/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/workflows/$id': typeof WorkflowsIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -515,6 +529,7 @@ export interface FileRoutesByTo {
   '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
+  '/workflows': typeof WorkflowsRoute
   '/assets/$id': typeof AssetsIdRoute
   '/assets/import': typeof AssetsImportRoute
   '/assets/new': typeof AssetsNewRoute
@@ -542,6 +557,7 @@ export interface FileRoutesByTo {
   '/service/new': typeof ServiceNewRoute
   '/service/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/workflows/$id': typeof WorkflowsIdRoute
   '/forms': typeof FormsIndexRoute
   '/invoices': typeof InvoicesIndexRoute
   '/links': typeof LinksIndexRoute
@@ -585,6 +601,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/support': typeof SupportRouteWithChildren
+  '/workflows': typeof WorkflowsRoute
   '/admin_/feedback': typeof AdminFeedbackRouteWithChildren
   '/assets_/$id': typeof AssetsIdRoute
   '/assets_/import': typeof AssetsImportRoute
@@ -613,6 +630,7 @@ export interface FileRoutesById {
   '/service_/new': typeof ServiceNewRoute
   '/service_/summary': typeof ServiceSummaryRoute
   '/support/$ticketId': typeof SupportTicketIdRoute
+  '/workflows_/$id': typeof WorkflowsIdRoute
   '/forms/': typeof FormsIndexRoute
   '/invoices/': typeof InvoicesIndexRoute
   '/links/': typeof LinksIndexRoute
@@ -657,6 +675,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/support'
+    | '/workflows'
     | '/admin/feedback'
     | '/assets/$id'
     | '/assets/import'
@@ -685,6 +704,7 @@ export interface FileRouteTypes {
     | '/service/new'
     | '/service/summary'
     | '/support/$ticketId'
+    | '/workflows/$id'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -723,6 +743,7 @@ export interface FileRouteTypes {
     | '/service'
     | '/settings'
     | '/stats'
+    | '/workflows'
     | '/assets/$id'
     | '/assets/import'
     | '/assets/new'
@@ -750,6 +771,7 @@ export interface FileRouteTypes {
     | '/service/new'
     | '/service/summary'
     | '/support/$ticketId'
+    | '/workflows/$id'
     | '/forms'
     | '/invoices'
     | '/links'
@@ -792,6 +814,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/support'
+    | '/workflows'
     | '/admin_/feedback'
     | '/assets_/$id'
     | '/assets_/import'
@@ -820,6 +843,7 @@ export interface FileRouteTypes {
     | '/service_/new'
     | '/service_/summary'
     | '/support/$ticketId'
+    | '/workflows_/$id'
     | '/forms/'
     | '/invoices/'
     | '/links/'
@@ -863,6 +887,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   SupportRoute: typeof SupportRouteWithChildren
+  WorkflowsRoute: typeof WorkflowsRoute
   AdminFeedbackRoute: typeof AdminFeedbackRouteWithChildren
   AssetsIdRoute: typeof AssetsIdRoute
   AssetsImportRoute: typeof AssetsImportRoute
@@ -885,6 +910,7 @@ export interface RootRouteChildren {
   ServiceRequestIdRoute: typeof ServiceRequestIdRoute
   ServiceNewRoute: typeof ServiceNewRoute
   ServiceSummaryRoute: typeof ServiceSummaryRoute
+  WorkflowsIdRoute: typeof WorkflowsIdRoute
   AdminOrganizationsIdRoute: typeof AdminOrganizationsIdRoute
   EmployeesAttendanceLogsRoute: typeof EmployeesAttendanceLogsRoute
   RecruitmentApplicationsApplicationIdRoute: typeof RecruitmentApplicationsApplicationIdRoute
@@ -896,6 +922,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workflows': {
+      id: '/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/support': {
       id: '/support'
       path: '/support'
@@ -1112,6 +1145,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/forms/'
       preLoaderRoute: typeof FormsIndexRouteImport
       parentRoute: typeof FormsRoute
+    }
+    '/workflows_/$id': {
+      id: '/workflows_/$id'
+      path: '/workflows/$id'
+      fullPath: '/workflows/$id'
+      preLoaderRoute: typeof WorkflowsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/support/$ticketId': {
       id: '/support/$ticketId'
@@ -1472,6 +1512,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   SupportRoute: SupportRouteWithChildren,
+  WorkflowsRoute: WorkflowsRoute,
   AdminFeedbackRoute: AdminFeedbackRouteWithChildren,
   AssetsIdRoute: AssetsIdRoute,
   AssetsImportRoute: AssetsImportRoute,
@@ -1494,6 +1535,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServiceRequestIdRoute: ServiceRequestIdRoute,
   ServiceNewRoute: ServiceNewRoute,
   ServiceSummaryRoute: ServiceSummaryRoute,
+  WorkflowsIdRoute: WorkflowsIdRoute,
   AdminOrganizationsIdRoute: AdminOrganizationsIdRoute,
   EmployeesAttendanceLogsRoute: EmployeesAttendanceLogsRoute,
   RecruitmentApplicationsApplicationIdRoute:

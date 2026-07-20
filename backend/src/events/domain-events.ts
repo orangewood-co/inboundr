@@ -1,3 +1,9 @@
+export interface RFQDomainEventPayload {
+  rfqId: string;
+  organizationId: string;
+  userId: string;
+}
+
 export interface DomainEventMap {
   "admin.notification_sample.requested": {
     organizationId: string;
@@ -7,6 +13,11 @@ export interface DomainEventMap {
     actionUrl?: string | null;
     actorUserId?: string | null;
   };
+  "rfq.identified": RFQDomainEventPayload;
+  "rfq.draft_saved": RFQDomainEventPayload;
+  "rfq.order_placed": RFQDomainEventPayload;
+  "rfq.quote_sent": RFQDomainEventPayload;
+  "rfq.archived": RFQDomainEventPayload;
 }
 
 type DomainEventName = keyof DomainEventMap;

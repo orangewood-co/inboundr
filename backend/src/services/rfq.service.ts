@@ -4,6 +4,7 @@ import { classifyEmail } from "../agents/check_rfq";
 import { generateRFQ } from "../agents/generate_rfq";
 import { Organization } from "../models/organization.model";
 import { hasEffectiveFeature } from "./entitlement.service";
+import { emitDomainEvent } from "../events/domain-events";
 
 interface ProcessEmailForRFQOptions {
   resetExisting?: boolean;
@@ -95,6 +96,14 @@ export async function processEmailForRFQ(
     console.log(
       `RFQ processed for email ${messageId}: ${queryProducts.length} products found`
     );
+
+    if (organizationId) {
+      void emitDomainEvent("rfq.identified", {
+        rfqId: rfqDoc._id.toString(),
+        organizationId,
+        userId,
+      });
+    }
   } catch (err: any) {
     console.error(`RFQ processing failed for email ${messageId}:`, err);
 

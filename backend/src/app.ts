@@ -42,6 +42,7 @@ import notificationRouter from "./routes/notification.route";
 import ogRouter from "./routes/og.route";
 import formShareRouter from "./routes/form-share.route";
 import serviceManagementRouter from "./routes/service-management.route";
+import workflowRouter from "./routes/workflow.route";
 import recruitmentRouter from "./routes/recruitment.route";
 import publicRecruitmentRouter from "./routes/public-recruitment.route";
 import { connectDB, disconnectDB } from "./config/database.config";
@@ -54,6 +55,10 @@ import {
 } from "./middleware/rate-limit.middleware";
 import { auth } from "./lib/auth";
 import { registerNotificationEventHandlers } from "./events/notification-event-handlers";
+import {
+  registerWorkflowEventHandlers,
+  startWorkflowDelayWorker,
+} from "./services/workflow-engine.service";
 import {
   startWatchesForConnectedAccounts,
   scheduleWatchRenewal,
@@ -105,6 +110,7 @@ app.use("/api/v1/email", emailRouter);
 app.use("/api/v1/gmail", gmailRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/rfq", rfqRouter);
+app.use("/api/v1/workflows", workflowRouter);
 app.use("/api/v1/customers", customerRouter);
 app.use("/api/v1/organization", organizationRouter);
 app.use("/api/v1/admin", adminRouter);
@@ -147,6 +153,8 @@ app.use((req: Request, res: Response) => {
 export async function initializeServices(): Promise<void> {
   await connectDB();
   registerNotificationEventHandlers();
+  registerWorkflowEventHandlers();
+  startWorkflowDelayWorker();
 
   try {
     await ensureKnowledgeSchema();

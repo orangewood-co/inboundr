@@ -43,6 +43,7 @@ export const ROUTE_LABELS: Record<string, string> = {
   "/settings": "Settings",
   "/stats": "Stats",
   "/support": "Support",
+  "/workflows": "Workflows",
   "/assets": "Assets",
   "/service": "Service",
   "/service/new": "New Service Request",
@@ -65,6 +66,7 @@ const DYNAMIC_TITLES: Array<{ match: (pathname: string) => boolean; title: strin
   { match: (p) => p.startsWith("/support/"), title: "Support Ticket" },
   { match: (p) => p.startsWith("/service/"), title: "Service Request" },
   { match: (p) => p.startsWith("/invite/"), title: "Invitation" },
+  { match: (p) => p.startsWith("/workflows/"), title: "Workflow Editor" },
 ]
 
 /** Browser tab title for a pathname, e.g. "Invoices - Inboundr". */

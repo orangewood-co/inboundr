@@ -20,6 +20,7 @@ import { streamRFQPdf } from "../services/rfq-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 import { renderRFQQuotePdfBuffer, rfqQuotePdfFilename } from "../services/rfq-quote-pdf.service";
 import type { IRFQ } from "../models/rfq.model";
+import { emitDomainEvent } from "../events/domain-events";
 
 export const archiveRFQ = async (
   req: Request,
@@ -39,6 +40,12 @@ export const archiveRFQ = async (
       res.status(404).json({ error: "RFQ not found" });
       return;
     }
+
+    void emitDomainEvent("rfq.archived", {
+      rfqId: String(rfq._id),
+      organizationId: String(organization._id),
+      userId: authReq.user.id,
+    });
 
     res.json({ message: "RFQ archived", rfq });
   } catch (err) {
@@ -691,6 +698,7 @@ export const saveRFQDraft = async (
     const quoteNotes =
       req.body && "quoteNotes" in req.body ? nullableString(req.body.quoteNotes) : rfq.quoteNotes ?? null;
     const savedAt = new Date();
+    const wasDraft = rfq.workflowStatus === "draft";
     rfq.savedQuoteProducts = products;
     rfq.paymentTermTemplateId = paymentTerms.paymentTermTemplateId;
     rfq.paymentTermName = paymentTerms.paymentTermName;
@@ -708,6 +716,14 @@ export const saveRFQDraft = async (
     const saved = await RFQ.findById(rfq._id)
       .populate("emailId", "subject from date snippet status")
       .lean();
+
+    if (!wasDraft) {
+      void emitDomainEvent("rfq.draft_saved", {
+        rfqId: String(rfq._id),
+        organizationId: String(organization._id),
+        userId: authReq.user.id,
+      });
+    }
 
     res.json(saved);
   } catch (err: any) {
@@ -754,6 +770,12 @@ export const setRFQQuoteNumber = async (
       res.status(404).json({ error: "RFQ not found" });
       return;
     }
+
+    void emitDomainEvent("rfq.order_placed", {
+      rfqId: String(rfq._id),
+      organizationId: String(organization._id),
+      userId: authReq.user.id,
+    });
 
     res.json(rfq);
   } catch (err) {
@@ -959,6 +981,8 @@ export const generateQuote = async (
       })),
     });
 
+    const wasDraft = rfq.workflowStatus === "draft";
+
     // Upsert: replace existing reply if regenerating
     await RFQ.updateOne(
       { _id: rfq._id },
@@ -1008,6 +1032,14 @@ export const generateQuote = async (
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
+
+    if (!wasDraft) {
+      void emitDomainEvent("rfq.draft_saved", {
+        rfqId: String(rfq._id),
+        organizationId: String(organization._id),
+        userId: authReq.user.id,
+      });
+    }
 
     res.json(reply);
   } catch (err: any) {
@@ -1145,6 +1177,12 @@ export const sendQuoteReply = async (
         },
         { new: true }
       ).lean();
+
+      void emitDomainEvent("rfq.quote_sent", {
+        rfqId: String(rfq._id),
+        organizationId: String(organization._id),
+        userId: authReq.user.id,
+      });
 
       res.json(sentReply);
     } catch (err: any) {
