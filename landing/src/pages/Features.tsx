@@ -77,25 +77,21 @@ export default function Features() {
           {features.map((feature, i) => (
             <FadeIn key={feature.title} delay={i * 0.1}>
               <Link to={feature.to} className="group block h-full">
-                <article className="flex h-full flex-col border border-border p-7 card-hover sm:p-8">
-                  <div className="mb-4 flex items-center gap-3">
-                    <span
-                      className="noise relative overflow-hidden px-2.5 py-0.5 label-sm"
-                      style={{ backgroundColor: feature.bg }}
-                    >
-                      <span className="relative z-10">{feature.tag}</span>
+                <article className="flex h-full flex-col border border-border bg-surface p-7 sm:p-8">
+                  <div className="mb-5 flex items-baseline justify-between gap-3">
+                    <h2 className="text-lg font-semibold tracking-[-0.01em]">{feature.title}</h2>
+                    <span className="shrink-0 font-mono text-[11px] text-text-dim">
+                      {feature.tag === "New" && <span className="mr-2 text-green-bright">New</span>}
+                      {feature.date}
                     </span>
-                    <span className="font-mono text-[11px] text-text-dim">{feature.date}</span>
                   </div>
-                  <h2 className="text-xl font-bold leading-snug transition-colors group-hover:text-green-bright sm:text-2xl">
-                    {feature.title}
-                  </h2>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-text-muted">
+                  <p className="flex-1 text-sm leading-relaxed text-text-muted">
                     {feature.description}
                   </p>
-                  <p className="mt-6 label text-text-dim transition-colors group-hover:text-text">
-                    Read more <ArrowRight className="mb-px ml-1 inline size-3" />
-                  </p>
+                  <div className="mt-6 flex items-center gap-1.5 text-[13px] text-text-dim transition-colors duration-200 group-hover:text-text">
+                    Read more
+                    <ArrowRight className="size-3.5" />
+                  </div>
                 </article>
               </Link>
             </FadeIn>
