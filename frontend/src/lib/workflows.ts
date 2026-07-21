@@ -56,6 +56,8 @@ export interface WorkflowRunRecord {
   _id: string
   status: string
   currentNodeId: string | null
+  /** Populated on the org-wide runs endpoint. */
+  workflowId?: { _id: string; name: string } | null
   steps: WorkflowRunStep[]
   approvalDecision: "approved" | "rejected" | null
   resumeAt: string | null
@@ -123,4 +125,28 @@ export function deleteWorkflow(id: string): Promise<{ message: string }> {
 
 export function listWorkflowRuns(id: string): Promise<{ runs: WorkflowRunRecord[] }> {
   return request(`/${id}/runs`)
+}
+
+export interface WorkflowRunsPage {
+  runs: WorkflowRunRecord[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export function listAllRuns(params: {
+  page?: number
+  limit?: number
+  status?: string
+  workflowId?: string
+  search?: string
+}): Promise<WorkflowRunsPage> {
+  const query = new URLSearchParams()
+  if (params.page) query.set("page", String(params.page))
+  if (params.limit) query.set("limit", String(params.limit))
+  if (params.status) query.set("status", params.status)
+  if (params.workflowId) query.set("workflowId", params.workflowId)
+  if (params.search) query.set("search", params.search)
+  const suffix = query.toString()
+  return request(`/runs${suffix ? `?${suffix}` : ""}`)
 }

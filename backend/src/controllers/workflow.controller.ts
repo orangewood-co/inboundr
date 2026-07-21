@@ -8,7 +8,7 @@ import {
   type IWorkflowNode,
   type WorkflowTriggerEvent,
 } from "../models/workflow.model";
-import { WorkflowRun } from "../models/workflow-run.model";
+import { WorkflowRun, WORKFLOW_RUN_STATUSES } from "../models/workflow-run.model";
 import { Form } from "../models/form.model";
 import { resolveApproval } from "../services/workflow-engine.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
@@ -268,6 +268,72 @@ export const deleteWorkflow = async (req: Request, res: Response): Promise<void>
   } catch (err) {
     console.error("Error deleting workflow:", err);
     res.status(500).json({ error: "Failed to delete workflow" });
+  }
+};
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export const listAllWorkflowRuns = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const organization = (req as OrganizationRequest).organization;
+
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
+
+    const filter: Record<string, unknown> = { organizationId: organization._id };
+
+    const status = String(req.query.status ?? "").trim();
+    if (status && (WORKFLOW_RUN_STATUSES as readonly string[]).includes(status)) {
+      filter.status = status;
+    }
+
+    const workflowId = String(req.query.workflowId ?? "").trim();
+    if (workflowId) {
+      if (!mongoose.Types.ObjectId.isValid(workflowId)) {
+        res.json({ runs: [], total: 0, page: 1, totalPages: 1 });
+        return;
+      }
+      filter.workflowId = workflowId;
+    }
+
+    const search = String(req.query.search ?? "").trim();
+    if (search && !workflowId) {
+      const matching = await Workflow.find({
+        organizationId: organization._id,
+        name: { $regex: escapeRegex(search), $options: "i" },
+      })
+        .select("_id")
+        .lean();
+      if (matching.length === 0) {
+        res.json({ runs: [], total: 0, page: 1, totalPages: 1 });
+        return;
+      }
+      filter.workflowId = { $in: matching.map((workflow) => workflow._id) };
+    }
+
+    const [runs, total] = await Promise.all([
+      WorkflowRun.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("workflowId", "name")
+        .populate("rfqId", "customer quoteNumber workflowStatus")
+        .populate("formId", "title slug")
+        .lean(),
+      WorkflowRun.countDocuments(filter),
+    ]);
+
+    res.json({
+      runs,
+      total,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    console.error("Error listing workflow runs:", err);
+    res.status(500).json({ error: "Failed to fetch workflow runs" });
   }
 };
 

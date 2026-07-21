@@ -308,15 +308,6 @@ export const NODE_DEFINITION_MAP = new Map(
   NODE_DEFINITIONS.map((definition) => [definition.type, definition])
 )
 
-export const TRIGGER_EVENT_LABELS: Record<string, string> = {
-  "rfq.identified": "RFQ Identified",
-  "rfq.draft_saved": "Quote Drafted",
-  "rfq.order_placed": "Order Placed",
-  "rfq.quote_sent": "Quote Sent",
-  "rfq.archived": "RFQ Archived",
-  "form.submitted": "Form Submitted",
-}
-
 export const CATEGORY_STYLES: Record<
   WorkflowNodeCategory,
   {

@@ -4,6 +4,7 @@ import {
   deleteWorkflow,
   getWorkflow,
   handleApprovalDecision,
+  listAllWorkflowRuns,
   listWorkflowRuns,
   listWorkflows,
   setWorkflowEnabled,
@@ -28,6 +29,8 @@ router.use(requireEmployeeModule("rfq"));
 
 router.get("/", listWorkflows);
 router.post("/", createWorkflow);
+// Must come before "/:id" so "runs" is not treated as a workflow id.
+router.get("/runs", listAllWorkflowRuns);
 router.get("/:id", getWorkflow);
 router.put("/:id", updateWorkflow);
 router.patch("/:id/enabled", setWorkflowEnabled);
