@@ -35,8 +35,8 @@ const nodeTypes: NodeTypes = Object.fromEntries(
 const proOptions = { hideAttribution: true }
 
 const defaultEdgeOptions = {
-  type: ConnectionLineType.SmoothStep,
-  style: { strokeWidth: 1.75 },
+  type: ConnectionLineType.Bezier,
+  style: { strokeWidth: 2.5 },
 }
 
 const snapGrid: [number, number] = [16, 16]
@@ -138,7 +138,7 @@ function EditorCanvas() {
           proOptions={proOptions}
           deleteKeyCode={["Backspace", "Delete"]}
           defaultEdgeOptions={defaultEdgeOptions}
-          connectionLineType={ConnectionLineType.SmoothStep}
+          connectionLineType={ConnectionLineType.Bezier}
           connectionRadius={36}
           snapToGrid
           snapGrid={snapGrid}
