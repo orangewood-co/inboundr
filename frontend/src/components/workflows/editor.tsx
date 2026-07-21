@@ -106,15 +106,6 @@ function EditorCanvas() {
             position="bottom-left"
             className="gap-px! overflow-hidden! rounded-lg! border! border-border! bg-background/95! shadow-sm! backdrop-blur! *:border-none! *:bg-transparent! hover:*:bg-muted!"
           />
-          <MiniMap
-            position="bottom-right"
-            pannable
-            zoomable
-            nodeColor={minimapNodeColor}
-            nodeBorderRadius={12}
-            className="overflow-hidden! rounded-xl! border! border-border! bg-background/95! shadow-sm! backdrop-blur!"
-          />
-
           <Panel position="top-left">
             <div className="flex items-center gap-2 rounded-xl border bg-background/95 p-1.5 shadow-sm backdrop-blur">
               <Button
