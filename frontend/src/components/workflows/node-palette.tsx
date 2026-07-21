@@ -1,7 +1,8 @@
 import { useMemo, useState, type DragEvent } from "react"
 import { useReactFlow } from "@xyflow/react"
-import { PlusIcon, SearchIcon } from "lucide-react"
+import { PlusIcon, SearchIcon, XIcon } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
@@ -71,7 +72,13 @@ function PaletteRow({
   )
 }
 
-export function NodePalette() {
+export function NodePalette({
+  open,
+  onClose,
+}: {
+  open: boolean
+  onClose: () => void
+}) {
   const [query, setQuery] = useState("")
   const { screenToFlowPosition } = useReactFlow()
   const addNode = useWorkflowBuilderStore((state) => state.addNode)
@@ -102,16 +109,34 @@ export function NodePalette() {
       y: window.innerHeight / 2 + (Math.random() - 0.5) * 80,
     })
     addNode(type, position)
+    onClose()
   }
 
   return (
-    <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r bg-background">
+    <div
+      className={cn(
+        "absolute inset-y-0 right-0 z-10 flex w-72 flex-col overflow-hidden border-l bg-background shadow-xl transition-transform duration-200 ease-out",
+        open ? "translate-x-0" : "pointer-events-none translate-x-full"
+      )}
+      aria-hidden={!open}
+    >
       <div className="space-y-2.5 border-b px-3 py-3">
-        <div>
-          <h2 className="px-1 text-sm font-semibold">Steps</h2>
-          <p className="mt-0.5 px-1 text-[11px] text-muted-foreground">
-            Drag onto the canvas, or click to add.
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="px-1 text-sm font-semibold">Add a Step</h2>
+            <p className="mt-0.5 px-1 text-[11px] text-muted-foreground">
+              Drag onto the canvas, or click to add.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            onClick={onClose}
+            aria-label="Close panel"
+          >
+            <XIcon className="size-4" />
+          </Button>
         </div>
         <div className="relative">
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />

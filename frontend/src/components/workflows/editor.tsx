@@ -12,7 +12,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react"
 import { useNavigate } from "@tanstack/react-router"
-import { ArrowLeftIcon, PencilIcon } from "lucide-react"
+import { ArrowLeftIcon, PencilIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import "@xyflow/react/dist/style.css"
@@ -69,6 +69,7 @@ function EditorCanvas() {
 
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   const colorMode = useMemo(() => (theme === "system" ? "system" : theme), [theme])
 
@@ -84,6 +85,7 @@ function EditorCanvas() {
       if (!type) return
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY })
       addNode(type, position)
+      setPaletteOpen(false)
     },
     [addNode, screenToFlowPosition]
   )
@@ -123,7 +125,6 @@ function EditorCanvas() {
 
   return (
     <div className="flex flex-1 overflow-hidden">
-      <NodePalette />
       <div className="relative flex-1">
         <ReactFlow
           nodes={nodes}
@@ -185,6 +186,18 @@ function EditorCanvas() {
             </div>
           </Panel>
 
+          <Panel position="top-right" className="mt-16!">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9 rounded-lg bg-background/95 shadow-sm backdrop-blur"
+              onClick={() => setPaletteOpen((open) => !open)}
+              title="Add a step"
+            >
+              <PlusIcon className="size-4" />
+            </Button>
+          </Panel>
+
           <Panel position="top-right">
             <div className="flex items-center gap-3 rounded-xl border bg-background/95 p-1.5 pl-3 shadow-sm backdrop-blur">
               <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
@@ -202,6 +215,7 @@ function EditorCanvas() {
             </div>
           </Panel>
         </ReactFlow>
+        <NodePalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </div>
     </div>
   )
