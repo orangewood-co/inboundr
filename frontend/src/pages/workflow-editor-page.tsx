@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/list-states"
 import { SiteHeader } from "@/components/site-header"
 import { Spinner } from "@/components/ui/spinner"
 import { WorkflowEditor } from "@/components/workflows/editor"
+import { WorkflowHeaderActions } from "@/components/workflows/header-actions"
 import { useWorkflowBuilderStore } from "@/components/workflows/store"
 import { getWorkflow } from "@/lib/workflows"
 
@@ -39,7 +40,7 @@ export default function WorkflowEditorPage() {
 
   return (
     <AppLayout>
-      <SiteHeader />
+      <SiteHeader actions={<WorkflowHeaderActions />} />
       {loading ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner className="size-6 text-muted-foreground" />

@@ -13,15 +13,11 @@ import {
 } from "@xyflow/react"
 import { useNavigate } from "@tanstack/react-router"
 import { ArrowLeftIcon, PencilIcon, PlusIcon } from "lucide-react"
-import { toast } from "sonner"
 
 import "@xyflow/react/dist/style.css"
 
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/theme-provider"
-import { setWorkflowEnabled, updateWorkflow } from "@/lib/workflows"
 
 import { CATEGORY_STYLES, NODE_DEFINITION_MAP, NODE_DEFINITIONS } from "./node-definitions"
 import { NodePalette, NODE_DRAG_MIME } from "./node-palette"
@@ -52,23 +48,15 @@ function EditorCanvas() {
   const { screenToFlowPosition } = useReactFlow()
   const { theme } = useTheme()
 
-  const workflowId = useWorkflowBuilderStore((state) => state.workflowId)
   const name = useWorkflowBuilderStore((state) => state.name)
-  const enabled = useWorkflowBuilderStore((state) => state.enabled)
   const nodes = useWorkflowBuilderStore((state) => state.nodes)
   const edges = useWorkflowBuilderStore((state) => state.edges)
-  const dirty = useWorkflowBuilderStore((state) => state.dirty)
   const onNodesChange = useWorkflowBuilderStore((state) => state.onNodesChange)
   const onEdgesChange = useWorkflowBuilderStore((state) => state.onEdgesChange)
   const onConnect = useWorkflowBuilderStore((state) => state.onConnect)
   const addNode = useWorkflowBuilderStore((state) => state.addNode)
   const setName = useWorkflowBuilderStore((state) => state.setName)
-  const setEnabled = useWorkflowBuilderStore((state) => state.setEnabled)
-  const markSaved = useWorkflowBuilderStore((state) => state.markSaved)
-  const serializeGraph = useWorkflowBuilderStore((state) => state.serializeGraph)
 
-  const [saving, setSaving] = useState(false)
-  const [toggling, setToggling] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
 
   const colorMode = useMemo(() => (theme === "system" ? "system" : theme), [theme])
@@ -89,39 +77,6 @@ function EditorCanvas() {
     },
     [addNode, screenToFlowPosition]
   )
-
-  const handleSave = async () => {
-    if (!workflowId) return
-    setSaving(true)
-    try {
-      const graph = serializeGraph()
-      await updateWorkflow(workflowId, { name, ...graph })
-      markSaved()
-      toast.success("Workflow saved")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save workflow")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleToggleEnabled = async (next: boolean) => {
-    if (!workflowId) return
-    if (next && dirty) {
-      toast.error("Save the workflow before enabling it")
-      return
-    }
-    setToggling(true)
-    try {
-      const workflow = await setWorkflowEnabled(workflowId, next)
-      setEnabled(workflow.enabled)
-      toast.success(workflow.enabled ? "Workflow enabled" : "Workflow disabled")
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update workflow")
-    } finally {
-      setToggling(false)
-    }
-  }
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -186,7 +141,7 @@ function EditorCanvas() {
             </div>
           </Panel>
 
-          <Panel position="top-right" className="mt-16!">
+          <Panel position="top-right">
             <Button
               variant="outline"
               size="icon"
@@ -196,23 +151,6 @@ function EditorCanvas() {
             >
               <PlusIcon className="size-4" />
             </Button>
-          </Panel>
-
-          <Panel position="top-right">
-            <div className="flex items-center gap-3 rounded-xl border bg-background/95 p-1.5 pl-3 shadow-sm backdrop-blur">
-              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                <Switch
-                  checked={enabled}
-                  onCheckedChange={handleToggleEnabled}
-                  disabled={toggling}
-                />
-                {enabled ? "Enabled" : "Disabled"}
-              </label>
-              <Button size="sm" onClick={handleSave} disabled={saving || !dirty}>
-                {saving && <Spinner data-icon="inline-start" />}
-                {dirty ? "Save" : "Saved"}
-              </Button>
-            </div>
           </Panel>
         </ReactFlow>
         <NodePalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />

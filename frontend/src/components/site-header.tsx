@@ -133,8 +133,12 @@ export function SiteHeader({
         {actions ? (
           <div className="ml-auto flex items-center gap-2">
             {leadingActions}
-            <NotificationBell />
             {actions}
+            <Separator
+              orientation="vertical"
+              className="mx-1 data-vertical:h-4 data-vertical:self-auto"
+            />
+            <NotificationBell />
           </div>
         ) : (
           <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto">
