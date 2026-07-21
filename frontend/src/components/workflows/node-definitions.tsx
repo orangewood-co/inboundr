@@ -26,6 +26,7 @@ export interface WorkflowFieldDefinition {
   options?: WorkflowFieldOption[]
   supportsVariables?: boolean
   defaultValue?: string | number
+  required?: boolean
 }
 
 export interface WorkflowOutputHandle {
@@ -123,6 +124,7 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         type: "text",
         placeholder: "person@company.com",
         supportsVariables: true,
+        required: true,
       },
       {
         key: "subject",
@@ -130,6 +132,7 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         type: "text",
         placeholder: "New RFQ from {{rfq.customer.company}}",
         supportsVariables: true,
+        required: true,
       },
       {
         key: "body",
@@ -158,6 +161,7 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         type: "text",
         placeholder: "manager@company.com",
         supportsVariables: true,
+        required: true,
       },
       {
         key: "subject",
@@ -218,6 +222,7 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         type: "text",
         placeholder: "RFQ from {{rfq.customer.company}}",
         supportsVariables: true,
+        required: true,
       },
       {
         key: "body",
@@ -243,6 +248,7 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         type: "number",
         placeholder: "10",
         defaultValue: 10,
+        required: true,
       },
       {
         key: "unit",
@@ -273,23 +279,53 @@ export const TRIGGER_EVENT_LABELS: Record<string, string> = {
 
 export const CATEGORY_STYLES: Record<
   WorkflowNodeCategory,
-  { accent: string; badge: string; iconWrap: string }
+  {
+    /** Solid icon chip (canvas card header + palette rows). */
+    iconSolid: string
+    /** Faint tint behind the card header. */
+    headerTint: string
+    /** Source/target connection dots. */
+    handle: string
+    /** Ring color when the node is selected. */
+    selectedRing: string
+    /** MiniMap node fill. */
+    minimapColor: string
+  }
 > = {
   trigger: {
-    accent: "border-t-amber-500",
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    iconWrap: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    iconSolid: "bg-amber-500 text-white",
+    headerTint: "bg-amber-500/8 dark:bg-amber-400/10",
+    handle: "bg-amber-500!",
+    selectedRing: "ring-amber-500/45 border-amber-500/60",
+    minimapColor: "#f59e0b",
   },
   action: {
-    accent: "border-t-sky-500",
-    badge: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-    iconWrap: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    iconSolid: "bg-sky-500 text-white",
+    headerTint: "bg-sky-500/8 dark:bg-sky-400/10",
+    handle: "bg-sky-500!",
+    selectedRing: "ring-sky-500/45 border-sky-500/60",
+    minimapColor: "#0ea5e9",
   },
   logic: {
-    accent: "border-t-violet-500",
-    badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-    iconWrap: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    iconSolid: "bg-violet-500 text-white",
+    headerTint: "bg-violet-500/8 dark:bg-violet-400/10",
+    handle: "bg-violet-500!",
+    selectedRing: "ring-violet-500/45 border-violet-500/60",
+    minimapColor: "#8b5cf6",
   },
+}
+
+/** True when every required field has a value. */
+export function isNodeConfigComplete(
+  definition: WorkflowNodeDefinition,
+  config: Record<string, unknown>
+): boolean {
+  return definition.fields
+    .filter((field) => field.required)
+    .every((field) => {
+      const value = config[field.key]
+      return value != null && String(value).trim() !== ""
+    })
 }
 
 export function defaultConfigForNode(type: string): Record<string, unknown> {

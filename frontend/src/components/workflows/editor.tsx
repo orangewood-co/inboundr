@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type DragEvent } from "react"
 import {
   Background,
   BackgroundVariant,
+  ConnectionLineType,
   Controls,
   MiniMap,
   Panel,
@@ -22,9 +23,9 @@ import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/components/theme-provider"
 import { setWorkflowEnabled, updateWorkflow } from "@/lib/workflows"
 
-import { NODE_DEFINITIONS } from "./node-definitions"
+import { CATEGORY_STYLES, NODE_DEFINITION_MAP, NODE_DEFINITIONS } from "./node-definitions"
 import { NodePalette, NODE_DRAG_MIME } from "./node-palette"
-import { useWorkflowBuilderStore } from "./store"
+import { useWorkflowBuilderStore, type BuilderNode } from "./store"
 import { WorkflowNodeComponent } from "./workflow-node"
 
 const nodeTypes: NodeTypes = Object.fromEntries(
@@ -32,6 +33,19 @@ const nodeTypes: NodeTypes = Object.fromEntries(
 )
 
 const proOptions = { hideAttribution: true }
+
+const defaultEdgeOptions = {
+  type: ConnectionLineType.SmoothStep,
+  style: { strokeWidth: 1.75 },
+}
+
+const snapGrid: [number, number] = [16, 16]
+
+function minimapNodeColor(node: BuilderNode): string {
+  const definition = NODE_DEFINITION_MAP.get(node.type ?? "")
+  if (!definition) return "#94a3b8"
+  return CATEGORY_STYLES[definition.category].minimapColor
+}
 
 function EditorCanvas() {
   const navigate = useNavigate()
@@ -123,13 +137,27 @@ function EditorCanvas() {
           colorMode={colorMode}
           proOptions={proOptions}
           deleteKeyCode={["Backspace", "Delete"]}
-          defaultEdgeOptions={{ animated: true }}
+          defaultEdgeOptions={defaultEdgeOptions}
+          connectionLineType={ConnectionLineType.SmoothStep}
+          connectionRadius={36}
+          snapToGrid
+          snapGrid={snapGrid}
           fitView
           fitViewOptions={{ padding: 0.3, maxZoom: 1 }}
         >
           <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} />
-          <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" pannable zoomable className="rounded-lg!" />
+          <Controls
+            position="bottom-left"
+            className="gap-px! overflow-hidden! rounded-lg! border! border-border! bg-background/95! shadow-sm! backdrop-blur! *:border-none! *:bg-transparent! hover:*:bg-muted!"
+          />
+          <MiniMap
+            position="bottom-right"
+            pannable
+            zoomable
+            nodeColor={minimapNodeColor}
+            nodeBorderRadius={12}
+            className="overflow-hidden! rounded-xl! border! border-border! bg-background/95! shadow-sm! backdrop-blur!"
+          />
 
           <Panel position="top-left">
             <div className="flex items-center gap-2 rounded-xl border bg-background/95 p-1.5 shadow-sm backdrop-blur">
@@ -151,10 +179,9 @@ function EditorCanvas() {
                 />
                 <PencilIcon className="pointer-events-none absolute right-2 size-3 text-muted-foreground" />
               </div>
-              <div className="flex items-center gap-1.5 border-l pl-2 pr-1 text-[11px] tabular-nums text-muted-foreground">
-                <span className="rounded-full bg-muted px-2 py-0.5">{nodes.length} nodes</span>
-                <span className="rounded-full bg-muted px-2 py-0.5">{edges.length} edges</span>
-              </div>
+              <span className="border-l py-0.5 pl-2.5 pr-1.5 text-[11px] tabular-nums text-muted-foreground">
+                {nodes.length} {nodes.length === 1 ? "step" : "steps"}
+              </span>
             </div>
           </Panel>
 
