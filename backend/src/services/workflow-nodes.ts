@@ -11,6 +11,7 @@ import { apiOrigin, frontendOrigin } from "../config/origins.config";
 export interface WorkflowNodeContext {
   workflow: IWorkflow;
   node: IWorkflowNode;
+  runId: string;
   rfq: IRFQ & { emailId?: { subject?: string; from?: string } | Types.ObjectId | null };
   organizationId: string;
   organizationName: string;
@@ -214,6 +215,8 @@ async function executeNotify(context: WorkflowNodeContext): Promise<WorkflowNode
     entityType: "workflow_run",
     entityId: String(context.rfq._id),
     metadata: { workflowId: String(context.workflow._id) },
+    // One notification per run step, even if the step is ever re-executed.
+    dedupeKey: `workflow-run:${context.runId}:${context.node.id}`,
   });
 
   return { output: `Notified ${context.userId}` };

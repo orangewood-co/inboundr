@@ -44,6 +44,7 @@ async function loadNodeContext(
   return {
     workflow,
     node,
+    runId: String(run._id),
     rfq: rfq as WorkflowNodeContext["rfq"],
     organizationId: String(run.organizationId),
     organizationName: organization?.name ?? "",
