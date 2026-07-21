@@ -1,4 +1,4 @@
-import { memo } from "react"
+import { memo, useEffect, useMemo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 import { BracesIcon } from "lucide-react"
 
@@ -20,9 +20,12 @@ import { cn } from "@/lib/utils"
 
 import {
   CATEGORY_STYLES,
+  FORM_TEMPLATE_VARIABLES,
+  GENERIC_TEMPLATE_VARIABLES,
   NODE_DEFINITION_MAP,
   TEMPLATE_VARIABLES,
   isNodeConfigComplete,
+  type TemplateVariable,
   type WorkflowFieldDefinition,
 } from "./node-definitions"
 import { useWorkflowBuilderStore, type BuilderNode } from "./store"
@@ -33,7 +36,33 @@ const HANDLE_BASE =
 const FILLED_INPUT =
   "nodrag border-transparent bg-muted/60 shadow-none placeholder:text-muted-foreground/60 hover:bg-muted focus-visible:bg-background dark:bg-muted/40 dark:hover:bg-muted/60 dark:focus-visible:bg-input/30"
 
+/**
+ * Variables available for the current graph: form triggers expose the
+ * selected form's fields as `{{submission.<fieldId>}}`; RFQ triggers keep
+ * the static RFQ list.
+ */
+function useTemplateVariables(): TemplateVariable[] {
+  const nodes = useWorkflowBuilderStore((state) => state.nodes)
+  const forms = useWorkflowBuilderStore((state) => state.forms)
+
+  return useMemo(() => {
+    const trigger = nodes.find((node) => (node.type ?? "").startsWith("trigger."))
+    if (trigger?.type !== "trigger.form_submitted") return TEMPLATE_VARIABLES
+
+    const formId = String(trigger.data.config?.formId ?? "")
+    const form = forms?.find((candidate) => candidate._id === formId)
+    const fieldVariables: TemplateVariable[] = (form?.fields ?? []).map((field) => ({
+      token: `{{submission.${field.id}}}`,
+      label: field.label || "Untitled field",
+    }))
+
+    return [...FORM_TEMPLATE_VARIABLES, ...fieldVariables, ...GENERIC_TEMPLATE_VARIABLES]
+  }, [nodes, forms])
+}
+
 function VariablePicker({ onInsert }: { onInsert: (token: string) => void }) {
+  const variables = useTemplateVariables()
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -46,7 +75,7 @@ function VariablePicker({ onInsert }: { onInsert: (token: string) => void }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
-        {TEMPLATE_VARIABLES.map((variable) => (
+        {variables.map((variable) => (
           <DropdownMenuItem
             key={variable.token}
             onSelect={() => onInsert(variable.token)}
@@ -60,6 +89,52 @@ function VariablePicker({ onInsert }: { onInsert: (token: string) => void }) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+function FormSelect({
+  nodeId,
+  field,
+  value,
+}: {
+  nodeId: string
+  field: WorkflowFieldDefinition
+  value: string
+}) {
+  const updateNodeConfig = useWorkflowBuilderStore((state) => state.updateNodeConfig)
+  const forms = useWorkflowBuilderStore((state) => state.forms)
+  const loadForms = useWorkflowBuilderStore((state) => state.loadForms)
+
+  useEffect(() => {
+    void loadForms()
+  }, [loadForms])
+
+  const selectable = (forms ?? []).filter((form) => form.status !== "archived")
+
+  return (
+    <Select
+      value={value || undefined}
+      onValueChange={(next) => updateNodeConfig(nodeId, field.key, next)}
+    >
+      <SelectTrigger size="sm" className={cn("h-8 w-full text-xs", FILLED_INPUT)}>
+        <SelectValue placeholder={forms === null ? "Loading forms…" : "Pick a form…"} />
+      </SelectTrigger>
+      <SelectContent>
+        {selectable.map((form) => (
+          <SelectItem key={form._id} value={form._id} className="text-xs">
+            {form.title || "Untitled form"}
+            {form.status !== "published" && (
+              <span className="text-muted-foreground"> (draft)</span>
+            )}
+          </SelectItem>
+        ))}
+        {forms !== null && selectable.length === 0 && (
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+            No forms yet — create one in Forms first.
+          </p>
+        )}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -88,7 +163,9 @@ function NodeField({
         {field.supportsVariables && <VariablePicker onInsert={insertVariable} />}
       </div>
 
-      {field.type === "textarea" ? (
+      {field.type === "form_select" ? (
+        <FormSelect nodeId={nodeId} field={field} value={stringValue} />
+      ) : field.type === "textarea" ? (
         <textarea
           className={cn(
             "flex min-h-20 w-full resize-none rounded-md border px-2.5 py-2 text-xs leading-relaxed outline-none transition-[color,background-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",

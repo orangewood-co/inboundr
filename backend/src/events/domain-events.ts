@@ -4,6 +4,12 @@ export interface RFQDomainEventPayload {
   userId: string;
 }
 
+export interface FormDomainEventPayload {
+  formId: string;
+  submissionId: string;
+  organizationId: string;
+}
+
 export interface DomainEventMap {
   "admin.notification_sample.requested": {
     organizationId: string;
@@ -18,6 +24,7 @@ export interface DomainEventMap {
   "rfq.order_placed": RFQDomainEventPayload;
   "rfq.quote_sent": RFQDomainEventPayload;
   "rfq.archived": RFQDomainEventPayload;
+  "form.submitted": FormDomainEventPayload;
 }
 
 type DomainEventName = keyof DomainEventMap;

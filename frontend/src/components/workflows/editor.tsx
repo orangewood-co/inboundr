@@ -4,7 +4,6 @@ import {
   BackgroundVariant,
   ConnectionLineType,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -19,9 +18,9 @@ import "@xyflow/react/dist/style.css"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/components/theme-provider"
 
-import { CATEGORY_STYLES, NODE_DEFINITION_MAP, NODE_DEFINITIONS } from "./node-definitions"
+import { NODE_DEFINITIONS } from "./node-definitions"
 import { NodePalette, NODE_DRAG_MIME } from "./node-palette"
-import { useWorkflowBuilderStore, type BuilderNode } from "./store"
+import { useWorkflowBuilderStore } from "./store"
 import { WorkflowNodeComponent } from "./workflow-node"
 
 const nodeTypes: NodeTypes = Object.fromEntries(
@@ -36,12 +35,6 @@ const defaultEdgeOptions = {
 }
 
 const snapGrid: [number, number] = [16, 16]
-
-function minimapNodeColor(node: BuilderNode): string {
-  const definition = NODE_DEFINITION_MAP.get(node.type ?? "")
-  if (!definition) return "#94a3b8"
-  return CATEGORY_STYLES[definition.category].minimapColor
-}
 
 function EditorCanvas() {
   const navigate = useNavigate()

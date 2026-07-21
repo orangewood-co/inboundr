@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   ArchiveIcon,
   BellIcon,
+  ClipboardListIcon,
   FileSearchIcon,
   FileTextIcon,
   MailCheckIcon,
@@ -21,7 +22,7 @@ export interface WorkflowFieldOption {
 export interface WorkflowFieldDefinition {
   key: string
   label: string
-  type: "text" | "textarea" | "number" | "select"
+  type: "text" | "textarea" | "number" | "select" | "form_select"
   placeholder?: string
   options?: WorkflowFieldOption[]
   supportsVariables?: boolean
@@ -45,7 +46,15 @@ export interface WorkflowNodeDefinition {
   fields: WorkflowFieldDefinition[]
 }
 
-export const TEMPLATE_VARIABLES: Array<{ token: string; label: string }> = [
+export interface TemplateVariable {
+  token: string
+  label: string
+}
+
+/** Action node types that operate on the triggering RFQ. */
+export const RFQ_ONLY_NODE_TYPES = ["action.place_order", "action.archive_rfq"]
+
+export const RFQ_TEMPLATE_VARIABLES: TemplateVariable[] = [
   { token: "{{rfq.customer.name}}", label: "Customer name" },
   { token: "{{rfq.customer.company}}", label: "Customer company" },
   { token: "{{rfq.customer.email}}", label: "Customer email" },
@@ -54,8 +63,21 @@ export const TEMPLATE_VARIABLES: Array<{ token: string; label: string }> = [
   { token: "{{rfq.productCount}}", label: "Product count" },
   { token: "{{rfq.quoteTotal}}", label: "Quote total" },
   { token: "{{rfq.link}}", label: "RFQ link" },
+]
+
+export const FORM_TEMPLATE_VARIABLES: TemplateVariable[] = [
+  { token: "{{form.title}}", label: "Form title" },
+  { token: "{{form.link}}", label: "Form link" },
+]
+
+export const GENERIC_TEMPLATE_VARIABLES: TemplateVariable[] = [
   { token: "{{workflow.name}}", label: "Workflow name" },
   { token: "{{organization.name}}", label: "Organization name" },
+]
+
+export const TEMPLATE_VARIABLES: TemplateVariable[] = [
+  ...RFQ_TEMPLATE_VARIABLES,
+  ...GENERIC_TEMPLATE_VARIABLES,
 ]
 
 export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
@@ -108,6 +130,23 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
     hasInput: false,
     outputs: [{ id: null }],
     fields: [],
+  },
+  {
+    type: "trigger.form_submitted",
+    label: "Form Submitted",
+    description: "Runs when someone submits the selected form.",
+    category: "trigger",
+    icon: ClipboardListIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [
+      {
+        key: "formId",
+        label: "Form",
+        type: "form_select",
+        required: true,
+      },
+    ],
   },
   {
     type: "action.send_email",
@@ -275,6 +314,7 @@ export const TRIGGER_EVENT_LABELS: Record<string, string> = {
   "rfq.order_placed": "Order Placed",
   "rfq.quote_sent": "Quote Sent",
   "rfq.archived": "RFQ Archived",
+  "form.submitted": "Form Submitted",
 }
 
 export const CATEGORY_STYLES: Record<

@@ -8,6 +8,7 @@ export type WorkflowTriggerEvent =
   | "rfq.order_placed"
   | "rfq.quote_sent"
   | "rfq.archived"
+  | "form.submitted"
 
 export interface WorkflowNodeData {
   id: string
@@ -33,7 +34,7 @@ export interface WorkflowRecord {
   _id: string
   name: string
   enabled: boolean
-  trigger: { event: WorkflowTriggerEvent }
+  trigger: { event: WorkflowTriggerEvent; formId?: string | null }
   nodes: WorkflowNodeData[]
   edges: WorkflowEdgeData[]
   createdAt: string
@@ -68,6 +69,12 @@ export interface WorkflowRunRecord {
     quoteNumber: string | null
     workflowStatus: string
   } | null
+  formId: {
+    _id: string
+    title: string
+    slug: string
+  } | null
+  formSubmissionId: string | null
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

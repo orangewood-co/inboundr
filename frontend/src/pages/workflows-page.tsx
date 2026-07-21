@@ -135,7 +135,7 @@ function RunsSheet({
           ) : runs.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                No runs yet. Enable the workflow and trigger it from the RFQ flow.
+                No runs yet. Enable the workflow and it will run when its trigger fires.
               </p>
             </div>
           ) : (
@@ -155,6 +155,15 @@ function RunsSheet({
                       {run.rfqId.customer.company || run.rfqId.customer.name}
                     </span>
                     {run.rfqId.quoteNumber && ` · ${run.rfqId.quoteNumber}`}
+                  </p>
+                )}
+
+                {run.formId && (
+                  <p className="mt-2 truncate text-xs text-muted-foreground">
+                    Form:{" "}
+                    <span className="font-medium text-foreground">
+                      {run.formId.title || "Untitled form"}
+                    </span>
                   </p>
                 )}
 
@@ -309,7 +318,7 @@ export default function WorkflowsPage() {
             <div>
               <h1 className="text-base font-semibold leading-tight">Workflows</h1>
               <p className="text-xs text-muted-foreground">
-                Automations that react to RFQ and order events.
+                Automations that react to RFQ, order, and form events.
               </p>
             </div>
           </div>

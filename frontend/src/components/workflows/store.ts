@@ -10,6 +10,8 @@ import {
 } from "@xyflow/react"
 
 import type { WorkflowEdgeData, WorkflowNodeData } from "@/lib/workflows"
+import type { ManagedForm } from "@/components/forms/types"
+import { listForms } from "@/lib/forms-api"
 import { defaultConfigForNode } from "./node-definitions"
 
 export type BuilderNode = Node<{ config: Record<string, unknown> }>
@@ -21,6 +23,9 @@ interface WorkflowBuilderState {
   nodes: BuilderNode[]
   edges: Edge[]
   dirty: boolean
+  /** Org forms for the form trigger picker; null until loaded. */
+  forms: ManagedForm[] | null
+  loadForms: () => Promise<void>
   hydrate: (workflow: {
     _id: string
     name: string
@@ -53,6 +58,18 @@ export const useWorkflowBuilderStore = create<WorkflowBuilderState>((set, get) =
   nodes: [],
   edges: [],
   dirty: false,
+  forms: null,
+
+  loadForms: async () => {
+    if (get().forms !== null) return
+    try {
+      const forms = await listForms()
+      set({ forms })
+    } catch (err) {
+      console.error("Failed to load forms for workflow builder:", err)
+      set({ forms: [] })
+    }
+  },
 
   hydrate: (workflow) =>
     set({

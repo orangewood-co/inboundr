@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import {
   CATEGORY_STYLES,
   NODE_DEFINITIONS,
+  RFQ_ONLY_NODE_TYPES,
   type WorkflowNodeCategory,
   type WorkflowNodeDefinition,
 } from "./node-definitions"
@@ -25,10 +26,12 @@ const CATEGORY_ORDER: Array<{ category: WorkflowNodeCategory; label: string }> =
 function PaletteRow({
   definition,
   disabled,
+  disabledReason,
   onAdd,
 }: {
   definition: WorkflowNodeDefinition
   disabled: boolean
+  disabledReason?: string
   onAdd: (type: string) => void
 }) {
   const styles = CATEGORY_STYLES[definition.category]
@@ -50,9 +53,7 @@ function PaletteRow({
           ? "cursor-not-allowed opacity-40"
           : "cursor-grab hover:border-border hover:bg-muted/60 active:cursor-grabbing"
       )}
-      title={
-        disabled ? "A workflow can only have one trigger" : definition.description
-      }
+      title={disabled ? disabledReason : definition.description}
     >
       <div
         className={cn(
@@ -84,6 +85,9 @@ export function NodePalette({
   const addNode = useWorkflowBuilderStore((state) => state.addNode)
   const hasTrigger = useWorkflowBuilderStore((state) =>
     state.nodes.some((node) => (node.type ?? "").startsWith("trigger."))
+  )
+  const hasFormTrigger = useWorkflowBuilderStore((state) =>
+    state.nodes.some((node) => node.type === "trigger.form_submitted")
   )
 
   const sections = useMemo(() => {
@@ -155,14 +159,24 @@ export function NodePalette({
               {label}
             </p>
             <div className="space-y-0.5">
-              {definitions.map((definition) => (
-                <PaletteRow
-                  key={definition.type}
-                  definition={definition}
-                  disabled={category === "trigger" && hasTrigger}
-                  onAdd={addAtViewportCenter}
-                />
-              ))}
+              {definitions.map((definition) => {
+                const triggerTaken = category === "trigger" && hasTrigger
+                const rfqOnlyBlocked =
+                  hasFormTrigger && RFQ_ONLY_NODE_TYPES.includes(definition.type)
+                return (
+                  <PaletteRow
+                    key={definition.type}
+                    definition={definition}
+                    disabled={triggerTaken || rfqOnlyBlocked}
+                    disabledReason={
+                      triggerTaken
+                        ? "A workflow can only have one trigger"
+                        : "This step needs an RFQ trigger — it can't run for form submissions"
+                    }
+                    onAdd={addAtViewportCenter}
+                  />
+                )
+              })}
             </div>
           </div>
         ))}

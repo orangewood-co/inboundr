@@ -6,8 +6,10 @@ import {
   validateWorkflowGraph,
   type IWorkflowEdge,
   type IWorkflowNode,
+  type WorkflowTriggerEvent,
 } from "../models/workflow.model";
 import { WorkflowRun } from "../models/workflow-run.model";
+import { Form } from "../models/form.model";
 import { resolveApproval } from "../services/workflow-engine.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { frontendOrigin } from "../config/origins.config";
@@ -42,6 +44,37 @@ function sanitizeEdges(value: unknown): IWorkflowEdge[] {
       target: String(edge.target ?? ""),
     };
   });
+}
+
+interface ResolvedTrigger {
+  event: WorkflowTriggerEvent;
+  formId: mongoose.Types.ObjectId | null;
+}
+
+/**
+ * Derives the trigger descriptor from the validated trigger node, verifying
+ * that a form trigger points at a real form in this organization.
+ */
+async function resolveTrigger(
+  triggerNode: IWorkflowNode,
+  organizationId: mongoose.Types.ObjectId | string
+): Promise<{ trigger?: ResolvedTrigger; error?: string }> {
+  const event = TRIGGER_NODE_EVENT_MAP[triggerNode.type];
+  if (!event) return { error: "Unknown trigger node type" };
+
+  if (triggerNode.type !== "trigger.form_submitted") {
+    return { trigger: { event, formId: null } };
+  }
+
+  const formId = String(triggerNode.config?.formId ?? "").trim();
+  if (!mongoose.Types.ObjectId.isValid(formId)) {
+    return { error: "The selected form is invalid" };
+  }
+  const form = await Form.findOne({ _id: formId, organizationId }).select("_id").lean();
+  if (!form) {
+    return { error: "The selected form no longer exists in this organization" };
+  }
+  return { trigger: { event, formId: new mongoose.Types.ObjectId(formId) } };
 }
 
 export const listWorkflows = async (req: Request, res: Response): Promise<void> => {
@@ -115,9 +148,9 @@ export const createWorkflow = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const event = TRIGGER_NODE_EVENT_MAP[validation.triggerNode.type];
-    if (!event) {
-      res.status(400).json({ error: "Unknown trigger node type" });
+    const { trigger, error } = await resolveTrigger(validation.triggerNode, organization._id);
+    if (!trigger) {
+      res.status(400).json({ error: error ?? "Invalid trigger" });
       return;
     }
 
@@ -125,7 +158,7 @@ export const createWorkflow = async (req: Request, res: Response): Promise<void>
       organizationId: organization._id,
       name,
       enabled: false,
-      trigger: { event },
+      trigger,
       nodes,
       edges,
       createdBy: authReq.user.id,
@@ -165,15 +198,15 @@ export const updateWorkflow = async (req: Request, res: Response): Promise<void>
         return;
       }
 
-      const event = TRIGGER_NODE_EVENT_MAP[validation.triggerNode.type];
-      if (!event) {
-        res.status(400).json({ error: "Unknown trigger node type" });
+      const { trigger, error } = await resolveTrigger(validation.triggerNode, organization._id);
+      if (!trigger) {
+        res.status(400).json({ error: error ?? "Invalid trigger" });
         return;
       }
 
       workflow.nodes = nodes;
       workflow.edges = edges;
-      workflow.trigger = { event };
+      workflow.trigger = trigger;
     }
 
     await workflow.save();
@@ -254,6 +287,7 @@ export const listWorkflowRuns = async (req: Request, res: Response): Promise<voi
       .sort({ createdAt: -1 })
       .limit(limit)
       .populate("rfqId", "customer quoteNumber workflowStatus")
+      .populate("formId", "title slug")
       .lean();
 
     res.json({ runs });

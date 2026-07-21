@@ -9,6 +9,7 @@ import { FormSubmission } from "../models/form-submission.model";
 import type { IDriveNode } from "../models/drive-node.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { keyBelongsToPrefix } from "../services/storage.service";
+import { emitDomainEvent } from "../events/domain-events";
 import { assertDriveAccess, getEffectiveDriveRole, requireDriveNode } from "../services/drive-access.service";
 import { importExistingObjectToDrive } from "../services/drive-import.service";
 
@@ -781,6 +782,12 @@ export async function submitPublicForm(req: Request, res: Response): Promise<voi
         os,
         browser,
       },
+    });
+
+    void emitDomainEvent("form.submitted", {
+      formId: String(form._id),
+      submissionId: String(submission._id),
+      organizationId: String(form.organizationId),
     });
 
     res.status(201).json({

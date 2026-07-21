@@ -1,4 +1,8 @@
-import { registerDomainEventHandler, type RFQDomainEventPayload } from "../events/domain-events";
+import {
+  registerDomainEventHandler,
+  type FormDomainEventPayload,
+  type RFQDomainEventPayload,
+} from "../events/domain-events";
 import {
   Workflow,
   WORKFLOW_TRIGGER_EVENTS,
@@ -8,11 +12,15 @@ import {
 } from "../models/workflow.model";
 import { WorkflowRun, type IWorkflowRun } from "../models/workflow-run.model";
 import { RFQ } from "../models/rfq.model";
+import { Form } from "../models/form.model";
+import { FormSubmission } from "../models/form-submission.model";
 import { Organization } from "../models/organization.model";
 import {
   WORKFLOW_NODE_EXECUTORS,
   type WorkflowNodeContext,
 } from "./workflow-nodes";
+
+type WorkflowTriggerPayload = RFQDomainEventPayload | FormDomainEventPayload;
 
 const MAX_STEPS_PER_RUN = 50;
 
@@ -34,21 +42,46 @@ async function loadNodeContext(
   workflow: IWorkflow,
   run: IWorkflowRun,
   node: IWorkflowNode
-): Promise<WorkflowNodeContext | null> {
+): Promise<{ context: WorkflowNodeContext | null; missing?: string }> {
+  const base = {
+    workflow,
+    node,
+    runId: String(run._id),
+    organizationId: String(run.organizationId),
+    userId: run.context.userId,
+  };
+
+  if (run.formSubmissionId) {
+    const [form, submission, organization] = await Promise.all([
+      Form.findById(run.formId).lean(),
+      FormSubmission.findById(run.formSubmissionId).lean(),
+      Organization.findById(run.organizationId).select("name").lean(),
+    ]);
+    if (!form) return { context: null, missing: "Form no longer exists" };
+    if (!submission) return { context: null, missing: "Form submission no longer exists" };
+
+    return {
+      context: {
+        ...base,
+        form: form as WorkflowNodeContext["form"],
+        submission: submission as WorkflowNodeContext["submission"],
+        organizationName: organization?.name ?? "",
+      },
+    };
+  }
+
   const [rfq, organization] = await Promise.all([
     RFQ.findById(run.rfqId).populate("emailId", "subject from").lean(),
     Organization.findById(run.organizationId).select("name").lean(),
   ]);
-  if (!rfq) return null;
+  if (!rfq) return { context: null, missing: "RFQ no longer exists" };
 
   return {
-    workflow,
-    node,
-    runId: String(run._id),
-    rfq: rfq as WorkflowNodeContext["rfq"],
-    organizationId: String(run.organizationId),
-    organizationName: organization?.name ?? "",
-    userId: run.context.userId,
+    context: {
+      ...base,
+      rfq: rfq as WorkflowNodeContext["rfq"],
+      organizationName: organization?.name ?? "",
+    },
   };
 }
 
@@ -84,9 +117,9 @@ async function executeFrom(
       return;
     }
 
-    const context = await loadNodeContext(workflow, run, current);
+    const { context, missing } = await loadNodeContext(workflow, run, current);
     if (!context) {
-      await failRun(run, "RFQ no longer exists");
+      await failRun(run, missing ?? "Workflow entity no longer exists");
       return;
     }
 
@@ -155,15 +188,19 @@ async function executeFrom(
 async function startWorkflowRun(
   workflow: IWorkflow,
   event: WorkflowTriggerEvent,
-  payload: RFQDomainEventPayload
+  payload: WorkflowTriggerPayload
 ): Promise<void> {
   const triggerNode = workflow.nodes.find((node) => node.type.startsWith("trigger."));
   if (!triggerNode) return;
 
+  const isFormPayload = "submissionId" in payload;
+
   const run = await WorkflowRun.create({
     workflowId: workflow._id,
     organizationId: workflow.organizationId,
-    rfqId: payload.rfqId,
+    rfqId: isFormPayload ? null : payload.rfqId,
+    formId: isFormPayload ? payload.formId : null,
+    formSubmissionId: isFormPayload ? payload.submissionId : null,
     status: "running",
     currentNodeId: triggerNode.id,
     steps: [
@@ -179,7 +216,8 @@ async function startWorkflowRun(
     ],
     context: {
       triggerEvent: event,
-      userId: payload.userId,
+      // Public form submissions have no acting user; notify the workflow owner.
+      userId: isFormPayload ? workflow.createdBy : payload.userId,
     },
     startedAt: new Date(),
   });
@@ -189,13 +227,18 @@ async function startWorkflowRun(
 
 async function handleTriggerEvent(
   event: WorkflowTriggerEvent,
-  payload: RFQDomainEventPayload
+  payload: WorkflowTriggerPayload
 ): Promise<void> {
-  const workflows = await Workflow.find({
+  const filter: Record<string, unknown> = {
     organizationId: payload.organizationId,
     enabled: true,
     "trigger.event": event,
-  });
+  };
+  if ("submissionId" in payload) {
+    filter["trigger.formId"] = payload.formId;
+  }
+
+  const workflows = await Workflow.find(filter);
 
   for (const workflow of workflows) {
     try {

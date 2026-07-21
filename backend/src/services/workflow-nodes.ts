@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import type { Types } from "mongoose";
 import { RFQ, type IRFQ } from "../models/rfq.model";
+import type { IForm } from "../models/form.model";
+import type { IFormSubmission } from "../models/form-submission.model";
 import type { IWorkflow, IWorkflowNode } from "../models/workflow.model";
 import { sendEmail } from "../lib/email";
 import { WorkflowNotificationEmail } from "../emails/workflow-notification";
@@ -12,7 +14,11 @@ export interface WorkflowNodeContext {
   workflow: IWorkflow;
   node: IWorkflowNode;
   runId: string;
-  rfq: IRFQ & { emailId?: { subject?: string; from?: string } | Types.ObjectId | null };
+  /** Present for RFQ-triggered runs. */
+  rfq?: (IRFQ & { emailId?: { subject?: string; from?: string } | Types.ObjectId | null }) | null;
+  /** Present for form-triggered runs. */
+  form?: IForm | null;
+  submission?: IFormSubmission | null;
   organizationId: string;
   organizationName: string;
   userId: string;
@@ -55,22 +61,47 @@ export function interpolateTemplate(
   });
 }
 
-export function buildTemplateVariables(context: WorkflowNodeContext): Record<string, unknown> {
-  const { rfq } = context;
-  const email =
-    rfq.emailId && typeof rfq.emailId === "object" && "subject" in rfq.emailId
-      ? rfq.emailId
-      : null;
-  const quotedProducts = (rfq.savedQuoteProducts ?? []).filter(
-    (product) => product.lineStatus !== "regretted"
-  );
-  const quoteTotal = quotedProducts.reduce((sum, product) => {
-    if (product.price == null) return sum;
-    return sum + product.price * product.quantity;
-  }, 0);
+/** Turns a raw submission value into a human-readable string for templates. */
+function formatSubmissionValue(value: unknown): string {
+  if (value == null) return "";
+  if (Array.isArray(value)) {
+    return value.map(formatSubmissionValue).filter(Boolean).join(", ");
+  }
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") {
+    const file = value as { originalName?: unknown };
+    if (typeof file.originalName === "string") return file.originalName;
+    return "";
+  }
+  return String(value);
+}
 
-  return {
-    rfq: {
+export function buildTemplateVariables(context: WorkflowNodeContext): Record<string, unknown> {
+  const variables: Record<string, unknown> = {
+    workflow: {
+      name: context.workflow.name,
+    },
+    organization: {
+      name: context.organizationName,
+    },
+  };
+
+  const { rfq, form, submission } = context;
+
+  if (rfq) {
+    const email =
+      rfq.emailId && typeof rfq.emailId === "object" && "subject" in rfq.emailId
+        ? rfq.emailId
+        : null;
+    const quotedProducts = (rfq.savedQuoteProducts ?? []).filter(
+      (product) => product.lineStatus !== "regretted"
+    );
+    const quoteTotal = quotedProducts.reduce((sum, product) => {
+      if (product.price == null) return sum;
+      return sum + product.price * product.quantity;
+    }, 0);
+
+    variables.rfq = {
       id: String(rfq._id),
       subject: email?.subject ?? "",
       from: email?.from ?? "",
@@ -85,14 +116,26 @@ export function buildTemplateVariables(context: WorkflowNodeContext): Record<str
         company: rfq.customer?.company ?? "",
         email: rfq.customer?.email ?? "",
       },
-    },
-    workflow: {
-      name: context.workflow.name,
-    },
-    organization: {
-      name: context.organizationName,
-    },
-  };
+    };
+  }
+
+  if (form) {
+    variables.form = {
+      id: String(form._id),
+      title: form.title,
+      link: `${frontendOrigin}/forms/${form.slug}`,
+    };
+  }
+
+  if (form && submission) {
+    const submissionVars: Record<string, string> = {};
+    for (const field of form.fields ?? []) {
+      submissionVars[field.id] = formatSubmissionValue(submission.values?.[field.id]);
+    }
+    variables.submission = submissionVars;
+  }
+
+  return variables;
 }
 
 function parseRecipients(value: string): string[] {
@@ -162,6 +205,9 @@ async function executeRequestApproval(context: WorkflowNodeContext): Promise<Wor
 }
 
 async function executePlaceOrder(context: WorkflowNodeContext): Promise<WorkflowNodeResult> {
+  if (!context.rfq) {
+    throw new Error("Place Order can only run in an RFQ-triggered workflow");
+  }
   const config = context.node.config ?? {};
   const variables = buildTemplateVariables(context);
   const configured = interpolateTemplate(configString(config, "quoteNumber"), variables);
@@ -186,6 +232,9 @@ async function executePlaceOrder(context: WorkflowNodeContext): Promise<Workflow
 }
 
 async function executeArchiveRFQ(context: WorkflowNodeContext): Promise<WorkflowNodeResult> {
+  if (!context.rfq) {
+    throw new Error("Archive RFQ can only run in an RFQ-triggered workflow");
+  }
   const updated = await RFQ.findOneAndUpdate(
     { _id: context.rfq._id, organizationId: context.organizationId },
     { $set: { isArchived: true } },
@@ -205,15 +254,26 @@ async function executeNotify(context: WorkflowNodeContext): Promise<WorkflowNode
     `Workflow "${context.workflow.name}" update`;
   const body = interpolateTemplate(configString(config, "body"), variables) || null;
 
+  const actionUrl = context.rfq
+    ? `/rfq?rfq=${String(context.rfq._id)}`
+    : context.form
+      ? `/forms/${context.form.slug}`
+      : null;
+  const entityId = context.rfq
+    ? String(context.rfq._id)
+    : context.submission
+      ? String(context.submission._id)
+      : context.runId;
+
   await createNotificationForRecipient({
     organizationId: context.organizationId,
     recipientUserId: context.userId,
     type: "workflow.notify",
     title,
     body,
-    actionUrl: `/rfq?rfq=${String(context.rfq._id)}`,
+    actionUrl,
     entityType: "workflow_run",
-    entityId: String(context.rfq._id),
+    entityId,
     metadata: { workflowId: String(context.workflow._id) },
     // One notification per run step, even if the step is ever re-executed.
     dedupeKey: `workflow-run:${context.runId}:${context.node.id}`,

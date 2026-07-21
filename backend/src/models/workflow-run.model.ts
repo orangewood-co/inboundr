@@ -23,7 +23,9 @@ export interface IWorkflowRunStep {
 export interface IWorkflowRun extends Document {
   workflowId: Types.ObjectId;
   organizationId: Types.ObjectId;
-  rfqId: Types.ObjectId;
+  rfqId: Types.ObjectId | null;
+  formId: Types.ObjectId | null;
+  formSubmissionId: Types.ObjectId | null;
   status: WorkflowRunStatus;
   currentNodeId: string | null;
   steps: IWorkflowRunStep[];
@@ -77,7 +79,18 @@ const workflowRunSchema = new Schema<IWorkflowRun>(
     rfqId: {
       type: Schema.Types.ObjectId,
       ref: "RFQ",
-      required: true,
+      default: null,
+      index: true,
+    },
+    formId: {
+      type: Schema.Types.ObjectId,
+      ref: "Form",
+      default: null,
+    },
+    formSubmissionId: {
+      type: Schema.Types.ObjectId,
+      ref: "FormSubmission",
+      default: null,
       index: true,
     },
     status: {

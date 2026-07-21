@@ -6,6 +6,7 @@ export const WORKFLOW_TRIGGER_EVENTS = [
   "rfq.order_placed",
   "rfq.quote_sent",
   "rfq.archived",
+  "form.submitted",
 ] as const;
 export type WorkflowTriggerEvent = (typeof WORKFLOW_TRIGGER_EVENTS)[number];
 
@@ -15,6 +16,7 @@ export const WORKFLOW_NODE_TYPES = [
   "trigger.rfq_order_placed",
   "trigger.rfq_quote_sent",
   "trigger.rfq_archived",
+  "trigger.form_submitted",
   "action.send_email",
   "action.request_approval",
   "action.place_order",
@@ -30,7 +32,14 @@ export const TRIGGER_NODE_EVENT_MAP: Record<string, WorkflowTriggerEvent> = {
   "trigger.rfq_order_placed": "rfq.order_placed",
   "trigger.rfq_quote_sent": "rfq.quote_sent",
   "trigger.rfq_archived": "rfq.archived",
+  "trigger.form_submitted": "form.submitted",
 };
+
+/** Actions that operate on the triggering RFQ and make no sense for form runs. */
+export const RFQ_ONLY_NODE_TYPES: WorkflowNodeType[] = [
+  "action.place_order",
+  "action.archive_rfq",
+];
 
 export interface IWorkflowNode {
   id: string;
@@ -50,7 +59,7 @@ export interface IWorkflow extends Document {
   organizationId: Types.ObjectId;
   name: string;
   enabled: boolean;
-  trigger: { event: WorkflowTriggerEvent };
+  trigger: { event: WorkflowTriggerEvent; formId: Types.ObjectId | null };
   nodes: IWorkflowNode[];
   edges: IWorkflowEdge[];
   createdBy: string;
@@ -93,6 +102,7 @@ const workflowSchema = new Schema<IWorkflow>(
     enabled: { type: Boolean, default: false, index: true },
     trigger: {
       event: { type: String, enum: WORKFLOW_TRIGGER_EVENTS, required: true },
+      formId: { type: Schema.Types.ObjectId, ref: "Form", default: null },
     },
     nodes: { type: [workflowNodeSchema], default: [] },
     edges: { type: [workflowEdgeSchema], default: [] },
@@ -102,7 +112,7 @@ const workflowSchema = new Schema<IWorkflow>(
 );
 
 workflowSchema.index({ organizationId: 1, updatedAt: -1 });
-workflowSchema.index({ enabled: 1, "trigger.event": 1 });
+workflowSchema.index({ enabled: 1, "trigger.event": 1, "trigger.formId": 1 });
 
 export const Workflow = mongoose.model<IWorkflow>("Workflow", workflowSchema);
 
@@ -145,6 +155,22 @@ export function validateWorkflowGraph(
     return { valid: false, error: "Workflow can only have one trigger node" };
   }
   const triggerNode = triggerNodes[0]!;
+
+  if (triggerNode.type === "trigger.form_submitted") {
+    const formId = triggerNode.config?.formId;
+    if (typeof formId !== "string" || !formId.trim()) {
+      return { valid: false, error: "The Form Submitted trigger needs a form selected" };
+    }
+    const rfqOnlyNode = nodes.find((node) =>
+      RFQ_ONLY_NODE_TYPES.includes(node.type)
+    );
+    if (rfqOnlyNode) {
+      return {
+        valid: false,
+        error: "Place Order and Archive RFQ nodes cannot be used with a form trigger",
+      };
+    }
+  }
 
   const outgoing = new Map<string, string[]>();
   for (const edge of edges) {
