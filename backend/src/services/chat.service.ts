@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { ChatMessage } from "../models/chat-message.model";
 import { ChatThread, type ChatThreadStatus } from "../models/chat-thread.model";
+import { createFormTools } from "../tools/form.tool";
 import { createInvoiceTools } from "../tools/invoice.tool";
 import { createKnowledgeTools } from "../tools/knowledge.tool";
 import { createProductTools } from "../tools/product.tool";
@@ -39,7 +40,14 @@ You can also help users with invoices:
 You can answer questions from the user's documents:
 - Use searchKnowledgeBase to retrieve relevant snippets from folders the user marked "Use for chat context" in Drive.
 - Prefer searchKnowledgeBase whenever a question is about the user's own files, documents, manuals, policies, or uploaded content.
-- Base your answer on the retrieved snippets and always cite the source file names. If nothing relevant is found, say so instead of guessing.`;
+- Base your answer on the retrieved snippets and always cite the source file names. If nothing relevant is found, say so instead of guessing.
+
+You can also help users with forms:
+- Use searchForms to find a form (and its field ids) before updating it or reading its submissions.
+- Forms you create are always drafts; the user finishes the design, branding, and publishing in the form editor. Only set status to published with updateForm when the user explicitly asks to publish.
+- When editing a form's questions, send the complete replacement fields list and keep the id of every existing question so submissions stay linked.
+- dropdown (single choice) and checkbox (multiple choice) fields need at least one option.
+- Use getFormSubmissions to report response counts or summarize what respondents said.`;
 
 export type ChatStreamInput = {
   messages?: UIMessage[];
@@ -98,6 +106,7 @@ export async function createChatStreamResponse(
     ...createProductTools(context),
     ...createInvoiceTools(context),
     ...createKnowledgeTools(context),
+    ...createFormTools(context),
     ...frontendTools((input.tools ?? {}) as Parameters<typeof frontendTools>[0]),
   };
   const result = streamText({

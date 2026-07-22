@@ -300,8 +300,8 @@ export default function FormEditorPage() {
   const headerActions = (
     <div className="flex items-center gap-2">
       {isDirty && (
-        <span className="hidden items-center gap-1.5 text-xs font-medium text-warning sm:flex animate-in fade-in">
-          <CircleDotIcon className="size-3" />
+        <span className="hidden items-center gap-1.5 whitespace-nowrap text-xs font-medium text-warning sm:flex animate-in fade-in">
+          <CircleDotIcon className="size-3 shrink-0" />
           Unsaved changes
         </span>
       )}

@@ -21,6 +21,7 @@ import {
   XIcon,
 } from "lucide-react"
 
+import { FormToolUIs } from "@/components/assistant-ui/form-tool-ui"
 import { InvoiceToolUIs } from "@/components/assistant-ui/invoice-tool-ui"
 import { KnowledgeToolUIs } from "@/components/assistant-ui/knowledge-tool-ui"
 import { Thread } from "@/components/assistant-ui/thread"
@@ -408,6 +409,7 @@ export default function ChatPage() {
         <InvoiceToolUIs />
         <WorkspaceToolUIs />
         <KnowledgeToolUIs />
+        <FormToolUIs />
         <SiteHeader actions={<ChatHeaderActions />} />
         <ChatContent />
       </ChatRuntimeProvider>
