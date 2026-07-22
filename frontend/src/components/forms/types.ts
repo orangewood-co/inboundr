@@ -60,12 +60,21 @@ export type FormSettings = {
   collectDeviceInfo: boolean
 }
 
+export type FormFolder = {
+  _id: string
+  name: string
+  branding: FormBranding
+  formCount: number
+}
+
 export type ManagedForm = {
   _id: string
   title: string
   description: string | null
   slug: string
   status: "draft" | "published" | "archived"
+  folderId?: string | null
+  useFolderDesign?: boolean
   fields: FormField[]
   branding: FormBranding
   settings: FormSettings

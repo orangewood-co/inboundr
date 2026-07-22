@@ -1,7 +1,9 @@
 import { useMemo } from "react"
 import {
+  CheckIcon,
   CopyIcon,
   EllipsisIcon,
+  FolderIcon,
   LinkIcon,
   PencilIcon,
   Trash2Icon,
@@ -13,26 +15,39 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatDateTime, formatRelativeTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { Sparkline } from "@/components/forms/sparkline"
-import { bucketRecentSubmissions, type ManagedForm } from "@/components/forms/types"
+import {
+  bucketRecentSubmissions,
+  type FormFolder,
+  type ManagedForm,
+} from "@/components/forms/types"
 
 export function FormCard({
   form,
+  folders = [],
+  folderName,
   onOpen,
   onCopyLink,
   onDuplicate,
   onArchive,
+  onMoveToFolder,
 }: {
   form: ManagedForm
+  folders?: FormFolder[]
+  folderName?: string | null
   onOpen: () => void
   onCopyLink: () => void
   onDuplicate: () => void
   onArchive: () => void
+  onMoveToFolder?: (folderId: string | null) => void
 }) {
   const buckets = useMemo(
     () => bucketRecentSubmissions(form.recentSubmissionDates),
@@ -57,19 +72,27 @@ export function FormCard({
     >
       {/* Status + actions */}
       <div className="flex items-center justify-between">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 text-xs font-medium",
-            isPublished ? "text-success" : "text-muted-foreground",
-          )}
-        >
+        <span className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
-              "size-1.5 rounded-full",
-              isPublished ? "bg-success" : "bg-muted-foreground/50",
+              "inline-flex shrink-0 items-center gap-1.5 text-xs font-medium",
+              isPublished ? "text-success" : "text-muted-foreground",
             )}
-          />
-          {isPublished ? "Live" : "Draft"}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full",
+                isPublished ? "bg-success" : "bg-muted-foreground/50",
+              )}
+            />
+            {isPublished ? "Live" : "Draft"}
+          </span>
+          {folderName && (
+            <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <FolderIcon className="size-3 shrink-0" />
+              <span className="truncate">{folderName}</span>
+            </span>
+          )}
         </span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -98,6 +121,30 @@ export function FormCard({
               <CopyIcon className="size-4" />
               Duplicate
             </DropdownMenuItem>
+            {onMoveToFolder && folders.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <FolderIcon className="size-4" />
+                  Move to Folder
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onClick={() => onMoveToFolder(null)}>
+                    {!form.folderId && <CheckIcon className="size-4" />}
+                    Unfiled
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {folders.map((folder) => (
+                    <DropdownMenuItem
+                      key={folder._id}
+                      onClick={() => onMoveToFolder(folder._id)}
+                    >
+                      {form.folderId === folder._id && <CheckIcon className="size-4" />}
+                      {folder.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onArchive}>
               <Trash2Icon className="size-4" />

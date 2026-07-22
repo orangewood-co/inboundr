@@ -3,6 +3,7 @@ import { useBlocker, useNavigate, useParams } from "@tanstack/react-router"
 import {
   CircleDotIcon,
   ExternalLinkIcon,
+  FolderIcon,
   LoaderIcon,
   Settings2Icon,
 } from "lucide-react"
@@ -26,7 +27,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { getFormBySlug, saveForm as apiSaveForm } from "@/lib/forms-api"
+import { getFormBySlug, listFolders, saveForm as apiSaveForm } from "@/lib/forms-api"
 import { DesignTab } from "@/components/forms/design-tab"
 import { FormCanvas } from "@/components/forms/form-canvas"
 import { ResponsesTab } from "@/components/forms/responses-tab"
@@ -39,6 +40,7 @@ import {
   type FieldType,
   type FormBranding,
   type FormField,
+  type FormFolder,
   type FormSettings,
   type ManagedForm,
 } from "@/components/forms/types"
@@ -61,6 +63,8 @@ function draftSignature(form: ManagedForm) {
     description: form.description,
     slug: form.slug,
     status: form.status,
+    folderId: form.folderId ?? null,
+    useFolderDesign: form.useFolderDesign ?? true,
     fields: form.fields,
     branding: form.branding,
     settings: form.settings,
@@ -76,6 +80,26 @@ export default function FormEditorPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [responseTotal, setResponseTotal] = useState(0)
+  const [folder, setFolder] = useState<FormFolder | null>(null)
+
+  const folderId = form?.folderId ?? null
+  useEffect(() => {
+    if (!folderId) {
+      setFolder(null)
+      return
+    }
+    let cancelled = false
+    listFolders()
+      .then((folders) => {
+        if (!cancelled) setFolder(folders.find((entry) => entry._id === folderId) ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setFolder(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [folderId])
 
   const isDirty = useMemo(
     () => Boolean(form && draft && draftSignature(form) !== draftSignature(draft)),
@@ -458,13 +482,49 @@ export default function FormEditorPage() {
         </TabsContent>
 
         <TabsContent value="design" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-          <DesignTab
-            title={draft.title}
-            description={draft.description ?? ""}
-            submitButtonLabel={draft.settings.submitButtonLabel}
-            branding={draft.branding}
-            onPatchBranding={patchBranding}
-          />
+          {folder && (
+            <div className="mx-auto mt-6 flex max-w-5xl items-center justify-between gap-4 rounded-xl border bg-muted/40 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    This form is in the <span className="font-semibold">{folder.name}</span> folder
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {(draft.useFolderDesign ?? true)
+                      ? "It follows the folder design — edits to the folder restyle this form instantly."
+                      : "Folder design is off — this form uses its own design below."}
+                  </p>
+                </div>
+              </div>
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+                Use folder design
+                <Switch
+                  checked={draft.useFolderDesign ?? true}
+                  onCheckedChange={(checked) => patchDraft({ useFolderDesign: checked })}
+                />
+              </label>
+            </div>
+          )}
+          {folder && (draft.useFolderDesign ?? true) ? (
+            <div className="pointer-events-none select-none" aria-disabled>
+              <DesignTab
+                title={draft.title}
+                description={draft.description ?? ""}
+                submitButtonLabel={draft.settings.submitButtonLabel}
+                branding={folder.branding}
+                onPatchBranding={() => {}}
+              />
+            </div>
+          ) : (
+            <DesignTab
+              title={draft.title}
+              description={draft.description ?? ""}
+              submitButtonLabel={draft.settings.submitButtonLabel}
+              branding={draft.branding}
+              onPatchBranding={patchBranding}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="share" className="mt-0 min-h-0 flex-1 overflow-y-auto">

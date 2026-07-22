@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { ClipboardListIcon, PlusIcon, SearchXIcon } from "lucide-react"
+import {
+  ClipboardListIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  PlusIcon,
+  SearchXIcon,
+  Settings2Icon,
+} from "lucide-react"
 
 import { toast } from "sonner"
 
@@ -22,13 +29,15 @@ import { PageHeader } from "@/components/page-header"
 import {
   archiveForm as apiArchiveForm,
   duplicateForm as apiDuplicateForm,
+  listFolders,
   listForms,
   saveForm,
 } from "@/lib/forms-api"
 import { cn } from "@/lib/utils"
+import { CreateFolderDialog, FolderSettingsDialog } from "@/components/forms/folder-dialogs"
 import { FormCard } from "@/components/forms/form-card"
 import { FormsStatCards } from "@/components/forms/forms-stat-cards"
-import { publicFormUrl, type ManagedForm } from "@/components/forms/types"
+import { publicFormUrl, type FormFolder, type ManagedForm } from "@/components/forms/types"
 
 type StatusFilter = "all" | "published" | "draft"
 
@@ -38,21 +47,29 @@ const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "draft", label: "Drafts" },
 ]
 
+type FolderFilter = "all" | "unfiled" | string
+
 export default function FormsListPage() {
   const navigate = useNavigate()
   const [forms, setForms] = useState<ManagedForm[]>([])
+  const [folders, setFolders] = useState<FormFolder[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<ManagedForm | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [folderFilter, setFolderFilter] = useState<FolderFilter>("all")
+  const [createFolderOpen, setCreateFolderOpen] = useState(false)
+  const [folderSettingsOpen, setFolderSettingsOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    listForms()
-      .then((data) => {
-        if (!cancelled) setForms(data)
+    Promise.all([listForms(), listFolders().catch(() => [] as FormFolder[])])
+      .then(([formsData, foldersData]) => {
+        if (cancelled) return
+        setForms(formsData)
+        setFolders(foldersData)
       })
       .catch(() => {
         /* handled by empty state */
@@ -73,11 +90,50 @@ export default function FormsListPage() {
     }
   }
 
+  async function refreshFolders() {
+    try {
+      setFolders(await listFolders())
+    } catch {
+      /* keep current list */
+    }
+  }
+
+  const selectedFolder = useMemo(
+    () => folders.find((folder) => folder._id === folderFilter) ?? null,
+    [folders, folderFilter],
+  )
+
+  const folderNameById = useMemo(
+    () => new Map(folders.map((folder) => [folder._id, folder.name])),
+    [folders],
+  )
+
   const filteredForms = useMemo(() => {
     return forms
+      .filter((form) =>
+        folderFilter === "all"
+          ? true
+          : folderFilter === "unfiled"
+            ? !form.folderId
+            : form.folderId === folderFilter,
+      )
       .filter((form) => statusFilter === "all" || form.status === statusFilter)
       .sort((a, b) => lastActivity(b) - lastActivity(a))
-  }, [forms, statusFilter])
+  }, [forms, statusFilter, folderFilter])
+
+  async function moveToFolder(form: ManagedForm, folderId: string | null) {
+    try {
+      await saveForm({ ...form, folderId, useFolderDesign: true })
+      toast.success(
+        folderId
+          ? `Moved to ${folderNameById.get(folderId) ?? "folder"}`
+          : "Removed from folder",
+      )
+      void refreshForms()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to move form")
+    }
+  }
 
   async function createFromTemplate(template: {
     title: string
@@ -92,6 +148,8 @@ export default function FormsListPage() {
         description: template.description,
         slug,
         status: "draft",
+        folderId: selectedFolder?._id ?? null,
+        useFolderDesign: true,
         fields: template.fields as ManagedForm["fields"],
         branding: { accentColor: "#111827", logoUrl: null },
         settings: {
@@ -180,6 +238,63 @@ export default function FormsListPage() {
               <div className="mt-6 space-y-6 animate-in fade-in-0 duration-300">
                 <FormsStatCards forms={forms} />
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <FolderChip
+                    label="All"
+                    count={forms.length}
+                    active={folderFilter === "all"}
+                    onClick={() => setFolderFilter("all")}
+                  />
+                  <FolderChip
+                    label="Unfiled"
+                    count={forms.filter((form) => !form.folderId).length}
+                    active={folderFilter === "unfiled"}
+                    onClick={() => setFolderFilter("unfiled")}
+                  />
+                  {folders.map((folder) => (
+                    <FolderChip
+                      key={folder._id}
+                      label={folder.name}
+                      count={forms.filter((form) => form.folderId === folder._id).length}
+                      active={folderFilter === folder._id}
+                      withIcon
+                      onClick={() => setFolderFilter(folder._id)}
+                    />
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-muted-foreground"
+                    onClick={() => setCreateFolderOpen(true)}
+                  >
+                    <FolderPlusIcon className="size-4" />
+                    New Folder
+                  </Button>
+                </div>
+
+                {selectedFolder && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <p className="truncate text-sm font-semibold">{selectedFolder.name}</p>
+                      <p className="shrink-0 text-xs text-muted-foreground">
+                        {(() => {
+                          const count = forms.filter((form) => form.folderId === selectedFolder._id).length
+                          return `${count} ${count === 1 ? "form inherits" : "forms inherit"} this folder's design`
+                        })()}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFolderSettingsOpen(true)}
+                    >
+                      <Settings2Icon className="size-4" />
+                      Edit Design
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex justify-end">
                   <div className="flex w-fit items-center rounded-lg bg-muted p-[3px]">
                     {STATUS_FILTERS.map((filter) => {
@@ -232,12 +347,19 @@ export default function FormsListPage() {
                       <FormCard
                         key={form._id}
                         form={form}
+                        folders={folders}
+                        folderName={
+                          folderFilter === "all" && form.folderId
+                            ? folderNameById.get(form.folderId) ?? null
+                            : null
+                        }
                         onOpen={() =>
                           void navigate({ to: "/forms/$slug", params: { slug: form.slug } })
                         }
                         onCopyLink={() => copyLink(form)}
                         onDuplicate={() => void duplicateForm(form)}
                         onArchive={() => setArchiveTarget(form)}
+                        onMoveToFolder={(folderId) => void moveToFolder(form, folderId)}
                       />
                     ))}
                   </div>
@@ -285,7 +407,68 @@ export default function FormsListPage() {
           onSelect={(t) => void createFromTemplate(t)}
           creating={creating}
         />
+
+        <CreateFolderDialog
+          open={createFolderOpen}
+          onOpenChange={setCreateFolderOpen}
+          onCreated={(folder) => {
+            setFolders((current) =>
+              [...current, folder].sort((a, b) => a.name.localeCompare(b.name)),
+            )
+            setFolderFilter(folder._id)
+          }}
+        />
+
+        <FolderSettingsDialog
+          folder={selectedFolder}
+          open={folderSettingsOpen}
+          onOpenChange={setFolderSettingsOpen}
+          onSaved={(saved) => {
+            setFolders((current) =>
+              current
+                .map((folder) => (folder._id === saved._id ? saved : folder))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+            )
+          }}
+          onDeleted={(folderId) => {
+            setFolders((current) => current.filter((folder) => folder._id !== folderId))
+            setFolderFilter("all")
+            void refreshForms()
+            void refreshFolders()
+          }}
+        />
     </AppLayout>
+  )
+}
+
+function FolderChip({
+  label,
+  count,
+  active,
+  withIcon,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  withIcon?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+        active
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {withIcon && <FolderIcon className="size-3.5" />}
+      <span className="max-w-40 truncate">{label}</span>
+      <span className="text-[11px] tabular-nums opacity-70">{count}</span>
+    </button>
   )
 }
 

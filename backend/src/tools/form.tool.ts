@@ -288,6 +288,8 @@ export function createFormTools(context: FormToolContext) {
           description: description !== undefined ? description : existing.description,
           slug: existing.slug,
           status: status !== undefined ? status : existing.status,
+          folderId: existing.folderId ? String(existing.folderId) : null,
+          useFolderDesign: existing.useFolderDesign,
           fields: fields !== undefined ? fields : existing.fields,
           branding: existing.branding,
           settings: { ...existing.settings, ...(settings ?? {}) },

@@ -13,6 +13,12 @@ import {
   updateSubmissionStatus,
 } from "../controllers/forms.controller";
 import {
+  createFolder,
+  deleteFolder,
+  listFolders,
+  updateFolder,
+} from "../controllers/form-folders.controller";
+import {
   requireAuth,
   requireEmployeeModule,
   requireFeature,
@@ -26,6 +32,11 @@ router.use(requireAuth);
 router.use(requireOrganization);
 router.use(requireFeature("forms"));
 router.use(requireEmployeeModule("forms"));
+
+router.get("/folders", listFolders);
+router.post("/folders", requireOrganizationAdmin(), createFolder);
+router.put("/folders/:folderId", requireOrganizationAdmin(), updateFolder);
+router.delete("/folders/:folderId", requireOrganizationAdmin(), deleteFolder);
 
 router.get("/", listForms);
 router.post("/", requireOrganizationAdmin(), createForm);

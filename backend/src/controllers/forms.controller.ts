@@ -9,7 +9,7 @@ import { FormSubmission } from "../models/form-submission.model";
 import type { IDriveNode } from "../models/drive-node.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { keyBelongsToPrefix, resolvePublicImageUrl } from "../services/storage.service";
-import { normalizeFormInput, validateFormInput } from "../services/form-input.service";
+import { normalizeFormInput, resolveEffectiveBranding, validateFormInput } from "../services/form-input.service";
 import { emitDomainEvent } from "../events/domain-events";
 import { assertDriveAccess, getEffectiveDriveRole, requireDriveNode } from "../services/drive-access.service";
 import { importExistingObjectToDrive } from "../services/drive-import.service";
@@ -226,6 +226,8 @@ export async function duplicateForm(req: Request, res: Response): Promise<void> 
       description: form.description,
       slug: `${form.slug}-${Date.now().toString(36)}`,
       status: "draft",
+      folderId: form.folderId ?? null,
+      useFolderDesign: form.useFolderDesign ?? true,
       fields: form.fields,
       branding: form.branding,
       settings: form.settings,
@@ -622,11 +624,12 @@ export async function getPublicForm(req: Request, res: Response): Promise<void> 
       res.status(404).json({ error: "Form not found" });
       return;
     }
+    const branding = await resolveEffectiveBranding(form);
     res.json({
       ...form,
       branding: {
-        ...form.branding,
-        logoUrl: await resolvePublicImageUrl(form.branding?.logoUrl),
+        ...branding,
+        logoUrl: await resolvePublicImageUrl(branding?.logoUrl),
       },
     });
   } catch (err) {

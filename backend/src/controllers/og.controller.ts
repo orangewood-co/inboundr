@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { Form } from "../models/form.model";
 import { apiOrigin, embedOrigin, formsShareOrigin } from "../config/origins.config";
 import { renderFallbackOgImage, renderFormOgImage } from "../services/og-image.service";
+import { resolveEffectiveBranding } from "../services/form-input.service";
 import { resolvePublicImageUrl } from "../services/storage.service";
 
 const MEMO_LIMIT = 200;
@@ -108,12 +109,13 @@ export async function getFormOgImage(req: Request, res: Response): Promise<void>
     const key = `${form.slug}:${new Date(form.updatedAt).getTime()}`;
     let png = memo.get(key);
     if (!png) {
+      const branding = await resolveEffectiveBranding(form);
       png = await renderFormOgImage({
         title: form.title,
         description: form.description,
         branding: {
-          ...form.branding,
-          logoUrl: await resolvePublicImageUrl(form.branding?.logoUrl),
+          ...branding,
+          logoUrl: await resolvePublicImageUrl(branding?.logoUrl),
         },
       });
       remember(key, png);

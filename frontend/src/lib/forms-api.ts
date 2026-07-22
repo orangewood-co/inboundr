@@ -1,5 +1,7 @@
 import { API_ORIGIN } from "@/lib/env"
 import type {
+  FormBranding,
+  FormFolder,
   FormSubmission,
   ManagedForm,
   UploadedFileValue,
@@ -35,6 +37,37 @@ export async function saveForm(payload: Partial<ManagedForm>): Promise<ManagedFo
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
+}
+
+export async function listFolders(): Promise<FormFolder[]> {
+  const data = await request<{ folders: FormFolder[] }>(`${API_BASE}/folders`)
+  return data.folders
+}
+
+export async function createFolder(payload: {
+  name: string
+  branding?: FormBranding
+}): Promise<FormFolder> {
+  return request<FormFolder>(`${API_BASE}/folders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateFolder(
+  id: string,
+  payload: { name?: string; branding?: FormBranding },
+): Promise<FormFolder> {
+  return request<FormFolder>(`${API_BASE}/folders/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  await request(`${API_BASE}/folders/${id}`, { method: "DELETE" })
 }
 
 export async function duplicateForm(id: string): Promise<ManagedForm> {

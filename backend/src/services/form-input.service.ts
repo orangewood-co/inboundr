@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 
-import type { FormFieldType, IFormField } from "../models/form.model";
+import type { FormFieldType, IFormBranding, IFormField } from "../models/form.model";
+import { FormFolder } from "../models/form-folder.model";
 
 export const FIELD_TYPES: FormFieldType[] = [
   "short_text",
@@ -61,34 +63,44 @@ export function normalizeFields(value: unknown): IFormField[] {
     .filter((field) => field.label);
 }
 
+export function normalizeBranding(value: unknown): IFormBranding {
+  const branding = (value ?? {}) as Record<string, unknown>;
+  return {
+    accentColor: String(branding.accentColor ?? "#111827").trim() || "#111827",
+    logoUrl: String(branding.logoUrl ?? "").trim() || null,
+    backgroundType: ["solid", "gradient", "none"].includes(String(branding.backgroundType))
+      ? (String(branding.backgroundType) as "solid" | "gradient" | "none")
+      : "none",
+    backgroundColor: String(branding.backgroundColor ?? "").trim() || null,
+    backgroundGradient: String(branding.backgroundGradient ?? "").trim().slice(0, 500) || null,
+    theme: String(branding.theme ?? "").trim().slice(0, 60) || null,
+    borderRadius: ["sm", "md", "lg"].includes(String(branding.borderRadius))
+      ? (String(branding.borderRadius) as "sm" | "md" | "lg")
+      : "md",
+  };
+}
+
 export function normalizeFormInput(body: Record<string, unknown>) {
   const title = String(body.title ?? "").trim();
   const slug = slugify(String(body.slug ?? title));
   const rawStatus = String(body.status);
   const status: "draft" | "published" | "archived" =
     rawStatus === "published" ? "published" : rawStatus === "archived" ? "archived" : "draft";
-  const branding = (body.branding ?? {}) as Record<string, unknown>;
   const settings = (body.settings ?? {}) as Record<string, unknown>;
+  const rawFolderId = String(body.folderId ?? "").trim();
 
   return {
     title,
     description: String(body.description ?? "").trim() || null,
     slug,
     status,
+    folderId:
+      rawFolderId && mongoose.Types.ObjectId.isValid(rawFolderId)
+        ? new mongoose.Types.ObjectId(rawFolderId)
+        : null,
+    useFolderDesign: Boolean(body.useFolderDesign ?? true),
     fields: normalizeFields(body.fields),
-    branding: {
-      accentColor: String(branding.accentColor ?? "#111827").trim() || "#111827",
-      logoUrl: String(branding.logoUrl ?? "").trim() || null,
-      backgroundType: ["solid", "gradient", "none"].includes(String(branding.backgroundType))
-        ? (String(branding.backgroundType) as "solid" | "gradient" | "none")
-        : "none",
-      backgroundColor: String(branding.backgroundColor ?? "").trim() || null,
-      backgroundGradient: String(branding.backgroundGradient ?? "").trim().slice(0, 500) || null,
-      theme: String(branding.theme ?? "").trim().slice(0, 60) || null,
-      borderRadius: ["sm", "md", "lg"].includes(String(branding.borderRadius))
-        ? (String(branding.borderRadius) as "sm" | "md" | "lg")
-        : "md",
-    },
+    branding: normalizeBranding(body.branding),
     settings: {
       submitButtonLabel: String(settings.submitButtonLabel ?? "Submit").trim() || "Submit",
       successMessage:
@@ -98,6 +110,26 @@ export function normalizeFormInput(body: Record<string, unknown>) {
       collectDeviceInfo: Boolean(settings.collectDeviceInfo ?? false),
     },
   };
+}
+
+// A form in a folder follows the folder's design unless it opted out (or the
+// folder has since been deleted).
+export async function resolveEffectiveBranding(form: {
+  organizationId: mongoose.Types.ObjectId;
+  folderId?: mongoose.Types.ObjectId | null;
+  useFolderDesign?: boolean;
+  branding: IFormBranding;
+}): Promise<IFormBranding> {
+  if (form.folderId && form.useFolderDesign !== false) {
+    const folder = await FormFolder.findOne({
+      _id: form.folderId,
+      organizationId: form.organizationId,
+    })
+      .select("branding")
+      .lean();
+    if (folder?.branding) return folder.branding;
+  }
+  return form.branding;
 }
 
 export function validateFormInput(input: ReturnType<typeof normalizeFormInput>): string | null {

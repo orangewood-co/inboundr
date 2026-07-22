@@ -27,22 +27,26 @@ export interface IFormField {
   multiple?: boolean;
 }
 
+export interface IFormBranding {
+  accentColor: string;
+  logoUrl: string | null;
+  backgroundType: "solid" | "gradient" | "none";
+  backgroundColor: string | null;
+  backgroundGradient: string | null;
+  theme: string | null;
+  borderRadius: "sm" | "md" | "lg";
+}
+
 export interface IForm extends Document {
   organizationId: mongoose.Types.ObjectId;
   title: string;
   description: string | null;
   slug: string;
   status: "draft" | "published" | "archived";
+  folderId: mongoose.Types.ObjectId | null;
+  useFolderDesign: boolean;
   fields: IFormField[];
-  branding: {
-    accentColor: string;
-    logoUrl: string | null;
-    backgroundType: "solid" | "gradient" | "none";
-    backgroundColor: string | null;
-    backgroundGradient: string | null;
-    theme: string | null;
-    borderRadius: "sm" | "md" | "lg";
-  };
+  branding: IFormBranding;
   settings: {
     submitButtonLabel: string;
     successMessage: string;
@@ -90,6 +94,13 @@ const formSchema = new Schema<IForm>(
       default: "draft",
       index: true,
     },
+    folderId: {
+      type: Schema.Types.ObjectId,
+      ref: "FormFolder",
+      default: null,
+      index: true,
+    },
+    useFolderDesign: { type: Boolean, default: true },
     fields: { type: [formFieldSchema], default: [] },
     branding: {
       accentColor: { type: String, default: "#111827" },
