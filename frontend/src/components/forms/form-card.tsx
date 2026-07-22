@@ -33,7 +33,7 @@ import {
 export function FormCard({
   form,
   folders = [],
-  folderName,
+  folder,
   onOpen,
   onCopyLink,
   onDuplicate,
@@ -42,7 +42,7 @@ export function FormCard({
 }: {
   form: ManagedForm
   folders?: FormFolder[]
-  folderName?: string | null
+  folder?: FormFolder | null
   onOpen: () => void
   onCopyLink: () => void
   onDuplicate: () => void
@@ -87,10 +87,13 @@ export function FormCard({
             />
             {isPublished ? "Live" : "Draft"}
           </span>
-          {folderName && (
-            <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              <FolderIcon className="size-3 shrink-0" />
-              <span className="truncate">{folderName}</span>
+          {folder && (
+            <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <span
+                className="size-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: folder.branding.accentColor }}
+              />
+              <span className="truncate">{folder.name}</span>
             </span>
           )}
         </span>
@@ -123,23 +126,32 @@ export function FormCard({
             </DropdownMenuItem>
             {onMoveToFolder && folders.length > 0 && (
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <FolderIcon className="size-4" />
-                  Move to Folder
+                <DropdownMenuSubTrigger className="gap-2">
+                  <FolderIcon className="size-4 text-muted-foreground" />
+                  <span className="whitespace-nowrap">Move to Folder</span>
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
+                <DropdownMenuSubContent className="min-w-44">
                   <DropdownMenuItem onClick={() => onMoveToFolder(null)}>
-                    {!form.folderId && <CheckIcon className="size-4" />}
-                    Unfiled
+                    <span className="size-2 shrink-0 rounded-full border-[1.5px] border-muted-foreground/50" />
+                    <span className="truncate">Unfiled</span>
+                    {!form.folderId && (
+                      <CheckIcon className="ml-auto size-4 text-muted-foreground" />
+                    )}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {folders.map((folder) => (
+                  {folders.map((entry) => (
                     <DropdownMenuItem
-                      key={folder._id}
-                      onClick={() => onMoveToFolder(folder._id)}
+                      key={entry._id}
+                      onClick={() => onMoveToFolder(entry._id)}
                     >
-                      {form.folderId === folder._id && <CheckIcon className="size-4" />}
-                      {folder.name}
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: entry.branding.accentColor }}
+                      />
+                      <span className="truncate">{entry.name}</span>
+                      {form.folderId === entry._id && (
+                        <CheckIcon className="ml-auto size-4 text-muted-foreground" />
+                      )}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuSubContent>

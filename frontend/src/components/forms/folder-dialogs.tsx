@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
   updateFolder as apiUpdateFolder,
 } from "@/lib/forms-api"
 import { DesignTab } from "@/components/forms/design-tab"
+import { FolderSwatch } from "@/components/forms/folder-swatch"
 import type { FormBranding, FormFolder } from "@/components/forms/types"
 
 const DEFAULT_FOLDER_BRANDING: FormBranding = {
@@ -108,25 +109,24 @@ export function FolderSettingsDialog({
   open,
   onOpenChange,
   onSaved,
-  onDeleted,
+  initialFocus = "design",
 }: {
   folder: FormFolder | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: (folder: FormFolder) => void
-  onDeleted: (folderId: string) => void
+  /** "name" opens the dialog with the name field focused and selected (Rename). */
+  initialFocus?: "design" | "name"
 }) {
+  const nameInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState("")
   const [branding, setBranding] = useState<FormBranding>(DEFAULT_FOLDER_BRANDING)
   const [saving, setSaving] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (open && folder) {
       setName(folder.name)
       setBranding({ ...DEFAULT_FOLDER_BRANDING, ...folder.branding })
-      setConfirmingDelete(false)
     }
   }, [open, folder])
 
@@ -137,6 +137,7 @@ export function FolderSettingsDialog({
     const trimmed = name.trim()
     if (!trimmed) {
       toast.error("Folder name is required")
+      nameInputRef.current?.focus()
       return
     }
     setSaving(true)
@@ -152,13 +153,89 @@ export function FolderSettingsDialog({
     }
   }
 
+  return (
+    <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
+      <DialogContent
+        className="flex max-h-[90dvh] flex-col gap-0 p-0 sm:max-w-5xl"
+        onOpenAutoFocus={(event) => {
+          if (initialFocus === "name") {
+            event.preventDefault()
+            nameInputRef.current?.focus()
+            nameInputRef.current?.select()
+          }
+        }}
+      >
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle>Folder Settings</DialogTitle>
+          <DialogDescription>
+            Forms in this folder inherit this design unless they opt out in their own
+            Design tab.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6">
+          <div className="flex items-end gap-3">
+            <FolderSwatch branding={branding} className="size-9" />
+            <div className="w-full max-w-sm space-y-1.5">
+              <Label className="text-[13px] text-muted-foreground">Folder name</Label>
+              <Input
+                ref={nameInputRef}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={80}
+              />
+            </div>
+          </div>
+
+          <DesignTab
+            title={name || "Folder design"}
+            description=""
+            submitButtonLabel="Start"
+            branding={branding}
+            onPatchBranding={(patch) => setBranding((current) => ({ ...current, ...patch }))}
+          />
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t px-6 py-4">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button type="button" disabled={saving} onClick={() => void save()}>
+            {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
+            Save Folder
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function DeleteFolderDialog({
+  folder,
+  open,
+  onOpenChange,
+  onDeleted,
+}: {
+  folder: FormFolder | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDeleted: (folderId: string) => void
+}) {
+  const [deleting, setDeleting] = useState(false)
+
+  if (!folder) return null
+
   async function remove() {
     if (!folder) return
     setDeleting(true)
     try {
       await apiDeleteFolder(folder._id)
       toast.success("Folder deleted")
-      setConfirmingDelete(false)
       onOpenChange(false)
       onDeleted(folder._id)
     } catch (err) {
@@ -169,73 +246,23 @@ export function FolderSettingsDialog({
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={(next) => !saving && onOpenChange(next)}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Folder Settings</DialogTitle>
-            <DialogDescription>
-              Forms in this folder inherit this design unless they opt out in their own Design tab.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="max-w-sm space-y-1.5">
-            <Label className="text-[13px] text-muted-foreground">Folder name</Label>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={80}
-            />
-          </div>
-
-          <DesignTab
-            title={name || "Folder design"}
-            description=""
-            submitButtonLabel="Start"
-            branding={branding}
-            onPatchBranding={(patch) => setBranding((current) => ({ ...current, ...patch }))}
-          />
-
-          <div className="flex items-center justify-between gap-2 border-t pt-4">
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={saving}
-              onClick={() => setConfirmingDelete(true)}
-            >
-              Delete Folder
-            </Button>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="button" disabled={saving} onClick={() => void save()}>
-                {saving && <Spinner className="size-3.5" data-icon="inline-start" />}
-                Save Folder
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={confirmingDelete} onOpenChange={(next) => !deleting && setConfirmingDelete(next)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Folder</DialogTitle>
-            <DialogDescription>
-              {`"${folder.name}" will be deleted. Its forms are kept and go back to using their own designs.`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" disabled={deleting} onClick={() => setConfirmingDelete(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" disabled={deleting} onClick={() => void remove()}>
-              {deleting ? "Deleting..." : "Delete Folder"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={(next) => !deleting && onOpenChange(next)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Folder</DialogTitle>
+          <DialogDescription>
+            {`"${folder.name}" will be deleted. Its forms are kept and go back to using their own designs.`}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" disabled={deleting} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" disabled={deleting} onClick={() => void remove()}>
+            {deleting ? "Deleting..." : "Delete Folder"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

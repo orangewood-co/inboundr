@@ -3,7 +3,6 @@ import { useBlocker, useNavigate, useParams } from "@tanstack/react-router"
 import {
   CircleDotIcon,
   ExternalLinkIcon,
-  FolderIcon,
   LoaderIcon,
   Settings2Icon,
 } from "lucide-react"
@@ -29,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFormBySlug, listFolders, saveForm as apiSaveForm } from "@/lib/forms-api"
 import { DesignTab } from "@/components/forms/design-tab"
+import { FolderSwatch } from "@/components/forms/folder-swatch"
 import { FormCanvas } from "@/components/forms/form-canvas"
 import { ResponsesTab } from "@/components/forms/responses-tab"
 import { ShareTab } from "@/components/forms/share-tab"
@@ -483,21 +483,19 @@ export default function FormEditorPage() {
 
         <TabsContent value="design" className="mt-0 min-h-0 flex-1 overflow-y-auto">
           {folder && (
-            <div className="mx-auto mt-6 flex max-w-5xl items-center justify-between gap-4 rounded-xl border bg-muted/40 px-4 py-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <FolderIcon className="size-4 shrink-0 text-muted-foreground" />
+            <div className="mx-auto mt-6 flex max-w-5xl items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3 shadow-xs max-lg:mx-6 lg:px-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <FolderSwatch branding={folder.branding} className="size-9" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    This form is in the <span className="font-semibold">{folder.name}</span> folder
-                  </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-sm font-semibold">{folder.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {(draft.useFolderDesign ?? true)
-                      ? "It follows the folder design — edits to the folder restyle this form instantly."
+                      ? "Following the folder design — edits to the folder restyle this form instantly."
                       : "Folder design is off — this form uses its own design below."}
                   </p>
                 </div>
               </div>
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+              <label className="flex shrink-0 cursor-pointer items-center gap-2.5 text-sm font-medium">
                 Use folder design
                 <Switch
                   checked={draft.useFolderDesign ?? true}
@@ -507,23 +505,26 @@ export default function FormEditorPage() {
             </div>
           )}
           {folder && (draft.useFolderDesign ?? true) ? (
-            <div className="pointer-events-none select-none" aria-disabled>
+            <div key="inherited" className="animate-in fade-in-0 duration-150">
               <DesignTab
                 title={draft.title}
                 description={draft.description ?? ""}
                 submitButtonLabel={draft.settings.submitButtonLabel}
                 branding={folder.branding}
                 onPatchBranding={() => {}}
+                previewOnly
               />
             </div>
           ) : (
-            <DesignTab
-              title={draft.title}
-              description={draft.description ?? ""}
-              submitButtonLabel={draft.settings.submitButtonLabel}
-              branding={draft.branding}
-              onPatchBranding={patchBranding}
-            />
+            <div key="own" className="animate-in fade-in-0 duration-150">
+              <DesignTab
+                title={draft.title}
+                description={draft.description ?? ""}
+                submitButtonLabel={draft.settings.submitButtonLabel}
+                branding={draft.branding}
+                onPatchBranding={patchBranding}
+              />
+            </div>
           )}
         </TabsContent>
 

@@ -125,7 +125,7 @@ export async function deleteFolder(req: Request, res: Response): Promise<void> {
     // Forms are kept; they fall back to their own design.
     await Form.updateMany(
       { organizationId: organization._id, folderId: folder._id },
-      { folderId: null, useFolderDesign: true }
+      { folderId: null, useFolderDesign: false }
     );
     res.json({ success: true });
   } catch (err) {

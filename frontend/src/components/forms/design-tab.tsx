@@ -17,12 +17,15 @@ export function DesignTab({
   submitButtonLabel,
   branding,
   onPatchBranding,
+  previewOnly = false,
 }: {
   title: string
   description: string
   submitButtonLabel: string
   branding: FormBranding
   onPatchBranding: (patch: Partial<FormBranding>) => void
+  /** Hides the controls and centers the live preview (inherited folder design). */
+  previewOnly?: boolean
 }) {
   const logoFileInputRef = useRef<HTMLInputElement>(null)
   const [logoUploading, setLogoUploading] = useState(false)
@@ -78,6 +81,26 @@ export function DesignTab({
       backgroundColor: preset.bg === "#ffffff" ? null : preset.bg,
       backgroundGradient: preset.gradient,
     })
+  }
+
+  if (previewOnly) {
+    return (
+      <div className="mx-auto w-full max-w-md px-6 py-10">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Live Preview
+        </p>
+        <WelcomePreview
+          title={title}
+          description={description}
+          submitButtonLabel={submitButtonLabel}
+          branding={branding}
+          logoDisplayUrl={logoDisplayUrl}
+        />
+        <p className="mt-3 text-xs text-muted-foreground">
+          This is how the welcome screen looks to respondents.
+        </p>
+      </div>
+    )
   }
 
   return (
