@@ -8,7 +8,7 @@ import { Form, type FormFieldType, type IFormField } from "../models/form.model"
 import { FormSubmission } from "../models/form-submission.model";
 import type { IDriveNode } from "../models/drive-node.model";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
-import { keyBelongsToPrefix } from "../services/storage.service";
+import { keyBelongsToPrefix, resolvePublicImageUrl } from "../services/storage.service";
 import { emitDomainEvent } from "../events/domain-events";
 import { assertDriveAccess, getEffectiveDriveRole, requireDriveNode } from "../services/drive-access.service";
 import { importExistingObjectToDrive } from "../services/drive-import.service";
@@ -733,7 +733,13 @@ export async function getPublicForm(req: Request, res: Response): Promise<void> 
       res.status(404).json({ error: "Form not found" });
       return;
     }
-    res.json(form);
+    res.json({
+      ...form,
+      branding: {
+        ...form.branding,
+        logoUrl: await resolvePublicImageUrl(form.branding?.logoUrl),
+      },
+    });
   } catch (err) {
     console.error("Error fetching public form:", err);
     res.status(500).json({ error: "Failed to fetch form" });

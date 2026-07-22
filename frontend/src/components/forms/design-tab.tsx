@@ -1,8 +1,11 @@
-import { ArrowRightIcon, CheckIcon } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { ArrowRightIcon, CheckIcon, Loader2Icon, UploadIcon, XIcon } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { resolveUploadedImageUrl, uploadBrandingImage } from "@/lib/uploaded-image"
 import {
   THEME_PRESETS,
   type FormBranding,
@@ -21,6 +24,50 @@ export function DesignTab({
   branding: FormBranding
   onPatchBranding: (patch: Partial<FormBranding>) => void
 }) {
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const [logoDisplayUrl, setLogoDisplayUrl] = useState<string | null>(null)
+
+  // The stored value may be an S3 key (from upload) or a plain URL; resolve
+  // keys to a signed URL so the preview can render them.
+  useEffect(() => {
+    const source = branding.logoUrl?.trim()
+    if (!source) {
+      setLogoDisplayUrl(null)
+      return
+    }
+    let cancelled = false
+    resolveUploadedImageUrl(source)
+      .then((url) => {
+        if (!cancelled) setLogoDisplayUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setLogoDisplayUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [branding.logoUrl])
+
+  async function handleLogoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    setLogoUploading(true)
+    setLogoError(null)
+    try {
+      const { key, displayUrl } = await uploadBrandingImage(file)
+      setLogoDisplayUrl(displayUrl)
+      onPatchBranding({ logoUrl: key })
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : "Failed to upload logo")
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
   function applyTheme(themeId: string) {
     const preset = THEME_PRESETS.find((theme) => theme.id === themeId)
     if (!preset) return
@@ -190,14 +237,63 @@ export function DesignTab({
 
         <section>
           <SectionTitle title="Logo" description="Shown at the top of the public form." />
-          <div className="mt-3 space-y-1.5">
-            <Label className="text-[13px] text-muted-foreground">Logo URL</Label>
-            <Input
-              value={branding.logoUrl ?? ""}
-              onChange={(event) => onPatchBranding({ logoUrl: event.target.value || null })}
-              placeholder="https://example.com/logo.png"
-              className="text-xs"
-            />
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <input
+                ref={logoFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={handleLogoFileChange}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={logoUploading}
+                onClick={() => logoFileInputRef.current?.click()}
+              >
+                {logoUploading ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <UploadIcon className="size-3.5" />
+                )}
+                {logoUploading ? "Uploading..." : "Upload Image"}
+              </Button>
+              {logoDisplayUrl && (
+                <div className="flex items-center gap-2">
+                  <img
+                    src={logoDisplayUrl}
+                    alt=""
+                    className="size-9 rounded-lg border bg-white object-contain shadow-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-muted-foreground"
+                    onClick={() => {
+                      setLogoDisplayUrl(null)
+                      setLogoError(null)
+                      onPatchBranding({ logoUrl: null })
+                    }}
+                    aria-label="Remove logo"
+                  >
+                    <XIcon className="size-3.5" />
+                  </Button>
+                </div>
+              )}
+            </div>
+            {logoError && <p className="text-xs text-destructive">{logoError}</p>}
+            <div className="space-y-1.5">
+              <Label className="text-[13px] text-muted-foreground">Or paste a logo URL</Label>
+              <Input
+                value={isUploadedKey(branding.logoUrl) ? "" : branding.logoUrl ?? ""}
+                onChange={(event) => onPatchBranding({ logoUrl: event.target.value || null })}
+                placeholder="https://example.com/logo.png"
+                className="text-xs"
+              />
+            </div>
           </div>
         </section>
       </div>
@@ -212,6 +308,7 @@ export function DesignTab({
           description={description}
           submitButtonLabel={submitButtonLabel}
           branding={branding}
+          logoDisplayUrl={logoDisplayUrl}
         />
         <p className="mt-3 text-xs text-muted-foreground">
           This is how the welcome screen looks to respondents.
@@ -226,11 +323,13 @@ function WelcomePreview({
   description,
   submitButtonLabel,
   branding,
+  logoDisplayUrl,
 }: {
   title: string
   description: string
   submitButtonLabel: string
   branding: FormBranding
+  logoDisplayUrl: string | null
 }) {
   const radius =
     branding.borderRadius === "sm" ? "6px" : branding.borderRadius === "lg" ? "28px" : "16px"
@@ -257,11 +356,11 @@ function WelcomePreview({
       style={{ background, borderRadius: radius }}
     >
       <div className="flex max-w-[260px] flex-col items-center text-center">
-        {branding.logoUrl ? (
+        {logoDisplayUrl ? (
           <img
-            src={branding.logoUrl}
+            src={logoDisplayUrl}
             alt=""
-            className="mb-5 size-14 rounded-xl bg-white object-contain shadow-md"
+            className="mb-5 h-16 w-auto max-w-[180px] object-contain"
           />
         ) : (
           <div
@@ -287,6 +386,12 @@ function WelcomePreview({
       </div>
     </div>
   )
+}
+
+function isUploadedKey(value: string | null | undefined): boolean {
+  if (!value) return false
+  const trimmed = value.trim()
+  return Boolean(trimmed) && !/^https?:\/\//i.test(trimmed) && !trimmed.startsWith("data:")
 }
 
 function SectionTitle({ title, description }: { title: string; description: string }) {

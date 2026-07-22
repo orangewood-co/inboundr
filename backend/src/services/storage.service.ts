@@ -183,6 +183,20 @@ export async function createPresignedViewUrl(
   return { url, expiresInSeconds: VIEW_EXPIRES_IN_SECONDS };
 }
 
+// Image values may be internal S3 keys (the internal app resolves them through
+// an authenticated endpoint). Public surfaces must emit a URL a browser can load.
+export async function resolvePublicImageUrl(value: unknown): Promise<string | null> {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+  try {
+    const { url } = await createPresignedViewUrl(raw);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 export async function getObjectMetadata(key: string): Promise<{
   contentType: string;
   size: number;

@@ -32,7 +32,7 @@ export function WelcomeStep({
           <img
             src={logoUrl}
             alt=""
-            className="mb-8 size-20 rounded-2xl object-contain shadow-lg"
+            className="mb-8 h-28 w-auto max-w-[280px] object-contain"
           />
         ) : (
           <div

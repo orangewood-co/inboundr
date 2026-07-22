@@ -120,25 +120,21 @@ export function FieldInput({
             <button
               key={opt}
               type="button"
-              onClick={() => {
-                onChange(opt)
-                setTimeout(() => onSubmit?.(), 300)
-              }}
+              onClick={() => onChange(opt)}
               className={`flex w-full items-center gap-3 rounded-xl border-2 px-5 py-4 text-left text-lg font-medium transition-all ${
                 selected
-                  ? "border-current bg-stone-50 text-stone-900"
-                  : "border-stone-200 text-stone-600 hover:border-stone-400 hover:bg-stone-50"
+                  ? "border-current bg-white text-stone-900"
+                  : "border-stone-200 bg-white/60 text-stone-600 hover:border-stone-400 hover:bg-white"
               }`}
               style={selected ? { borderColor: accent, color: accent } : undefined}
             >
-              <span className={`flex size-7 shrink-0 items-center justify-center rounded-md border text-xs font-bold ${
-                selected ? "border-current bg-current text-white" : "border-stone-300 text-stone-400"
-              }`}>
-                {selected ? (
-                  <span style={{ color: "white" }}>{String.fromCharCode(65 + i)}</span>
-                ) : (
-                  String.fromCharCode(65 + i)
-                )}
+              <span
+                className={`flex size-7 shrink-0 items-center justify-center rounded-md border text-xs font-bold ${
+                  selected ? "text-white" : "border-stone-300 text-stone-400"
+                }`}
+                style={selected ? { backgroundColor: accent, borderColor: accent } : undefined}
+              >
+                {String.fromCharCode(65 + i)}
               </span>
               <span className={selected ? "text-stone-900" : ""}>{opt}</span>
             </button>
@@ -166,14 +162,17 @@ export function FieldInput({
               }}
               className={`flex w-full items-center gap-3 rounded-xl border-2 px-5 py-4 text-left text-lg font-medium transition-all ${
                 checked
-                  ? "border-current bg-stone-50 text-stone-900"
-                  : "border-stone-200 text-stone-600 hover:border-stone-400 hover:bg-stone-50"
+                  ? "border-current bg-white text-stone-900"
+                  : "border-stone-200 bg-white/60 text-stone-600 hover:border-stone-400 hover:bg-white"
               }`}
               style={checked ? { borderColor: accent, color: accent } : undefined}
             >
-              <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg border-2 text-xs font-bold transition-colors ${
-                checked ? "border-current bg-current" : "border-stone-300"
-              }`}>
+              <span
+                className={`flex size-7 shrink-0 items-center justify-center rounded-lg border-2 text-xs font-bold transition-colors ${
+                  checked ? "" : "border-stone-300"
+                }`}
+                style={checked ? { backgroundColor: accent, borderColor: accent } : undefined}
+              >
                 {checked && (
                   <svg className="size-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -199,10 +198,7 @@ export function FieldInput({
           <button
             key={star}
             type="button"
-            onClick={() => {
-              onChange(star)
-              setTimeout(() => onSubmit?.(), 400)
-            }}
+            onClick={() => onChange(star)}
             className="transition-transform hover:scale-110"
           >
             <svg
@@ -230,14 +226,11 @@ export function FieldInput({
             <button
               key={opt}
               type="button"
-              onClick={() => {
-                onChange(opt)
-                setTimeout(() => onSubmit?.(), 300)
-              }}
+              onClick={() => onChange(opt)}
               className={`rounded-xl border-2 px-6 py-5 text-xl font-semibold capitalize transition-all ${
                 isSelected
-                  ? "border-current text-stone-900"
-                  : "border-stone-200 text-stone-500 hover:border-stone-400 hover:bg-stone-50"
+                  ? "border-current bg-white"
+                  : "border-stone-200 bg-white/60 text-stone-500 hover:border-stone-400 hover:bg-white"
               }`}
               style={isSelected ? { borderColor: accent, color: accent } : undefined}
             >
