@@ -713,3 +713,200 @@ export const getProductStats = async (
     res.status(500).json({ error: "Failed to fetch product stats" });
   }
 };
+
+type DuplicateMatchType = "sku" | "name";
+
+type ProductDuplicateRow = Product & {
+  sku_key: string | null;
+  name_key: string | null;
+  brand_key: string;
+};
+
+export const listProductDuplicates = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const organizationId = (req as OrganizationRequest).organization._id.toString();
+    const requestedType = String(req.query.type ?? "all").trim().toLowerCase();
+    const typeFilter: "all" | DuplicateMatchType =
+      requestedType === "sku" || requestedType === "name" ? requestedType : "all";
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, 50, 100);
+    const search = String(req.query.search ?? "").trim().toLowerCase();
+
+    const skuKeyExpr = `NULLIF(regexp_replace(lower(trim(COALESCE(productcode, ''))), '[^a-z0-9]', '', 'g'), '')`;
+    const nameKeyExpr = `NULLIF(lower(trim(regexp_replace(COALESCE(productdescription, ''), '[[:space:]]+', ' ', 'g'))), '')`;
+    const brandKeyExpr = `lower(trim(COALESCE(brand, '')))`;
+
+    const result = await pool.query<ProductDuplicateRow>(
+      `WITH keyed AS (
+         SELECT
+           ${PRODUCT_COLUMNS.join(", ")},
+           ${skuKeyExpr} AS sku_key,
+           ${nameKeyExpr} AS name_key,
+           ${brandKeyExpr} AS brand_key
+         FROM products
+         WHERE organization_id = $1
+       ),
+       sku_dup_keys AS (
+         SELECT sku_key
+         FROM keyed
+         WHERE sku_key IS NOT NULL
+         GROUP BY sku_key
+         HAVING COUNT(*) > 1
+       ),
+       name_dup_keys AS (
+         SELECT name_key, brand_key
+         FROM keyed
+         WHERE name_key IS NOT NULL
+         GROUP BY name_key, brand_key
+         HAVING COUNT(*) > 1
+       )
+       SELECT k.*
+       FROM keyed k
+       WHERE
+         k.sku_key IN (SELECT sku_key FROM sku_dup_keys)
+         OR (k.name_key, k.brand_key) IN (SELECT name_key, brand_key FROM name_dup_keys)
+       ORDER BY k.addedtime DESC NULLS LAST, k.id DESC`,
+      [organizationId]
+    );
+
+    const productsById = new Map<string, ProductDuplicateRow>();
+    const skuBuckets = new Map<string, string[]>();
+    const nameBuckets = new Map<string, string[]>();
+
+    for (const row of result.rows) {
+      productsById.set(row.id, row);
+
+      if (row.sku_key) {
+        const ids = skuBuckets.get(row.sku_key) ?? [];
+        ids.push(row.id);
+        skuBuckets.set(row.sku_key, ids);
+      }
+
+      if (row.name_key) {
+        const nameBucketKey = `${row.name_key}\u0000${row.brand_key}`;
+        const ids = nameBuckets.get(nameBucketKey) ?? [];
+        ids.push(row.id);
+        nameBuckets.set(nameBucketKey, ids);
+      }
+    }
+
+    type DuplicateGroup = {
+      id: string;
+      type: DuplicateMatchType;
+      matchKey: string;
+      label: string;
+      secondaryLabel: string | null;
+      count: number;
+      products: ReturnType<typeof serializeProductRecord>[];
+    };
+
+    const groups: DuplicateGroup[] = [];
+
+    for (const [matchKey, ids] of skuBuckets) {
+      if (ids.length < 2) continue;
+      const products = ids
+        .map((id) => productsById.get(id))
+        .filter((row): row is ProductDuplicateRow => Boolean(row));
+      if (products.length < 2) continue;
+
+      const label =
+        products.find((product) => product.productcode?.trim())?.productcode?.trim() ||
+        matchKey;
+
+      groups.push({
+        id: `sku:${matchKey}`,
+        type: "sku",
+        matchKey,
+        label,
+        secondaryLabel: null,
+        count: products.length,
+        products: products.map(serializeProductRecord),
+      });
+    }
+
+    for (const [bucketKey, ids] of nameBuckets) {
+      if (ids.length < 2) continue;
+      const products = ids
+        .map((id) => productsById.get(id))
+        .filter((row): row is ProductDuplicateRow => Boolean(row));
+      if (products.length < 2) continue;
+
+      const [nameKey, brandKey = ""] = bucketKey.split("\u0000");
+      const label =
+        products.find((product) => product.productdescription?.trim())?.productdescription?.trim() ||
+        nameKey;
+      const secondaryLabel =
+        products.find((product) => product.brand?.trim())?.brand?.trim() ||
+        (brandKey || null);
+
+      groups.push({
+        id: `name:${bucketKey}`,
+        type: "name",
+        matchKey: bucketKey,
+        label,
+        secondaryLabel,
+        count: products.length,
+        products: products.map(serializeProductRecord),
+      });
+    }
+
+    groups.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (a.type !== b.type) return a.type === "sku" ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
+
+    const searchedGroups = search
+      ? groups.filter((group) => {
+          const haystack = [
+            group.label,
+            group.secondaryLabel ?? "",
+            group.matchKey,
+            ...group.products.flatMap((product) => [
+              String(product.productcode ?? product.sku ?? ""),
+              String(product.productdescription ?? product.description ?? product.name ?? ""),
+              String(product.brand ?? product.manufacturer ?? ""),
+            ]),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(search);
+        })
+      : groups;
+
+    const typedGroups =
+      typeFilter === "all"
+        ? searchedGroups
+        : searchedGroups.filter((group) => group.type === typeFilter);
+
+    const totalGroups = typedGroups.length;
+    const offset = (page - 1) * limit;
+    const pageGroups = typedGroups.slice(offset, offset + limit);
+
+    const duplicateProductIds = new Set<string>();
+    for (const group of searchedGroups) {
+      for (const product of group.products) {
+        duplicateProductIds.add(String(product.id));
+      }
+    }
+
+    res.json({
+      groups: pageGroups,
+      summary: {
+        skuGroupCount: searchedGroups.filter((group) => group.type === "sku").length,
+        nameGroupCount: searchedGroups.filter((group) => group.type === "name").length,
+        totalGroups: searchedGroups.length,
+        duplicateProductCount: duplicateProductIds.size,
+      },
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(totalGroups / limit)),
+    });
+  } catch (err) {
+    console.error("Error listing product duplicates:", err);
+    res.status(500).json({ error: "Failed to find duplicate products" });
+  }
+};

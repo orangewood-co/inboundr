@@ -53,6 +53,7 @@ import { Route as ProjectsNewRouteImport } from './routes/projects_.new'
 import { Route as ProjectsIdRouteImport } from './routes/projects_.$id'
 import { Route as ProductsSettingsRouteImport } from './routes/products_.settings'
 import { Route as ProductsImportRouteImport } from './routes/products_.import'
+import { Route as ProductsDuplicatesRouteImport } from './routes/products_.duplicates'
 import { Route as LinksCreateRouteImport } from './routes/links.create'
 import { Route as LinksIdRouteImport } from './routes/links.$id'
 import { Route as InvoicesNewRouteImport } from './routes/invoices.new'
@@ -300,6 +301,11 @@ const ProductsImportRoute = ProductsImportRouteImport.update({
   path: '/products/import',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsDuplicatesRoute = ProductsDuplicatesRouteImport.update({
+  id: '/products_/duplicates',
+  path: '/products/duplicates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LinksCreateRoute = LinksCreateRouteImport.update({
   id: '/create',
   path: '/create',
@@ -479,6 +485,7 @@ export interface FileRoutesByFullPath {
   '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products/duplicates': typeof ProductsDuplicatesRoute
   '/products/import': typeof ProductsImportRoute
   '/products/settings': typeof ProductsSettingsRoute
   '/projects/$id': typeof ProjectsIdRoute
@@ -546,6 +553,7 @@ export interface FileRoutesByTo {
   '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products/duplicates': typeof ProductsDuplicatesRoute
   '/products/import': typeof ProductsImportRoute
   '/products/settings': typeof ProductsSettingsRoute
   '/projects/$id': typeof ProjectsIdRoute
@@ -619,6 +627,7 @@ export interface FileRoutesById {
   '/invoices/new': typeof InvoicesNewRoute
   '/links/$id': typeof LinksIdRoute
   '/links/create': typeof LinksCreateRoute
+  '/products_/duplicates': typeof ProductsDuplicatesRoute
   '/products_/import': typeof ProductsImportRoute
   '/products_/settings': typeof ProductsSettingsRoute
   '/projects_/$id': typeof ProjectsIdRoute
@@ -693,6 +702,7 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/links/$id'
     | '/links/create'
+    | '/products/duplicates'
     | '/products/import'
     | '/products/settings'
     | '/projects/$id'
@@ -760,6 +770,7 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/links/$id'
     | '/links/create'
+    | '/products/duplicates'
     | '/products/import'
     | '/products/settings'
     | '/projects/$id'
@@ -832,6 +843,7 @@ export interface FileRouteTypes {
     | '/invoices/new'
     | '/links/$id'
     | '/links/create'
+    | '/products_/duplicates'
     | '/products_/import'
     | '/products_/settings'
     | '/projects_/$id'
@@ -900,6 +912,7 @@ export interface RootRouteChildren {
   EmployeesAttendanceRoute: typeof EmployeesAttendanceRoute
   EmployeesNewRoute: typeof EmployeesNewRoute
   InviteTokenRoute: typeof InviteTokenRoute
+  ProductsDuplicatesRoute: typeof ProductsDuplicatesRoute
   ProductsImportRoute: typeof ProductsImportRoute
   ProductsSettingsRoute: typeof ProductsSettingsRoute
   ProjectsIdRoute: typeof ProjectsIdRoute
@@ -1230,6 +1243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsImportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/products_/duplicates': {
+      id: '/products_/duplicates'
+      path: '/products/duplicates'
+      fullPath: '/products/duplicates'
+      preLoaderRoute: typeof ProductsDuplicatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/links/create': {
       id: '/links/create'
       path: '/create'
@@ -1525,6 +1545,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesAttendanceRoute: EmployeesAttendanceRoute,
   EmployeesNewRoute: EmployeesNewRoute,
   InviteTokenRoute: InviteTokenRoute,
+  ProductsDuplicatesRoute: ProductsDuplicatesRoute,
   ProductsImportRoute: ProductsImportRoute,
   ProductsSettingsRoute: ProductsSettingsRoute,
   ProjectsIdRoute: ProjectsIdRoute,

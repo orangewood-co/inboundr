@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+
+import { Route as ProductsRoute } from "@/routes/products"
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
@@ -9,6 +11,7 @@ import {
   CalendarPlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CopyIcon,
   Edit3Icon,
   FilterXIcon,
   IndianRupeeIcon,
@@ -97,10 +100,6 @@ import {
 const API_BASE = `${API_ORIGIN}/api/v1/products`
 const PAGE_LIMIT = 20
 const ALL_FILTER = "__all__"
-
-function getInitialListSearch(): string {
-  return new URLSearchParams(window.location.search).get("search") ?? ""
-}
 
 interface Product {
   id: string
@@ -489,6 +488,7 @@ function DashboardView({
   onViewCatalog,
   onAddProduct,
   onBulkImport,
+  onFindDuplicates,
   currency,
   onOpenSettings,
   terminology,
@@ -500,6 +500,7 @@ function DashboardView({
   onViewCatalog: () => void
   onAddProduct: () => void
   onBulkImport: () => void
+  onFindDuplicates: () => void
   currency: string
   onOpenSettings: () => void
   terminology: ProductSettings["terminology"] | undefined
@@ -549,7 +550,7 @@ function DashboardView({
         </div>
 
         {/* Action cards */}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <button
             type="button"
             onClick={onViewCatalog}
@@ -594,6 +595,22 @@ function DashboardView({
               <h3 className="text-sm font-semibold">Bulk Upload</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Import catalog rows from CSV or Excel with column matching.
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={onFindDuplicates}
+            className="group flex cursor-pointer flex-col gap-3 rounded-xl border bg-background p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/5"
+          >
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+              <CopyIcon className="size-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">Find Duplicates</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Spot matching SKUs or names and clean up duplicate catalog rows.
               </p>
             </div>
           </button>
@@ -706,7 +723,8 @@ function SortableHeader({
 
 export default function ProductsPage() {
   const navigate = useNavigate()
-  const initialSearch = getInitialListSearch()
+  const routeSearch = ProductsRoute.useSearch()
+  const initialSearch = routeSearch.search ?? ""
   const [view, setView] = useState<"dashboard" | "table">(initialSearch ? "table" : "dashboard")
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
@@ -836,6 +854,16 @@ export default function ProductsPage() {
     }
   }, [fetchProducts, view])
 
+  useEffect(() => {
+    const nextSearch = routeSearch.search ?? ""
+    setSearch(nextSearch)
+    setDebouncedSearch(nextSearch.trim())
+    if (nextSearch.trim()) {
+      setView("table")
+      setPage(1)
+    }
+  }, [routeSearch.search])
+
   const visibleRange = useMemo(() => {
     if (total === 0) return "0"
     const start = (page - 1) * PAGE_LIMIT + 1
@@ -875,6 +903,10 @@ export default function ProductsPage() {
 
   function openSettingsPage() {
     void navigate({ to: "/products/settings" })
+  }
+
+  function openDuplicatesPage() {
+    void navigate({ to: "/products/duplicates" })
   }
 
   function openEditSheet(product: Product) {
@@ -1114,6 +1146,7 @@ export default function ProductsPage() {
               onViewCatalog={() => setView("table")}
               onAddProduct={openCreateSheet}
               onBulkImport={openImportPage}
+              onFindDuplicates={openDuplicatesPage}
               currency={settings?.currency ?? "INR"}
               onOpenSettings={openSettingsPage}
               terminology={settings?.terminology}
@@ -1149,6 +1182,15 @@ export default function ProductsPage() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Configure catalog fields and matching</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={openDuplicatesPage}>
+                          <CopyIcon className="size-4" />
+                          Duplicates
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Find duplicate catalog products</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
