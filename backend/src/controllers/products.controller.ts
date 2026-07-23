@@ -834,10 +834,11 @@ export const listProductDuplicates = async (
         .filter((row): row is ProductDuplicateRow => Boolean(row));
       if (products.length < 2) continue;
 
-      const [nameKey, brandKey = ""] = bucketKey.split("\u0000");
+      const [nameKey = "", brandKey = ""] = bucketKey.split("\u0000");
       const label =
         products.find((product) => product.productdescription?.trim())?.productdescription?.trim() ||
-        nameKey;
+        nameKey ||
+        "Untitled product";
       const secondaryLabel =
         products.find((product) => product.brand?.trim())?.brand?.trim() ||
         (brandKey || null);
