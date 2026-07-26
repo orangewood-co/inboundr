@@ -155,7 +155,8 @@ import {
   useDriveUploads,
   type UploadTask,
 } from "@/lib/drive-uploads"
-import FileViewerDialog, { MIME_MAP } from "@/components/media-viewer/file-viewer-dialog"
+import FileViewerDialog from "@/components/media-viewer/file-viewer-dialog"
+import { getComponentForMimeType, isZipFile } from "@/components/media-viewer/viewer-utils"
 
 type DriveView = "my" | "shared" | "trash"
 type LayoutMode = "list" | "grid"
@@ -453,7 +454,7 @@ export default function DrivePage() {
   function canPreview(node: DriveNode) {
     if (node.type !== "file") return false
     const type = node.contentType ?? ""
-    return Object.keys(MIME_MAP).includes(type)
+    return isZipFile(type, node.name) || getComponentForMimeType(type, node.name) !== null
   }
 
   function activateNode(node: DriveNode) {

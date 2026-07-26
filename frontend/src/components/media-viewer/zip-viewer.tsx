@@ -1,9 +1,9 @@
-import { useEffect, useState, useMemo, useRef } from "react"
+import { createElement, useEffect, useState, useMemo, useRef } from "react"
 import JSZip from "jszip"
 import { Download, ExternalLink, File, Folder, Search, FileCode, Eye, ArrowLeft, AlertTriangle } from "lucide-react"
-import { ToolbarButton, ToolbarLink, ViewerSpinner, ViewerErrorState, downloadFile } from "./viewer-toolbar"
+import { ToolbarButton, ToolbarLink, ViewerSpinner, ViewerErrorState } from "./viewer-toolbar"
 import { cn } from "@/lib/utils"
-import { getComponentForMimeType } from "./file-viewer-dialog"
+import { downloadFile, getComponentForMimeType } from "./viewer-utils"
 
 interface ZipViewerProps {
   url: string
@@ -162,10 +162,9 @@ export default function ZipViewer({ url, name }: ZipViewerProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
   }
 
-  const PreviewComponent = useMemo(
-    () => (previewEntry ? getComponentForMimeType("", previewEntry.name) : null),
-    [previewEntry?.name]
-  )
+  const previewComponent = previewEntry
+    ? getComponentForMimeType("", previewEntry.name)
+    : null
 
   if (previewEntry) {
     return (
@@ -193,9 +192,9 @@ export default function ZipViewer({ url, name }: ZipViewerProps) {
             <ViewerErrorState message="Couldn't extract this file from the archive" onRetry={() => handleOpenEntry(previewEntry)} />
           )}
           {previewStatus === "ready" && previewUrl && (
-            PreviewComponent ? (
+            previewComponent ? (
               <div className="absolute inset-0">
-                <PreviewComponent url={previewUrl} name={previewEntry.name} />
+                {createElement(previewComponent, { url: previewUrl, name: previewEntry.name })}
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center">

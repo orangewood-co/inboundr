@@ -4,7 +4,8 @@ import remarkGfm from "remark-gfm"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { oneLight, oneDark } from "react-syntax-highlighter/dist/esm/styles/prism"
 import { Download, ExternalLink, Code, Eye, Search, FileText } from "lucide-react"
-import { ToolbarButton, ToolbarLink, ViewerSpinner, ViewerErrorState, downloadFile } from "./viewer-toolbar"
+import { ToolbarButton, ToolbarLink, ViewerSpinner, ViewerErrorState } from "./viewer-toolbar"
+import { downloadFile } from "./viewer-utils"
 import { useTheme } from "../theme-provider"
 
 const EXT_LANGUAGE: Record<string, string> = {

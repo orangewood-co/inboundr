@@ -14,8 +14,8 @@ import {
   ToolbarLink,
   ViewerSpinner,
   ViewerErrorState,
-  downloadFile,
 } from "./viewer-toolbar"
+import { downloadFile } from "./viewer-utils"
 
 interface XlsxViewerProps {
   url: string

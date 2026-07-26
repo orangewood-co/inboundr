@@ -280,7 +280,8 @@ export function formatDriveNodeType(node: DriveTypeDescriptorInput) {
 
   const contentType =
     node.contentType?.split(";")[0]?.trim().toLowerCase() ?? ""
-  const exactLabel = DRIVE_MIME_TYPE_LABELS[contentType]
+  const exactLabel =
+    DRIVE_MIME_TYPE_LABELS[contentType as keyof typeof DRIVE_MIME_TYPE_LABELS]
   if (exactLabel) return exactLabel
 
   if (contentType.startsWith("image/")) return "Image"

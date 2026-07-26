@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import { renderAsync } from "docx-preview"
 import { ZoomIn, ZoomOut, Download, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ToolbarButton, ToolbarDivider, ToolbarLink, ViewerSpinner, ViewerErrorState, downloadFile } from "./viewer-toolbar"
+import { ToolbarButton, ToolbarDivider, ToolbarLink, ViewerSpinner, ViewerErrorState } from "./viewer-toolbar"
+import { downloadFile } from "./viewer-utils"
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 

@@ -1,8 +1,8 @@
-import * as React from "react"
 import { useState } from "react"
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { ZoomIn, ZoomOut, RotateCw, Maximize2, Download, ExternalLink, AlertTriangle } from "lucide-react"
-import { ToolbarButton, ToolbarDivider, ToolbarLink, ViewerSpinner, downloadFile } from "./viewer-toolbar"
+import { ToolbarButton, ToolbarDivider, ToolbarLink, ViewerSpinner } from "./viewer-toolbar"
+import { downloadFile } from "./viewer-utils"
 
 interface ImageViewerProps {
   url: string

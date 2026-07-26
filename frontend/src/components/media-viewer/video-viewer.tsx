@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Download, ExternalLink, AlertTriangle } from "lucide-react"
-import { ToolbarButton, ToolbarLink, downloadFile } from "./viewer-toolbar"
+import { ToolbarButton, ToolbarLink } from "./viewer-toolbar"
+import { downloadFile } from "./viewer-utils"
 
 interface VideoViewerProps {
   url: string
