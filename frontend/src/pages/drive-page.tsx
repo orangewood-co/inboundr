@@ -120,7 +120,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { formatDateTime, formatRelativeTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import {
-  canPreview,
   createDriveExport,
   createDriveFolder,
   createDrivePublicLink,
@@ -156,6 +155,7 @@ import {
   useDriveUploads,
   type UploadTask,
 } from "@/lib/drive-uploads"
+import FileViewerDialog, { MIME_MAP } from "@/components/media-viewer/file-viewer-dialog"
 
 type DriveView = "my" | "shared" | "trash"
 type LayoutMode = "list" | "grid"
@@ -304,7 +304,7 @@ export default function DrivePage() {
       .then((response) => {
         if (!cancelled) setQuota(response.quota)
       })
-      .catch(() => {})
+      .catch(() => { })
     return () => {
       cancelled = true
     }
@@ -449,6 +449,11 @@ export default function DrivePage() {
       }
     }
     toast.info("Export is still running. Try download again shortly.")
+  }
+  function canPreview(node: DriveNode) {
+    if (node.type !== "file") return false
+    const type = node.contentType ?? ""
+    return Object.keys(MIME_MAP).includes(type)
   }
 
   function activateNode(node: DriveNode) {
@@ -1156,92 +1161,92 @@ export default function DrivePage() {
                   onDragLeave={onAreaDragLeave}
                   onDrop={onAreaDrop}
                 >
-              {loading ? (
-                <DriveSkeleton layout={layout} />
-              ) : isEmpty ? (
-                <DriveEmptyState view={view} search={debouncedSearch} hasParent={Boolean(parent)} />
-              ) : layout === "list" ? (
-                <div className="flex-1 overflow-auto">
-                  <table className="w-full min-w-[820px] text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        <th className="w-10 py-2.5 pr-0 pl-4">
-                          <span
-                            className="inline-flex"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleSelectAll()
-                            }}
-                          >
-                            <Checkbox checked={allSelected} tabIndex={-1} aria-label="Select all" />
-                          </span>
-                        </th>
-                        <th className="px-3 py-2.5">Name</th>
-                        <th className="px-5 py-2.5">Type</th>
-                        <th className="px-5 py-2.5">Size</th>
-                        <th className="px-5 py-2.5">Access</th>
-                        <th className="px-5 py-2.5">Updated</th>
-                        <th className="w-12 px-3 py-2.5" />
-                      </tr>
-                    </thead>
-                    <tbody className="animate-in fade-in-0 duration-300">
-                      {nodes.map((node, index) => (
-                        <DriveListRow
-                          key={node._id}
-                          node={node}
-                          index={index}
-                          selected={selectedIds.has(node._id)}
-                          anySelected={anySelected}
-                          dragEnabled={dragEnabled}
-                          isExternalTarget={externalTargetId === node._id}
-                          onItemClick={handleItemClick}
-                          onItemDoubleClick={handleItemDoubleClick}
-                          onCheckboxClick={handleCheckboxClick}
-                          onFolderDragOver={onFolderDragOver}
-                          onFolderDragLeave={onFolderDragLeave}
-                          actions={renderActions(node)}
-                          renderMenu={(children) => renderItemMenu(node, index, children)}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-auto p-4">
-                  <div className="grid grid-cols-2 gap-3 animate-in fade-in-0 duration-300 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {nodes.map((node, index) => (
-                      <DriveGridCard
-                        key={node._id}
-                        node={node}
-                        index={index}
-                        selected={selectedIds.has(node._id)}
-                        anySelected={anySelected}
-                        dragEnabled={dragEnabled}
-                        isExternalTarget={externalTargetId === node._id}
-                        onItemClick={handleItemClick}
-                        onItemDoubleClick={handleItemDoubleClick}
-                        onCheckboxClick={handleCheckboxClick}
-                        onFolderDragOver={onFolderDragOver}
-                        onFolderDragLeave={onFolderDragLeave}
-                        actions={renderActions(node)}
-                        renderMenu={(children) => renderItemMenu(node, index, children)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {loading ? (
+                    <DriveSkeleton layout={layout} />
+                  ) : isEmpty ? (
+                    <DriveEmptyState view={view} search={debouncedSearch} hasParent={Boolean(parent)} />
+                  ) : layout === "list" ? (
+                    <div className="flex-1 overflow-auto">
+                      <table className="w-full min-w-[820px] text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            <th className="w-10 py-2.5 pr-0 pl-4">
+                              <span
+                                className="inline-flex"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleSelectAll()
+                                }}
+                              >
+                                <Checkbox checked={allSelected} tabIndex={-1} aria-label="Select all" />
+                              </span>
+                            </th>
+                            <th className="px-3 py-2.5">Name</th>
+                            <th className="px-5 py-2.5">Type</th>
+                            <th className="px-5 py-2.5">Size</th>
+                            <th className="px-5 py-2.5">Access</th>
+                            <th className="px-5 py-2.5">Updated</th>
+                            <th className="w-12 px-3 py-2.5" />
+                          </tr>
+                        </thead>
+                        <tbody className="animate-in fade-in-0 duration-300">
+                          {nodes.map((node, index) => (
+                            <DriveListRow
+                              key={node._id}
+                              node={node}
+                              index={index}
+                              selected={selectedIds.has(node._id)}
+                              anySelected={anySelected}
+                              dragEnabled={dragEnabled}
+                              isExternalTarget={externalTargetId === node._id}
+                              onItemClick={handleItemClick}
+                              onItemDoubleClick={handleItemDoubleClick}
+                              onCheckboxClick={handleCheckboxClick}
+                              onFolderDragOver={onFolderDragOver}
+                              onFolderDragLeave={onFolderDragLeave}
+                              actions={renderActions(node)}
+                              renderMenu={(children) => renderItemMenu(node, index, children)}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-auto p-4">
+                      <div className="grid grid-cols-2 gap-3 animate-in fade-in-0 duration-300 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                        {nodes.map((node, index) => (
+                          <DriveGridCard
+                            key={node._id}
+                            node={node}
+                            index={index}
+                            selected={selectedIds.has(node._id)}
+                            anySelected={anySelected}
+                            dragEnabled={dragEnabled}
+                            isExternalTarget={externalTargetId === node._id}
+                            onItemClick={handleItemClick}
+                            onItemDoubleClick={handleItemDoubleClick}
+                            onCheckboxClick={handleCheckboxClick}
+                            onFolderDragOver={onFolderDragOver}
+                            onFolderDragLeave={onFolderDragLeave}
+                            actions={renderActions(node)}
+                            renderMenu={(children) => renderItemMenu(node, index, children)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {isDraggingFiles && (
-                <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/5 backdrop-blur-[1px]">
-                  <div className="flex flex-col items-center gap-2 text-primary">
-                    <UploadCloudIcon className="size-9" />
-                    <p className="text-sm font-medium">
-                      {externalTargetId ? "Drop to upload into folder" : "Drop files to upload"}
-                    </p>
-                  </div>
-                </div>
-              )}
+                  {isDraggingFiles && (
+                    <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 bg-primary/5 backdrop-blur-[1px]">
+                      <div className="flex flex-col items-center gap-2 text-primary">
+                        <UploadCloudIcon className="size-9" />
+                        <p className="text-sm font-medium">
+                          {externalTargetId ? "Drop to upload into folder" : "Drop files to upload"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </AreaContextMenu>
               {detailsOpen && !isMobile && (
@@ -1769,9 +1774,8 @@ function DriveStatusBar({
   const left =
     selectedCount > 0
       ? `${selectedCount} selected · ${formatBytes(selectedBytes)}`
-      : `${folderCount} ${folderCount === 1 ? "folder" : "folders"}, ${fileCount} ${
-          fileCount === 1 ? "file" : "files"
-        } · ${formatBytes(totalBytes)}`
+      : `${folderCount} ${folderCount === 1 ? "folder" : "folders"}, ${fileCount} ${fileCount === 1 ? "file" : "files"
+      } · ${formatBytes(totalBytes)}`
   const usage = quota
     ? `${formatBytes(quota.usedBytes + quota.reservedBytes)} of ${formatBytes(quota.limitBytes)} used`
     : null
@@ -1834,12 +1838,12 @@ function UploadQueuePanel({
   const active = tasks.some((task) => task.status === "pending" || task.status === "uploading")
   const progress = total
     ? Math.round(
-        tasks.reduce((sum, task) => {
-          if (task.status === "done") return sum + 100
-          if (task.status === "uploading") return sum + task.progress
-          return sum
-        }, 0) / total
-      )
+      tasks.reduce((sum, task) => {
+        if (task.status === "done") return sum + 100
+        if (task.status === "uploading") return sum + task.progress
+        return sum
+      }, 0) / total
+    )
     : 0
 
   React.useEffect(() => {
@@ -2322,40 +2326,7 @@ function BulkDeleteDialog({
   )
 }
 
-function FileViewerDialog({
-  viewer,
-  onOpenChange,
-}: {
-  viewer: { node: DriveNode; url: string } | null
-  onOpenChange: (open: boolean) => void
-}) {
-  const type = viewer?.node.contentType ?? ""
-  return (
-    <Dialog open={Boolean(viewer)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] max-w-5xl overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>{viewer?.node.name}</DialogTitle>
-          <DialogDescription>{type || "File preview"}</DialogDescription>
-        </DialogHeader>
-        {viewer && (
-          <div className="h-[70svh] overflow-hidden rounded-lg border bg-background">
-            {type.startsWith("image/") ? (
-              <img src={viewer.url} alt={viewer.node.name} className="h-full w-full object-contain" />
-            ) : type.startsWith("video/") ? (
-              <video src={viewer.url} controls className="h-full w-full" />
-            ) : type.startsWith("audio/") ? (
-              <div className="flex h-full items-center justify-center p-6">
-                <audio src={viewer.url} controls className="w-full" />
-              </div>
-            ) : (
-              <iframe title={viewer.node.name} src={viewer.url} className="h-full w-full" />
-            )}
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
+
 
 function ShareDialog({ node, onOpenChange }: { node: DriveNode | null; onOpenChange: (open: boolean) => void }) {
   const [shares, setShares] = React.useState<DriveShare[]>([])
