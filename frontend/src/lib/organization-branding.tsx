@@ -16,6 +16,7 @@ interface OrganizationBranding {
   name: string
   logoUrl: string
   logoDisplayUrl: string
+  showLogoInSidebar: boolean
   primaryColor: string
   theme: OrganizationTheme
   colorTheme: string
@@ -199,6 +200,7 @@ export function OrganizationBrandingProvider({
           name: organization?.name ?? "",
           logoUrl,
           logoDisplayUrl: await resolveLogoDisplayUrl(logoUrl),
+          showLogoInSidebar: organization?.preferences?.showLogoInSidebar !== false,
           primaryColor:
             normalizeHexColor(organization?.preferences?.primaryColor) ??
             DEFAULT_PRIMARY_COLOR,

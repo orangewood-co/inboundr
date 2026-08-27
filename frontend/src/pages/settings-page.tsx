@@ -192,6 +192,7 @@ interface Organization {
     primaryColor: string
     theme: "dark" | "light"
     colorTheme: string
+    showLogoInSidebar: boolean
     pricing: string
     defaultTerms: string
     defaultUpiId: string
@@ -291,6 +292,7 @@ const emptyOrganizationForm: OrganizationFormState = {
     primaryColor: "#f5b400",
     theme: "dark",
     colorTheme: "default",
+    showLogoInSidebar: true,
     pricing: "INR",
     defaultTerms: "",
     defaultUpiId: "",
@@ -544,6 +546,7 @@ function OrganizationTab() {
       primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
       theme: organization.preferences?.theme ?? "dark",
       colorTheme: organization.preferences?.colorTheme ?? "default",
+      showLogoInSidebar: organization.preferences?.showLogoInSidebar !== false,
       pricing: organization.preferences?.pricing ?? "INR",
       defaultTerms: defaultPaymentTerm?.text ?? organization.preferences?.defaultTerms ?? "",
       defaultUpiId: organization.preferences?.defaultUpiId ?? "",
@@ -836,7 +839,10 @@ function OrganizationTab() {
   }
 
   const updatePreference = (
-    field: Exclude<keyof OrganizationFormState["preferences"], "paymentTerms" | "deliveryTerms">,
+    field: Exclude<
+      keyof OrganizationFormState["preferences"],
+      "paymentTerms" | "deliveryTerms" | "showLogoInSidebar"
+    >,
     value: string,
   ) => {
     setForm((current) => ({
@@ -1048,6 +1054,27 @@ function OrganizationTab() {
                   </div>
                   {uploadingLogo && <p className="text-sm text-muted-foreground">Uploading...</p>}
                 </div>
+                {form.logoUrl && (
+                  <div className="flex items-center justify-between gap-4 rounded-xl border bg-muted/20 p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="showLogoInSidebar">Show logo in sidebar</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Replace the default sidebar logo with your organization logo. Save
+                        organization settings to apply.
+                      </p>
+                    </div>
+                    <Switch
+                      id="showLogoInSidebar"
+                      checked={form.preferences.showLogoInSidebar}
+                      onCheckedChange={(checked) =>
+                        setForm((current) => ({
+                          ...current,
+                          preferences: { ...current.preferences, showLogoInSidebar: checked },
+                        }))
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">

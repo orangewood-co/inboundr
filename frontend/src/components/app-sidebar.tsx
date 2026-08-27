@@ -246,7 +246,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }, [sessionImage])
   const organizationName = branding?.name?.trim() || "Inboundr"
-  const logoUrl = branding?.logoDisplayUrl?.trim()
+  // Treat a missing flag (stale cached branding) as enabled.
+  const showOrgLogo = branding?.showLogoInSidebar !== false
+  const logoUrl = showOrgLogo ? branding?.logoDisplayUrl?.trim() : ""
   const navCategories = React.useMemo(() => {
     const categories: SidebarCategory[] = data.navMain
       .map((category) => ({

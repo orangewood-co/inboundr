@@ -55,6 +55,8 @@ export interface IOrganizationPreferences {
   primaryColor: string;
   theme: OrganizationTheme;
   colorTheme: string;
+  /** Controls whether the uploaded organization logo replaces the app logo in the sidebar. */
+  showLogoInSidebar: boolean;
   pricing: string;
   defaultTerms: string;
   defaultUpiId: string;
@@ -169,6 +171,7 @@ const organizationPreferencesSchema = new Schema<IOrganizationPreferences>(
     primaryColor: { type: String, default: "#f5b400" },
     theme: { type: String, enum: ["dark", "light"], default: "dark" },
     colorTheme: { type: String, default: "default", trim: true },
+    showLogoInSidebar: { type: Boolean, default: true },
     pricing: { type: String, default: "INR" },
     defaultTerms: { type: String, default: "" },
     defaultUpiId: { type: String, default: "", trim: true },

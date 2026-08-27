@@ -234,6 +234,9 @@ function normalizeOrganizationInput(body: Record<string, unknown>) {
             ...(preferences.colorTheme !== undefined
               ? { colorTheme: stringValue(preferences.colorTheme) || "default" }
               : {}),
+            ...(preferences.showLogoInSidebar !== undefined
+              ? { showLogoInSidebar: Boolean(preferences.showLogoInSidebar) }
+              : {}),
             ...(preferences.pricing !== undefined
               ? { pricing: stringValue(preferences.pricing) || "INR" }
               : {}),
