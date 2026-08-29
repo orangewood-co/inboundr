@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/resizable"
 import { Spinner } from "@/components/ui/spinner"
 import { APP_TITLE, documentTitleForPath } from "@/lib/route-meta"
+import { setTabBaseTitle } from "@/lib/tab-indicator"
 
 const PAGE_SIZE = 25
 
@@ -156,15 +157,15 @@ export default function SupportInboxPage() {
 
   useEffect(() => {
     if (!ticketId) {
-      document.title = documentTitleForPath("/support")
+      setTabBaseTitle(documentTitleForPath("/support"))
       return
     }
     if (!selectedTicket) {
-      document.title = documentTitleForPath(`/support/${ticketId}`)
+      setTabBaseTitle(documentTitleForPath(`/support/${ticketId}`))
       return
     }
     const requester = selectedTicket.requester.name.trim() || selectedTicket.requester.email
-    document.title = `${selectedTicket.ticketReference} ${requester} - Support - ${APP_TITLE}`
+    setTabBaseTitle(`${selectedTicket.ticketReference} ${requester} - Support - ${APP_TITLE}`)
   }, [selectedTicket, ticketId])
 
   const openTicket = (id: string) =>

@@ -13,6 +13,7 @@ import {
   updateNotificationReadState,
   type AppNotification,
 } from "@/lib/notifications-api"
+import { setTabUnreadCount } from "@/lib/tab-indicator"
 
 type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected"
 
@@ -125,6 +126,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     window.addEventListener("focus", handleFocus)
     return () => window.removeEventListener("focus", handleFocus)
   }, [])
+
+  useEffect(() => {
+    setTabUnreadCount(unreadCount)
+  }, [unreadCount])
 
   useEffect(() => {
     if (!isSignedIn) {
