@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowLeftIcon, ArrowRightIcon, BriefcaseBusinessIcon, Building2Icon, CalendarDaysIcon, CheckCircle2Icon, ChevronDownIcon, Clock3Icon, ExternalLinkIcon, MapPinIcon, SearchIcon, UploadCloudIcon } from "lucide-react"
+import { ArrowLeftIcon, ArrowRightIcon, BriefcaseBusinessIcon, Building2Icon, CalendarDaysIcon, CheckCircle2Icon, ChevronDownIcon, Clock3Icon, CompassIcon, ExternalLinkIcon, GlobeIcon, HeartIcon, MailIcon, MapPinIcon, SearchIcon, SparklesIcon, TrendingUpIcon, UploadCloudIcon, UsersIcon, ZapIcon } from "lucide-react"
 import { motion } from "motion/react"
 
 import { Turnstile } from "../components/turnstile"
@@ -120,8 +120,10 @@ function Header({ site, embed }: { site: CareersSite; embed: boolean }) {
 }
 
 const heroGlow = {
-  background: "radial-gradient(56rem 32rem at 84% -18%, color-mix(in oklab, var(--brand) 40%, transparent), transparent 66%), radial-gradient(44rem 30rem at -12% 118%, color-mix(in oklab, var(--brand) 20%, transparent), transparent 62%)",
+  background: "radial-gradient(64rem 34rem at 50% -24%, color-mix(in oklab, var(--brand) 38%, transparent), transparent 66%), radial-gradient(40rem 26rem at -14% 40%, color-mix(in oklab, var(--brand) 14%, transparent), transparent 62%), radial-gradient(40rem 26rem at 114% 40%, color-mix(in oklab, var(--brand) 14%, transparent), transparent 62%)",
 }
+
+const BENEFIT_ICONS = [SparklesIcon, ZapIcon, UsersIcon, GlobeIcon, TrendingUpIcon, HeartIcon, CompassIcon] as const
 
 function CareersListing({ site, jobs, embed, onNavigate }: { site: CareersSite; jobs: CareersJob[]; embed: boolean; onNavigate?: (path: string) => void }) {
   const initialParams = useMemo(() => new URLSearchParams(window.location.search), [])
@@ -131,91 +133,126 @@ function CareersListing({ site, jobs, embed, onNavigate }: { site: CareersSite; 
   const [query, setQuery] = useState(() => initialParams.get("query") ?? "")
   const values = (key: "department" | "location" | "employmentType") => Array.from(new Set(jobs.map((job) => job[key]).filter(Boolean))).sort()
   const filtered = jobs.filter((job) => (!department || job.department === department) && (!location || job.location === location) && (!type || job.employmentType === type) && (!query || `${job.title} ${job.department} ${job.location}`.toLowerCase().includes(query.toLowerCase())))
-  const grouped: Array<{ name: string; jobs: CareersJob[] }> = []
-  for (const job of filtered) {
-    const name = job.department || "General"
-    const group = grouped.find((entry) => entry.name === name)
-    if (group) group.jobs.push(job)
-    else grouped.push({ name, jobs: [job] })
-  }
-  const showGroups = grouped.length > 1
+  const departments = values("department")
+  const contactEmail = site.contactEmail ?? ""
+  const teamMembers = site.teamMembers ?? []
+  const benefits = site.benefits ?? []
+  const aboutParagraphs = (site.aboutBody ?? "").split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean)
+  const sectionHeading = "text-center font-display text-3xl font-semibold tracking-tight text-balance text-stone-50 sm:text-4xl"
   return <>
     <Meta site={site} />
     <Header site={site} embed={embed} />
     <main className="relative text-stone-200">
       <section className="relative overflow-hidden">
-        {site.bannerUrl && <>
-          <img src={site.bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0c0a09]/60 via-[#0c0a09]/80 to-[#0c0a09]" />
-        </>}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={heroGlow} />
         <div aria-hidden="true" className="grain pointer-events-none absolute inset-0 opacity-[0.055]" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[#0c0a09]" />
-        <div className={`relative mx-auto max-w-6xl px-5 ${embed ? "pt-12 pb-10" : "pt-20 pb-16 sm:pt-28 sm:pb-20"}`}>
-          <p className="reveal flex items-center gap-3 text-[11px] font-bold tracking-[0.28em] text-brand-bright uppercase" style={reveal(0)}>
+        <div className={`relative mx-auto max-w-6xl px-5 text-center ${embed ? "pt-12 pb-8" : "pt-20 pb-14 sm:pt-28 sm:pb-16"}`}>
+          <p className="reveal flex items-center justify-center gap-3 text-[11px] font-bold tracking-[0.28em] text-brand-bright uppercase" style={reveal(0)}>
             <span aria-hidden="true" className="h-px w-8 bg-brand-bright/60" />
             Careers at {site.organizationName}
+            <span aria-hidden="true" className="h-px w-8 bg-brand-bright/60" />
           </p>
-          <h1 className={`reveal mt-5 max-w-4xl font-display font-bold tracking-tight text-balance text-stone-50 ${embed ? "text-3xl sm:text-4xl" : "text-4xl sm:text-6xl lg:text-7xl"}`} style={reveal(1)}>
+          <h1 className={`reveal mx-auto mt-5 max-w-4xl font-display font-bold tracking-tight text-balance text-stone-50 ${embed ? "text-3xl sm:text-4xl" : "text-4xl sm:text-6xl lg:text-7xl"}`} style={reveal(1)}>
             {site.headline || `Do work that moves things forward.`}
           </h1>
-          {site.intro && <p className="reveal mt-6 max-w-xl text-base leading-7 whitespace-pre-line text-stone-400" style={reveal(2)}>{site.intro}</p>}
+          {site.intro && <p className="reveal mx-auto mt-6 max-w-2xl text-base leading-7 whitespace-pre-line text-stone-400" style={reveal(2)}>{site.intro}</p>}
+          {!embed && <div className="reveal mt-8 flex flex-wrap items-center justify-center gap-3" style={reveal(3)}>
+            <a href="#roles" className="brand-shadow group flex items-center gap-2 rounded-full bg-brand-strong px-6 py-3 text-sm font-bold text-brand-ink transition-[transform,filter] duration-150 hover:brightness-110 active:scale-[.98]">See Open Roles <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" /></a>
+            {contactEmail && <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-stone-300 transition-colors hover:border-white/25 hover:text-stone-100"><MailIcon className="size-4 text-stone-500" />{contactEmail}</a>}
+          </div>}
+          {!embed && site.bannerUrl && <div className="reveal relative mx-auto mt-12 max-w-5xl overflow-hidden rounded-3xl border border-white/10" style={reveal(4)}>
+            <img src={site.bannerUrl} alt={`Life at ${site.organizationName}`} className="aspect-[21/9] w-full object-cover saturate-75" />
+            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-[#0c0a09]/70 via-transparent to-[#0c0a09]/25" />
+          </div>}
         </div>
       </section>
-      <section className={`mx-auto max-w-6xl px-5 ${embed ? "pb-12" : "pb-20 sm:pb-28"}`}>
-        <div className="reveal flex flex-wrap items-baseline justify-between gap-2 border-t border-white/[0.08] pt-8" style={reveal(3)}>
-          <h2 className="font-display text-2xl font-semibold text-stone-100">Open Roles</h2>
-          <p className="text-sm tabular-nums text-stone-500">{filtered.length} role{filtered.length === 1 ? "" : "s"} shown</p>
+      {!embed && aboutParagraphs.length > 0 && <section className="relative border-t border-white/[0.06]">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
+          <h2 className={sectionHeading}>{site.aboutTitle || `Careers at ${site.organizationName}`}</h2>
+          <div className="mx-auto mt-10 max-w-4xl gap-10 md:columns-2">
+            {aboutParagraphs.map((paragraph, index) => <p key={index} className="mb-5 break-inside-avoid text-[15px] leading-[1.85] text-stone-400">{paragraph}</p>)}
+          </div>
         </div>
-        <div className="reveal mt-6 grid gap-2 sm:grid-cols-3 lg:grid-cols-[1.6fr_1fr_1fr_1fr]" style={reveal(4)}>
-          <label className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 transition-colors focus-within:border-brand-bright/50 focus-within:bg-white/[0.06] sm:col-span-3 lg:col-span-1">
-            <SearchIcon className="size-4 shrink-0 text-stone-500" />
-            <span className="sr-only">Search roles</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search roles" className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-stone-100 outline-none placeholder:text-stone-500" />
-          </label>
-          {[["Department", department, setDepartment, values("department")], ["Location", location, setLocation, values("location")], ["Type", type, setType, values("employmentType")]].map(([label, current, setter, options]) => <label key={label as string} className="relative">
-            <span className="sr-only">{label as string}</span>
-            <select value={current as string} onChange={(event) => (setter as (value: string) => void)(event.target.value)} className="w-full appearance-none rounded-xl border border-white/10 bg-white/[0.04] py-2.5 pr-9 pl-3.5 text-sm text-stone-200 outline-none transition-colors focus:border-brand-bright/50 [&>option]:bg-[#1c1917]">
-              <option value="">All {String(label).toLowerCase()}s</option>
-              {(options as string[]).map((option) => <option key={option}>{option}</option>)}
-            </select>
-            <ChevronDownIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-stone-500" />
-          </label>)}
+      </section>}
+      {!embed && benefits.length > 0 && <section className="relative border-t border-white/[0.06]">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
+          <h2 className={sectionHeading}>Why You’ll Love Working Here</h2>
+          <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {benefits.map((benefit, index) => {
+              const Icon = BENEFIT_ICONS[index % BENEFIT_ICONS.length]
+              return <div key={`${benefit.title}-${index}`} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 transition-colors hover:border-white/[0.14] hover:bg-white/[0.03]">
+                <span className="flex size-9 items-center justify-center rounded-lg border border-brand-bright/20 bg-brand-bright/10 text-brand-bright"><Icon className="size-4" /></span>
+                <h3 className="mt-4 font-display text-base font-semibold text-stone-100">{benefit.title}</h3>
+                {benefit.description && <p className="mt-1.5 text-sm leading-6 text-stone-400">{benefit.description}</p>}
+              </div>
+            })}
+          </div>
         </div>
-        {filtered.length > 0 ? <div className="reveal mt-8 space-y-10" style={reveal(5)}>
-          {grouped.map((group) => <div key={group.name}>
-            {showGroups && <div className="mb-3 flex items-baseline gap-2.5">
-              <p className="text-[11px] font-bold tracking-[0.22em] text-stone-500 uppercase">{group.name}</p>
-              <span className="text-[11px] font-semibold tabular-nums text-stone-600">{group.jobs.length}</span>
-            </div>}
-            <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
-              {group.jobs.map((job) => {
-                const salary = formatSalary(job)
-                const path = job.seo.canonicalPath || publicCareersPath(site.organizationPath, job.slug)
-                return <a key={job.id} href={`${path}${embed ? "?embed=1" : ""}`} onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate(path) } : undefined} className="group flex items-center gap-5 py-5 transition-colors duration-200 hover:bg-white/[0.02] sm:gap-6 sm:py-6">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <h3 className="font-display text-lg font-semibold text-stone-100 transition-colors duration-200 group-hover:text-brand-bright sm:text-xl">{job.title}</h3>
-                      {job.deadlineClosed && <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] font-bold tracking-[0.14em] text-stone-500 uppercase">Applications closed</span>}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-stone-500">
-                      {!showGroups && <span className="flex items-center gap-1.5"><Building2Icon className="size-3.5" />{job.department || "General"}</span>}
-                      <span className="flex items-center gap-1.5"><MapPinIcon className="size-3.5" />{job.location || "Flexible"}</span>
-                      <span className="flex items-center gap-1.5"><Clock3Icon className="size-3.5" />{job.employmentType || "Role"}</span>
-                      {salary && <span className="rounded-full border border-brand-bright/20 bg-brand-bright/10 px-2.5 py-0.5 text-xs font-semibold text-brand-bright">{salary}</span>}
-                    </div>
+      </section>}
+      {!embed && teamMembers.length > 0 && <section className="relative border-t border-white/[0.06]">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
+          <h2 className={sectionHeading}>The Team Behind {site.organizationName}</h2>
+          <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-x-8 gap-y-7 sm:grid-cols-3">
+            {teamMembers.map((member, index) => <div key={`${member.name}-${index}`}>
+              <p className="text-[15px] font-semibold text-stone-100">{member.name}</p>
+              {member.role && <p className="mt-1 text-[13px] text-stone-500">{member.role}</p>}
+            </div>)}
+          </div>
+        </div>
+      </section>}
+      <section id="roles" className={`relative scroll-mt-20 ${embed ? "" : "border-t border-white/[0.06]"}`}>
+        <div className={`mx-auto max-w-6xl px-5 ${embed ? "pt-2 pb-12" : "py-16 sm:pb-28 sm:pt-20"}`}>
+          <h2 className={sectionHeading}>Explore Open Roles</h2>
+          <p className="mt-3 text-center text-sm tabular-nums text-stone-500">{filtered.length} role{filtered.length === 1 ? "" : "s"} shown</p>
+          {departments.length > 1 && <div className="mt-8 flex flex-wrap justify-center gap-2">
+            {["", ...departments].map((option) => {
+              const active = department === option
+              return <button key={option || "all"} type="button" onClick={() => setDepartment(option)} className={`rounded-full px-4 py-2 text-[13px] transition-colors ${active ? "bg-brand-strong font-semibold text-brand-ink" : "border border-white/10 bg-white/[0.04] font-medium text-stone-300 hover:border-white/25 hover:text-stone-100"}`}>{option || "All Departments"}</button>
+            })}
+          </div>}
+          <div className={`grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr] ${departments.length > 1 ? "mt-4" : "mt-8"}`}>
+            <label className="flex min-w-0 items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 transition-colors focus-within:border-brand-bright/50 focus-within:bg-white/[0.06] sm:col-span-2 lg:col-span-1">
+              <SearchIcon className="size-4 shrink-0 text-stone-500" />
+              <span className="sr-only">Search roles</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search roles" className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-stone-100 outline-none placeholder:text-stone-500" />
+            </label>
+            {[["Location", location, setLocation, values("location")], ["Type", type, setType, values("employmentType")]].map(([label, current, setter, options]) => <label key={label as string} className="relative">
+              <span className="sr-only">{label as string}</span>
+              <select value={current as string} onChange={(event) => (setter as (value: string) => void)(event.target.value)} className="w-full appearance-none rounded-xl border border-white/10 bg-white/[0.04] py-2.5 pr-9 pl-3.5 text-sm text-stone-200 outline-none transition-colors focus:border-brand-bright/50 [&>option]:bg-[#1c1917]">
+                <option value="">All {String(label).toLowerCase()}s</option>
+                {(options as string[]).map((option) => <option key={option}>{option}</option>)}
+              </select>
+              <ChevronDownIcon aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-stone-500" />
+            </label>)}
+          </div>
+          {filtered.length > 0 ? <div className="mt-8 divide-y divide-white/[0.06] border-y border-white/[0.06]">
+            {filtered.map((job) => {
+              const salary = formatSalary(job)
+              const path = job.seo.canonicalPath || publicCareersPath(site.organizationPath, job.slug)
+              return <a key={job.id} href={`${path}${embed ? "?embed=1" : ""}`} onClick={onNavigate ? (event) => { event.preventDefault(); onNavigate(path) } : undefined} className="group flex items-center gap-5 py-5 transition-colors duration-200 hover:bg-white/[0.02] sm:gap-6 sm:py-6">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <h3 className="font-display text-lg font-semibold text-stone-100 transition-colors duration-200 group-hover:text-brand-bright sm:text-xl">{job.title}</h3>
+                    {job.deadlineClosed && <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] font-bold tracking-[0.14em] text-stone-500 uppercase">Applications closed</span>}
                   </div>
-                  <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-400 transition-colors duration-200 group-hover:border-brand-strong group-hover:bg-brand-strong group-hover:text-brand-ink">
-                    <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:-rotate-45" />
-                  </span>
-                </a>
-              })}
-            </div>
-          </div>)}
-        </div> : <div className="reveal mt-8 rounded-2xl border border-dashed border-white/10 py-20 text-center" style={reveal(5)}>
-          <p className="font-display text-xl font-semibold text-stone-200">No roles match those filters.</p>
-          <button type="button" className="mt-4 text-sm font-semibold text-brand-bright underline-offset-4 hover:underline" onClick={() => { setQuery(""); setDepartment(""); setLocation(""); setType("") }}>Clear filters</button>
-        </div>}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-stone-500">
+                    <span className="flex items-center gap-1.5"><Building2Icon className="size-3.5" />{job.department || "General"}</span>
+                    <span className="flex items-center gap-1.5"><MapPinIcon className="size-3.5" />{job.location || "Flexible"}</span>
+                    <span className="flex items-center gap-1.5"><Clock3Icon className="size-3.5" />{job.employmentType || "Role"}</span>
+                    {salary && <span className="rounded-full border border-brand-bright/20 bg-brand-bright/10 px-2.5 py-0.5 text-xs font-semibold text-brand-bright">{salary}</span>}
+                  </div>
+                </div>
+                <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 text-stone-400 transition-colors duration-200 group-hover:border-brand-strong group-hover:bg-brand-strong group-hover:text-brand-ink">
+                  <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:-rotate-45" />
+                </span>
+              </a>
+            })}
+          </div> : <div className="mt-8 rounded-2xl border border-dashed border-white/10 py-20 text-center">
+            <p className="font-display text-xl font-semibold text-stone-200">No roles match those filters.</p>
+            <button type="button" className="mt-4 text-sm font-semibold text-brand-bright underline-offset-4 hover:underline" onClick={() => { setQuery(""); setDepartment(""); setLocation(""); setType("") }}>Clear filters</button>
+          </div>}
+        </div>
       </section>
     </main>
     <Footer site={site} />

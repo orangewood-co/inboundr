@@ -14,6 +14,16 @@ export interface IRecruitmentSocialLink {
   url: string;
 }
 
+export interface IRecruitmentTeamMember {
+  name: string;
+  role: string;
+}
+
+export interface IRecruitmentBenefit {
+  title: string;
+  description: string;
+}
+
 export interface IRecruitmentBranding {
   primaryColor: string;
   logoUrl: string | null;
@@ -38,6 +48,11 @@ export interface IRecruitmentSettings extends Document<Types.ObjectId> {
   headerBrandDisplay: HeaderBrandDisplay;
   headline: string;
   intro: string;
+  contactEmail: string;
+  aboutTitle: string;
+  aboutBody: string;
+  teamMembers: IRecruitmentTeamMember[];
+  benefits: IRecruitmentBenefit[];
   seoTitle: string;
   seoDescription: string;
   socialShareText: string;
@@ -115,6 +130,27 @@ const recruitmentSettingsSchema = new Schema<IRecruitmentSettings>(
     },
     headline: { type: String, default: "", trim: true, maxlength: 240 },
     intro: { type: String, default: "", trim: true, maxlength: 5000 },
+    contactEmail: { type: String, default: "", trim: true, lowercase: true, maxlength: 320 },
+    aboutTitle: { type: String, default: "", trim: true, maxlength: 120 },
+    aboutBody: { type: String, default: "", trim: true, maxlength: 10000 },
+    teamMembers: {
+      type: [
+        {
+          name: { type: String, required: true, trim: true, maxlength: 120 },
+          role: { type: String, default: "", trim: true, maxlength: 120 },
+        },
+      ],
+      default: [],
+    },
+    benefits: {
+      type: [
+        {
+          title: { type: String, required: true, trim: true, maxlength: 80 },
+          description: { type: String, default: "", trim: true, maxlength: 300 },
+        },
+      ],
+      default: [],
+    },
     seoTitle: { type: String, default: "", trim: true, maxlength: 120 },
     seoDescription: { type: String, default: "", trim: true, maxlength: 320 },
     socialShareText: { type: String, default: "", trim: true, maxlength: 500 },

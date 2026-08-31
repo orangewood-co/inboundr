@@ -37,6 +37,11 @@ export type CareersSite = {
   headerBrandDisplay: "logo_and_name" | "logo_only" | "name_only"
   headline: string
   intro: string
+  contactEmail?: string
+  aboutTitle?: string
+  aboutBody?: string
+  teamMembers?: Array<{ name: string; role: string }>
+  benefits?: Array<{ title: string; description: string }>
   seoTitle: string
   seoDescription: string
   socialShareText: string

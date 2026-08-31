@@ -174,6 +174,17 @@ export async function getPublicCareersSite(pathValue: unknown) {
     headerBrandDisplay: settings.headerBrandDisplay ?? "logo_and_name",
     headline: settings.headline,
     intro: settings.intro,
+    contactEmail: settings.contactEmail ?? "",
+    aboutTitle: settings.aboutTitle ?? "",
+    aboutBody: settings.aboutBody ?? "",
+    teamMembers: (settings.teamMembers ?? []).map((member) => ({
+      name: member.name,
+      role: member.role,
+    })),
+    benefits: (settings.benefits ?? []).map((benefit) => ({
+      title: benefit.title,
+      description: benefit.description,
+    })),
     seoTitle: settings.seoTitle,
     seoDescription: settings.seoDescription,
     socialShareText: settings.socialShareText,

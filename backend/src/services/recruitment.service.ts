@@ -186,6 +186,37 @@ export async function updateRecruitmentSettings(
   }
   if ("headline" in body) update.headline = text(body.headline).slice(0, 240);
   if ("intro" in body) update.intro = text(body.intro).slice(0, 5000);
+  if ("contactEmail" in body) {
+    const contactEmail = text(body.contactEmail).toLowerCase().slice(0, 320);
+    if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      throw new RecruitmentServiceError("Contact email is invalid");
+    }
+    update.contactEmail = contactEmail;
+  }
+  if ("aboutTitle" in body) update.aboutTitle = text(body.aboutTitle).slice(0, 120);
+  if ("aboutBody" in body) update.aboutBody = text(body.aboutBody).slice(0, 10000);
+  if ("teamMembers" in body) {
+    if (!Array.isArray(body.teamMembers)) {
+      throw new RecruitmentServiceError("Team members must be a list");
+    }
+    update.teamMembers = body.teamMembers.slice(0, 24).map((item) => {
+      const member = objectValue(item);
+      const name = text(member.name).slice(0, 120);
+      if (!name) throw new RecruitmentServiceError("Team members require a name");
+      return { name, role: text(member.role).slice(0, 120) };
+    });
+  }
+  if ("benefits" in body) {
+    if (!Array.isArray(body.benefits)) {
+      throw new RecruitmentServiceError("Benefits must be a list");
+    }
+    update.benefits = body.benefits.slice(0, 12).map((item) => {
+      const benefit = objectValue(item);
+      const title = text(benefit.title).slice(0, 80);
+      if (!title) throw new RecruitmentServiceError("Benefits require a title");
+      return { title, description: text(benefit.description).slice(0, 300) };
+    });
+  }
   if ("seoTitle" in body) update.seoTitle = text(body.seoTitle).slice(0, 120);
   if ("seoDescription" in body) update.seoDescription = text(body.seoDescription).slice(0, 320);
   if ("socialShareText" in body) {
