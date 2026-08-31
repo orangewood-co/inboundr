@@ -29,7 +29,7 @@ export function Turnstile({ onToken }: { onToken: (token: string) => void }) {
         callback: onToken,
         "expired-callback": () => onToken(""),
         "error-callback": () => { onToken(""); setUnavailable(true) },
-        theme: "light",
+        theme: "dark",
       })
     }
     if (window.turnstile) render()
@@ -53,6 +53,6 @@ export function Turnstile({ onToken }: { onToken: (token: string) => void }) {
   }, [id, onToken])
 
   if (!TURNSTILE_SITE_KEY && import.meta.env.DEV) return <p className="text-xs text-stone-500">Verification is delegated to the local application server.</p>
-  if (unavailable || (!TURNSTILE_SITE_KEY && import.meta.env.PROD)) return <p role="alert" className="text-sm text-red-700">Application verification could not load. Check your connection and refresh.</p>
+  if (unavailable || (!TURNSTILE_SITE_KEY && import.meta.env.PROD)) return <p role="alert" className="text-sm text-red-300">Application verification could not load. Check your connection and refresh.</p>
   return <div id={id} className="min-h-[65px]" aria-label="Application verification" />
 }

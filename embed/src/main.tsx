@@ -22,6 +22,8 @@ const careersMatch = path.match(/^\/careers\/([^/]+)(?:\/(?:jobs\/)?([^/]+))?$/)
 
 let page: React.ReactNode
 if (careersMatch) {
+  // Applied before render so the dark careers theme never flashes light.
+  document.documentElement.classList.add("careers-dark")
   page = (
     <CareersPage
       organizationPath={decodeURIComponent(careersMatch[1])}

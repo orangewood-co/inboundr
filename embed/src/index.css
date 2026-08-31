@@ -7,8 +7,20 @@
   --font-display: "Bricolage Grotesque", "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-bright: var(--brand-bright);
+  --color-brand-ink: var(--brand-ink);
+}
+
 :root {
   color-scheme: light;
+  /* Neutral fallbacks; replaced per-organization by applyBrandPalette(). */
+  --brand: #e8a33d;
+  --brand-strong: #d9942e;
+  --brand-bright: #f0bc6e;
+  --brand-ink: #0c0a09;
 }
 
 html.dark {
@@ -34,38 +46,50 @@ html.dark body {
   background: #0a0908;
 }
 
-html.widget-theme-dark,
-html.widget-theme-dark body {
+/* Careers site: natively dark, scoped so other embed surfaces stay light. */
+html.careers-dark {
   color-scheme: dark;
-  color: #e7e5e4;
-  background: #11100f;
 }
 
-html.widget-theme-dark [class*="bg-[#f4f1ea]"],
-html.widget-theme-dark [class*="bg-[#f8f6f1]"],
-html.widget-theme-dark [class*="bg-white"] {
-  background-color: #171513;
+html.careers-dark body {
+  color: #d6d3d1;
+  background: #0c0a09;
 }
 
-html.widget-theme-dark [class*="bg-stone-100"],
-html.widget-theme-dark [class*="bg-stone-200"] {
-  background-color: #292524;
+html.careers-dark ::selection {
+  background: color-mix(in oklab, var(--brand-bright) 32%, transparent);
+  color: #fafaf9;
 }
 
-html.widget-theme-dark [class*="text-stone-950"],
-html.widget-theme-dark [class*="text-stone-900"],
-html.widget-theme-dark [class*="text-stone-700"] {
-  color: #f5f5f4;
+.grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
 }
 
-html.widget-theme-dark [class*="text-stone-600"],
-html.widget-theme-dark [class*="text-stone-500"] {
-  color: #a8a29e;
+@keyframes careers-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-html.widget-theme-dark [class*="border-black/10"],
-html.widget-theme-dark [class*="border-stone-"] {
-  border-color: rgb(255 255 255 / 12%);
+.reveal {
+  animation: careers-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--reveal-i, 0) * 95ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
+
+.brand-shadow {
+  box-shadow: 0 10px 36px -10px color-mix(in oklab, var(--brand-strong) 55%, transparent);
 }
 
 #root {
