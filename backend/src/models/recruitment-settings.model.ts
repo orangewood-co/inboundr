@@ -24,6 +24,12 @@ export interface IRecruitmentBenefit {
   description: string;
 }
 
+export interface IRecruitmentSections {
+  story: boolean;
+  benefits: boolean;
+  team: boolean;
+}
+
 export interface IRecruitmentBranding {
   primaryColor: string;
   logoUrl: string | null;
@@ -53,6 +59,7 @@ export interface IRecruitmentSettings extends Document<Types.ObjectId> {
   aboutBody: string;
   teamMembers: IRecruitmentTeamMember[];
   benefits: IRecruitmentBenefit[];
+  sections: IRecruitmentSections;
   seoTitle: string;
   seoDescription: string;
   socialShareText: string;
@@ -150,6 +157,11 @@ const recruitmentSettingsSchema = new Schema<IRecruitmentSettings>(
         },
       ],
       default: [],
+    },
+    sections: {
+      story: { type: Boolean, default: true },
+      benefits: { type: Boolean, default: true },
+      team: { type: Boolean, default: true },
     },
     seoTitle: { type: String, default: "", trim: true, maxlength: 120 },
     seoDescription: { type: String, default: "", trim: true, maxlength: 320 },

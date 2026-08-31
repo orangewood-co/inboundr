@@ -175,16 +175,22 @@ export async function getPublicCareersSite(pathValue: unknown) {
     headline: settings.headline,
     intro: settings.intro,
     contactEmail: settings.contactEmail ?? "",
-    aboutTitle: settings.aboutTitle ?? "",
-    aboutBody: settings.aboutBody ?? "",
-    teamMembers: (settings.teamMembers ?? []).map((member) => ({
-      name: member.name,
-      role: member.role,
-    })),
-    benefits: (settings.benefits ?? []).map((benefit) => ({
-      title: benefit.title,
-      description: benefit.description,
-    })),
+    // Disabled sections are omitted entirely so the public payload carries no
+    // hidden content and the embed hides them without extra logic.
+    aboutTitle: settings.sections?.story === false ? "" : settings.aboutTitle ?? "",
+    aboutBody: settings.sections?.story === false ? "" : settings.aboutBody ?? "",
+    teamMembers: settings.sections?.team === false
+      ? []
+      : (settings.teamMembers ?? []).map((member) => ({
+          name: member.name,
+          role: member.role,
+        })),
+    benefits: settings.sections?.benefits === false
+      ? []
+      : (settings.benefits ?? []).map((benefit) => ({
+          title: benefit.title,
+          description: benefit.description,
+        })),
     seoTitle: settings.seoTitle,
     seoDescription: settings.seoDescription,
     socialShareText: settings.socialShareText,

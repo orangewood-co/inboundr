@@ -217,6 +217,14 @@ export async function updateRecruitmentSettings(
       return { title, description: text(benefit.description).slice(0, 300) };
     });
   }
+  if ("sections" in body) {
+    const sections = objectValue(body.sections);
+    update.sections = {
+      story: sections.story !== false,
+      benefits: sections.benefits !== false,
+      team: sections.team !== false,
+    };
+  }
   if ("seoTitle" in body) update.seoTitle = text(body.seoTitle).slice(0, 120);
   if ("seoDescription" in body) update.seoDescription = text(body.seoDescription).slice(0, 320);
   if ("socialShareText" in body) {

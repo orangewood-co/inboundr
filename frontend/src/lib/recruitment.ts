@@ -173,6 +173,7 @@ export interface RecruitmentSettings {
   aboutBody: string
   teamMembers: Array<{ name: string; role: string }>
   benefits: Array<{ title: string; description: string }>
+  sections: { story: boolean; benefits: boolean; team: boolean }
   seoTitle: string
   seoDescription: string
   socialShareText: string
