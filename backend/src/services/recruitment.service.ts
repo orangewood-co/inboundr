@@ -142,6 +142,22 @@ async function inferredOrganizationPath(organizationId: OrganizationId): Promise
   return conflict ? `${base}-${organizationId.toString().slice(-6)}` : base;
 }
 
+// The storage bucket is private, so the public-style URL persisted at upload
+// time is not browser-loadable (S3 answers 403 XML, which ORB blocks for
+// images). Replace it with a fresh presigned view URL on every read.
+async function withBannerViewUrl<T extends { toObject(): any } | null>(settings: T) {
+  if (!settings) return settings;
+  const doc = settings.toObject();
+  if (doc.banner?.key) {
+    try {
+      doc.bannerUrl = (await createPresignedViewUrl(doc.banner.key)).url;
+    } catch {
+      // Presigning failed; leave the stored URL in place.
+    }
+  }
+  return doc;
+}
+
 export async function getRecruitmentSettings(organizationId: OrganizationId) {
   const inferredPath = await inferredOrganizationPath(organizationId);
   const upsert = (organizationPath: string) =>
@@ -159,10 +175,12 @@ export async function getRecruitmentSettings(organizationId: OrganizationId) {
       { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     );
   try {
-    return await upsert(inferredPath);
+    return await withBannerViewUrl(await upsert(inferredPath));
   } catch (error: any) {
     if (error?.code !== 11000) throw error;
-    return upsert(`${inferredPath.slice(0, 64)}-${organizationId.toString().slice(-6)}`);
+    return withBannerViewUrl(
+      await upsert(`${inferredPath.slice(0, 64)}-${organizationId.toString().slice(-6)}`)
+    );
   }
 }
 
@@ -281,10 +299,12 @@ export async function updateRecruitmentSettings(
     }
   }
   try {
-    return await RecruitmentSettings.findOneAndUpdate(
-      { organizationId },
-      { $set: update },
-      { returnDocument: "after", runValidators: true }
+    return await withBannerViewUrl(
+      await RecruitmentSettings.findOneAndUpdate(
+        { organizationId },
+        { $set: update },
+        { returnDocument: "after", runValidators: true }
+      )
     );
   } catch (error: any) {
     if (error?.code === 11000) {
@@ -365,7 +385,7 @@ export async function saveRecruitmentBanner(
     },
     { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, runValidators: true }
   );
-  return settings;
+  return withBannerViewUrl(settings);
 }
 
 async function activity(input: {

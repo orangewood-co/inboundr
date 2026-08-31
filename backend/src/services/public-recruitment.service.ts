@@ -163,9 +163,12 @@ async function effectiveBranding(settings: any) {
 
 export async function getPublicCareersSite(pathValue: unknown) {
   const settings = await publicSettings(pathValue);
-  const [organization, branding] = await Promise.all([
+  const [organization, branding, bannerUrl] = await Promise.all([
     Organization.findById(settings.organizationId).select("name website").lean(),
     effectiveBranding(settings),
+    // Prefer the storage key: the persisted bannerUrl points at the private
+    // bucket and is not browser-loadable, so presign a view URL instead.
+    resolvePublicImageUrl(settings.banner?.key || settings.bannerUrl),
   ]);
   return {
     organizationPath: settings.organizationPath,
@@ -194,14 +197,14 @@ export async function getPublicCareersSite(pathValue: unknown) {
     seoTitle: settings.seoTitle,
     seoDescription: settings.seoDescription,
     socialShareText: settings.socialShareText,
-    bannerUrl: settings.bannerUrl,
+    bannerUrl,
     socialLinks: settings.socialLinks,
     privacyPolicyUrl: settings.privacyPolicyUrl,
     branding,
     seo: {
       title: settings.seoTitle || settings.headline || `${organization?.name ?? ""} Careers`,
       description: settings.seoDescription || settings.intro.slice(0, 180),
-      image: [settings.bannerUrl, branding?.logoUrl].find(
+      image: [bannerUrl, branding?.logoUrl].find(
         (value) => typeof value === "string" && isAbsoluteImageUrl(value)
       ) ?? null,
       canonicalPath: `/careers/${settings.organizationPath}`,
