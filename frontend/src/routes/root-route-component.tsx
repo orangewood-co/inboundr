@@ -3,6 +3,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router"
 
 import { PostHogAnalytics } from "@/lib/posthog"
 import { documentTitleForPath } from "@/lib/route-meta"
+import { setTabBaseTitle } from "@/lib/tab-indicator"
 
 export function RootRouteComponent() {
   const pathname = useRouterState({
@@ -10,7 +11,7 @@ export function RootRouteComponent() {
   })
 
   useEffect(() => {
-    document.title = documentTitleForPath(pathname)
+    setTabBaseTitle(documentTitleForPath(pathname))
   }, [pathname])
 
   return (
