@@ -680,6 +680,12 @@ function numberInputValue(value: number | string | null | undefined): string {
   return Number.isFinite(number) ? String(number) : ""
 }
 
+function savedProductCalibrationInputValue(product: RFQSavedQuoteProduct): string {
+  if (product.calibrationCharges != null) return String(product.calibrationCharges)
+  const calibration = product.adjustments?.find((adjustment) => adjustment.code === "calibration")
+  return numberInputValue(calibration?.value)
+}
+
 function savedProductBasePriceInputValue(product: RFQSavedQuoteProduct): string {
   if (product.basePrice != null) return numberInputValue(product.basePrice)
   if (product.price == null) return ""
@@ -1337,7 +1343,7 @@ export function DashboardPage() {
             price: savedProductBasePriceInputValue(product),
             quantity: String(product.quantity),
             discountPercent: product.discountPercent ? String(product.discountPercent) : "",
-            calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+            calibrationCharges: savedProductCalibrationInputValue(product),
             adjustments: product.adjustments,
             deliveryTimeline: product.deliveryTimeline ?? "",
           }
@@ -1360,7 +1366,7 @@ export function DashboardPage() {
           discountPercent: product.discountPercent ? String(product.discountPercent) : "",
           hsnCode: product.hsnCode ?? "",
           gstRate: product.gstRate != null ? String(product.gstRate) : "",
-          calibrationCharges: product.calibrationCharges != null ? String(product.calibrationCharges) : "",
+          calibrationCharges: savedProductCalibrationInputValue(product),
           adjustments: product.adjustments,
           deliveryTimeline: product.deliveryTimeline ?? "",
           source: product.productId !== "0" ? "catalog" : "custom",

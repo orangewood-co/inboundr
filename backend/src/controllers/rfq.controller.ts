@@ -169,24 +169,28 @@ function quoteAdjustments(
       taxable: item.taxable === true,
     }];
   });
-  const calibration = nullableNumber(legacyCalibration);
-  if (calibration == null || calibration < 0) return normalized;
+  // `undefined` means the caller never exposed calibration as its own field, so
+  // the adjustments list is the only source of truth. Anything else (including
+  // "", null, or 0) is the quote builder's explicit answer and has to win over
+  // the adjustment the catalog seeded onto the product.
+  if (legacyCalibration === undefined) return normalized;
 
-  // The quote builder exposes calibration as its own field, so an edited value
-  // has to win over the adjustment the catalog seeded onto the product.
+  const calibration = nullableNumber(legacyCalibration);
+  if (calibration == null || calibration <= 0) {
+    return normalized.filter((item) => item.code !== "calibration");
+  }
+
   const existing = normalized.findIndex((item) => item.code === "calibration");
   if (existing === -1) {
-    if (calibration > 0) {
-      normalized.push({
-        id: "legacy.calibration",
-        code: "calibration",
-        label: "Calibration",
-        type: "fixed",
-        value: calibration,
-        amount: calibration * quantity,
-        taxable: false,
-      });
-    }
+    normalized.push({
+      id: "legacy.calibration",
+      code: "calibration",
+      label: "Calibration",
+      type: "fixed",
+      value: calibration,
+      amount: calibration * quantity,
+      taxable: false,
+    });
     return normalized;
   }
 
@@ -452,11 +456,18 @@ function resolveSelectedProducts(
     const basePrice = resolveSubmittedBasePrice(overridePrice ?? match.price, discount, previous);
     const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
     const quantity = positiveNumber(overrides.quantity) ?? sr.query.quantity;
+    // A cleared Calib. field arrives as "" (not nullish), so only fall back to the
+    // catalog value when the builder never sent the field at all.
+    const calibrationCharges = overrides.calibrationCharges !== undefined
+      ? nullableNumber(overrides.calibrationCharges)
+      : match.calibrationCharges;
     const adjustments = quoteAdjustments(
       overrides.adjustments ?? match.defaultAdjustments,
       quantity,
       finalPrice,
-      overrides.calibrationCharges ?? match.calibrationCharges
+      overrides.calibrationCharges !== undefined
+        ? overrides.calibrationCharges
+        : match.calibrationCharges ?? undefined
     );
 
     return {
@@ -472,7 +483,7 @@ function resolveSelectedProducts(
       hsnCode: nullableString(overrides.hsnCode) ?? match.hsnCode,
       gstRate: nullableNumber(overrides.gstRate) ?? match.gstRate,
       discountPercent: discount,
-      calibrationCharges: nullableNumber(overrides.calibrationCharges) ?? match.calibrationCharges,
+      calibrationCharges,
       tax: {
         code: nullableString(overrides.hsnCode) ?? match.tax?.code ?? match.hsnCode,
         rate: nullableNumber(overrides.gstRate) ?? match.tax?.rate ?? match.gstRate,
