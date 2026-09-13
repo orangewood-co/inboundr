@@ -2,7 +2,8 @@ import type { Request, Response } from "express";
 import { RFQ } from "../models/rfq.model";
 import { Email } from "../models/email.model";
 import { RFQReply } from "../models/rfq-reply.model";
-import { processEmailForRFQ } from "../services/rfq.service";
+import { processEmailForRFQ, processManualRFQ } from "../services/rfq.service";
+import { keyBelongsToPrefix } from "../services/storage.service";
 import { generateQuoteReply } from "../agents/generate_quote";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { GmailAccount } from "../models/gmail-account.model";
@@ -14,9 +15,11 @@ import {
   isSpecialDiscountEnabled,
 } from "../services/customer-field.service";
 import {
+  buildManualRFQProcessingInput,
   buildRFQProcessingInput,
   hasRFQProcessableContent,
 } from "../services/rfq-input.service";
+import { classifyEmail } from "../agents/check_rfq";
 import { streamRFQPdf } from "../services/rfq-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 import { renderRFQQuotePdfBuffer, rfqQuotePdfFilename } from "../services/rfq-quote-pdf.service";
@@ -166,24 +169,28 @@ function quoteAdjustments(
       taxable: item.taxable === true,
     }];
   });
-  const calibration = nullableNumber(legacyCalibration);
-  if (calibration == null || calibration < 0) return normalized;
+  // `undefined` means the caller never exposed calibration as its own field, so
+  // the adjustments list is the only source of truth. Anything else (including
+  // "", null, or 0) is the quote builder's explicit answer and has to win over
+  // the adjustment the catalog seeded onto the product.
+  if (legacyCalibration === undefined) return normalized;
 
-  // The quote builder exposes calibration as its own field, so an edited value
-  // has to win over the adjustment the catalog seeded onto the product.
+  const calibration = nullableNumber(legacyCalibration);
+  if (calibration == null || calibration <= 0) {
+    return normalized.filter((item) => item.code !== "calibration");
+  }
+
   const existing = normalized.findIndex((item) => item.code === "calibration");
   if (existing === -1) {
-    if (calibration > 0) {
-      normalized.push({
-        id: "legacy.calibration",
-        code: "calibration",
-        label: "Calibration",
-        type: "fixed",
-        value: calibration,
-        amount: calibration * quantity,
-        taxable: false,
-      });
-    }
+    normalized.push({
+      id: "legacy.calibration",
+      code: "calibration",
+      label: "Calibration",
+      type: "fixed",
+      value: calibration,
+      amount: calibration * quantity,
+      taxable: false,
+    });
     return normalized;
   }
 
@@ -449,12 +456,18 @@ function resolveSelectedProducts(
     const basePrice = resolveSubmittedBasePrice(overridePrice ?? match.price, discount, previous);
     const finalPrice = basePrice != null ? basePrice * (1 - discount / 100) : null;
     const quantity = positiveNumber(overrides.quantity) ?? sr.query.quantity;
-    const calibrationCharges = nullableNumber(overrides.calibrationCharges) ?? match.calibrationCharges;
+    // A cleared Calib. field arrives as "" (not nullish), so only fall back to the
+    // catalog value when the builder never sent the field at all.
+    const calibrationCharges = overrides.calibrationCharges !== undefined
+      ? nullableNumber(overrides.calibrationCharges)
+      : match.calibrationCharges;
     const adjustments = quoteAdjustments(
       overrides.adjustments ?? match.defaultAdjustments,
       quantity,
       finalPrice,
-      calibrationCharges
+      overrides.calibrationCharges !== undefined
+        ? overrides.calibrationCharges
+        : match.calibrationCharges ?? undefined
     );
 
     return {
@@ -835,6 +848,108 @@ export const downloadRFQPdf = async (
   }
 };
 
+const MANUAL_RFQ_MAX_TEXT_LENGTH = 20000;
+const MANUAL_RFQ_MAX_ATTACHMENTS = 4;
+
+export const createManualRFQ = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+
+    const text =
+      typeof req.body?.text === "string"
+        ? req.body.text.trim().slice(0, MANUAL_RFQ_MAX_TEXT_LENGTH)
+        : "";
+
+    const rawAttachments: unknown[] = Array.isArray(req.body?.attachments)
+      ? req.body.attachments
+      : [];
+    if (rawAttachments.length > MANUAL_RFQ_MAX_ATTACHMENTS) {
+      res.status(400).json({
+        error: `A maximum of ${MANUAL_RFQ_MAX_ATTACHMENTS} files can be attached`,
+      });
+      return;
+    }
+
+    const attachments = [];
+    for (const raw of rawAttachments) {
+      const item = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      const key = nullableString(item.key);
+      const filename = nullableString(item.filename);
+      const mimeType = nullableString(item.mimeType);
+      const size = nullableNumber(item.size);
+
+      if (!key || !filename || !mimeType || size == null) {
+        res.status(400).json({ error: "Invalid file reference" });
+        return;
+      }
+      // Only accept keys this organization uploaded through the rfq scope.
+      if (!keyBelongsToPrefix(key, ["rfq", String(organization._id)])) {
+        res.status(400).json({ error: "Invalid file reference" });
+        return;
+      }
+
+      attachments.push({ key, filename, mimeType, size });
+    }
+
+    if (!text && attachments.length === 0) {
+      res.status(400).json({ error: "Paste the RFQ text or attach at least one file" });
+      return;
+    }
+
+    const manualInput = { text: text || null, attachments };
+
+    // Extract once up front so the submission can be classified before an RFQ
+    // is created; the same input is then reused for background processing.
+    const processingInput = await buildManualRFQProcessingInput(manualInput);
+    if (!processingInput.trim()) {
+      res.status(400).json({
+        error: "No readable text could be extracted from the submission",
+      });
+      return;
+    }
+
+    // Reject random pastes that clearly are not a request for quotation. If
+    // the classifier itself is unavailable, let the submission through rather
+    // than blocking a legitimate RFQ.
+    let reason = "Added manually";
+    try {
+      const classification = await classifyEmail(processingInput);
+      if (!classification.isRFQemail) {
+        res.status(400).json({
+          error: `This doesn't look like an RFQ. ${classification.reason}`,
+        });
+        return;
+      }
+      reason = classification.reason;
+    } catch (classifyErr) {
+      console.warn("Manual RFQ classification failed, accepting submission:", classifyErr);
+    }
+
+    const rfq = await RFQ.create({
+      userId: authReq.user.id,
+      organizationId: organization._id,
+      source: "manual",
+      isRFQ: true,
+      reason,
+      isProcessed: false,
+      manualInput,
+    });
+
+    processManualRFQ(rfq._id.toString(), processingInput).catch((err) =>
+      console.error(`Manual RFQ processing failed for ${rfq._id}:`, err)
+    );
+
+    res.status(201).json(rfq);
+  } catch (err) {
+    console.error("Error creating manual RFQ:", err);
+    res.status(500).json({ error: "Failed to create RFQ" });
+  }
+};
+
 export const retryRFQ = async (
   req: Request,
   res: Response
@@ -849,6 +964,35 @@ export const retryRFQ = async (
     }).lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    // Manual RFQs have no source email to rebuild from, so the same document
+    // is reset and reprocessed from its stored manualInput (id stays stable).
+    if (rfq.source === "manual") {
+      if (!rfq.manualInput) {
+        res.status(400).json({ error: "This RFQ has no stored submission to reprocess" });
+        return;
+      }
+
+      await RFQ.updateOne(
+        { _id: rfq._id },
+        {
+          $set: {
+            isProcessed: false,
+            errorMessage: null,
+            customer: null,
+            queryProducts: [],
+            searchResults: [],
+          },
+        }
+      );
+
+      processManualRFQ(rfq._id.toString()).catch((err) =>
+        console.error(`Manual RFQ retry failed for ${rfq._id}:`, err)
+      );
+
+      res.json({ message: "RFQ reprocessing started" });
       return;
     }
 
@@ -1044,7 +1188,7 @@ export const generateQuote = async (
         deliveryTerms: deliveryTerms.deliveryTerms ?? "",
         subject,
         body,
-        to: originalSenderEmail,
+        to: originalSenderEmail || customerEmail,
         generatedAt: new Date(),
         sendStatus: "draft",
         sentAt: null,
@@ -1109,6 +1253,14 @@ export const sendQuoteReply = async (
     }).lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    if (!rfq.emailId || !rfq.gmailAccountId) {
+      res.status(400).json({
+        error:
+          "This RFQ was added manually and has no email thread to reply on. Download the quote PDF to share it.",
+      });
       return;
     }
 
