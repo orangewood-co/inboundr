@@ -498,7 +498,15 @@ function SidebarContent({
       {thumb && (
         <div
           onPointerDown={handleTrackPointerDown}
-          className="absolute inset-y-0 right-0 w-2.5 cursor-grab group-data-[collapsible=icon]:w-1.5"
+          className={cn(
+            "absolute inset-y-0 right-0 w-2.5 cursor-grab transition-[right] duration-200 ease-linear group-data-[collapsible=icon]:w-1.5",
+            // In the inset variant the wrapper and the rail share bg-sidebar,
+            // so the rail's own right edge is invisible. When collapsed, the
+            // rail is (icon + 2px) wide inside a p-2 container and the main
+            // panel adds ml-2, leaving a spacing(4) - 2px gap. Push the track
+            // across that gap so the thumb sits flush against the main panel.
+            "group-data-[variant=inset]:group-data-[collapsible=icon]:right-[calc(2px-(--spacing(4)))]"
+          )}
         >
           <div
             ref={thumbRef}
