@@ -36,7 +36,7 @@ const MODULE_LABELS: Record<FeedbackModule, string> = {
   home: "Home",
   rfq: "RFQ",
   emails: "Inbox",
-  orders: "Orders",
+  orders: "Quotes",
   stats: "Stats",
   chat: "AI Chat",
   support: "Support",

@@ -18,7 +18,7 @@ import { adminMeQueryOptions } from "@/lib/queries/admin"
 import { ProBadge } from "@/components/pro-badge"
 import { useEntitlements, type EmployeeAccessModule, type FeatureKey } from "@/lib/entitlements"
 import { useOrganizationBranding } from "@/lib/organization-branding"
-import { BotMessageSquareIcon, BriefcaseBusinessIcon, CircleDollarSignIcon, ClipboardListIcon, FileTextIcon, FolderKanbanIcon, HandshakeIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, MonitorCogIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShieldCheckIcon, ShoppingCartIcon, UsersIcon, WorkflowIcon, WrenchIcon } from "lucide-react"
+import { BotMessageSquareIcon, BriefcaseBusinessIcon, CircleDollarSignIcon, ClipboardListIcon, FileCheckIcon, FileTextIcon, FolderKanbanIcon, HandshakeIcon, HardDriveIcon, HeadsetIcon, IdCardIcon, InboxIcon, LinkIcon, MonitorCogIcon, PackageIcon, ReceiptTextIcon, Settings2Icon, ShieldCheckIcon, UsersIcon, WorkflowIcon, WrenchIcon } from "lucide-react"
 
 type SidebarNavItem = {
   title: string
@@ -53,9 +53,9 @@ const data: { navMain: SidebarCategory[] } = {
           module: "rfq",
         },
         {
-          title: "Orders",
+          title: "Quotes",
           url: "/orders",
-          icon: <ShoppingCartIcon />,
+          icon: <FileCheckIcon />,
           feature: "rfq",
           module: "rfq",
         },

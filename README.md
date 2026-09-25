@@ -48,10 +48,10 @@ The reason this thing exists.
 - **Reply on thread** — Approve the draft and it goes out through the original Gmail thread, not some no-reply alias.
 - **Attachment parsing** — PDFs, spreadsheets, and images on the inbound email are read for RFQ content (vision for images, parsing for PDF/XLSX).
 
-### Inbox and Orders
+### Inbox and Quotes
 
 - **Inbox (`/emails`)** — Synced Gmail view with per-message processing status (received, processing, processed, failed), RFQ classification badges, inline attachment preview (including spreadsheet rendering), and a reprocess action when the agent trips.
-- **Orders (`/orders`)** — Saved quote drafts waiting on an external quote number and a "mark processed" once they're out the door.
+- **Quotes (`/orders`)** — Saved quote drafts waiting on an external quote number and a "mark processed" once they're out the door.
 
 ### AI assistant chat
 

@@ -92,7 +92,7 @@ export const FEEDBACK_MODULE_OPTIONS: { value: FeedbackModule; label: string }[]
   { value: "home", label: "Home" },
   { value: "rfq", label: "RFQ" },
   { value: "emails", label: "Inbox" },
-  { value: "orders", label: "Orders" },
+  { value: "orders", label: "Quotes" },
   { value: "stats", label: "Stats" },
   { value: "chat", label: "AI Chat" },
   { value: "support", label: "Support" },

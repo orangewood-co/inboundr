@@ -233,7 +233,7 @@ function EmptyState({ onCreate, creating }: { onCreate: () => void; creating: bo
       <div className="space-y-1">
         <p className="text-sm font-medium text-muted-foreground">No Workflows Yet</p>
         <p className="mx-auto max-w-sm text-xs text-muted-foreground/60">
-          Build node-based automations on top of the RFQ and Orders flow — approvals, emails,
+          Build node-based automations on top of the RFQ and Quotes flow — approvals, emails,
           order placement, and more.
         </p>
       </div>

@@ -118,9 +118,9 @@ export function FeedbackSubmittedEmail({
 FeedbackSubmittedEmail.PreviewProps = {
   companyName: "Inboundr.co",
   email: "person@example.com",
-  message: "It would be great if the orders table could be exported to CSV.",
+  message: "It would be great if the quotes table could be exported to CSV.",
   attachmentSummary: "Includes 1 screenshot.",
-  moduleLabel: "Orders",
+  moduleLabel: "Quotes",
   name: "Customer",
   organizationName: "Acme Inc.",
   typeLabel: "Feature Request",
