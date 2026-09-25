@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import mongoose from "mongoose";
 import {
   archiveThread,
   getAttachment,
@@ -119,24 +120,151 @@ export const emailWebhookController = async (
   }
 };
 
+// ── Inbox listing ────────────────────────────────────────────────────────────
+
+const EMAIL_LIST_FILTERS = ["all", "rfq", "not_rfq", "pending", "failed"] as const;
+type EmailListFilter = (typeof EMAIL_LIST_FILTERS)[number];
+
+const EMAIL_SEARCH_MAX_LENGTH = 200;
+
+function parseEmailListFilter(value: unknown): EmailListFilter {
+  return EMAIL_LIST_FILTERS.includes(value as EmailListFilter)
+    ? (value as EmailListFilter)
+    : "all";
+}
+
+function parseBooleanFlag(value: unknown): boolean {
+  return value === "1" || value === "true";
+}
+
+function parseSearchQuery(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, EMAIL_SEARCH_MAX_LENGTH) : "";
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// One row per Gmail conversation: the newest inbound message represents the
+// thread. Legacy rows without a threadId stay as standalone rows.
+const THREAD_KEY_EXPR = {
+  account: "$gmailAccountId",
+  thread: { $ifNull: ["$threadId", { $toString: "$_id" }] },
+};
+
+async function countThreads(match: Record<string, unknown>): Promise<number> {
+  const rows = await Email.aggregate([
+    { $match: match },
+    { $project: { gmailAccountId: 1, threadId: 1 } },
+    { $group: { _id: THREAD_KEY_EXPR } },
+    { $count: "total" },
+  ]).allowDiskUse(true);
+  return rows[0]?.total ?? 0;
+}
+
+interface RFQClassificationSets {
+  /** Emails whose own RFQ row is a positive classification. */
+  rfqEmailIds: mongoose.Types.ObjectId[];
+  /** Threads holding at least one positive classification. */
+  rfqThreadIds: string[];
+  /** Emails whose RFQ row recorded a processing error. */
+  failedEmailIds: mongoose.Types.ObjectId[];
+}
+
+/**
+ * Classification lives on the RFQ collection, and the list pipeline has to
+ * filter before it paginates, so the (small) positive and failed sets are
+ * loaded up front and matched by id. Mirrors resolveRFQ below: an email counts
+ * as an RFQ if its own row or any row in its thread is positive.
+ */
+async function loadRFQClassificationSets(
+  scope: RequestScope,
+  options: { includeFailed: boolean }
+): Promise<RFQClassificationSets> {
+  const rows = await RFQ.find({
+    userId: scope.userId,
+    organizationId: scope.organizationId,
+    ...(options.includeFailed
+      ? { $or: [{ isRFQ: true }, { errorMessage: { $ne: null } }] }
+      : { isRFQ: true }),
+  })
+    .select("emailId threadId isRFQ errorMessage")
+    .lean();
+
+  const sets: RFQClassificationSets = { rfqEmailIds: [], rfqThreadIds: [], failedEmailIds: [] };
+  const seenThreads = new Set<string>();
+  for (const row of rows) {
+    if (row.isRFQ) {
+      if (row.emailId) sets.rfqEmailIds.push(row.emailId);
+      if (row.threadId && !seenThreads.has(row.threadId)) {
+        seenThreads.add(row.threadId);
+        sets.rfqThreadIds.push(row.threadId);
+      }
+    }
+    if (row.errorMessage && row.emailId) sets.failedEmailIds.push(row.emailId);
+  }
+  return sets;
+}
+
+function rfqMembershipCondition(sets: RFQClassificationSets): Record<string, unknown> {
+  return {
+    $or: [
+      { _id: { $in: sets.rfqEmailIds } },
+      { threadId: { $in: sets.rfqThreadIds } },
+    ],
+  };
+}
+
+function classificationCondition(
+  filter: EmailListFilter,
+  sets: RFQClassificationSets
+): Record<string, unknown> | null {
+  switch (filter) {
+    case "rfq":
+      return rfqMembershipCondition(sets);
+    case "failed":
+      return { $or: [{ status: "failed" }, { _id: { $in: sets.failedEmailIds } }] };
+    case "pending":
+      return { status: { $in: ["received", "processing"] } };
+    case "not_rfq":
+      // Everything that finished processing without landing in the positive or
+      // failed sets. Legacy rows without a threadId pass the $nin as intended.
+      return {
+        status: "processed",
+        _id: { $nin: [...sets.rfqEmailIds, ...sets.failedEmailIds] },
+        threadId: { $nin: sets.rfqThreadIds },
+      };
+    default:
+      return null;
+  }
+}
+
 export const listEmails = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const organization = (req as OrganizationRequest).organization;
+    const scope = requestScope(req);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
+
+    const filter = parseEmailListFilter(req.query.filter);
+    const unreadOnly = parseBooleanFlag(req.query.unread);
+    const withAttachments = parseBooleanFlag(req.query.attachments);
+    const search = parseSearchQuery(req.query.q);
+    const accountId =
+      typeof req.query.account === "string" && mongoose.isValidObjectId(req.query.account)
+        ? new mongoose.Types.ObjectId(req.query.account)
+        : null;
 
     // Legacy rows predate `direction`, so $ne matches them as inbound. The INBOX
     // label keeps messages the user archived in Gmail out of the list, but rows
     // ingested before labels were recorded have none, and requiring the label
     // outright would hide them.
-    const listFilter = {
-      userId: authReq.user.id,
-      organizationId: organization._id,
+    const inboxFilter: Record<string, unknown> = {
+      userId: scope.userId,
+      organizationId: scope.organizationId,
       direction: { $ne: "outbound" as const },
       $or: [
         { labels: "INBOX" },
@@ -144,25 +272,45 @@ export const listEmails = async (
         { labels: { $exists: false } },
       ],
     };
+    if (accountId) inboxFilter.gmailAccountId = accountId;
+    if (withAttachments) inboxFilter["attachments.0"] = { $exists: true };
 
-    // One row per Gmail conversation: the newest inbound message represents
-    // the thread. Legacy rows without a threadId stay as standalone rows.
-    const threadKeyExpr = {
-      account: "$gmailAccountId",
-      thread: { $ifNull: ["$threadId", { $toString: "$_id" }] },
-    };
+    // Search, account and attachments narrow the scope the chip counts are
+    // computed over; the classification chip and unread toggle then narrow the
+    // page itself,
+    // so a chip's count always says how many rows picking it would show.
+    const scopeConditions: Record<string, unknown>[] = [inboxFilter];
+    if (search) {
+      const pattern = { $regex: escapeRegex(search), $options: "i" };
+      scopeConditions.push({
+        $or: [{ from: pattern }, { subject: pattern }, { snippet: pattern }],
+      });
+    }
+    const scopeFilter: Record<string, unknown> =
+      scopeConditions.length === 1 ? inboxFilter : { $and: scopeConditions };
+
+    const classificationSets = await loadRFQClassificationSets(scope, {
+      includeFailed: filter === "failed" || filter === "not_rfq",
+    });
+
+    const pageConditions: Record<string, unknown>[] = [scopeFilter];
+    const classification = classificationCondition(filter, classificationSets);
+    if (classification) pageConditions.push(classification);
+    if (unreadOnly) pageConditions.push({ labels: "UNREAD" });
+    const listFilter: Record<string, unknown> =
+      pageConditions.length === 1 ? scopeFilter : { $and: pageConditions };
 
     // Sorting/grouping full documents (with bodies) blows MongoDB's 32MB
     // in-memory sort limit on large mailboxes, so the pipeline works on slim
     // key tuples only and the page of full documents is fetched afterwards.
-    const [pageRows, totalRows] = await Promise.all([
+    const [pageRows, total, unreadCount, rfqCount] = await Promise.all([
       Email.aggregate([
         { $match: listFilter },
         { $project: { date: 1, gmailAccountId: 1, threadId: 1 } },
         { $sort: { date: -1, _id: -1 } },
         {
           $group: {
-            _id: threadKeyExpr,
+            _id: THREAD_KEY_EXPR,
             emailId: { $first: "$_id" },
             date: { $first: "$date" },
           },
@@ -171,13 +319,12 @@ export const listEmails = async (
         { $skip: skip },
         { $limit: limit },
       ]).allowDiskUse(true),
-      Email.aggregate([
-        { $match: listFilter },
-        { $group: { _id: threadKeyExpr } },
-        { $count: "total" },
-      ]).allowDiskUse(true),
+      countThreads(listFilter),
+      countThreads({ $and: [scopeFilter, { labels: "UNREAD" }] }),
+      countThreads({ $and: [scopeFilter, rfqMembershipCondition(classificationSets)] }),
     ]);
-    const total: number = totalRows[0]?.total ?? 0;
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
 
     const pageEmailIds = pageRows.map((row) => row.emailId);
     const pageDocs = await Email.find({ _id: { $in: pageEmailIds } })
@@ -276,6 +423,8 @@ export const listEmails = async (
           : 1,
       })),
       total,
+      unreadCount,
+      rfqCount,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
