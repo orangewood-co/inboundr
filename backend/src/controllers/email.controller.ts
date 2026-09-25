@@ -250,7 +250,6 @@ export const listEmails = async (
     const skip = (page - 1) * limit;
 
     const filter = parseEmailListFilter(req.query.filter);
-    const unreadOnly = parseBooleanFlag(req.query.unread);
     const withAttachments = parseBooleanFlag(req.query.attachments);
     const search = parseSearchQuery(req.query.q);
     const accountId =
@@ -276,9 +275,8 @@ export const listEmails = async (
     if (withAttachments) inboxFilter["attachments.0"] = { $exists: true };
 
     // Search, account and attachments narrow the scope the chip counts are
-    // computed over; the classification chip and unread toggle then narrow the
-    // page itself,
-    // so a chip's count always says how many rows picking it would show.
+    // computed over; the classification chip then narrows the page itself, so
+    // a chip's count always says how many rows picking it would show.
     const scopeConditions: Record<string, unknown>[] = [inboxFilter];
     if (search) {
       const pattern = { $regex: escapeRegex(search), $options: "i" };
@@ -293,17 +291,15 @@ export const listEmails = async (
       includeFailed: filter === "failed" || filter === "not_rfq",
     });
 
-    const pageConditions: Record<string, unknown>[] = [scopeFilter];
     const classification = classificationCondition(filter, classificationSets);
-    if (classification) pageConditions.push(classification);
-    if (unreadOnly) pageConditions.push({ labels: "UNREAD" });
-    const listFilter: Record<string, unknown> =
-      pageConditions.length === 1 ? scopeFilter : { $and: pageConditions };
+    const listFilter: Record<string, unknown> = classification
+      ? { $and: [scopeFilter, classification] }
+      : scopeFilter;
 
     // Sorting/grouping full documents (with bodies) blows MongoDB's 32MB
     // in-memory sort limit on large mailboxes, so the pipeline works on slim
     // key tuples only and the page of full documents is fetched afterwards.
-    const [pageRows, total, unreadCount, rfqCount] = await Promise.all([
+    const [pageRows, total, rfqCount] = await Promise.all([
       Email.aggregate([
         { $match: listFilter },
         { $project: { date: 1, gmailAccountId: 1, threadId: 1 } },
@@ -320,7 +316,6 @@ export const listEmails = async (
         { $limit: limit },
       ]).allowDiskUse(true),
       countThreads(listFilter),
-      countThreads({ $and: [scopeFilter, { labels: "UNREAD" }] }),
       countThreads({ $and: [scopeFilter, rfqMembershipCondition(classificationSets)] }),
     ]);
     const authReq = req as AuthenticatedRequest;
@@ -423,7 +418,6 @@ export const listEmails = async (
           : 1,
       })),
       total,
-      unreadCount,
       rfqCount,
       page,
       limit,

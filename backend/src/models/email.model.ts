@@ -161,8 +161,6 @@ emailSchema.index({ organizationId: 1, direction: 1, date: -1 });
 // Inbox listing sorts every matching row by date; thread views sort a single
 // conversation chronologically.
 emailSchema.index({ userId: 1, organizationId: 1, date: -1 });
-// Inbox filters match on Gmail labels (INBOX, UNREAD); multikey on labels.
-emailSchema.index({ userId: 1, organizationId: 1, labels: 1, date: -1 });
 emailSchema.index({ gmailAccountId: 1, threadId: 1, date: 1 });
 // Partial so that many drafts, which have no messageId at all, can coexist.
 emailSchema.index(

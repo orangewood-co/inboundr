@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/site-header"
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
 import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SenderHoverCard } from "@/components/contact-hover-card"
@@ -34,6 +35,7 @@ import {
   ReplyIcon,
   ReplyAllIcon,
   ForwardIcon,
+  SearchIcon,
 } from "lucide-react"
 
 import { ReplyComposer } from "@/components/email/reply-composer"
@@ -52,6 +54,18 @@ import { queryClient } from "@/lib/query-client"
 const API_BASE = `${API_ORIGIN}/api/v1/email`
 const SPREADSHEET_PREVIEW_ROW_LIMIT = 200
 const SPREADSHEET_PREVIEW_COLUMN_LIMIT = 30
+const SEARCH_DEBOUNCE_MS = 300
+
+/** Classification filters the list endpoint understands; absent means all. */
+export const EMAIL_LIST_FILTERS = ["rfq", "not_rfq", "pending", "failed"] as const
+export type EmailListFilter = (typeof EMAIL_LIST_FILTERS)[number]
+
+type InboxChip = "all" | "rfq" | "failed"
+
+interface InboxListParams {
+  q?: string
+  filter?: EmailListFilter
+}
 
 interface EmailSummary {
   _id: string
@@ -85,6 +99,7 @@ interface EmailDetail extends EmailSummary {
 interface ListResponse {
   emails: EmailSummary[]
   total: number
+  rfqCount: number
   page: number
   limit: number
   totalPages: number
@@ -654,18 +669,90 @@ function SpreadsheetAttachmentPreview({
   )
 }
 
-function EmptyState() {
+function EmptyState({ filtered, onClear }: { filtered: boolean; onClear: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center animate-in fade-in-0 duration-500">
       <div className="surface-raised rounded-2xl p-6">
-        <InboxIcon className="size-10 text-muted-foreground/40" />
+        {filtered ? (
+          <SearchIcon className="size-10 text-muted-foreground/40" />
+        ) : (
+          <InboxIcon className="size-10 text-muted-foreground/40" />
+        )}
       </div>
       <div className="space-y-1.5">
-        <p className="font-heading text-[13px] font-semibold text-muted-foreground">No Emails Yet</p>
+        <p className="font-heading text-[13px] font-semibold text-muted-foreground">
+          {filtered ? "No Emails Match" : "No Emails Yet"}
+        </p>
         <p className="text-[11px] text-muted-foreground/60">
-          Incoming emails will appear here once the Gmail watcher picks them up.
+          {filtered
+            ? "Try a different search term or clear the active filters."
+            : "Incoming emails will appear here once the Gmail watcher picks them up."}
         </p>
       </div>
+      {filtered && (
+        <Button variant="outline" size="sm" onClick={onClear}>
+          Clear Filters
+        </Button>
+      )}
+    </div>
+  )
+}
+
+const INBOX_CHIPS: { value: InboxChip; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "rfq", label: "RFQ" },
+  { value: "failed", label: "Failed" },
+]
+
+function chipFromParams(params: InboxListParams): InboxChip {
+  if (params.filter === "rfq" || params.filter === "failed") return params.filter
+  return "all"
+}
+
+function paramsFromChip(chip: InboxChip): Pick<InboxListParams, "filter"> {
+  return { filter: chip === "all" ? undefined : chip }
+}
+
+function InboxChips({
+  active,
+  counts,
+  onChange,
+}: {
+  active: InboxChip
+  counts: Partial<Record<InboxChip, number>>
+  onChange: (chip: InboxChip) => void
+}) {
+  return (
+    <div role="tablist" aria-label="Filter conversations" className="flex items-center gap-1 overflow-x-auto">
+      {INBOX_CHIPS.map((chip) => {
+        const isActive = chip.value === active
+        const count = counts[chip.value]
+        return (
+          <button
+            key={chip.value}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(chip.value)}
+            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {chip.label}
+            {count != null && count > 0 && (
+              <span
+                className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                  isActive ? "bg-primary-foreground/20" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -719,7 +806,7 @@ function DetailPlaceholder() {
       </div>
       <div className="space-y-1">
         <p className="text-[13px] text-muted-foreground/50">Select an email to read</p>
-        <p className="text-[11px] text-muted-foreground/30">Use J/K keys to navigate the list</p>
+        <p className="text-[11px] text-muted-foreground/30">J/K to navigate · / to search</p>
       </div>
     </div>
   )
@@ -727,7 +814,11 @@ function DetailPlaceholder() {
 
 export function EmailsPage() {
   const navigate = useNavigate()
-  const { email: selectedEmailId } = useSearch({ from: "/emails" })
+  const {
+    email: selectedEmailId,
+    q: listQuery,
+    filter: listFilter,
+  } = useSearch({ from: "/emails" })
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "inboundr:layout:inbox",
     storage: localStorage,
@@ -735,10 +826,21 @@ export function EmailsPage() {
 
   const [emails, setEmails] = useState<EmailSummary[]>([])
   const [total, setTotal] = useState(0)
+  const [chipCounts, setChipCounts] = useState<Partial<Record<InboxChip, number>>>({})
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
+
+  // The input is controlled locally and pushed to the URL after a pause, so
+  // typing does not fire a request per keystroke.
+  const [searchInput, setSearchInput] = useState(listQuery ?? "")
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  // Last query this component wrote to the URL, so the URL→input sync below
+  // can tell its own writes apart from external navigation.
+  const pushedQueryRef = useRef(listQuery ?? "")
+  const activeChip = chipFromParams({ filter: listFilter })
+  const hasActiveFilters = Boolean(listQuery || listFilter)
 
   const [selectedId, setSelectedId] = useState<string | null>(selectedEmailId ?? null)
   const [detail, setDetail] = useState<EmailDetail | null>(null)
@@ -759,25 +861,75 @@ export function EmailsPage() {
   const [creatingDraft, setCreatingDraft] = useState(false)
   const [signaturesByAccount, setSignaturesByAccount] = useState<Record<string, string | null>>({})
 
-  const fetchList = useCallback(async (p: number) => {
-    setListLoading(true)
-    setListError(null)
-    try {
-      const res = await fetch(`${API_BASE}?page=${p}&limit=20`, {
-        credentials: "include",
+  const fetchList = useCallback(
+    async (p: number) => {
+      setListLoading(true)
+      setListError(null)
+      try {
+        const params = new URLSearchParams({ page: String(p), limit: "20" })
+        if (listQuery) params.set("q", listQuery)
+        if (listFilter) params.set("filter", listFilter)
+        const res = await fetch(`${API_BASE}?${params}`, {
+          credentials: "include",
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data: ListResponse = await res.json()
+        setEmails(data.emails)
+        setTotal(data.total)
+        setChipCounts({ rfq: data.rfqCount })
+        setPage(data.page)
+        setTotalPages(data.totalPages)
+      } catch (err: any) {
+        setListError(err.message || "Failed to load emails")
+      } finally {
+        setListLoading(false)
+      }
+    },
+    [listQuery, listFilter]
+  )
+
+  /** Merge into the URL so the list state survives refresh and is shareable. */
+  const updateListParams = useCallback(
+    (patch: InboxListParams) => {
+      void navigate({
+        to: "/emails",
+        search: (prev) => ({ ...prev, ...patch }),
+        replace: true,
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data: ListResponse = await res.json()
-      setEmails(data.emails)
-      setTotal(data.total)
-      setPage(data.page)
-      setTotalPages(data.totalPages)
-    } catch (err: any) {
-      setListError(err.message || "Failed to load emails")
-    } finally {
-      setListLoading(false)
-    }
-  }, [])
+    },
+    [navigate]
+  )
+
+  const setChip = useCallback(
+    (chip: InboxChip) => updateListParams(paramsFromChip(chip)),
+    [updateListParams]
+  )
+
+  const clearFilters = useCallback(() => {
+    setSearchInput("")
+    pushedQueryRef.current = ""
+    updateListParams({ q: undefined, filter: undefined })
+  }, [updateListParams])
+
+  useEffect(() => {
+    const trimmed = searchInput.trim()
+    if (trimmed === (listQuery ?? "")) return
+    const timeout = window.setTimeout(() => {
+      pushedQueryRef.current = trimmed
+      updateListParams({ q: trimmed || undefined })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => window.clearTimeout(timeout)
+  }, [searchInput, listQuery, updateListParams])
+
+  // Back/forward or a shared link can change the query out from under the
+  // input. Writes that originated here are skipped so in-flight keystrokes
+  // are never overwritten by the echo of an older value.
+  useEffect(() => {
+    const next = listQuery ?? ""
+    if (next === pushedQueryRef.current) return
+    pushedQueryRef.current = next
+    setSearchInput(next)
+  }, [listQuery])
 
   const fetchDetail = useCallback(async (id: string) => {
     setDetailLoading(true)
@@ -801,7 +953,7 @@ export function EmailsPage() {
       }
       void navigate({
         to: "/emails",
-        search: id ? { email: id } : {},
+        search: (prev) => ({ ...prev, email: id ?? undefined }),
         replace: true,
       })
     },
@@ -1052,6 +1204,13 @@ export function EmailsPage() {
       // Everything below acts on the thread, which is behind an open overlay.
       if (activeDraftId || selectedAttachment) return
 
+      if (e.key === "/") {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+
       if (e.key === "j" || e.key === "k") {
         e.preventDefault()
         const currentIndex = emails.findIndex((em) => em._id === selectedId)
@@ -1131,15 +1290,54 @@ export function EmailsPage() {
               </Tooltip>
             </div>
 
+            <div className="space-y-2 border-b px-3 py-2.5">
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground/60" />
+                <Input
+                  ref={searchInputRef}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape") return
+                    event.preventDefault()
+                    if (searchInput) setSearchInput("")
+                    else event.currentTarget.blur()
+                  }}
+                  placeholder="Search sender, subject, or preview"
+                  aria-label="Search conversations"
+                  className="h-8 pl-8 pr-8 text-[12px]"
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInput("")
+                      searchInputRef.current?.focus()
+                    }}
+                    aria-label="Clear search"
+                    className="absolute top-1/2 right-1.5 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                  >
+                    <XIcon className="size-3.5" />
+                  </button>
+                )}
+              </div>
+              <InboxChips active={activeChip} counts={chipCounts} onChange={setChip} />
+            </div>
+
             <div ref={listRef} className="flex-1 overflow-y-auto">
-              {listLoading ? (
+              {listLoading && emails.length === 0 ? (
                 <ListSkeleton />
               ) : listError ? (
                 <ErrorState message={listError} onRetry={() => fetchList(page)} />
               ) : emails.length === 0 ? (
-                <EmptyState />
+                <EmptyState filtered={hasActiveFilters} onClear={clearFilters} />
               ) : (
-                <div className="space-y-0.5 px-2 pb-2 animate-in fade-in-0 duration-300">
+                <div
+                  className={`space-y-0.5 px-2 pb-2 animate-in fade-in-0 duration-300 transition-opacity ${
+                    listLoading ? "pointer-events-none opacity-50" : ""
+                  }`}
+                  aria-busy={listLoading}
+                >
                   {emails.map((email) => {
                     const { name, email: senderEmail } = parseSender(email.from)
                     const isSelected = selectedId === email._id
