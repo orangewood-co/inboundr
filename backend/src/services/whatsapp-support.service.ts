@@ -210,7 +210,8 @@ async function findThreadTicket(
   }).sort({ lastMessageAt: -1 });
   if (!latest) return null;
   if (latest.status === "open" || latest.status === "pending") return latest;
-  const since = now.getTime() - new Date(latest.lastMessageAt).getTime();
+  const lastCustomerActivity = latest.lastVisitorMessageAt ?? latest.lastMessageAt;
+  const since = now.getTime() - new Date(lastCustomerActivity).getTime();
   return since <= REOPEN_WINDOW_MS ? latest : null;
 }
 
