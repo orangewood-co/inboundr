@@ -77,11 +77,23 @@ export interface IInvoiceTotals {
   balanceDue: number;
 }
 
+export type InvoiceDeliveryChannel = "email" | "whatsapp";
+
 export interface IInvoiceReminder {
   /** Days after the due date this reminder corresponds to (0 = on the due date). */
   offsetDays: number;
   sentAt: Date;
+  channel: InvoiceDeliveryChannel;
   gmailMessageId: string;
+  whatsappMessageId: string;
+}
+
+export interface IInvoiceWhatsAppSend {
+  sentAt: Date;
+  messageId: string;
+  /** Recipient in +E.164 form. */
+  to: string;
+  sentByUserId: string | null;
 }
 
 export interface IInvoiceRecurringProfile {
@@ -130,6 +142,8 @@ export interface IInvoice extends Document {
   recurring: IInvoiceRecurringProfile;
   remindersEnabled: boolean;
   reminders: IInvoiceReminder[];
+  /** Manual "send on WhatsApp" actions (the invoice template with the PDF attached). */
+  whatsappSends: IInvoiceWhatsAppSend[];
   sentAt: Date | null;
   viewedAt: Date | null;
   cancelledAt: Date | null;
@@ -189,7 +203,19 @@ const invoiceReminderSchema = new Schema<IInvoiceReminder>(
   {
     offsetDays: { type: Number, required: true },
     sentAt: { type: Date, required: true },
+    channel: { type: String, enum: ["email", "whatsapp"], default: "email" },
     gmailMessageId: { type: String, default: "" },
+    whatsappMessageId: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const invoiceWhatsAppSendSchema = new Schema<IInvoiceWhatsAppSend>(
+  {
+    sentAt: { type: Date, required: true },
+    messageId: { type: String, default: "" },
+    to: { type: String, default: "" },
+    sentByUserId: { type: String, default: null },
   },
   { _id: false }
 );
@@ -270,6 +296,7 @@ const invoiceSchema = new Schema<IInvoice>(
     recurring: { type: invoiceRecurringSchema, default: () => ({}) },
     remindersEnabled: { type: Boolean, default: true },
     reminders: { type: [invoiceReminderSchema], default: [] },
+    whatsappSends: { type: [invoiceWhatsAppSendSchema], default: [] },
     sentAt: { type: Date, default: null },
     viewedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },

@@ -7,6 +7,7 @@ import {
   processWhatsAppMessagesValue,
   type WebhookMessagesValue,
 } from "../services/whatsapp-support.service";
+import { applyTemplateStatusUpdate } from "../services/whatsapp-template.service";
 import { appSecretFor, verifyWhatsAppSignature } from "../services/whatsapp.service";
 
 function rawBody(req: Request): Buffer {
@@ -42,8 +43,9 @@ export async function whatsAppWebhookVerify(req: Request, res: Response): Promis
 }
 
 interface WebhookEntry {
+  /** WABA id for WhatsApp Business Account webhooks. */
   id?: string;
-  changes?: Array<{ field?: string; value?: WebhookMessagesValue }>;
+  changes?: Array<{ field?: string; value?: WebhookMessagesValue & Record<string, unknown> }>;
 }
 
 /**
@@ -67,8 +69,14 @@ export async function whatsAppWebhook(req: Request, res: Response): Promise<void
     return;
   }
 
-  const changes = (body.entry ?? []).flatMap((entry) => entry.changes ?? []);
+  const entries = body.entry ?? [];
+  const changes = entries.flatMap((entry) => entry.changes ?? []);
   const messageChanges = changes.filter((change) => change.field === "messages" && change.value);
+  const templateChanges = entries.flatMap((entry) =>
+    (entry.changes ?? [])
+      .filter((change) => change.field === "message_template_status_update" && change.value)
+      .map((change) => ({ wabaId: String(entry.id ?? ""), value: change.value! }))
+  );
   const phoneNumberIds = [
     ...new Set(
       messageChanges
@@ -76,12 +84,16 @@ export async function whatsAppWebhook(req: Request, res: Response): Promise<void
         .filter(Boolean)
     ),
   ];
+  const wabaIds = [...new Set(templateChanges.map((change) => change.wabaId).filter(Boolean))];
 
   const skipSignature = process.env.SKIP_SIGNATURE_VALIDATION === "true";
   const signature = req.header("x-hub-signature-256");
 
   // Resolve accounts first: the secret used for verification depends on them.
-  const accounts = await Promise.all(phoneNumberIds.map((id) => findWhatsAppAccountByPhoneNumberId(id)));
+  const accounts = await Promise.all([
+    ...phoneNumberIds.map((id) => findWhatsAppAccountByPhoneNumberId(id)),
+    ...wabaIds.map((id) => WhatsAppAccount.findOne({ wabaId: id })),
+  ]);
   const knownAccounts = accounts.filter(Boolean) as NonNullable<(typeof accounts)[number]>[];
 
   if (!skipSignature) {
@@ -113,6 +125,9 @@ export async function whatsAppWebhook(req: Request, res: Response): Promise<void
   }
 
   const accountByPhoneNumberId = new Map(knownAccounts.map((account) => [account.phoneNumberId, account]));
+  const accountByWabaId = new Map(
+    knownAccounts.filter((account) => account.wabaId).map((account) => [account.wabaId!, account])
+  );
   void (async () => {
     for (const change of messageChanges) {
       const value = change.value!;
@@ -122,6 +137,15 @@ export async function whatsAppWebhook(req: Request, res: Response): Promise<void
         await processWhatsAppMessagesValue(account, value);
       } catch (err) {
         console.error(`Failed to process WhatsApp webhook change for ${account.phoneNumberId}:`, err);
+      }
+    }
+    for (const change of templateChanges) {
+      const account = accountByWabaId.get(change.wabaId);
+      if (!account) continue;
+      try {
+        await applyTemplateStatusUpdate(account, change.value as Parameters<typeof applyTemplateStatusUpdate>[1]);
+      } catch (err) {
+        console.error(`Failed to apply WhatsApp template status for WABA ${change.wabaId}:`, err);
       }
     }
   })();

@@ -11,6 +11,7 @@ import {
   markInvoiceViewed,
   recordInvoicePayment,
   sendInvoice,
+  sendInvoiceWhatsApp,
   setInvoiceReminders,
   updateInvoice,
   writeOffInvoice,
@@ -31,6 +32,7 @@ router.post("/", createInvoice);
 router.get("/:id", getInvoice);
 router.put("/:id", updateInvoice);
 router.post("/:id/send", sendInvoice);
+router.post("/:id/send-whatsapp", sendInvoiceWhatsApp);
 router.post("/:id/viewed", markInvoiceViewed);
 router.post("/:id/payments", recordInvoicePayment);
 router.post("/:id/reminders", setInvoiceReminders);

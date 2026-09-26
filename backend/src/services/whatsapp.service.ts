@@ -227,6 +227,153 @@ export async function sendWhatsAppMediaLink(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+export type WhatsAppTemplateParameter =
+  | { type: "text"; text: string }
+  | { type: "document"; document: { link: string; filename?: string } }
+  | { type: "image"; image: { link: string } };
+
+export interface WhatsAppTemplateComponentInput {
+  type: "header" | "body" | "button";
+  parameters: WhatsAppTemplateParameter[];
+  sub_type?: string;
+  index?: number;
+}
+
+/**
+ * Sends an approved template. Templates are the only message type Meta accepts
+ * outside the 24h customer-service window, so all business-initiated sends
+ * (invoices, reminders) go through here.
+ */
+export async function sendWhatsAppTemplate(
+  account: IWhatsAppAccount,
+  to: string,
+  input: { name: string; language: string; components: WhatsAppTemplateComponentInput[] }
+): Promise<WhatsAppSendResult> {
+  return sendMessagePayload(account, {
+    to: toWhatsAppRecipient(to),
+    type: "template",
+    template: {
+      name: input.name,
+      language: { code: input.language },
+      components: input.components,
+    },
+  });
+}
+
+export interface WhatsAppRemoteTemplate {
+  id: string;
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  rejectedReason: string | null;
+}
+
+/** Lists templates on a WABA, paging through Meta's cursor. */
+export async function listWhatsAppTemplates(
+  account: Pick<IWhatsAppAccount, "accessToken"> & { wabaId: string }
+): Promise<WhatsAppRemoteTemplate[]> {
+  const token = accessTokenFor(account);
+  const templates: WhatsAppRemoteTemplate[] = [];
+  let path: string | null =
+    `${account.wabaId}/message_templates?fields=id,name,language,status,category,rejected_reason&limit=100`;
+
+  while (path) {
+    const page: {
+      data?: Array<{
+        id: string;
+        name: string;
+        language: string;
+        status: string;
+        category: string;
+        rejected_reason?: string;
+      }>;
+      paging?: { cursors?: { after?: string }; next?: string };
+    } = await graphRequest(token, path);
+    for (const item of page.data ?? []) {
+      templates.push({
+        id: item.id,
+        name: item.name,
+        language: item.language,
+        status: item.status,
+        category: item.category,
+        rejectedReason: item.rejected_reason && item.rejected_reason !== "NONE" ? item.rejected_reason : null,
+      });
+    }
+    const after = page.paging?.cursors?.after;
+    path =
+      page.paging?.next && after
+        ? `${account.wabaId}/message_templates?fields=id,name,language,status,category,rejected_reason&limit=100&after=${encodeURIComponent(after)}`
+        : null;
+  }
+  return templates;
+}
+
+export interface WhatsAppTemplateDefinition {
+  name: string;
+  language: string;
+  category: "UTILITY" | "MARKETING" | "AUTHENTICATION";
+  components: Array<Record<string, unknown>>;
+}
+
+export async function createWhatsAppTemplate(
+  account: Pick<IWhatsAppAccount, "accessToken"> & { wabaId: string },
+  definition: WhatsAppTemplateDefinition
+): Promise<{ id: string; status: string; category: string }> {
+  return graphRequest(accessTokenFor(account), `${account.wabaId}/message_templates`, {
+    method: "POST",
+    body: JSON.stringify(definition),
+  });
+}
+
+/**
+ * Uploads a sample file through Meta's Resumable Upload API and returns the
+ * handle (`4:…`) that template media headers require as their example.
+ */
+export async function uploadWhatsAppTemplateSample(
+  account: Pick<IWhatsAppAccount, "accessToken">,
+  appId: string,
+  file: { name: string; contentType: string; data: Buffer }
+): Promise<string> {
+  const token = accessTokenFor(account);
+  const session = await graphRequest<{ id: string }>(
+    token,
+    `${appId}/uploads?file_name=${encodeURIComponent(file.name)}&file_length=${file.data.byteLength}&file_type=${encodeURIComponent(file.contentType)}`,
+    { method: "POST" }
+  );
+  if (!session?.id) throw new WhatsAppApiError({ message: "Meta did not open an upload session", status: 502 });
+
+  const response = await fetch(`${whatsAppGraphBaseUrl()}/${session.id}`, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${token}`,
+      file_offset: "0",
+      "Content-Type": file.contentType,
+    },
+    body: new Uint8Array(file.data),
+  });
+  const text = await response.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!response.ok || !json?.h) {
+    const error = json?.error ?? {};
+    throw new WhatsAppApiError({
+      message: error.message || `Template sample upload failed (${response.status})`,
+      status: response.status,
+      code: typeof error.code === "number" ? error.code : null,
+    });
+  }
+  return String(json.h);
+}
+
 /**
  * Marks an inbound message as read (blue ticks). When `typing` is set, Meta
  * also shows a typing indicator to the customer for up to ~25s or until the

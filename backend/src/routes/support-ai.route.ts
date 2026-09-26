@@ -19,6 +19,7 @@ import {
 import {
   disconnectSupportWhatsApp,
   getSupportWhatsAppSettings,
+  syncSupportWhatsAppTemplates,
   updateSupportWhatsAppSettings,
 } from "../controllers/support-whatsapp.controller";
 import {
@@ -45,6 +46,7 @@ router.patch("/call/settings", updateSupportCallSettings);
 router.get("/whatsapp/settings", getSupportWhatsAppSettings);
 router.patch("/whatsapp/settings", requireOrganizationAdmin(), updateSupportWhatsAppSettings);
 router.delete("/whatsapp/settings", requireOrganizationAdmin(), disconnectSupportWhatsApp);
+router.post("/whatsapp/templates/sync", requireOrganizationAdmin(), syncSupportWhatsAppTemplates);
 router.get("/ai/settings", getSupportAiSettings);
 router.patch("/ai/settings", updateSupportAiSettings);
 router.get("/knowledge", listKnowledgeArticles);

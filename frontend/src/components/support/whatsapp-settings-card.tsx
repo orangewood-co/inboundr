@@ -24,10 +24,32 @@ import { queryClient } from "@/lib/query-client"
 import { copyToClipboard } from "@/lib/utils"
 import { WhatsAppIcon } from "./channel"
 
+type WhatsAppTemplateStatus =
+  | "APPROVED"
+  | "PENDING"
+  | "REJECTED"
+  | "PAUSED"
+  | "DISABLED"
+  | "IN_APPEAL"
+  | "MISSING"
+
+type WhatsAppTemplate = {
+  key: string
+  name: string
+  description: string
+  language: string
+  status: WhatsAppTemplateStatus
+  rejectedReason: string | null
+  updatedAt: string | null
+}
+
 type WhatsAppAccount = {
   id: string
   phoneNumberId: string
   wabaId: string | null
+  appId: string | null
+  templates: WhatsAppTemplate[]
+  templatesSyncedAt: string | null
   displayPhoneNumber: string
   verifiedName: string
   enabled: boolean
@@ -44,9 +66,31 @@ type WhatsAppSettingsResponse = {
   webhookUrl: string
   verifyToken: string | null
   platformAppSecretConfigured: boolean
+  platformAppIdConfigured: boolean
+  sync?: { created: string[]; errors: Array<{ name: string; message: string }> }
 }
 
 const SETTINGS_URL = `${API_ORIGIN}/api/v1/support/whatsapp/settings`
+const TEMPLATE_SYNC_URL = `${API_ORIGIN}/api/v1/support/whatsapp/templates/sync`
+
+const TEMPLATE_STATUS_META: Record<WhatsAppTemplateStatus, { label: string; className: string }> = {
+  APPROVED: { label: "Approved", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  PENDING: { label: "In review", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  IN_APPEAL: { label: "In appeal", className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  REJECTED: { label: "Rejected", className: "bg-destructive/15 text-destructive" },
+  PAUSED: { label: "Paused", className: "bg-destructive/15 text-destructive" },
+  DISABLED: { label: "Disabled", className: "bg-destructive/15 text-destructive" },
+  MISSING: { label: "Not created", className: "bg-muted text-muted-foreground" },
+}
+
+function TemplateStatusPill({ status }: { status: WhatsAppTemplateStatus }) {
+  const meta = TEMPLATE_STATUS_META[status] ?? TEMPLATE_STATUS_META.MISSING
+  return (
+    <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${meta.className}`}>
+      {meta.label}
+    </span>
+  )
+}
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback
@@ -102,12 +146,14 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
   const data = (query.data ?? null) as WhatsAppSettingsResponse | null
   const loading = query.isPending
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [editing, setEditing] = useState(false)
 
   const [phoneNumberId, setPhoneNumberId] = useState("")
   const [wabaId, setWabaId] = useState("")
+  const [appId, setAppId] = useState("")
   const [accessToken, setAccessToken] = useState("")
   const [appSecret, setAppSecret] = useState("")
 
@@ -121,9 +167,33 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
   function startEditing() {
     setPhoneNumberId(account?.phoneNumberId ?? "")
     setWabaId(account?.wabaId ?? "")
+    setAppId(account?.appId ?? "")
     setAccessToken("")
     setAppSecret("")
     setEditing(true)
+  }
+
+  async function syncTemplates() {
+    setSyncing(true)
+    try {
+      const res = await fetch(TEMPLATE_SYNC_URL, { method: "POST", credentials: "include" })
+      const json = (await res.json().catch(() => null)) as WhatsAppSettingsResponse | null
+      if (!res.ok || !json) throw new Error((json as { error?: string } | null)?.error || "Template sync failed")
+      setData(json)
+      const created = json.sync?.created ?? []
+      const errors = json.sync?.errors ?? []
+      if (errors.length > 0) {
+        toast.error(`Could not create ${errors.map((error) => error.name).join(", ")}: ${errors[0].message}`)
+      } else if (created.length > 0) {
+        toast.success(`Submitted ${created.length} template${created.length === 1 ? "" : "s"} to Meta for review`)
+      } else {
+        toast.success("Template status refreshed")
+      }
+    } catch (err) {
+      toast.error(errorMessage(err, "Template sync failed"))
+    } finally {
+      setSyncing(false)
+    }
   }
 
   async function save(body: Record<string, unknown>) {
@@ -154,6 +224,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
     const ok = await save({
       phoneNumberId: phoneNumberId.trim(),
       wabaId: wabaId.trim(),
+      appId: appId.trim(),
       ...(accessToken.trim() ? { accessToken: accessToken.trim() } : {}),
       ...(appSecret.trim() ? { appSecret: appSecret.trim() } : {}),
       enabled: account?.enabled ?? true,
@@ -176,6 +247,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
       setData(json)
       setPhoneNumberId("")
       setWabaId("")
+      setAppId("")
       setAccessToken("")
       setAppSecret("")
       setEditing(false)
@@ -286,9 +358,27 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Lets Inboundr subscribe to webhooks for you when the token permits it.
+                Needed to create and track the message templates used for invoices and
+                payment reminders.
               </p>
             </div>
+            {!data.platformAppIdConfigured || account?.appId ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="whatsappAppId">Meta App ID (optional)</Label>
+                <Input
+                  id="whatsappAppId"
+                  value={appId}
+                  onChange={(event) => setAppId(event.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="e.g. 1264793705777779"
+                  disabled={!canManage || saving}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  The app your token belongs to. Required for Inboundr to create templates
+                  with a PDF attachment on your behalf.
+                </p>
+              </div>
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="whatsappAccessToken">
@@ -368,6 +458,57 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
               Meta webhook setup guide
               <ExternalLinkIcon className="size-3" />
             </a>
+          </div>
+
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Message templates</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  WhatsApp only allows business-initiated messages (invoices, payment reminders)
+                  through templates approved by Meta. Inboundr creates these on your account;
+                  approval usually takes minutes to a few hours.
+                </p>
+              </div>
+              {canManage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void syncTemplates()}
+                  disabled={syncing || !account.wabaId}
+                >
+                  {syncing && <Spinner data-icon="inline-start" />}
+                  {account.templates.some((template) => template.status === "MISSING")
+                    ? "Create & Sync Templates"
+                    : "Refresh Status"}
+                </Button>
+              )}
+            </div>
+            {!account.wabaId && (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Add your WhatsApp Business Account ID under Update Credentials to enable templates.
+              </p>
+            )}
+            <div className="divide-y rounded-lg border">
+              {account.templates.map((template) => (
+                <div key={template.name} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs">{template.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{template.description}</p>
+                    {template.rejectedReason && template.status !== "APPROVED" && (
+                      <p className="mt-1 text-xs text-destructive">{template.rejectedReason}</p>
+                    )}
+                  </div>
+                  <TemplateStatusPill status={template.status} />
+                </div>
+              ))}
+            </div>
+            {account.templatesSyncedAt && (
+              <p className="text-xs text-muted-foreground">
+                Last checked {formatDateTime(account.templatesSyncedAt)}
+              </p>
+            )}
           </div>
 
           {canManage && !editing && (

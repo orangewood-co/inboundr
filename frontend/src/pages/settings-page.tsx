@@ -45,6 +45,8 @@ import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
 import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/tag-chip"
 import type { ResolutionReason, SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
 import { WhatsAppSettingsCardContent } from "@/components/support/whatsapp-settings-card"
+import { WhatsAppIcon } from "@/components/support/channel"
+import { cn } from "@/lib/utils"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -4604,8 +4606,11 @@ function NotificationsTab() {
 
 // ─── Payment Reminders ───────────────────────────────────────
 
+type ReminderChannel = "email" | "whatsapp"
+
 interface PaymentReminderPrefs {
   enabled: boolean
+  channels: ReminderChannel[]
   offsets: number[]
   sendTimeLocal: string
   timezone: string
@@ -4629,6 +4634,7 @@ function PaymentRemindersCard() {
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
   const [prefs, setPrefs] = useState<PaymentReminderPrefs>({
     enabled: false,
+    channels: ["email"],
     offsets: [0, 7, 14],
     sendTimeLocal: "10:00",
     timezone: "UTC",
@@ -4645,6 +4651,10 @@ function PaymentRemindersCard() {
         if (reminders) {
           setPrefs({
             enabled: reminders.enabled ?? false,
+            channels:
+              Array.isArray(reminders.channels) && reminders.channels.length > 0
+                ? reminders.channels
+                : ["email"],
             offsets: Array.isArray(reminders.offsets) ? reminders.offsets : [0, 7, 14],
             sendTimeLocal: reminders.sendTimeLocal ?? "10:00",
             timezone: reminders.timezone ?? "UTC",
@@ -4661,6 +4671,10 @@ function PaymentRemindersCard() {
   const handleSave = async () => {
     if (prefs.enabled && prefs.offsets.length === 0) {
       toast.error("Select at least one reminder schedule")
+      return
+    }
+    if (prefs.enabled && prefs.channels.length === 0) {
+      toast.error("Select at least one reminder channel")
       return
     }
 
@@ -4696,6 +4710,15 @@ function PaymentRemindersCard() {
     }))
   }
 
+  const toggleChannel = (channel: ReminderChannel, checked: boolean) => {
+    setPrefs((prev) => ({
+      ...prev,
+      channels: checked
+        ? [...new Set([...prev.channels, channel])]
+        : prev.channels.filter((item) => item !== channel),
+    }))
+  }
+
   const offsetOptions = [
     ...REMINDER_OFFSET_OPTIONS,
     ...prefs.offsets
@@ -4725,7 +4748,7 @@ function PaymentRemindersCard() {
   return (
     <SettingsCard
       title="Payment Reminders"
-      description="Email customers automatically when an invoice is due or overdue. Applies to the whole organization."
+      description="Remind customers automatically when an invoice is due or overdue. Applies to the whole organization."
       action={
         <Switch
           checked={prefs.enabled}
@@ -4761,6 +4784,68 @@ function PaymentRemindersCard() {
           </div>
           {prefs.enabled && prefs.offsets.length === 0 && (
             <p className="text-xs text-destructive">Select at least one reminder schedule.</p>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold">Channels</p>
+            <p className="text-xs text-muted-foreground">
+              Each reminder goes out on every enabled channel the customer can be reached on.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
+                prefs.channels.includes("email") ? "border-primary bg-primary/5" : "hover:bg-muted/40",
+                !prefs.enabled && "cursor-not-allowed opacity-50"
+              )}
+            >
+              <Checkbox
+                checked={prefs.channels.includes("email")}
+                disabled={!prefs.enabled}
+                onCheckedChange={(checked) => toggleChannel("email", checked === true)}
+                className="mt-0.5"
+              />
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <MailIcon className="size-3.5 text-muted-foreground" />
+                  Email
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Sent from your connected Gmail account with the PDF attached. Needs a customer
+                  email on the invoice.
+                </p>
+              </div>
+            </label>
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
+                prefs.channels.includes("whatsapp") ? "border-primary bg-primary/5" : "hover:bg-muted/40",
+                !prefs.enabled && "cursor-not-allowed opacity-50"
+              )}
+            >
+              <Checkbox
+                checked={prefs.channels.includes("whatsapp")}
+                disabled={!prefs.enabled}
+                onCheckedChange={(checked) => toggleChannel("whatsapp", checked === true)}
+                className="mt-0.5"
+              />
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <WhatsAppIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  WhatsApp
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Sent via the approved payment-reminder template with the PDF attached. Needs
+                  WhatsApp connected under Support and a customer mobile number on the invoice.
+                </p>
+              </div>
+            </label>
+          </div>
+          {prefs.enabled && prefs.channels.length === 0 && (
+            <p className="text-xs text-destructive">Select at least one reminder channel.</p>
           )}
         </div>
 
@@ -4830,11 +4915,14 @@ function PaymentRemindersCard() {
         </div>
 
         <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-          Reminders are sent from your connected Gmail account with the invoice PDF attached, and only for sent invoices with a due date, a balance due, and a customer email. Reminders can be turned off per invoice from its detail page.
+          Reminders only go out for sent invoices with a due date and a balance due. Reminders can be turned off per invoice from its detail page.
         </div>
 
         <div className="flex pt-1">
-          <Button onClick={handleSave} disabled={saving || (prefs.enabled && prefs.offsets.length === 0)}>
+          <Button
+            onClick={handleSave}
+            disabled={saving || (prefs.enabled && (prefs.offsets.length === 0 || prefs.channels.length === 0))}
+          >
             {saving && <Spinner data-icon="inline-start" />}
             Save Reminder Settings
           </Button>

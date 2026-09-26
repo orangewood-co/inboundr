@@ -1,8 +1,18 @@
-import { GmailAccount } from "../models/gmail-account.model";
+import { GmailAccount, type IGmailAccount } from "../models/gmail-account.model";
 import { Invoice, type IInvoice, type InvoiceStatus } from "../models/invoice.model";
-import { Organization, type IOrganization } from "../models/organization.model";
+import {
+  Organization,
+  type IOrganization,
+  type OrganizationReminderChannel,
+} from "../models/organization.model";
+import type { IWhatsAppAccount } from "../models/whatsapp-account.model";
 import { sendStandaloneEmail } from "./gmail-send.service";
 import { buildInvoiceUpiAssets, renderInvoicePdfBuffer } from "./invoice-pdf.service";
+import {
+  invoiceWhatsAppRecipient,
+  resolveReminderWhatsAppAccount,
+  sendInvoiceReminderOnWhatsApp,
+} from "./invoice-whatsapp.service";
 import { resolveInvoiceUpiId, resolveStatus } from "./invoice.service";
 import { resolveOrganizationPdfBranding } from "./organization-pdf-branding.service";
 import type { PdfOrganizationBranding } from "./pdf-branding.service";
@@ -16,6 +26,16 @@ function formatMoney(value: number): string {
 
 function formatDate(value: Date): string {
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(value);
+}
+
+export function effectiveReminderChannels(
+  settings: { channels?: OrganizationReminderChannel[] | null } | null | undefined
+): OrganizationReminderChannel[] {
+  const channels = (settings?.channels ?? []).filter(
+    (channel): channel is OrganizationReminderChannel => channel === "email" || channel === "whatsapp"
+  );
+  // Legacy orgs saved before channels existed keep the old email-only behaviour.
+  return channels.length > 0 ? [...new Set(channels)] : ["email"];
 }
 
 function renderReminderEmail(invoice: IInvoice, daysPastDue: number, upiId: string): string {
@@ -41,14 +61,13 @@ function renderReminderEmail(invoice: IInvoice, daysPastDue: number, upiId: stri
     .join("\n");
 }
 
-async function sendInvoiceReminder(
+async function sendEmailReminder(
   invoice: IInvoice,
   organization: IOrganization,
-  account: Parameters<typeof sendStandaloneEmail>[0]["account"],
+  account: IGmailAccount,
   branding: PdfOrganizationBranding,
-  offsetDays: number,
   daysPastDue: number
-): Promise<void> {
+): Promise<string> {
   const upiId = resolveInvoiceUpiId(invoice, organization);
   const assets = await buildInvoiceUpiAssets(invoice, organization);
   const pdf = await renderInvoicePdfBuffer(invoice, branding, assets);
@@ -66,20 +85,73 @@ async function sendInvoiceReminder(
       },
     ],
   });
+  return gmailMessageId ?? "";
+}
 
-  invoice.reminders.push({
-    offsetDays,
-    sentAt: new Date(),
-    gmailMessageId: gmailMessageId ?? "",
-  });
-  invoice.status = resolveStatus(invoice.status, invoice.totals, invoice.dueDate);
-  await invoice.save();
+interface ReminderSenders {
+  email: IGmailAccount | null;
+  whatsapp: IWhatsAppAccount | null;
+}
+
+/**
+ * Sends one reminder offset for an invoice on every enabled channel that can
+ * reach this customer. An offset is recorded as sent once at least one channel
+ * succeeded; per-channel entries are logged so the invoice timeline shows how
+ * the customer was reached.
+ */
+async function sendInvoiceReminder(
+  invoice: IInvoice,
+  organization: IOrganization,
+  senders: ReminderSenders,
+  channels: OrganizationReminderChannel[],
+  branding: PdfOrganizationBranding,
+  offsetDays: number,
+  daysPastDue: number
+): Promise<boolean> {
+  const now = new Date();
+  let sentAny = false;
+
+  if (channels.includes("email") && senders.email && invoice.customerSnapshot.email) {
+    try {
+      const gmailMessageId = await sendEmailReminder(invoice, organization, senders.email, branding, daysPastDue);
+      invoice.reminders.push({ offsetDays, sentAt: now, channel: "email", gmailMessageId, whatsappMessageId: "" });
+      sentAny = true;
+    } catch (err) {
+      console.error(`Email payment reminder failed for invoice ${invoice._id}:`, err);
+    }
+  }
+
+  if (channels.includes("whatsapp") && senders.whatsapp && invoiceWhatsAppRecipient(invoice)) {
+    try {
+      const result = await sendInvoiceReminderOnWhatsApp(invoice, organization, daysPastDue, {
+        account: senders.whatsapp,
+        branding,
+      });
+      invoice.reminders.push({
+        offsetDays,
+        sentAt: now,
+        channel: "whatsapp",
+        gmailMessageId: "",
+        whatsappMessageId: result.messageId,
+      });
+      sentAny = true;
+    } catch (err) {
+      console.error(`WhatsApp payment reminder failed for invoice ${invoice._id}:`, (err as Error).message);
+    }
+  }
+
+  if (sentAny) {
+    invoice.status = resolveStatus(invoice.status, invoice.totals, invoice.dueDate);
+    await invoice.save();
+  }
+  return sentAny;
 }
 
 async function sendOrganizationReminders(organization: IOrganization, now: Date): Promise<void> {
   const settings = organization.preferences?.paymentReminders;
   const offsets = settings?.offsets ?? [];
   if (offsets.length === 0) return;
+  const channels = effectiveReminderChannels(settings);
 
   const invoices = await Invoice.find({
     organizationId: organization._id,
@@ -87,22 +159,32 @@ async function sendOrganizationReminders(organization: IOrganization, now: Date)
     remindersEnabled: true,
     dueDate: { $ne: null, $lte: now },
     "totals.balanceDue": { $gt: 0 },
-    "customerSnapshot.email": { $nin: [null, ""] },
   });
   if (invoices.length === 0) return;
 
-  // Customer-facing reminders go out from the business's own Gmail address,
-  // mirroring how invoices are sent. Orgs without a connected account are skipped.
-  const account = await GmailAccount.findOne({
-    organizationId: organization._id,
-    status: "connected",
-  }).sort({ updatedAt: -1 });
-  if (!account) {
-    console.warn(
-      `Payment reminders skipped for organization ${organization._id}: no connected Gmail account`
-    );
-    return;
+  const senders: ReminderSenders = { email: null, whatsapp: null };
+
+  if (channels.includes("email")) {
+    // Customer-facing reminders go out from the business's own Gmail address,
+    // mirroring how invoices are sent.
+    senders.email = await GmailAccount.findOne({
+      organizationId: organization._id,
+      status: "connected",
+    }).sort({ updatedAt: -1 });
+    if (!senders.email) {
+      console.warn(`Email payment reminders skipped for organization ${organization._id}: no connected Gmail account`);
+    }
   }
+
+  if (channels.includes("whatsapp")) {
+    const resolved = await resolveReminderWhatsAppAccount(organization._id);
+    senders.whatsapp = resolved.account;
+    if (!resolved.account) {
+      console.warn(`WhatsApp payment reminders skipped for organization ${organization._id}: ${resolved.reason}`);
+    }
+  }
+
+  if (!senders.email && !senders.whatsapp) return;
 
   const branding = await resolveOrganizationPdfBranding(organization);
 
@@ -111,7 +193,7 @@ async function sendOrganizationReminders(organization: IOrganization, now: Date)
       const daysPastDue = Math.floor((now.getTime() - new Date(invoice.dueDate!).getTime()) / DAY_MS);
       // Each offset fires at most once. When several offsets have already
       // elapsed (e.g. reminders enabled on an old invoice), only the latest
-      // one is sent so the customer doesn't get a backlog of emails.
+      // one is sent so the customer doesn't get a backlog of reminders.
       const maxSentOffset = invoice.reminders.reduce(
         (max, reminder) => Math.max(max, reminder.offsetDays),
         -1
@@ -124,7 +206,8 @@ async function sendOrganizationReminders(organization: IOrganization, now: Date)
       await sendInvoiceReminder(
         invoice,
         organization,
-        account,
+        senders,
+        channels,
         branding,
         Math.max(...pendingOffsets),
         daysPastDue

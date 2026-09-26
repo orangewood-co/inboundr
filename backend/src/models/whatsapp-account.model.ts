@@ -2,6 +2,27 @@ import mongoose, { Schema, type Document } from "mongoose";
 
 export type WhatsAppAccountStatus = "connected" | "error" | "disabled";
 
+/** Meta template review states, plus our own marker for "not created yet". */
+export type WhatsAppTemplateStatus =
+  | "APPROVED"
+  | "PENDING"
+  | "REJECTED"
+  | "PAUSED"
+  | "DISABLED"
+  | "IN_APPEAL"
+  | "MISSING";
+
+/** Snapshot of one Inboundr-managed message template on the org's WABA. */
+export interface IWhatsAppAccountTemplate {
+  name: string;
+  language: string;
+  category: string;
+  status: WhatsAppTemplateStatus;
+  metaId: string | null;
+  rejectedReason: string | null;
+  updatedAt: Date;
+}
+
 /**
  * A WhatsApp Business phone number connected to an organization via the Meta
  * Cloud API. One number per organization for now. Inbound webhooks are routed
@@ -11,8 +32,16 @@ export interface IWhatsAppAccount extends Document {
   organizationId: mongoose.Types.ObjectId;
   /** Meta phone number id (`metadata.phone_number_id` on webhooks). */
   phoneNumberId: string;
-  /** WhatsApp Business Account id; informational. */
+  /** WhatsApp Business Account id; required for template management. */
   wabaId: string | null;
+  /**
+   * Meta app id the token belongs to. Needed for the Resumable Upload API when
+   * creating templates with media headers. Null means "use the platform app".
+   */
+  appId: string | null;
+  /** Inboundr-managed templates and their Meta review status. */
+  templates: IWhatsAppAccountTemplate[];
+  templatesSyncedAt: Date | null;
   /** Human-readable number, e.g. +91 80467 33659, as reported by Meta. */
   displayPhoneNumber: string;
   /** Verified business display name reported by Meta. */
@@ -38,6 +67,23 @@ export interface IWhatsAppAccount extends Document {
   updatedAt: Date;
 }
 
+const whatsAppAccountTemplateSchema = new Schema<IWhatsAppAccountTemplate>(
+  {
+    name: { type: String, required: true, trim: true },
+    language: { type: String, required: true, trim: true },
+    category: { type: String, default: "UTILITY", trim: true },
+    status: {
+      type: String,
+      enum: ["APPROVED", "PENDING", "REJECTED", "PAUSED", "DISABLED", "IN_APPEAL", "MISSING"],
+      default: "MISSING",
+    },
+    metaId: { type: String, default: null, trim: true },
+    rejectedReason: { type: String, default: null },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const whatsAppAccountSchema = new Schema<IWhatsAppAccount>(
   {
     organizationId: {
@@ -47,7 +93,10 @@ const whatsAppAccountSchema = new Schema<IWhatsAppAccount>(
       unique: true,
     },
     phoneNumberId: { type: String, required: true, trim: true, unique: true },
-    wabaId: { type: String, default: null, trim: true },
+    wabaId: { type: String, default: null, trim: true, index: true },
+    appId: { type: String, default: null, trim: true },
+    templates: { type: [whatsAppAccountTemplateSchema], default: [] },
+    templatesSyncedAt: { type: Date, default: null },
     displayPhoneNumber: { type: String, default: "", trim: true },
     verifiedName: { type: String, default: "", trim: true },
     accessToken: { type: String, required: true },

@@ -21,6 +21,7 @@ import { toast } from "sonner"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
+import { WhatsAppIcon } from "@/components/support/channel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -79,7 +80,16 @@ interface InvoicePayment {
 interface InvoiceReminder {
   offsetDays: number
   sentAt: string
+  channel?: "email" | "whatsapp"
   gmailMessageId: string
+  whatsappMessageId?: string
+}
+
+interface InvoiceWhatsAppSend {
+  sentAt: string
+  messageId: string
+  to: string
+  sentByUserId: string | null
 }
 
 interface Invoice {
@@ -115,6 +125,7 @@ interface Invoice {
   payments: InvoicePayment[]
   remindersEnabled?: boolean
   reminders?: InvoiceReminder[]
+  whatsappSends?: InvoiceWhatsAppSend[]
   totals: {
     subtotal: number
     discountTotal: number
@@ -239,11 +250,21 @@ export default function InvoiceDetailPage() {
     }
 
     for (const reminder of invoice.reminders ?? []) {
+      const viaWhatsApp = reminder.channel === "whatsapp"
       events.push({
         date: reminder.sentAt,
-        icon: <BellIcon className="size-3.5" />,
-        label: "Payment reminder sent",
+        icon: viaWhatsApp ? <WhatsAppIcon className="size-3.5" /> : <BellIcon className="size-3.5" />,
+        label: viaWhatsApp ? "Payment reminder sent on WhatsApp" : "Payment reminder emailed",
         detail: reminderOffsetLabel(reminder.offsetDays),
+      })
+    }
+
+    for (const send of invoice.whatsappSends ?? []) {
+      events.push({
+        date: send.sentAt,
+        icon: <WhatsAppIcon className="size-3.5" />,
+        label: "Invoice sent on WhatsApp",
+        detail: send.to ? `To ${send.to}` : undefined,
       })
     }
 
@@ -278,7 +299,7 @@ export default function InvoiceDetailPage() {
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error ?? "Action failed")
-      toast.success("Invoice updated")
+      toast.success(action === "send-whatsapp" ? "Invoice sent on WhatsApp" : "Invoice updated")
       setInvoice(payload)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed")
@@ -378,6 +399,8 @@ export default function InvoiceDetailPage() {
 
   const isDraft = invoice.status === "draft"
   const isCancellable = invoice.status !== "cancelled" && invoice.status !== "written_off" && invoice.status !== "paid"
+  const canSendWhatsApp =
+    invoice.status !== "cancelled" && invoice.status !== "written_off" && invoice.lineItems.length > 0
 
   return (
     <AppLayout>
@@ -414,6 +437,26 @@ export default function InvoiceDetailPage() {
               {actionLoading === "send" ? <Spinner className="size-3.5" data-icon="inline-start" /> : <SendIcon className="size-3.5" />}
               Send
             </Button>
+            {canSendWhatsApp && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void runAction("send-whatsapp")}
+                disabled={actionLoading !== null || !invoice.customerSnapshot.contactNumber}
+                title={
+                  invoice.customerSnapshot.contactNumber
+                    ? `Send the PDF to ${invoice.customerSnapshot.contactNumber} on WhatsApp`
+                    : "Add a customer contact number to send on WhatsApp"
+                }
+              >
+                {actionLoading === "send-whatsapp" ? (
+                  <Spinner className="size-3.5" data-icon="inline-start" />
+                ) : (
+                  <WhatsAppIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                )}
+                WhatsApp
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={openPreview}>
               <EyeIcon className="size-3.5" />
               Preview
@@ -754,7 +797,7 @@ export default function InvoiceDetailPage() {
               <div>
                 <h2 className="text-sm font-semibold">Payment Reminders</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Automatic reminder emails for this invoice while a balance is due. The schedule is configured in Settings → Notifications.
+                  Automatic reminders for this invoice while a balance is due. The schedule and channels are configured in Settings → Notifications.
                 </p>
               </div>
               <Switch
@@ -768,8 +811,15 @@ export default function InvoiceDetailPage() {
                 {invoice.reminders!.map((reminder, index) => (
                   <div key={index} className="flex items-center justify-between gap-4 px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <BellIcon className="size-3.5 text-muted-foreground" />
+                      {reminder.channel === "whatsapp" ? (
+                        <WhatsAppIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <BellIcon className="size-3.5 text-muted-foreground" />
+                      )}
                       <span className="text-sm">{reminderOffsetLabel(reminder.offsetDays)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        · {reminder.channel === "whatsapp" ? "WhatsApp" : "Email"}
+                      </span>
                     </div>
                     <span className="text-xs text-muted-foreground">{formatDateTime(reminder.sentAt)}</span>
                   </div>

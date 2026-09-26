@@ -14,8 +14,12 @@ export interface IOrganizationDefaultContact {
   phoneNumber: string;
 }
 
+export type OrganizationReminderChannel = "email" | "whatsapp";
+
 export interface IOrganizationPaymentReminders {
   enabled: boolean;
+  /** Delivery channels; each due reminder goes out on every enabled channel. */
+  channels: OrganizationReminderChannel[];
   /** Days after the invoice due date when a reminder is sent (0 = on the due date). */
   offsets: number[];
   sendTimeLocal: string;
@@ -126,6 +130,10 @@ const defaultContactSchema = new Schema<IOrganizationDefaultContact>(
 const organizationPaymentRemindersSchema = new Schema<IOrganizationPaymentReminders>(
   {
     enabled: { type: Boolean, default: false },
+    channels: {
+      type: [{ type: String, enum: ["email", "whatsapp"] }],
+      default: ["email"],
+    },
     offsets: { type: [Number], default: [0, 7, 14] },
     sendTimeLocal: { type: String, default: "10:00" },
     timezone: { type: String, default: "UTC" },

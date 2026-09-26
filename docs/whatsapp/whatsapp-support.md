@@ -1,9 +1,14 @@
-# WhatsApp Support Runbook (Meta Cloud API)
+# WhatsApp Runbook (Meta Cloud API)
 
-This guide covers connecting a WhatsApp Business number so customer messages
-become support conversations: an inbound message opens (or continues) a
-`whatsapp`-channel ticket, the AI agent replies automatically when enabled, and
-agents answer from the same inbox as live chat and phone calls.
+This guide covers connecting a WhatsApp Business number and the two things
+built on top of it:
+
+1. **Support** — an inbound message opens (or continues) a `whatsapp`-channel
+   ticket, the AI agent replies automatically when enabled, and agents answer
+   from the same inbox as live chat and phone calls.
+2. **Invoices and payment reminders** — business-initiated messages that send
+   the invoice PDF via Meta-approved message templates (see
+   [Templates, invoices and reminders](#templates-invoices-and-reminders)).
 
 ## Architecture
 
@@ -39,6 +44,8 @@ signature verification requires the exact raw request bytes.
 | Meta webhook verification handshake | `GET` | `/api/v1/whatsapp/webhook` |
 | Meta inbound events | `POST` | `/api/v1/whatsapp/webhook` |
 | Org WhatsApp settings (app UI) | `GET`/`PATCH`/`DELETE` | `/api/v1/support/whatsapp/settings` |
+| Create/refresh message templates | `POST` | `/api/v1/support/whatsapp/templates/sync` |
+| Send an invoice PDF on WhatsApp | `POST` | `/api/v1/invoices/:id/send-whatsapp` |
 
 With `API_ORIGIN=https://api.example.com` the callback URL to paste into Meta is
 `https://api.example.com/api/v1/whatsapp/webhook`.
@@ -74,6 +81,9 @@ TOKEN_ENCRYPTION_SECRET=generate-a-long-random-secret
 # Optional; only for the platform-owned app model.
 # WHATSAPP_APP_SECRET=your-meta-app-secret          # App settings → Basic → App secret (32 hex chars, NOT an EAA… access token)
 # WHATSAPP_VERIFY_TOKEN=any-random-string           # alias: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+
+# Optional; platform app id for template media uploads (orgs can set their own in the UI).
+# WHATSAPP_APP_ID=1234567890
 
 # Optional; Graph API version (default v23.0).
 WHATSAPP_GRAPH_API_VERSION=v23.0
@@ -145,6 +155,63 @@ credentials; existing tickets remain.
 - **Notifications.** Owners/admins get a `support.new_chat` notification titled
   "New WhatsApp conversation" for each new ticket.
 
+## Templates, invoices and reminders
+
+WhatsApp only lets a business start a conversation (or write after the 24-hour
+window) with a **message template** that Meta has reviewed. Inboundr manages
+two UTILITY templates, both with a document header carrying the invoice PDF:
+
+| Template | Used by | Body variables |
+| --- | --- | --- |
+| `inboundr_invoice` | Invoice → **WhatsApp** button, AI chat `sendInvoice` with `channel: "whatsapp"` | name, invoice no., org, amount due, due date |
+| `inboundr_payment_reminder` | Hourly payment-reminder cron when the `whatsapp` channel is enabled | name, invoice no., org, "due today / N days past due", amount due, due date |
+
+Definitions live in `backend/src/services/whatsapp-template.service.ts`
+(`WHATSAPP_TEMPLATE_CATALOG`). Changing body text requires creating a new
+template version on Meta's side; bump the template name if you edit it.
+
+### Setting up templates
+
+1. In Settings → Support → WhatsApp, make sure the **WhatsApp Business Account
+   ID** is filled in. Add the **Meta App ID** as well unless `WHATSAPP_APP_ID`
+   is set on the backend (the Resumable Upload API used for the PDF sample
+   needs an app id).
+2. Click **Create & Sync Templates**. Inboundr uploads a sample PDF, creates
+   any missing templates via `POST /{waba_id}/message_templates`, and stores
+   each template's status on `WhatsAppAccount.templates`.
+3. Statuses update automatically through the `message_template_status_update`
+   webhook field (subscribe to it alongside `messages`), or manually via
+   **Refresh Status**. Sends are refused until the relevant template is
+   **Approved**.
+
+Template sync also runs best-effort whenever credentials are saved with a WABA
+id present.
+
+### Sending an invoice
+
+Invoice detail page → **WhatsApp** (next to Send). Works for drafts (marks the
+invoice sent) and already-sent invoices (re-share). The PDF is rendered, stored
+under `invoices/{org}/{invoiceId}/whatsapp/` in S3, and passed to Meta as a
+presigned link in the template header. Each send is logged in
+`Invoice.whatsappSends` and appears in the activity timeline.
+
+Recipient resolution: `customerSnapshot.contactNumber` is parsed with
+`libphonenumber-js` using `IN` as the default country, so `98765 43210`,
+`09876543210` and `+91 98765 43210` all resolve to `+919876543210`. Invalid or
+missing numbers return a `400` with a clear message.
+
+### Payment reminders
+
+Settings → Notifications → Payment Reminders now has **Channels** (Email,
+WhatsApp). Each due offset is sent on every enabled channel that can reach the
+customer; one `Invoice.reminders` entry is logged per channel with
+`channel` and `whatsappMessageId`/`gmailMessageId`. An offset counts as sent if
+at least one channel succeeded. WhatsApp reminders are skipped (with a log
+line) when the account is not connected, the template is not approved, or the
+invoice has no valid mobile number.
+
+Organizations saved before channels existed behave as email-only.
+
 ## Verification checklist
 
 - [ ] `TOKEN_ENCRYPTION_SECRET` set in the backend `.env`.
@@ -165,6 +232,11 @@ credentials; existing tickets remain.
 | Agent replies show **Not delivered · … token is invalid** | Token expired/revoked. Update credentials in Settings. The account status flips to **Needs attention**. |
 | Media shows as `[image could not be downloaded from WhatsApp]` | Token lacks `whatsapp_business_messaging`, or media exceeded 100 MB. |
 | Bot never replies on WhatsApp | AI Agent disabled for the org, ticket in Review/Paused mode, or the ticket was escalated (attachment / "talk to a human"). |
+| Template shows **Not created** with "Add the Meta App ID…" | Neither the account nor `WHATSAPP_APP_ID` has an app id; the sample-PDF upload needs one. |
+| Template **Rejected** | Meta's reason is shown under the template. Common causes: business not verified, or category disagreement. Fix in Meta Business Suite → Message templates, then **Refresh Status**. |
+| Invoice **WhatsApp** button returns "template is not approved yet" | Wait for Meta's review (minutes to hours) and refresh status; sends are blocked until **Approved**. |
+| Invoice **WhatsApp** button returns "not a valid mobile number" | `customerSnapshot.contactNumber` is a landline, has extra digits, or a non-Indian number without a `+country` prefix. Fix the customer's contact number. |
+| Reminder cron logs "WhatsApp payment reminders skipped" | Account disconnected/paused or `inboundr_payment_reminder` not approved; email reminders still go out if enabled. |
 
 ## Local testing
 

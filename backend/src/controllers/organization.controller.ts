@@ -158,11 +158,25 @@ function normalizePaymentReminders(value: unknown) {
     throw validationError("Select at least one reminder schedule");
   }
 
+  const channels = Array.isArray(source.channels)
+    ? [
+        ...new Set(
+          source.channels.filter(
+            (channel): channel is "email" | "whatsapp" => channel === "email" || channel === "whatsapp"
+          )
+        ),
+      ]
+    : ["email" as const];
+  if (Boolean(source.enabled) && channels.length === 0) {
+    throw validationError("Select at least one reminder channel");
+  }
+
   const sendTimeLocal = normalizeTime(source.sendTimeLocal, "10:00");
   const timezone = normalizeTimezone(source.timezone);
 
   return {
     enabled: Boolean(source.enabled),
+    channels,
     offsets,
     sendTimeLocal,
     timezone,

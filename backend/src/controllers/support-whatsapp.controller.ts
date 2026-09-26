@@ -7,6 +7,11 @@ import { decryptSecret, encryptSecret } from "../lib/crypto";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import { WhatsAppAccount, type IWhatsAppAccount } from "../models/whatsapp-account.model";
 import {
+  WHATSAPP_TEMPLATE_CATALOG,
+  WHATSAPP_TEMPLATE_LANGUAGE,
+  syncWhatsAppTemplates,
+} from "../services/whatsapp-template.service";
+import {
   WhatsAppApiError,
   fetchWhatsAppPhoneNumberInfo,
   subscribeWhatsAppWebhooks,
@@ -14,6 +19,24 @@ import {
 
 function webhookUrl(): string {
   return `${apiOrigin}/api/v1/whatsapp/webhook`;
+}
+
+function serializeTemplates(account: IWhatsAppAccount | any) {
+  const stored = new Map<string, any>(
+    (account.templates ?? []).map((template: any) => [template.name, template])
+  );
+  return WHATSAPP_TEMPLATE_CATALOG.map((catalog) => {
+    const template = stored.get(catalog.name);
+    return {
+      key: catalog.key,
+      name: catalog.name,
+      description: catalog.description,
+      language: WHATSAPP_TEMPLATE_LANGUAGE,
+      status: template?.status ?? "MISSING",
+      rejectedReason: template?.rejectedReason ?? null,
+      updatedAt: template?.updatedAt ?? null,
+    };
+  });
 }
 
 function serializeAccount(account: IWhatsAppAccount | any | null) {
@@ -26,6 +49,7 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
       // a per-account token is generated on connect.
       verifyToken: platform.verifyToken,
       platformAppSecretConfigured: Boolean(platform.appSecret),
+      platformAppIdConfigured: Boolean(platform.appId),
     };
   }
   return {
@@ -33,6 +57,7 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
       id: String(account._id),
       phoneNumberId: account.phoneNumberId,
       wabaId: account.wabaId ?? null,
+      appId: account.appId ?? null,
       displayPhoneNumber: account.displayPhoneNumber ?? "",
       verifiedName: account.verifiedName ?? "",
       enabled: account.enabled !== false,
@@ -41,11 +66,14 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
       hasAppSecret: Boolean(account.appSecret),
       lastInboundAt: account.lastInboundAt ?? null,
       lastOutboundAt: account.lastOutboundAt ?? null,
+      templates: serializeTemplates(account),
+      templatesSyncedAt: account.templatesSyncedAt ?? null,
       updatedAt: account.updatedAt ?? null,
     },
     webhookUrl: webhookUrl(),
     verifyToken: account.verifyToken,
     platformAppSecretConfigured: Boolean(platform.appSecret),
+    platformAppIdConfigured: Boolean(platform.appId),
   };
 }
 
@@ -74,12 +102,19 @@ export async function updateSupportWhatsAppSettings(req: Request, res: Response)
     const wabaId = req.body?.wabaId !== undefined
       ? String(req.body.wabaId ?? "").trim() || null
       : existing?.wabaId ?? null;
+    const appId = req.body?.appId !== undefined
+      ? String(req.body.appId ?? "").trim() || null
+      : existing?.appId ?? null;
     const newAccessToken = String(req.body?.accessToken ?? "").trim();
     const newAppSecret = req.body?.appSecret !== undefined ? String(req.body.appSecret ?? "").trim() : null;
     const enabled = req.body?.enabled !== undefined ? Boolean(req.body.enabled) : existing?.enabled ?? true;
 
     if (!phoneNumberId || !/^\d{5,32}$/.test(phoneNumberId)) {
       res.status(400).json({ error: "A valid WhatsApp phone number ID is required" });
+      return;
+    }
+    if ((wabaId && !/^\d{5,32}$/.test(wabaId)) || (appId && !/^\d{5,32}$/.test(appId))) {
+      res.status(400).json({ error: "WABA ID and App ID must be numeric Meta ids" });
       return;
     }
     if (!newAccessToken && !existing) {
@@ -122,6 +157,7 @@ export async function updateSupportWhatsAppSettings(req: Request, res: Response)
     const update: Record<string, unknown> = {
       phoneNumberId,
       wabaId,
+      appId,
       displayPhoneNumber: info.displayPhoneNumber,
       verifiedName: info.verifiedName,
       enabled,
@@ -147,10 +183,58 @@ export async function updateSupportWhatsAppSettings(req: Request, res: Response)
       });
     }
 
+    // Best effort: pick up template status (and create missing ones) whenever
+    // the WABA is known. Failures are recorded per template, never fatal here.
+    if (account.wabaId && (newAccessToken || wabaId !== existing?.wabaId || appId !== existing?.appId)) {
+      try {
+        await syncWhatsAppTemplates(account);
+      } catch (err) {
+        console.warn(`WhatsApp template sync skipped for org ${orgReq.organization._id}:`, (err as Error).message);
+      }
+    }
+
     res.json(serializeAccount(account));
   } catch (err) {
     console.error("Failed to update WhatsApp settings:", err);
     res.status(500).json({ error: "Failed to save WhatsApp settings" });
+  }
+}
+
+/** Creates missing Inboundr templates on the WABA and refreshes review status. */
+export async function syncSupportWhatsAppTemplates(req: Request, res: Response): Promise<void> {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id });
+    if (!account) {
+      res.status(404).json({ error: "WhatsApp is not connected" });
+      return;
+    }
+    if (!account.wabaId) {
+      res.status(400).json({ error: "Add the WhatsApp Business Account ID before syncing templates" });
+      return;
+    }
+
+    let result;
+    try {
+      result = await syncWhatsAppTemplates(account);
+    } catch (err) {
+      const message =
+        err instanceof WhatsAppApiError
+          ? err.isAuthError
+            ? "Meta rejected the access token; reconnect WhatsApp with a valid token."
+            : err.details || err.message
+          : (err as Error)?.message || "Template sync failed";
+      res.status(400).json({ error: `Template sync failed: ${message}` });
+      return;
+    }
+
+    res.json({
+      ...serializeAccount(account),
+      sync: { created: result.created, errors: result.errors },
+    });
+  } catch (err) {
+    console.error("Failed to sync WhatsApp templates:", err);
+    res.status(500).json({ error: "Failed to sync WhatsApp templates" });
   }
 }
 

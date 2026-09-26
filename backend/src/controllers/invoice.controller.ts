@@ -24,6 +24,7 @@ import {
   streamInvoicePdf,
 } from "../services/invoice-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
+import { InvoiceWhatsAppError, sendInvoiceOnWhatsApp } from "../services/invoice-whatsapp.service";
 
 const ACTIVE_STATUSES = new Set<InvoiceStatus>(["sent", "viewed", "partially_paid", "overdue"]);
 
@@ -183,6 +184,48 @@ export const sendInvoice = async (req: Request, res: Response): Promise<void> =>
   } catch (err) {
     console.error("Error sending invoice:", err);
     res.status(500).json({ error: "Failed to send invoice" });
+  }
+};
+
+/**
+ * Sends the invoice PDF to the customer's WhatsApp via the approved template.
+ * Works for drafts (which become "sent") and for already-sent invoices (re-share).
+ */
+export const sendInvoiceWhatsApp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const orgReq = req as OrganizationRequest;
+    const invoice = await mutateInvoice(req, res);
+    if (!invoice) return;
+    if (invoice.lineItems.length === 0) {
+      res.status(400).json({ error: "Invoice must have line items before sending" });
+      return;
+    }
+    if (invoice.status === "cancelled" || invoice.status === "written_off") {
+      res.status(400).json({ error: "Cancelled or written-off invoices cannot be sent" });
+      return;
+    }
+
+    const result = await sendInvoiceOnWhatsApp(invoice, orgReq.organization);
+
+    invoice.whatsappSends.push({
+      sentAt: new Date(),
+      messageId: result.messageId,
+      to: result.to,
+      sentByUserId: orgReq.user.id,
+    });
+    if (invoice.status === "draft") {
+      invoice.status = "sent";
+      invoice.sentAt = new Date();
+    }
+    await invoice.save();
+    res.json({ ...invoice.toObject(), whatsappMessageId: result.messageId });
+  } catch (err) {
+    if (err instanceof InvoiceWhatsAppError) {
+      res.status(err.code === "send_failed" ? 502 : 400).json({ error: err.message, code: err.code });
+      return;
+    }
+    console.error("Error sending invoice on WhatsApp:", err);
+    res.status(500).json({ error: "Failed to send invoice on WhatsApp" });
   }
 };
 

@@ -13,6 +13,7 @@ import {
   searchInvoiceRecords,
   updateDraftInvoiceRecord,
 } from "../services/invoice.service";
+import { InvoiceWhatsAppError, sendInvoiceOnWhatsApp } from "../services/invoice-whatsapp.service";
 
 type InvoiceToolContext = {
   user: AuthenticatedRequest["user"];
@@ -279,11 +280,15 @@ export function createInvoiceTools(context: InvoiceToolContext) {
     }),
     sendInvoice: tool({
       description:
-        "Request sending an invoice to the customer. Sending is not available from chat; this tool confirms the invoice exists and tells the user to send it from the Invoices page.",
+        "Send an invoice to the customer. WhatsApp sends happen immediately (the PDF is delivered via the organization's connected WhatsApp number using an approved template). Email sends are not available from chat; the tool will ask the user to send from the Invoices page instead.",
       inputSchema: z.object({
         invoiceId: z.string().min(1).describe("The id of the invoice the user wants to send."),
+        channel: z
+          .enum(["whatsapp", "email"])
+          .default("email")
+          .describe('Delivery channel. Use "whatsapp" only when the user explicitly asks for WhatsApp.'),
       }),
-      execute: async ({ invoiceId }) => {
+      execute: async ({ invoiceId, channel }) => {
         await ensureInvoiceAccess(context);
 
         if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
@@ -293,16 +298,51 @@ export function createInvoiceTools(context: InvoiceToolContext) {
         const invoice = await Invoice.findOne({
           _id: invoiceId,
           organizationId: context.organization._id,
-        }).lean();
+        });
         if (!invoice) {
           return { status: "not_found", error: "Invoice not found" };
+        }
+
+        if (channel === "whatsapp") {
+          if (invoice.lineItems.length === 0) {
+            return { status: "error", error: "Invoice must have line items before sending" };
+          }
+          if (invoice.status === "cancelled" || invoice.status === "written_off") {
+            return { status: "error", error: "Cancelled or written-off invoices cannot be sent" };
+          }
+          try {
+            const result = await sendInvoiceOnWhatsApp(invoice, context.organization);
+            invoice.whatsappSends.push({
+              sentAt: new Date(),
+              messageId: result.messageId,
+              to: result.to,
+              sentByUserId: context.user.id,
+            });
+            if (invoice.status === "draft") {
+              invoice.status = "sent";
+              invoice.sentAt = new Date();
+            }
+            await invoice.save();
+            return {
+              status: "sent",
+              channel: "whatsapp",
+              invoiceNumber: invoice.invoiceNumber,
+              to: result.to,
+              invoice: serializeInvoice(invoice),
+            };
+          } catch (err) {
+            if (err instanceof InvoiceWhatsAppError) {
+              return { status: "error", code: err.code, error: err.message };
+            }
+            throw err;
+          }
         }
 
         return {
           status: "manual_send_required",
           invoiceNumber: invoice.invoiceNumber,
           message:
-            "Invoices cannot be sent from chat. Please open the invoice on the Invoices page and use the Send action there.",
+            "Email sends are not available from chat. Open the invoice on the Invoices page and use the Send action there, or ask to send it on WhatsApp.",
         };
       },
     }),
