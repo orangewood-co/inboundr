@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useSearch } from "@tanstack/react-router"
+import { useQuery } from "@tanstack/react-query"
 import * as XLSX from "xlsx"
 
 import { AppLayout } from "@/components/app-layout"
@@ -57,6 +58,7 @@ import {
   PaperclipIcon,
   ExternalLinkIcon,
   EyeIcon,
+  PackageSearchIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -84,8 +86,11 @@ import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/form
 import type { CatalogAdjustment } from "@/lib/catalog"
 import { getAvatarColor } from "@/lib/utils"
 
+import { ProcurementSheet, type ProcuredQuoteLine } from "@/components/procurement/procurement-sheet"
+import { useEntitlements } from "@/lib/entitlements"
 import { API_ORIGIN } from "@/lib/env"
 import { organizationMeQueryOptions } from "@/lib/queries"
+import { isActiveProcurementRun, procurementRunsQueryOptions } from "@/lib/queries/procurement"
 import { queryClient } from "@/lib/query-client"
 const API_BASE = `${API_ORIGIN}/api/v1/rfq`
 const EMAIL_API_BASE = `${API_ORIGIN}/api/v1/email`
@@ -1135,6 +1140,15 @@ export function DashboardPage() {
   const [addRfqOpen, setAddRfqOpen] = useState(false)
   const [sourceEmailOpen, setSourceEmailOpen] = useState(false)
   const [selectedSourceAttachment, setSelectedSourceAttachment] = useState<RFQEmailAttachment | null>(null)
+  const [procurementLineIndex, setProcurementLineIndex] = useState<number | null>(null)
+  const [procurementOpen, setProcurementOpen] = useState(false)
+
+  const { hasFeature } = useEntitlements()
+  const canProcure = hasFeature("procurement")
+  const { data: procurementRuns } = useQuery({
+    ...procurementRunsQueryOptions(detail?._id ?? ""),
+    enabled: canProcure && Boolean(detail?._id && detail.isProcessed && detail.searchResults.length > 0),
+  })
 
   const hasActiveFilters =
     statusFilter !== "all" ||
@@ -1286,6 +1300,8 @@ export function DashboardPage() {
       setManualFallbacks({})
       setSourceEmailOpen(false)
       setSelectedSourceAttachment(null)
+      setProcurementOpen(false)
+      setProcurementLineIndex(null)
       setSelectedPaymentTermId("")
       setPaymentTermName("")
       setPaymentTermsText("")
@@ -1829,6 +1845,31 @@ export function DashboardPage() {
 
   const handleRemoveManualProduct = (id: string) => {
     setManualProducts((prev) => prev.filter((product) => product.id !== id))
+  }
+
+  const handleUseProcuredSupplier = (searchResultIndex: number, line: ProcuredQuoteLine) => {
+    const query = detail?.searchResults[searchResultIndex]?.query
+    if (!query) return
+    setManualProducts((prev) => [
+      ...prev,
+      {
+        id: `procured-${Date.now()}`,
+        searchResultIndex,
+        queryName: query.name,
+        quantity: String(query.quantity),
+        productId: line.productId,
+        brand: line.brand,
+        description: line.description,
+        code: line.code,
+        price: numberInputValue(line.price),
+        discountPercent: "",
+        hsnCode: line.hsnCode,
+        gstRate: line.gstRate,
+        calibrationCharges: "",
+        deliveryTimeline: "",
+        source: line.source,
+      },
+    ])
   }
 
   const handleCustomProductChange = (field: ManualProductField, value: string) => {
@@ -3137,6 +3178,12 @@ export function DashboardPage() {
                     <div className="space-y-5">
                       {detail.searchResults.map((sr, i) => {
                         const regrettedLine = regrettedLines[i]
+                        const lineRun = procurementRuns?.find((run) => run.lineIndex === i)
+                        const lineRunActive = isActiveProcurementRun(lineRun)
+                        const lineSupplierCount =
+                          lineRun?.status === "succeeded" && lineRun.check?.decision === "proceed"
+                            ? lineRun.candidates.length
+                            : null
                         return (
                         <div key={i}>
                           {/* Query header */}
@@ -3151,6 +3198,30 @@ export function DashboardPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
+                              {canProcure && !regrettedLine && (sr.status !== "matched" || lineRun) && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 gap-1.5 px-2 text-[11px]"
+                                      onClick={() => {
+                                        setProcurementLineIndex(i)
+                                        setProcurementOpen(true)
+                                      }}
+                                    >
+                                      {lineRunActive ? (
+                                        <Spinner data-icon="inline-start" />
+                                      ) : (
+                                        <PackageSearchIcon className="size-3" />
+                                      )}
+                                      {lineSupplierCount != null ? `Suppliers (${lineSupplierCount})` : "Procure"}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Find external suppliers for this item</TooltipContent>
+                                </Tooltip>
+                              )}
                               <Button
                                 type="button"
                                 variant={regrettedLine ? "destructive" : "ghost"}
@@ -3750,6 +3821,17 @@ export function DashboardPage() {
             )}
           </ResizablePanel>
         </ResizablePanelGroup>
+
+      {canProcure && detail && (
+        <ProcurementSheet
+          open={procurementOpen && procurementLineIndex != null}
+          onOpenChange={setProcurementOpen}
+          rfqId={detail._id}
+          lineIndex={procurementLineIndex}
+          query={procurementLineIndex != null ? detail.searchResults[procurementLineIndex]?.query ?? null : null}
+          onUseSupplier={handleUseProcuredSupplier}
+        />
+      )}
 
       <Sheet
         open={sourceEmailOpen && Boolean(detail)}

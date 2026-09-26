@@ -19,6 +19,7 @@ export const FEATURE_KEYS = [
   "service_management",
   "recruitment",
   "workflows",
+  "procurement",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -54,6 +55,7 @@ export const FEATURE_CATALOG: FeatureDefinition[] = [
   { key: "service_management", label: "Service Management", description: "Service requests, visits, equipment, workflow, and service history." },
   { key: "recruitment", label: "Recruitment", description: "Jobs, candidates, application pipelines, and hiring activity." },
   { key: "workflows", label: "Workflows", description: "Node-based automations on top of the RFQ and Quotes flow." },
+  { key: "procurement", label: "Procurement", description: "Find and rank suppliers for RFQ items that aren't in the catalog." },
 ];
 
 export const PLAN_DEFINITIONS: PlanDefinition[] = [

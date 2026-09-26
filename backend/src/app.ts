@@ -8,6 +8,7 @@ import { toNodeHandler } from "better-auth/node";
 import emailRouter from "./routes/email.route";
 import productsRouter from "./routes/products.route";
 import rfqRouter from "./routes/rfq.route";
+import procurementRouter from "./routes/procurement.route";
 import gmailRouter from "./routes/gmail.route";
 import customerRouter from "./routes/customer.route";
 import crmRouter from "./routes/crm.route";
@@ -76,6 +77,7 @@ import { startPaymentReminderCron } from "./jobs/payment-reminder-cron";
 import { startCrmActivityReminderCron } from "./jobs/crm-activity-reminder-cron";
 import { startRecruitmentRankingWorker } from "./services/recruitment-ranking.service";
 import { startRecruitmentAcknowledgementWorker } from "./services/recruitment-acknowledgement.service";
+import { startProcurementWorker } from "./services/procurement.service";
 import { backfillRFQThreadIds } from "./services/rfq.service";
 
 const app: Application = express();
@@ -122,6 +124,7 @@ app.use("/api/v1/email", emailRouter);
 app.use("/api/v1/gmail", gmailRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/rfq", rfqRouter);
+app.use("/api/v1/procurement", procurementRouter);
 app.use("/api/v1/workflows", workflowRouter);
 app.use("/api/v1/customers", customerRouter);
 app.use("/api/v1/crm", crmRouter);
@@ -202,6 +205,7 @@ export async function initializeServices(): Promise<void> {
   startCallRecordingCron();
   startRecruitmentRankingWorker();
   startRecruitmentAcknowledgementWorker();
+  startProcurementWorker();
 }
 
 async function shutdown(): Promise<void> {

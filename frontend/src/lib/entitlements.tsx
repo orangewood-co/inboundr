@@ -22,6 +22,7 @@ export type FeatureKey =
   | "service_management"
   | "recruitment"
   | "workflows"
+  | "procurement"
 export type EmployeeAccessModule =
   | "rfq"
   | "inbox"
@@ -80,6 +81,7 @@ const DEFAULT_ENTITLEMENTS: EntitlementState = {
     "service_management",
     "recruitment",
     "workflows",
+    "procurement",
   ],
   planSlug: "all_features",
   employeeAccess: {
