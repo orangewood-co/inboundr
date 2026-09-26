@@ -1,5 +1,6 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
+  ClockIcon,
   LoaderIcon,
   MessageSquareIcon,
   PaperclipIcon,
@@ -18,6 +19,35 @@ import { fileSize, SUPPORT_MESSAGE_MAX_LENGTH } from "./support-utils"
 import type { ComposerMode, PendingAttachment, Ticket } from "./types"
 
 const MAX_FILES = 5
+const WHATSAPP_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Meta only accepts free-form replies within 24h of the customer's last
+ * message. Re-evaluates every minute so the notice appears while a thread is
+ * left open.
+ */
+function WhatsAppWindowNotice({ lastVisitorMessageAt }: { lastVisitorMessageAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const closed =
+    !lastVisitorMessageAt ||
+    now - new Date(lastVisitorMessageAt).getTime() >= WHATSAPP_SERVICE_WINDOW_MS
+  if (!closed) return null
+
+  return (
+    <div className="mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <ClockIcon className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        The 24-hour WhatsApp reply window has closed. Free-form messages will be rejected by
+        WhatsApp until the customer writes again.
+      </span>
+    </div>
+  )
+}
 
 const ACCEPTED_FILE_TYPES =
   "application/pdf,image/jpeg,image/png,image/webp,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,video/mp4,video/webm,video/quicktime"
@@ -147,6 +177,10 @@ export function Composer({
           {draft.length}/{SUPPORT_MESSAGE_MAX_LENGTH}
         </span>
       </div>
+
+      {ticket.channel === "whatsapp" && !isNote && (
+        <WhatsAppWindowNotice lastVisitorMessageAt={ticket.lastVisitorMessageAt} />
+      )}
 
       {files.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">

@@ -25,7 +25,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ContactHoverCard } from "@/components/contact-hover-card"
 import { cn, copyToClipboard, getAvatarColor } from "@/lib/utils"
-import { ChannelIcon, getChannelMeta } from "./channel"
+import { ChannelIcon, WhatsAppIcon, getChannelMeta } from "./channel"
 import { initialsFromName } from "./support-utils"
 import type { Ticket } from "./types"
 
@@ -53,8 +53,13 @@ export function ConversationHeader({
   const avatar = getAvatarColor(ticket.requester.name)
   const resolved = ticket.status === "resolved"
   const isPhone = ticket.channel === "phone"
+  const isWhatsApp = ticket.channel === "whatsapp"
+  // Phone and WhatsApp requesters are identified by number, not email.
+  const contactByPhone = isPhone || isWhatsApp
   const phoneNumber = ticket.requester.phoneNumber ?? ""
-  const secondaryContact = ticket.requester.email || phoneNumber
+  const secondaryContact = contactByPhone
+    ? phoneNumber || ticket.requester.email
+    : ticket.requester.email || phoneNumber
   const channelLabel = getChannelMeta(ticket.channel).label
   const aiModeLabel =
     ticket.aiMode === "autonomous"
@@ -114,7 +119,25 @@ export function ConversationHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        {isPhone ? (
+        {isWhatsApp ? (
+          phoneNumber && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-sm" asChild>
+                  <a
+                    href={`https://wa.me/${phoneNumber.replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open in WhatsApp"
+                  >
+                    <WhatsAppIcon className="size-4" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open in WhatsApp</TooltipContent>
+            </Tooltip>
+          )
+        ) : isPhone ? (
           phoneNumber && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -190,7 +213,7 @@ export function ConversationHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            {isPhone ? (
+            {contactByPhone ? (
               <DropdownMenuItem
                 onSelect={() => copyToClipboard(phoneNumber, "Phone number copied")}
                 disabled={!phoneNumber}

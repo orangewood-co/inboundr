@@ -56,6 +56,7 @@ function ticketMatchesSearchQuery(ticket: Ticket, search: string) {
     ticket.initialIssue,
     ticket.requester.name,
     ticket.requester.email,
+    ticket.requester.phoneNumber ?? "",
     ticket.lastMessagePreview ?? "",
     ticket.ticketReference,
     `#${ticket.ticketNumber}`,
@@ -442,6 +443,12 @@ function useSupportInboxValue() {
           if (message.ticketId === selectedTicketIdRef.current && message.authorType === "visitor") {
             socket.send(JSON.stringify({ type: "mark_read", ticketId: message.ticketId }))
           }
+        }
+        if (payload.type === "message.updated") {
+          const message = payload.message
+          setMessages((current) =>
+            current.map((existing) => (existing.id === message.id ? { ...existing, ...message } : existing))
+          )
         }
         if (payload.type === "ai_draft.created") {
           const draft = payload.draft

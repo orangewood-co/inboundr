@@ -20,6 +20,7 @@ import {
   serializeSupportAiDraft,
   serializeTicket,
 } from "../services/ticket.service";
+import { deliverTicketMessageViaWhatsApp } from "../services/whatsapp-support.service";
 
 const INSTRUCTIONS_MAX = 8000;
 const ARTICLE_TITLE_MAX = 160;
@@ -360,6 +361,15 @@ export async function approveTicketAiDraft(req: Request, res: Response): Promise
     const serializedDraft = serializeSupportAiDraft(draft);
     broadcastSupportAiDraftUpdate(String(orgReq.organization._id), draft, "updated");
     res.json({ message, draft: serializedDraft });
+
+    if (freshTicket?.channel === "whatsapp") {
+      const ticketDoc = await Ticket.findById(draft.ticketId);
+      if (ticketDoc) {
+        void deliverTicketMessageViaWhatsApp(ticketDoc, message).catch((err) => {
+          console.error(`WhatsApp relay failed for approved draft ${draft._id}:`, err);
+        });
+      }
+    }
   } catch (err) {
     console.error("Failed to approve support AI draft:", err);
     res.status(500).json({ error: "Failed to approve AI draft" });

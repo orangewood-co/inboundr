@@ -104,6 +104,8 @@ export type TicketAttachment = {
   url: string | null
 }
 
+export type MessageDeliveryStatus = "pending" | "sent" | "delivered" | "read" | "failed"
+
 export type TicketMessage = {
   id: string
   ticketId: string
@@ -112,6 +114,9 @@ export type TicketMessage = {
   bodyText: string
   attachments: TicketAttachment[]
   isInternal: boolean
+  /** Only set for messages relayed to an external channel (WhatsApp). */
+  deliveryStatus?: MessageDeliveryStatus | null
+  deliveryError?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -138,6 +143,7 @@ export type SocketEvent =
   | { type: "ticket.updated"; ticket: Ticket }
   | { type: "ticket.deleted"; ticketId: string }
   | { type: "message.created"; message: TicketMessage }
+  | { type: "message.updated"; message: TicketMessage }
   | { type: "ai_draft.created"; draft: SupportAiDraft }
   | { type: "ai_draft.updated"; draft: SupportAiDraft }
   | { type: "typing"; ticketId: string; actor: "agent" | "visitor"; isTyping: boolean }

@@ -2,7 +2,7 @@ import mongoose, { Schema, type Document } from "mongoose";
 
 export type TicketStatus = "open" | "pending" | "resolved" | "closed";
 export type TicketPriority = "low" | "normal" | "high" | "urgent";
-export type TicketChannel = "chat" | "email" | "form" | "phone";
+export type TicketChannel = "chat" | "email" | "form" | "phone" | "whatsapp";
 export type TicketAiMode = "autonomous" | "review" | "paused";
 
 export interface ITicketRequester {
@@ -124,7 +124,7 @@ const ticketSchema = new Schema<ITicket>(
     },
     channel: {
       type: String,
-      enum: ["chat", "email", "form", "phone"],
+      enum: ["chat", "email", "form", "phone", "whatsapp"],
       required: true,
       index: true,
     },

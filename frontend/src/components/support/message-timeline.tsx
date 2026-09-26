@@ -1,10 +1,22 @@
 import { useEffect, useRef, useState } from "react"
-import { CheckIcon, FileIcon, HeadphonesIcon, LoaderIcon, LockIcon, PhoneIcon, SparklesIcon, XIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  CheckCheckIcon,
+  CheckIcon,
+  FileIcon,
+  HeadphonesIcon,
+  LoaderIcon,
+  LockIcon,
+  PhoneIcon,
+  SparklesIcon,
+  XIcon,
+} from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn, getAvatarColor } from "@/lib/utils"
 import { AudioMessage } from "./audio-message"
+import { WhatsAppIcon } from "./channel"
 import {
   authorLabel,
   dayKey,
@@ -183,16 +195,60 @@ function SystemGroup({ messages }: { messages: TicketMessage[] }) {
   )
 }
 
+const DELIVERY_LABEL: Record<NonNullable<TicketMessage["deliveryStatus"]>, string> = {
+  pending: "Sending…",
+  sent: "Sent",
+  delivered: "Delivered",
+  read: "Read",
+  failed: "Not delivered",
+}
+
+/** Per-message relay state for external channels (WhatsApp). */
+function DeliveryStatus({ message, align }: { message: TicketMessage; align: "left" | "right" }) {
+  const status = message.deliveryStatus
+  if (!status) return null
+  const failed = status === "failed"
+  return (
+    <p
+      className={cn(
+        "mt-1 flex items-center gap-1 px-1 text-[11px]",
+        align === "right" ? "justify-end text-right" : "justify-start text-left",
+        failed ? "text-destructive" : "text-muted-foreground"
+      )}
+      title={message.deliveryError ?? undefined}
+    >
+      {failed ? (
+        <AlertCircleIcon className="size-3 shrink-0" />
+      ) : status === "pending" ? (
+        <LoaderIcon className="size-3 shrink-0 animate-spin" />
+      ) : status === "sent" ? (
+        <CheckIcon className="size-3 shrink-0" />
+      ) : (
+        <CheckCheckIcon
+          className={cn("size-3 shrink-0", status === "read" && "text-sky-600 dark:text-sky-400")}
+        />
+      )}
+      <span>
+        {DELIVERY_LABEL[status]}
+        {failed && message.deliveryError ? ` · ${message.deliveryError}` : ""}
+      </span>
+    </p>
+  )
+}
+
 function BubbleGroup({
   group,
   requesterName,
   receiptForMessageId,
   receiptLabel,
+  showDelivery,
 }: {
   group: Extract<RenderItem, { kind: "group" }>
   requesterName: string
   receiptForMessageId: string | null
   receiptLabel: string
+  /** Render provider delivery state instead of the socket-based "Seen" receipt. */
+  showDelivery: boolean
 }) {
   const isAgent = group.authorType === "agent"
   const isBot = group.authorType === "bot"
@@ -246,7 +302,10 @@ function BubbleGroup({
               {message.bodyText && <p className="whitespace-pre-wrap">{message.bodyText}</p>}
               <MessageAttachments attachments={message.attachments} tone={isAgent ? "agent" : "neutral"} />
             </div>
-            {receiptForMessageId === message.id && (
+            {showDelivery && (isAgent || isBot) && (
+              <DeliveryStatus message={message} align={isAgent ? "right" : "left"} />
+            )}
+            {!showDelivery && receiptForMessageId === message.id && (
               <p
                 className={cn(
                   "mt-1 px-1 text-[11px] text-muted-foreground",
@@ -259,6 +318,15 @@ function BubbleGroup({
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function WhatsAppBanner({ phoneNumber }: { phoneNumber: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+      <WhatsAppIcon className="size-3.5" />
+      WhatsApp conversation{phoneNumber ? ` with ${phoneNumber}` : ""}
     </div>
   )
 }
@@ -473,11 +541,13 @@ export function MessageTimeline({
 
   const items = buildRenderItems(messages)
   const isPhone = ticket.channel === "phone"
+  const isWhatsApp = ticket.channel === "whatsapp"
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         {isPhone && <CallTranscriptBanner />}
+        {isWhatsApp && <WhatsAppBanner phoneNumber={ticket.requester.phoneNumber ?? ""} />}
         {items.map((item) =>
           item.kind === "divider" ? (
             <div key={item.key} className="flex items-center gap-3 py-1">
@@ -498,6 +568,7 @@ export function MessageTimeline({
               key={item.key}
               group={item}
               requesterName={ticket.requester.name}
+              showDelivery={isWhatsApp}
               receiptForMessageId={
                 latestAgentMessage && latestAgentSeenByVisitor
                   ? latestAgentMessage.id

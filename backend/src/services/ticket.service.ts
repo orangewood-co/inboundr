@@ -188,6 +188,8 @@ export async function serializeTicketMessage(message: ITicketMessage | any) {
     bodyText: message.bodyText,
     attachments: await serializeAttachments(message.attachments ?? []),
     isInternal: Boolean(message.isInternal),
+    deliveryStatus: message.deliveryStatus ?? null,
+    deliveryError: message.deliveryError ?? null,
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
   };
@@ -247,7 +249,7 @@ export async function listTickets(input: {
 }) {
   const match: Record<string, unknown> = {
     organizationId: input.organizationId,
-    channel: { $in: ["chat", "phone"] },
+    channel: { $in: ["chat", "phone", "whatsapp"] },
   };
   if (input.status === "archived") {
     match.isArchived = true;
@@ -285,6 +287,7 @@ export async function listTickets(input: {
       { subject: { $regex: pattern, $options: "i" } },
       { "requester.name": { $regex: pattern, $options: "i" } },
       { "requester.email": { $regex: pattern, $options: "i" } },
+      { "requester.phoneNumber": { $regex: pattern, $options: "i" } },
       { ticketReference: { $regex: pattern, $options: "i" } },
     ];
     const asNumber = Number(search.replace(/^#/, "").replace(/^SR-?/i, ""));
@@ -485,18 +488,22 @@ export async function listRelatedTickets(input: {
     _id: input.ticketId,
     organizationId: input.organizationId,
   })
-    .select("requester.email")
+    .select("requester.email requester.phoneNumber")
     .lean();
   if (!ticket) return null;
 
   const email = ticket.requester?.email;
-  if (!email) return [];
+  const phoneNumber = ticket.requester?.phoneNumber;
+  const identity: Record<string, unknown>[] = [];
+  if (email) identity.push({ "requester.email": email });
+  if (phoneNumber) identity.push({ "requester.phoneNumber": phoneNumber });
+  if (identity.length === 0) return [];
 
   const related = await Ticket.find({
     organizationId: input.organizationId,
-    channel: { $in: ["chat", "phone"] },
+    channel: { $in: ["chat", "phone", "whatsapp"] },
     _id: { $ne: ticket._id },
-    "requester.email": email,
+    $or: identity,
   })
     .sort({ lastMessageAt: -1, createdAt: -1 })
     .limit(20)
@@ -521,6 +528,11 @@ export async function listCustomerCandidates(input: {
   const search = String(input.search ?? "").trim();
   const requesterEmail = ticket.requester?.email ?? "";
   const requesterName = ticket.requester?.name ?? "";
+  // Phone/WhatsApp requesters are matched on the trailing 10 digits since
+  // Customer.contactNumber is free text.
+  const requesterPhoneNsn = String(ticket.requester?.phoneNumber ?? "")
+    .replace(/[^0-9]/g, "")
+    .slice(-10);
   const baseFilter = {
     organizationId: input.organizationId,
     isArchived: { $ne: true },
@@ -536,9 +548,16 @@ export async function listCustomerCandidates(input: {
     : {
         ...baseFilter,
         $or: [
-          { email: requesterEmail },
-          { name: { $regex: requesterName, $options: "i" } },
-          { company: { $regex: requesterName, $options: "i" } },
+          ...(requesterEmail ? [{ email: requesterEmail }] : []),
+          ...(requesterPhoneNsn.length >= 7
+            ? [{ contactNumber: { $regex: `${requesterPhoneNsn}\\s*$` } }]
+            : []),
+          ...(requesterName
+            ? [
+                { name: { $regex: requesterName, $options: "i" } },
+                { company: { $regex: requesterName, $options: "i" } },
+              ]
+            : []),
         ],
       };
 

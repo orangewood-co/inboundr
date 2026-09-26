@@ -588,13 +588,23 @@ export function ContextPanel({
         </Avatar>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{ticket.requester.name}</p>
-          <CopyableText
-            value={ticket.requester.email}
-            label="Email copied"
-            className="text-xs text-muted-foreground"
-          >
-            <span className="truncate">{ticket.requester.email}</span>
-          </CopyableText>
+          {ticket.requester.email ? (
+            <CopyableText
+              value={ticket.requester.email}
+              label="Email copied"
+              className="text-xs text-muted-foreground"
+            >
+              <span className="truncate">{ticket.requester.email}</span>
+            </CopyableText>
+          ) : ticket.requester.phoneNumber ? (
+            <CopyableText
+              value={ticket.requester.phoneNumber}
+              label="Phone number copied"
+              className="text-xs text-muted-foreground"
+            >
+              <span className="truncate">{ticket.requester.phoneNumber}</span>
+            </CopyableText>
+          ) : null}
         </div>
       </div>
 

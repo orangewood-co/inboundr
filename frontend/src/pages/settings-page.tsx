@@ -44,6 +44,7 @@ import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organ
 import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
 import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/tag-chip"
 import type { ResolutionReason, SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
+import { WhatsAppSettingsCardContent } from "@/components/support/whatsapp-settings-card"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
 import {
@@ -3201,6 +3202,7 @@ function SupportResolutionReasonsCard() {
 }
 
 function SupportTab() {
+  const { canManageOrganization } = useEntitlements()
   const [settings, setSettings] = useState<SupportAiSettings>({
     enabled: true,
     instructions: "",
@@ -3798,6 +3800,13 @@ function SupportTab() {
             </>
           )}
         </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="WhatsApp"
+        description="Turn messages to your WhatsApp Business number into support conversations, answered by the AI agent or your team."
+      >
+        <WhatsAppSettingsCardContent canManage={canManageOrganization} />
       </SettingsCard>
 
       <SettingsCard

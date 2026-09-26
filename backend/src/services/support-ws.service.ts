@@ -26,6 +26,7 @@ import {
 } from "./support-resolution.service";
 import { serializeSupportAiDraft, serializeTicket, serializeTicketMessage } from "./ticket.service";
 import { keyBelongsToPrefix } from "./storage.service";
+import { deliverTicketMessageViaWhatsApp } from "./whatsapp-support.service";
 
 type SupportSocketKind = "agent" | "visitor";
 
@@ -133,6 +134,22 @@ export async function broadcastMessageCreated(
       // Internal notes are agent-only and must never reach a visitor socket.
       (context.kind === "agent" || (!isInternal && ticketTopic(ticketId, context))),
     { type: "message.created", message: serialized }
+  );
+}
+
+/** Fan-out for in-place message changes (e.g. WhatsApp delivery status). */
+export async function broadcastMessageUpdated(
+  message: unknown & { ticketId?: unknown; organizationId?: unknown; isInternal?: unknown }
+) {
+  const serialized = await serializeTicketMessage(message);
+  const ticketId = String(message.ticketId ?? serialized.ticketId);
+  const organizationId = String(message.organizationId ?? "");
+  const isInternal = Boolean(message.isInternal ?? serialized.isInternal);
+  broadcast(
+    (context) =>
+      context.organizationId === organizationId &&
+      (context.kind === "agent" || (!isInternal && ticketTopic(ticketId, context))),
+    { type: "message.updated", message: serialized }
   );
 }
 
@@ -306,6 +323,14 @@ async function handleAgentMessage(ws: SupportSocket, payload: Record<string, unk
 
   await broadcastMessageCreated(message);
   await broadcastTicketById(String(ticket._id));
+
+  // WhatsApp customers aren't on a socket; relay through the Cloud API. The
+  // outcome is written back onto the message and broadcast as message.updated.
+  if (ticket.channel === "whatsapp") {
+    void deliverTicketMessageViaWhatsApp(ticket, message).catch((err) => {
+      console.error(`WhatsApp relay failed for ticket ${ticket._id}:`, err);
+    });
+  }
 }
 
 async function handleVisitorMessage(ws: SupportSocket, payload: Record<string, unknown>) {

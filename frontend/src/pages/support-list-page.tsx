@@ -191,7 +191,9 @@ function TicketRow({
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{ticket.requester.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{ticket.requester.email}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {ticket.requester.email || ticket.requester.phoneNumber || ""}
+            </p>
           </div>
         </div>
       </TableCell>

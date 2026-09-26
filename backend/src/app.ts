@@ -34,6 +34,7 @@ import attendanceRouter from "./routes/attendance.route";
 import publicAttendanceRouter from "./routes/public-attendance.route";
 import publicSupportRouter from "./routes/public-support.route";
 import telephonyRouter from "./routes/telephony.route";
+import whatsAppRouter from "./routes/whatsapp.route";
 import chatRouter from "./routes/chat.route";
 import ticketRouter from "./routes/ticket.route";
 import supportAiRouter from "./routes/support-ai.route";
@@ -94,9 +95,10 @@ app.use(
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
-// Telephony webhooks need the raw request body for signature verification, so
-// they are mounted before the global JSON body parser.
+// Telephony and WhatsApp webhooks need the raw request body for signature
+// verification, so they are mounted before the global JSON body parser.
 app.use("/api/v1/telephony", telephonyRouter);
+app.use("/api/v1/whatsapp", whatsAppRouter);
 
 app.use("/api/v1/products/import", express.json({ limit: "1mb" }));
 // Composed replies carry an HTML body, a quoted chain and possibly inline

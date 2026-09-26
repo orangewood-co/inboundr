@@ -107,6 +107,8 @@ export async function sendSupportResolvedEmail(ticketId: string): Promise<boolea
   if (!mongoose.Types.ObjectId.isValid(ticketId)) return false;
   const ticket = await Ticket.findById(ticketId);
   if (!ticket || ticket.resolvedEmailSentAt) return false;
+  // Phone and WhatsApp requesters usually have no email on file.
+  if (!ticket.requester?.email) return false;
 
   const payload = await emailPayload(ticket);
   await sendEmail({
