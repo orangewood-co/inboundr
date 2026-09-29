@@ -77,7 +77,7 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
   };
 }
 
-export async function getSupportWhatsAppSettings(req: Request, res: Response): Promise<void> {
+export async function getWhatsAppSettings(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
     const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id }).lean();
@@ -93,7 +93,7 @@ export async function getSupportWhatsAppSettings(req: Request, res: Response): P
  * validated against Meta before anything is stored so a typo surfaces
  * immediately rather than on the first customer message.
  */
-export async function updateSupportWhatsAppSettings(req: Request, res: Response): Promise<void> {
+export async function updateWhatsAppSettings(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
     const existing = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id });
@@ -201,7 +201,7 @@ export async function updateSupportWhatsAppSettings(req: Request, res: Response)
 }
 
 /** Creates missing Inboundr templates on the WABA and refreshes review status. */
-export async function syncSupportWhatsAppTemplates(req: Request, res: Response): Promise<void> {
+export async function syncWhatsAppTemplatesForOrganization(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
     const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id });
@@ -238,7 +238,7 @@ export async function syncSupportWhatsAppTemplates(req: Request, res: Response):
   }
 }
 
-export async function disconnectSupportWhatsApp(req: Request, res: Response): Promise<void> {
+export async function disconnectWhatsApp(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
     await WhatsAppAccount.deleteOne({ organizationId: orgReq.organization._id });

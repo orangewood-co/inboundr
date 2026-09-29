@@ -108,13 +108,13 @@ async function requireAccount(
   if (!account || !account.enabled || account.status === "disabled") {
     throw new InvoiceWhatsAppError(
       "not_connected",
-      "WhatsApp is not connected for this organization. Connect it in Settings → Support → WhatsApp."
+      "WhatsApp is not connected for this organization. Connect it in Settings → Integrations."
     );
   }
   if (!isTemplateApproved(account, templateKey)) {
     throw new InvoiceWhatsAppError(
       "template_not_approved",
-      `The "${WHATSAPP_TEMPLATE_NAMES[templateKey]}" WhatsApp template is not approved yet. Sync templates in Settings → Support → WhatsApp and wait for Meta's approval.`
+      `The "${WHATSAPP_TEMPLATE_NAMES[templateKey]}" WhatsApp template is not approved yet. Sync templates in Settings → Integrations and wait for Meta's approval.`
     );
   }
   return account;

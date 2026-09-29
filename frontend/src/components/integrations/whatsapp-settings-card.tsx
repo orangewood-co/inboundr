@@ -17,12 +17,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
-import { API_ORIGIN } from "@/lib/env"
 import { formatDateTime } from "@/lib/format"
-import { supportWhatsAppSettingsQueryOptions } from "@/lib/queries"
+import {
+  WHATSAPP_SETTINGS_URL,
+  invalidateWhatsAppSettings,
+  whatsAppSettingsQueryOptions,
+} from "@/lib/queries"
 import { queryClient } from "@/lib/query-client"
 import { copyToClipboard } from "@/lib/utils"
-import { WhatsAppIcon } from "./channel"
+import { WhatsAppIcon } from "@/components/support/channel"
 
 type WhatsAppTemplateStatus =
   | "APPROVED"
@@ -70,8 +73,8 @@ type WhatsAppSettingsResponse = {
   sync?: { created: string[]; errors: Array<{ name: string; message: string }> }
 }
 
-const SETTINGS_URL = `${API_ORIGIN}/api/v1/support/whatsapp/settings`
-const TEMPLATE_SYNC_URL = `${API_ORIGIN}/api/v1/support/whatsapp/templates/sync`
+const SETTINGS_URL = WHATSAPP_SETTINGS_URL
+const TEMPLATE_SYNC_URL = `${WHATSAPP_SETTINGS_URL}/templates/sync`
 
 const TEMPLATE_STATUS_META: Record<WhatsAppTemplateStatus, { label: string; className: string }> = {
   APPROVED: { label: "Approved", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
@@ -139,10 +142,11 @@ function StatusBadge({ account }: { account: WhatsAppAccount }) {
 
 /**
  * Connects a Meta Cloud API number to the organization so inbound WhatsApp
- * messages become support tickets. Rendered inside the Settings → Support tab.
+ * messages become support tickets and invoices/reminders can be sent. Rendered
+ * inside the Settings → Integrations tab.
  */
 export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean }) {
-  const query = useQuery(supportWhatsAppSettingsQueryOptions)
+  const query = useQuery(whatsAppSettingsQueryOptions)
   const data = (query.data ?? null) as WhatsAppSettingsResponse | null
   const loading = query.isPending
   const [saving, setSaving] = useState(false)
@@ -161,7 +165,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
   const showForm = !account || editing
 
   function setData(next: WhatsAppSettingsResponse) {
-    queryClient.setQueryData(supportWhatsAppSettingsQueryOptions.queryKey, next)
+    queryClient.setQueryData(whatsAppSettingsQueryOptions.queryKey, next)
   }
 
   function startEditing() {
@@ -251,7 +255,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
       setAccessToken("")
       setAppSecret("")
       setEditing(false)
-      void queryClient.invalidateQueries({ queryKey: supportWhatsAppSettingsQueryOptions.queryKey })
+      void invalidateWhatsAppSettings()
       setConfirmDisconnect(false)
       toast.success("WhatsApp disconnected")
     } catch (err) {

@@ -44,7 +44,7 @@ import { ACTIVE_ORGANIZATION_ID_KEY, setActiveOrganizationId } from "@/lib/organ
 import { useEntitlements, type EmployeeAccessModule } from "@/lib/entitlements"
 import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/tag-chip"
 import type { ResolutionReason, SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
-import { WhatsAppSettingsCardContent } from "@/components/support/whatsapp-settings-card"
+import { WhatsAppSettingsCardContent } from "@/components/integrations/whatsapp-settings-card"
 import { WhatsAppIcon } from "@/components/support/channel"
 import { cn } from "@/lib/utils"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
@@ -62,6 +62,7 @@ import {
   MailIcon,
   MessageSquareTextIcon,
   MoreVerticalIcon,
+  PlugIcon,
   PlusIcon,
   ShieldCheckIcon,
   Trash2Icon,
@@ -3205,6 +3206,7 @@ function SupportResolutionReasonsCard() {
 
 function SupportTab() {
   const { canManageOrganization } = useEntitlements()
+  const navigate = useNavigate({ from: "/settings" })
   const [settings, setSettings] = useState<SupportAiSettings>({
     enabled: true,
     instructions: "",
@@ -3806,9 +3808,25 @@ function SupportTab() {
 
       <SettingsCard
         title="WhatsApp"
-        description="Turn messages to your WhatsApp Business number into support conversations, answered by the AI agent or your team."
+        description="Messages to your WhatsApp Business number arrive here as support conversations."
       >
-        <WhatsAppSettingsCardContent canManage={canManageOrganization} />
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <p className="text-sm text-muted-foreground">
+            The WhatsApp number, webhook and message templates are managed under Integrations,
+            since invoices and payment reminders use the same connection.
+          </p>
+          {canManageOrganization && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void navigate({ search: { tab: "integrations" } })}
+              className="gap-1.5"
+            >
+              <WhatsAppIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              Open Integrations
+            </Button>
+          )}
+        </div>
       </SettingsCard>
 
       <SettingsCard
@@ -4111,6 +4129,14 @@ export function SettingsPage() {
         isVisible: canShowManagementTabs,
         content: <NotificationsTab />,
       },
+      {
+        value: "integrations",
+        label: "Integrations",
+        icon: PlugIcon,
+        group: "Organization",
+        isVisible: canShowManagementTabs,
+        content: <IntegrationsTab />,
+      },
     ],
     [canShowCustomerTab, canShowManagementTabs, canShowSupportTab],
   )
@@ -4176,6 +4202,32 @@ export function SettingsPage() {
         </div>
       </div>
     </AppLayout>
+  )
+}
+
+// ─── Integrations Tab ────────────────────────────────────────
+
+function IntegrationsTab() {
+  const { canManageOrganization } = useEntitlements()
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Integrations"
+        description="Connect the external services your organization sends and receives messages through."
+      />
+
+      <SettingsCard
+        title="WhatsApp Business"
+        description="One number for support conversations, invoice delivery and payment reminders, via the Meta Cloud API."
+      >
+        <WhatsAppSettingsCardContent canManage={canManageOrganization} />
+      </SettingsCard>
+
+      <div className="rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
+        Gmail accounts are connected per person under <span className="font-medium text-foreground">Account</span>,
+        since each teammate sends from their own inbox.
+      </div>
+    </div>
   )
 }
 
@@ -4839,7 +4891,7 @@ function PaymentRemindersCard() {
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Sent via the approved payment-reminder template with the PDF attached. Needs
-                  WhatsApp connected under Support and a customer mobile number on the invoice.
+                  WhatsApp connected under Integrations and a customer mobile number on the invoice.
                 </p>
               </div>
             </label>

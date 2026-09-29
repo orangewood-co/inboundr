@@ -45,14 +45,6 @@ export const supportCallSettingsQueryOptions = queryOptions({
   staleTime: 5 * 60_000,
 })
 
-export const supportWhatsAppSettingsQueryOptions = queryOptions({
-  queryKey: ["support", "whatsapp-settings"],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  queryFn: async (): Promise<Record<string, any>> =>
-    fetchSupportResource("whatsapp/settings", "Failed to load WhatsApp settings"),
-  staleTime: 60_000,
-})
-
 export function invalidateSupportTags() {
   return queryClient.invalidateQueries({ queryKey: supportTagsQueryOptions.queryKey })
 }

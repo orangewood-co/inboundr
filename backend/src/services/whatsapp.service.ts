@@ -68,7 +68,7 @@ export class WhatsAppApiError extends Error {
       return "Meta is rate limiting messages to this customer. Try again later.";
     }
     if (this.isAuthError) {
-      return "The WhatsApp access token is invalid or expired. Reconnect WhatsApp in Settings → Support.";
+      return "The WhatsApp access token is invalid or expired. Reconnect WhatsApp in Settings → Integrations.";
     }
     return this.details || this.message || "WhatsApp rejected the message.";
   }

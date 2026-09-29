@@ -43,8 +43,8 @@ signature verification requires the exact raw request bytes.
 | --- | --- | --- |
 | Meta webhook verification handshake | `GET` | `/api/v1/whatsapp/webhook` |
 | Meta inbound events | `POST` | `/api/v1/whatsapp/webhook` |
-| Org WhatsApp settings (app UI) | `GET`/`PATCH`/`DELETE` | `/api/v1/support/whatsapp/settings` |
-| Create/refresh message templates | `POST` | `/api/v1/support/whatsapp/templates/sync` |
+| Org WhatsApp settings (app UI) | `GET`/`PATCH`/`DELETE` | `/api/v1/organization/whatsapp` |
+| Create/refresh message templates | `POST` | `/api/v1/organization/whatsapp/templates/sync` |
 | Send an invoice PDF on WhatsApp | `POST` | `/api/v1/invoices/:id/send-whatsapp` |
 
 With `API_ORIGIN=https://api.example.com` the callback URL to paste into Meta is
@@ -59,7 +59,7 @@ own the Meta app that the number sits under are supported:
 1. **Org brings its own Meta app** (default, zero platform config). The org
    creates a Meta app, adds the WhatsApp product, generates a System User token,
    and pastes the phone number id, token, and the app's **App secret** into
-   Settings → Support → WhatsApp. Inboundr generates a per-org verify token to
+   Settings → Integrations → WhatsApp. Inboundr generates a per-org verify token to
    paste into Meta's webhook config. Signatures are verified with that org's
    app secret.
 2. **Platform-owned Meta app.** Set `WHATSAPP_APP_SECRET` and
@@ -107,7 +107,9 @@ WHATSAPP_GRAPH_API_VERSION=v23.0
 
 ## 2. Connect in Inboundr
 
-Settings → **Support** → **WhatsApp** (owners/admins):
+Settings → **Integrations** → **WhatsApp Business** (owners/admins). The
+connection is organization-level and not tied to the support feature, since
+invoices and payment reminders use the same number.
 
 1. Paste the Phone number ID, optional WABA ID, the permanent token, and (if
    shown) the App secret. Click **Connect WhatsApp**. The backend validates the
@@ -172,7 +174,7 @@ template version on Meta's side; bump the template name if you edit it.
 
 ### Setting up templates
 
-1. In Settings → Support → WhatsApp, make sure the **WhatsApp Business Account
+1. In Settings → Integrations → WhatsApp, make sure the **WhatsApp Business Account
    ID** is filled in. Add the **Meta App ID** as well unless `WHATSAPP_APP_ID`
    is set on the backend (the Resumable Upload API used for the PDF sample
    needs an app id).
@@ -215,7 +217,7 @@ Organizations saved before channels existed behave as email-only.
 ## Verification checklist
 
 - [ ] `TOKEN_ENCRYPTION_SECRET` set in the backend `.env`.
-- [ ] Number connected in Settings → Support → WhatsApp (status **Connected**).
+- [ ] Number connected in Settings → Integrations → WhatsApp (status **Connected**).
 - [ ] Callback URL + verify token saved in Meta; `messages` field subscribed.
 - [ ] Test message creates a `whatsapp` ticket; bot reply arrives on the phone.
 - [ ] Agent reply from the inbox arrives on the phone and shows **Delivered**.
