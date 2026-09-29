@@ -9,6 +9,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/date-picker"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -2735,11 +2736,11 @@ export function DashboardPage() {
                         <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
                           From
                         </label>
-                        <Input
-                          type="date"
+                        <DatePicker
+                          size="sm"
                           value={dateFrom}
-                          onChange={(event) => setDateFrom(event.target.value)}
-                          className="h-8 text-xs"
+                          onChange={setDateFrom}
+                          placeholder="Start date"
                           aria-label="RFQ date from"
                         />
                       </div>
@@ -2747,11 +2748,11 @@ export function DashboardPage() {
                         <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
                           To
                         </label>
-                        <Input
-                          type="date"
+                        <DatePicker
+                          size="sm"
                           value={dateTo}
-                          onChange={(event) => setDateTo(event.target.value)}
-                          className="h-8 text-xs"
+                          onChange={setDateTo}
+                          placeholder="End date"
                           aria-label="RFQ date to"
                         />
                       </div>

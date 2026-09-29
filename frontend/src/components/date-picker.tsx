@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 function toDate(value: string): Date | undefined {
   if (!value) return undefined
@@ -26,9 +27,21 @@ interface DatePickerProps {
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  /** `sm` matches the compact controls used inside filter popovers. */
+  size?: "default" | "sm"
+  className?: string
+  "aria-label"?: string
 }
 
-export function DatePicker({ label, value, onChange, placeholder = "Pick a date" }: DatePickerProps) {
+export function DatePicker({
+  label,
+  value,
+  onChange,
+  placeholder = "Pick a date",
+  size = "default",
+  className,
+  "aria-label": ariaLabel,
+}: DatePickerProps) {
   const selected = toDate(value)
   const currentYear = new Date().getFullYear()
   const startMonth = new Date(currentYear - 10, 0)
@@ -42,8 +55,14 @@ export function DatePicker({ label, value, onChange, placeholder = "Pick a date"
           <Button
             type="button"
             variant="outline"
+            size={size}
             data-empty={!selected}
-            className="w-full justify-start font-normal data-[empty=true]:text-muted-foreground"
+            aria-label={ariaLabel}
+            className={cn(
+              "w-full justify-start font-normal data-[empty=true]:text-muted-foreground",
+              size === "sm" && "h-8 px-2.5 text-xs",
+              className
+            )}
           >
             <CalendarIcon className="size-3.5" />
             {selected ? format(selected, "dd MMM yyyy") : <span>{placeholder}</span>}
