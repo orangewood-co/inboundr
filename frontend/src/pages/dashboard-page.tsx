@@ -2658,7 +2658,7 @@ export function DashboardPage() {
             <div className="flex items-center justify-between border-b px-4 py-3">
               <div className="flex items-center gap-2">
                 <FileTextIcon className="size-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">RFQ Requests</h2>
+                <h2 className="text-sm font-semibold">Requests</h2>
                 {!listLoading && (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
                     {total}
