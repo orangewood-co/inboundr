@@ -2137,6 +2137,7 @@ export function DashboardPage() {
   const hasDeliveryTerms = deliveryTermsText.trim().length > 0
   // Manual RFQs (pasted text / uploaded files) have no source email.
   const detailEmail = detail?.emailId ?? null
+  const canUseCompletedRFQActions = Boolean(detail?.isProcessed && !detail.errorMessage)
 
   const renderManualProductEditor = (product: ManualProduct) => {
     const effectivePrice = product.price.trim() !== "" ? Number(product.price) : null
@@ -2978,32 +2979,36 @@ export function DashboardPage() {
                           <TooltipContent>Open original email in Inbox</TooltipContent>
                         </Tooltip>
                       )}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 shrink-0"
-                            onClick={() => openDownload(`${API_BASE}/${detail._id}/pdf`)}
-                          >
-                            <DownloadIcon className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Download PDF</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7 shrink-0 text-destructive hover:bg-destructive/10"
-                            onClick={() => setArchiveConfirmOpen(true)}
-                          >
-                            <ArchiveIcon className="size-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Archive RFQ</TooltipContent>
-                      </Tooltip>
+                      {canUseCompletedRFQActions && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 shrink-0"
+                                onClick={() => openDownload(`${API_BASE}/${detail._id}/pdf`)}
+                              >
+                                <DownloadIcon className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Download PDF</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 shrink-0 text-destructive hover:bg-destructive/10"
+                                onClick={() => setArchiveConfirmOpen(true)}
+                              >
+                                <ArchiveIcon className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Archive RFQ</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
