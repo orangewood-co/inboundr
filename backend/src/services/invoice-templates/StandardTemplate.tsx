@@ -1,290 +1,335 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { FONT } from "./fonts";
 import {
   amount,
+  customerLines,
+  documentStatus,
   formatDate,
   imageSource,
   invoiceHasDiscount,
   invoiceHasTax,
+  lineItemMeta,
   money,
   normalizeColor,
   orgContactLines,
   resolveBranding,
-  statusLabel,
+  shippingAddress,
 } from "./shared";
 import type { InvoiceTemplateProps } from "./types";
 
-const COLORS = {
-  text: "#111827",
-  muted: "#6b7280",
-  border: "#e5e7eb",
-  soft: "#f9fafb",
-  white: "#ffffff",
+const C = {
+  ink: "#15171a",
+  body: "#3a3d42",
+  muted: "#7a7e85",
+  rule: "#e3e4e7",
+  good: "#067647",
+  bad: "#b42318",
 };
 
+const PAD_X = 48;
+
 const styles = StyleSheet.create({
-  // No lineHeight here: react-pdf resolves a unitless page lineHeight against
-  // the base fontSize and children inherit that absolute value, so larger text
-  // (e.g. the 26pt title) overlaps the line below it. Leading is set per-style.
+  // No lineHeight on the page: react-pdf resolves a unitless page lineHeight
+  // against the base fontSize and children inherit the absolute value, so
+  // larger text overlaps the next line. Leading is set per-style instead.
   page: {
-    paddingTop: 40,
-    paddingBottom: 56,
-    paddingHorizontal: 44,
-    fontFamily: "Helvetica",
-    fontSize: 9,
-    color: COLORS.text,
+    paddingTop: 46,
+    paddingBottom: 64,
+    paddingHorizontal: PAD_X,
+    fontFamily: FONT.sans,
+    fontSize: 8.5,
+    color: C.body,
   },
-  letterhead: { width: "100%", height: 64, objectFit: "contain", marginBottom: 16 },
+  edge: { position: "absolute", top: 0, left: 0, right: 0, height: 4 },
+  letterhead: { width: "100%", height: 64, objectFit: "contain", marginBottom: 20 },
+
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  brandBlock: { maxWidth: 280 },
-  logo: { height: 34, width: 120, objectFit: "contain", marginBottom: 8 },
-  orgName: { fontFamily: "Helvetica-Bold", fontSize: 15, color: COLORS.text },
-  orgLine: { fontSize: 8.5, color: COLORS.muted, lineHeight: 1.4 },
-  titleBlock: { alignItems: "flex-end" },
-  title: { fontFamily: "Helvetica-Bold", fontSize: 26, letterSpacing: 1 },
-  invoiceNo: { fontSize: 10, color: COLORS.muted, marginTop: 2 },
-  statusPill: {
-    marginTop: 8,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    color: COLORS.white,
-    fontFamily: "Helvetica-Bold",
-    fontSize: 8,
+  brand: { maxWidth: 270 },
+  logo: { height: 30, width: 130, objectFit: "contain", objectPosition: "left", marginBottom: 10 },
+  orgName: { fontWeight: 600, fontSize: 12, color: C.ink, marginBottom: 3 },
+  orgLine: { fontSize: 8, color: C.muted, lineHeight: 1.45 },
+  docBlock: { alignItems: "flex-end" },
+  eyebrow: { fontSize: 7, fontWeight: 500, color: C.muted, letterSpacing: 1.2, textTransform: "uppercase" },
+  docNumber: { fontSize: 15, fontWeight: 500, color: C.ink, marginTop: 4 },
+
+  hero: { marginTop: 28, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  heroAmount: { fontSize: 26, fontWeight: 600, color: C.ink, letterSpacing: -0.6, lineHeight: 1.1 },
+  heroSub: { fontSize: 10, color: C.muted, marginTop: 4 },
+  status: { fontSize: 7.5, fontWeight: 600, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 },
+
+  parties: {
+    marginTop: 22,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.ink,
+    flexDirection: "row",
+    gap: 24,
   },
-  rule: { height: 2, marginTop: 16, marginBottom: 18, borderRadius: 2 },
-  metaRow: { flexDirection: "row", justifyContent: "space-between", gap: 16 },
-  partyBlock: { flex: 1 },
-  metaBlock: { width: 200 },
-  blockLabel: { fontFamily: "Helvetica-Bold", fontSize: 7.5, color: COLORS.muted, letterSpacing: 0.6, marginBottom: 4 },
-  partyName: { fontFamily: "Helvetica-Bold", fontSize: 11 },
-  partyLine: { fontSize: 9, color: COLORS.muted, lineHeight: 1.4 },
-  metaItem: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
-  metaKey: { color: COLORS.muted, fontSize: 9 },
-  metaValue: { fontFamily: "Helvetica-Bold", fontSize: 9 },
-  table: { marginTop: 22, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, overflow: "hidden" },
-  tableHead: { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 10 },
-  tableHeadText: { color: COLORS.white, fontFamily: "Helvetica-Bold", fontSize: 7.5, letterSpacing: 0.4 },
-  row: { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
-  rowAlt: { backgroundColor: COLORS.soft },
-  cellDesc: { flex: 1, paddingRight: 8 },
-  descText: { fontFamily: "Helvetica-Bold", fontSize: 9 },
-  descMeta: { fontSize: 7.5, color: COLORS.muted, marginTop: 1 },
-  num: { width: 38, textAlign: "right" },
-  rate: { width: 64, textAlign: "right" },
-  disc: { width: 40, textAlign: "right" },
-  hsn: { width: 48, textAlign: "left" },
-  gst: { width: 40, textAlign: "right" },
-  total: { width: 74, textAlign: "right", fontFamily: "Helvetica-Bold" },
-  footRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 20, gap: 24 },
-  payBox: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12, alignSelf: "flex-start" },
-  payTitle: { fontFamily: "Helvetica-Bold", fontSize: 10, marginBottom: 8 },
-  payInner: { flexDirection: "row", gap: 10, alignItems: "center" },
-  qr: { width: 76, height: 76 },
-  payHint: { fontSize: 8, color: COLORS.muted, lineHeight: 1.4 },
-  payUpi: { fontFamily: "Helvetica-Bold", fontSize: 9, marginTop: 4 },
-  totalsBox: { width: 230 },
-  totalsRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5 },
-  totalsKey: { fontSize: 9, color: COLORS.muted },
-  totalsValue: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  totalsDivider: { borderTopWidth: 1, borderTopColor: COLORS.border, marginVertical: 5 },
-  balanceRow: {
+  party: { flex: 1 },
+  details: { width: 172 },
+  label: { fontSize: 7, fontWeight: 500, color: C.muted, letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 },
+  partyName: { fontSize: 9.5, fontWeight: 600, color: C.ink, marginBottom: 2 },
+  partyLine: { fontSize: 8.5, lineHeight: 1.45 },
+  detailRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
+  detailKey: { color: C.muted },
+  detailValue: { color: C.ink, fontWeight: 500, textAlign: "right", maxWidth: 110 },
+
+  table: { marginTop: 26 },
+  th: {
+    flexDirection: "row",
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: C.ink,
+  },
+  thText: { fontSize: 7, fontWeight: 500, color: C.muted, letterSpacing: 1, textTransform: "uppercase" },
+  tr: { flexDirection: "row", paddingVertical: 8, borderBottomWidth: 0.75, borderBottomColor: C.rule },
+  cIdx: { width: 22, color: C.muted },
+  cItem: { flex: 1, paddingRight: 12 },
+  cHsn: { width: 52, color: C.muted },
+  cQty: { width: 36, textAlign: "right" },
+  cRate: { width: 70, textAlign: "right" },
+  cDisc: { width: 40, textAlign: "right" },
+  cGst: { width: 56, textAlign: "right" },
+  cAmt: { width: 80, textAlign: "right" },
+  itemName: { fontSize: 8.5, color: C.ink, fontWeight: 500, lineHeight: 1.35 },
+  itemMeta: { fontSize: 7.5, color: C.muted, marginTop: 2 },
+  sub: { fontSize: 7, color: C.muted, marginTop: 2, textAlign: "right" },
+  amt: { color: C.ink, fontWeight: 500 },
+
+  below: { flexDirection: "row", justifyContent: "space-between", marginTop: 18, gap: 32 },
+  pay: { flex: 1, flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  qr: { width: 74, height: 74, marginLeft: -4, marginTop: -4 },
+  payText: { flex: 1, paddingTop: 2 },
+  payId: { fontSize: 9, fontWeight: 500, color: C.ink, marginBottom: 3 },
+  payHint: { fontSize: 7.5, color: C.muted, lineHeight: 1.45 },
+  totals: { width: 220 },
+  tRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
+  tKey: { color: C.muted },
+  tVal: { color: C.ink },
+  tStrong: { color: C.ink, fontWeight: 600 },
+  dueRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    marginTop: 4,
+    alignItems: "baseline",
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: C.ink,
   },
-  balanceKey: { color: COLORS.white, fontFamily: "Helvetica-Bold", fontSize: 10 },
-  balanceValue: { color: COLORS.white, fontFamily: "Helvetica-Bold", fontSize: 12 },
-  notesWrap: { marginTop: 22, gap: 12 },
-  noteBlock: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 12 },
-  noteTitle: { fontFamily: "Helvetica-Bold", fontSize: 9.5, marginBottom: 4 },
-  noteText: { fontSize: 8.5, color: COLORS.muted, lineHeight: 1.4 },
+  dueKey: { fontSize: 9.5, fontWeight: 600, color: C.ink },
+  dueVal: { fontSize: 13, fontWeight: 600 },
+
+  notes: { flexDirection: "row", gap: 32, marginTop: 40 },
+  note: { flex: 1 },
+  noteText: { fontSize: 8, lineHeight: 1.55 },
+
   footer: {
     position: "absolute",
-    bottom: 24,
-    left: 44,
-    right: 44,
+    bottom: 28,
+    left: PAD_X,
+    right: PAD_X,
+    paddingTop: 8,
+    borderTopWidth: 0.75,
+    borderTopColor: C.rule,
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 7.5,
-    color: COLORS.muted,
+    fontSize: 7,
+    color: C.muted,
   },
 });
 
 export function StandardTemplate({ invoice, branding, assets }: InvoiceTemplateProps) {
   const org = resolveBranding(invoice, branding);
-  const primary = normalizeColor(org.primaryColor);
+  const accent = normalizeColor(org.primaryColor);
   const showTax = invoiceHasTax(invoice);
   const showDiscount = invoiceHasDiscount(invoice);
+  const { totals } = invoice;
   const customer = invoice.customerSnapshot;
+  const shipTo = shippingAddress(invoice);
   const letterhead = imageSource(org.letterheadBuffer);
   const logo = imageSource(org.logoBuffer);
   const qr = imageSource(assets?.upiQr?.buffer);
+  const status = documentStatus(invoice.status);
+  const statusColor = status?.tone === "bad" ? C.bad : status?.tone === "good" ? C.good : C.muted;
+  const settled = totals.balanceDue <= 0 && totals.grandTotal > 0;
 
-  const contactLines = orgContactLines(org);
+  const details: [string, string][] = [
+    ["Issued", formatDate(invoice.issueDate)],
+    ["Due", invoice.dueDate ? formatDate(invoice.dueDate) : invoice.paymentTerms || "On receipt"],
+  ];
+  if (invoice.paymentTerms && invoice.dueDate) details.push(["Terms", invoice.paymentTerms]);
+  if (invoice.poNumber) details.push(["Reference", invoice.poNumber]);
 
   return (
     <Document title={`Invoice ${invoice.invoiceNumber}`} author={org.name ?? "Invoice"}>
       <Page size="A4" style={styles.page}>
+        <View style={[styles.edge, { backgroundColor: accent }]} fixed />
         {letterhead ? <Image src={letterhead} style={styles.letterhead} /> : null}
 
         <View style={styles.header}>
-          <View style={styles.brandBlock}>
+          <View style={styles.brand}>
             {logo ? <Image src={logo} style={styles.logo} /> : null}
             <Text style={styles.orgName}>{org.name || "Organization"}</Text>
-            {contactLines.map((line, index) => (
+            {orgContactLines(org).map((line, index) => (
               <Text key={index} style={styles.orgLine}>
                 {line}
               </Text>
             ))}
           </View>
-          <View style={styles.titleBlock}>
-            <Text style={styles.title}>INVOICE</Text>
-            <Text style={styles.invoiceNo}>{invoice.invoiceNumber}</Text>
-            <Text style={[styles.statusPill, { backgroundColor: primary }]}>
-              {statusLabel(invoice.status).toUpperCase()}
-            </Text>
+          <View style={styles.docBlock}>
+            <Text style={styles.eyebrow}>Invoice</Text>
+            <Text style={styles.docNumber}>{invoice.invoiceNumber}</Text>
           </View>
         </View>
 
-        <View style={[styles.rule, { backgroundColor: primary }]} />
-
-        <View style={styles.metaRow}>
-          <View style={styles.partyBlock}>
-            <Text style={styles.blockLabel}>BILL TO</Text>
-            <Text style={styles.partyName}>{customer.company || customer.name || "-"}</Text>
-            {customer.company && customer.name && customer.company !== customer.name ? (
-              <Text style={styles.partyLine}>{customer.name}</Text>
-            ) : null}
-            {customer.billingAddress ? <Text style={styles.partyLine}>{customer.billingAddress}</Text> : null}
-            {customer.email ? <Text style={styles.partyLine}>{customer.email}</Text> : null}
-            {customer.contactNumber ? <Text style={styles.partyLine}>{customer.contactNumber}</Text> : null}
+        <View style={styles.hero}>
+          <View>
+            <Text style={styles.heroAmount}>{money(settled ? totals.grandTotal : totals.balanceDue)}</Text>
+            <Text style={styles.heroSub}>
+              {settled
+                ? "Paid in full. Thank you."
+                : invoice.dueDate
+                  ? `Due ${formatDate(invoice.dueDate)}`
+                  : `Due ${invoice.paymentTerms ? invoice.paymentTerms.toLowerCase() : "on receipt"}`}
+            </Text>
           </View>
-          <View style={styles.metaBlock}>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaKey}>Issue date</Text>
-              <Text style={styles.metaValue}>{formatDate(invoice.issueDate)}</Text>
+          {status ? <Text style={[styles.status, { color: statusColor }]}>{status.label}</Text> : null}
+        </View>
+
+        <View style={styles.parties}>
+          <View style={styles.party}>
+            <Text style={styles.label}>Billed to</Text>
+            <Text style={styles.partyName}>{customer.company || customer.name || "-"}</Text>
+            {customerLines(invoice).map((line, index) => (
+              <Text key={index} style={styles.partyLine}>
+                {line}
+              </Text>
+            ))}
+          </View>
+          {shipTo ? (
+            <View style={styles.party}>
+              <Text style={styles.label}>Ship to</Text>
+              <Text style={styles.partyLine}>{shipTo}</Text>
             </View>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaKey}>Due date</Text>
-              <Text style={styles.metaValue}>{formatDate(invoice.dueDate)}</Text>
-            </View>
-            {invoice.paymentTerms ? (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaKey}>Payment terms</Text>
-                <Text style={styles.metaValue}>{invoice.paymentTerms}</Text>
+          ) : null}
+          <View style={styles.details}>
+            <Text style={styles.label}>Details</Text>
+            {details.map(([key, value]) => (
+              <View key={key} style={styles.detailRow}>
+                <Text style={styles.detailKey}>{key}</Text>
+                <Text style={styles.detailValue}>{value}</Text>
               </View>
-            ) : null}
-            {invoice.poNumber ? (
-              <View style={styles.metaItem}>
-                <Text style={styles.metaKey}>PO / Reference</Text>
-                <Text style={styles.metaValue}>{invoice.poNumber}</Text>
-              </View>
-            ) : null}
+            ))}
           </View>
         </View>
 
         <View style={styles.table}>
-          <View style={[styles.tableHead, { backgroundColor: primary }]} fixed>
-            <Text style={[styles.tableHeadText, styles.cellDesc]}>Item</Text>
-            {showTax ? <Text style={[styles.tableHeadText, styles.hsn]}>HSN</Text> : null}
-            <Text style={[styles.tableHeadText, styles.num]}>Qty</Text>
-            <Text style={[styles.tableHeadText, styles.rate]}>Rate</Text>
-            {showDiscount ? <Text style={[styles.tableHeadText, styles.disc]}>Disc</Text> : null}
-            {showTax ? <Text style={[styles.tableHeadText, styles.gst]}>GST</Text> : null}
-            <Text style={[styles.tableHeadText, styles.total]}>Amount</Text>
+          <View style={styles.th} fixed>
+            <Text style={[styles.thText, styles.cIdx]}>#</Text>
+            <Text style={[styles.thText, styles.cItem]}>Item</Text>
+            {showTax ? <Text style={[styles.thText, styles.cHsn]}>HSN/SAC</Text> : null}
+            <Text style={[styles.thText, styles.cQty]}>Qty</Text>
+            <Text style={[styles.thText, styles.cRate]}>Rate</Text>
+            {showDiscount ? <Text style={[styles.thText, styles.cDisc]}>Disc</Text> : null}
+            {showTax ? <Text style={[styles.thText, styles.cGst]}>GST</Text> : null}
+            <Text style={[styles.thText, styles.cAmt]}>Amount</Text>
           </View>
           {invoice.lineItems.map((item, index) => {
-            const meta = [item.productCode, item.unit].filter(Boolean).join(" · ");
+            const meta = lineItemMeta(item);
             return (
-              <View key={index} style={[styles.row, index % 2 === 1 ? styles.rowAlt : {}]} wrap={false}>
-                <View style={styles.cellDesc}>
-                  <Text style={styles.descText}>{item.description || "-"}</Text>
-                  {meta ? <Text style={styles.descMeta}>{meta}</Text> : null}
+              <View key={index} style={styles.tr} wrap={false}>
+                <Text style={styles.cIdx}>{String(index + 1).padStart(2, "0")}</Text>
+                <View style={styles.cItem}>
+                  <Text style={styles.itemName}>{item.description || "-"}</Text>
+                  {meta ? <Text style={styles.itemMeta}>{meta}</Text> : null}
                 </View>
-                {showTax ? <Text style={styles.hsn}>{item.hsnCode || "-"}</Text> : null}
-                <Text style={styles.num}>{item.quantity}</Text>
-                <Text style={styles.rate}>{amount(item.unitPrice)}</Text>
-                {showDiscount ? <Text style={styles.disc}>{item.discountPercentage}%</Text> : null}
-                {showTax ? <Text style={styles.gst}>{item.gstRate}%</Text> : null}
-                <Text style={styles.total}>{amount(item.totalAmount)}</Text>
+                {showTax ? <Text style={styles.cHsn}>{item.hsnCode || "-"}</Text> : null}
+                <Text style={styles.cQty}>{item.quantity}</Text>
+                <Text style={styles.cRate}>{amount(item.unitPrice)}</Text>
+                {showDiscount ? (
+                  <Text style={styles.cDisc}>{item.discountPercentage ? `${item.discountPercentage}%` : "-"}</Text>
+                ) : null}
+                {showTax ? (
+                  <View style={styles.cGst}>
+                    <Text>{item.gstRate}%</Text>
+                    {item.taxAmount ? <Text style={styles.sub}>{amount(item.taxAmount)}</Text> : null}
+                  </View>
+                ) : null}
+                <Text style={[styles.cAmt, styles.amt]}>{amount(item.totalAmount)}</Text>
               </View>
             );
           })}
         </View>
 
-        <View style={styles.footRow}>
-          {/* The pay box must be a direct flex child of the row: wrapping it in
-              an unsized View lets yoga collapse its width to almost nothing. */}
+        <View style={styles.below} wrap={false}>
+          {/* The pay block must be a direct flex child of the row: wrapping it
+              in an unsized View lets yoga collapse its width to almost nothing. */}
           {qr && assets?.upiQr ? (
-            <View style={styles.payBox}>
-              <Text style={styles.payTitle}>Pay via UPI</Text>
-              <View style={styles.payInner}>
-                <Image src={qr} style={styles.qr} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.payHint}>Scan with any UPI app to pay the balance due.</Text>
-                  <Text style={[styles.payUpi, { color: primary }]}>{assets.upiQr.upiId}</Text>
-                </View>
+            <View style={styles.pay}>
+              <Image src={qr} style={styles.qr} />
+              <View style={styles.payText}>
+                <Text style={styles.label}>Pay by UPI</Text>
+                <Text style={styles.payId}>{assets.upiQr.upiId}</Text>
+                <Text style={styles.payHint}>Scan with any UPI app. The amount is filled in for you.</Text>
               </View>
             </View>
           ) : (
             <View style={{ flex: 1 }} />
           )}
 
-          <View style={styles.totalsBox}>
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsKey}>Subtotal</Text>
-              <Text style={styles.totalsValue}>{money(invoice.totals.subtotal)}</Text>
+          <View style={styles.totals}>
+            <View style={styles.tRow}>
+              <Text style={styles.tKey}>Subtotal</Text>
+              <Text style={styles.tVal}>{money(totals.subtotal)}</Text>
             </View>
             {showDiscount ? (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsKey}>Discount</Text>
-                <Text style={styles.totalsValue}>- {money(invoice.totals.discountTotal)}</Text>
+              <View style={styles.tRow}>
+                <Text style={styles.tKey}>Discount</Text>
+                <Text style={styles.tVal}>{money(-totals.discountTotal)}</Text>
               </View>
             ) : null}
             {showTax ? (
               <>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsKey}>Taxable</Text>
-                  <Text style={styles.totalsValue}>{money(invoice.totals.taxableTotal)}</Text>
-                </View>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsKey}>Tax (GST)</Text>
-                  <Text style={styles.totalsValue}>{money(invoice.totals.taxTotal)}</Text>
+                {showDiscount ? (
+                  <View style={styles.tRow}>
+                    <Text style={styles.tKey}>Taxable value</Text>
+                    <Text style={styles.tVal}>{money(totals.taxableTotal)}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.tRow}>
+                  <Text style={styles.tKey}>GST</Text>
+                  <Text style={styles.tVal}>{money(totals.taxTotal)}</Text>
                 </View>
               </>
             ) : null}
-            <View style={styles.totalsDivider} />
-            <View style={styles.totalsRow}>
-              <Text style={[styles.totalsKey, { fontFamily: "Helvetica-Bold", color: COLORS.text }]}>Grand total</Text>
-              <Text style={styles.totalsValue}>{money(invoice.totals.grandTotal)}</Text>
+            <View style={styles.tRow}>
+              <Text style={styles.tStrong}>Total</Text>
+              <Text style={styles.tStrong}>{money(totals.grandTotal)}</Text>
             </View>
-            {invoice.totals.paidTotal > 0 ? (
-              <View style={styles.totalsRow}>
-                <Text style={styles.totalsKey}>Paid</Text>
-                <Text style={styles.totalsValue}>- {money(invoice.totals.paidTotal)}</Text>
+            {totals.paidTotal > 0 ? (
+              <View style={styles.tRow}>
+                <Text style={styles.tKey}>Paid</Text>
+                <Text style={styles.tVal}>{money(-totals.paidTotal)}</Text>
               </View>
             ) : null}
-            <View style={[styles.balanceRow, { backgroundColor: primary }]}>
-              <Text style={styles.balanceKey}>Balance due</Text>
-              <Text style={styles.balanceValue}>{money(invoice.totals.balanceDue)}</Text>
+            <View style={styles.dueRow}>
+              <Text style={styles.dueKey}>Amount due</Text>
+              <Text style={[styles.dueVal, { color: settled ? C.ink : accent }]}>{money(totals.balanceDue)}</Text>
             </View>
           </View>
         </View>
 
         {invoice.notes || invoice.termsAndConditions ? (
-          <View style={styles.notesWrap}>
+          <View style={styles.notes}>
             {invoice.notes ? (
-              <View style={styles.noteBlock}>
-                <Text style={styles.noteTitle}>Notes</Text>
+              <View style={styles.note}>
+                <Text style={styles.label}>Notes</Text>
                 <Text style={styles.noteText}>{invoice.notes}</Text>
               </View>
             ) : null}
             {invoice.termsAndConditions ? (
-              <View style={styles.noteBlock}>
-                <Text style={styles.noteTitle}>Terms &amp; conditions</Text>
+              <View style={styles.note}>
+                <Text style={styles.label}>Terms</Text>
                 <Text style={styles.noteText}>{invoice.termsAndConditions}</Text>
               </View>
             ) : null}
@@ -292,10 +337,11 @@ export function StandardTemplate({ invoice, branding, assets }: InvoiceTemplateP
         ) : null}
 
         <View style={styles.footer} fixed>
-          <Text>{invoice.invoiceNumber}</Text>
-          <Text
-            render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-          />
+          <Text>
+            {org.name ? `${org.name}  ·  ` : ""}
+            {invoice.invoiceNumber}
+          </Text>
+          <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>
     </Document>

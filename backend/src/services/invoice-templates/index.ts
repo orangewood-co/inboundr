@@ -4,6 +4,7 @@ import {
   normalizeInvoiceTemplateId,
   type InvoiceTemplateId,
 } from "../../models/invoice.model";
+import "./fonts";
 import { ClassicTemplate } from "./ClassicTemplate";
 import { MinimalTemplate } from "./MinimalTemplate";
 import { StandardTemplate } from "./StandardTemplate";
@@ -20,19 +21,19 @@ export const INVOICE_TEMPLATES: Record<InvoiceTemplateId, InvoiceTemplateMeta> =
   minimal: {
     id: "minimal",
     label: "Minimal",
-    description: "Monospace, typewriter-style layout. Clean and distraction-free.",
+    description: "Monochrome, monospaced receipt layout with dashed rules.",
     component: MinimalTemplate,
   },
   classic: {
     id: "classic",
     label: "Classic",
-    description: "Bold centered header with a prominent logo and tidy summary.",
+    description: "Editorial serif layout with a centered masthead and double-ruled totals.",
     component: ClassicTemplate,
   },
   standard: {
     id: "standard",
     label: "Standard",
-    description: "Branded layout with accent color, summary cards, and totals.",
+    description: "Clean sans-serif layout that leads with the amount due. Uses your accent color sparingly.",
     component: StandardTemplate,
   },
 };

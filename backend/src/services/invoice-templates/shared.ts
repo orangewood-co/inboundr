@@ -15,16 +15,66 @@ export function amount(value: number): string {
   return numberFormatter.format(Number.isFinite(value) ? value : 0);
 }
 
-/**
- * Amount prefixed with the INR currency code. The bundled PDF fonts cannot
- * render the ₹ glyph, so the ASCII code keeps every template legible.
- */
+/** Amount prefixed with the rupee sign; every template font carries the ₹ glyph. */
 export function money(value: number): string {
-  return `INR ${amount(value)}`;
+  const safe = Number.isFinite(value) ? value : 0;
+  return `${safe < 0 ? "−" : ""}₹${amount(Math.abs(safe))}`;
 }
 
 export function statusLabel(status: string): string {
   return status.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+/**
+ * Status worth printing on a customer-facing document. Internal delivery
+ * states ("sent", "viewed") are noise to the recipient, so they print nothing.
+ */
+export function documentStatus(status: string): { label: string; tone: "neutral" | "good" | "bad" } | null {
+  switch (status) {
+    case "draft":
+      return { label: "Draft", tone: "neutral" };
+    case "paid":
+      return { label: "Paid", tone: "good" };
+    case "partially_paid":
+      return { label: "Partially paid", tone: "neutral" };
+    case "overdue":
+      return { label: "Overdue", tone: "bad" };
+    case "cancelled":
+      return { label: "Cancelled", tone: "bad" };
+    case "written_off":
+      return { label: "Written off", tone: "neutral" };
+    default:
+      return null;
+  }
+}
+
+export function customerLines(invoice: PdfInvoice): string[] {
+  const customer = invoice.customerSnapshot;
+  const primary = customer.company || customer.name;
+  return [
+    customer.name && customer.name !== primary ? customer.name : "",
+    customer.billingAddress,
+    customer.email,
+    customer.contactNumber,
+  ]
+    .map((line) => (line ?? "").trim())
+    .filter(Boolean);
+}
+
+/** Shipping address, only when it differs from the billing address. */
+export function shippingAddress(invoice: PdfInvoice): string | null {
+  const { shippingAddress: shipping, billingAddress } = invoice.customerSnapshot;
+  const trimmed = (shipping ?? "").trim();
+  if (!trimmed || trimmed === (billingAddress ?? "").trim()) return null;
+  return trimmed;
+}
+
+export function lineItemMeta(item: PdfInvoice["lineItems"][number]): string {
+  return [item.productCode, item.unit].map((part) => (part ?? "").trim()).filter(Boolean).join(" · ");
+}
+
+export function websiteLabel(website: string | null | undefined): string {
+  return (website ?? "").trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
 /**
@@ -62,7 +112,7 @@ export function resolveBranding(
 export { pdfImageSource as imageSource } from "../pdf-branding.service";
 
 export function orgContactLines(branding: PdfOrganizationBranding): string[] {
-  return [branding.address, branding.email, branding.phoneNumber, branding.website]
+  return [branding.address, branding.email, branding.phoneNumber, websiteLabel(branding.website)]
     .map((line) => (line ?? "").trim())
     .filter(Boolean);
 }

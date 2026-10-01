@@ -164,17 +164,17 @@ const INVOICE_TEMPLATE_OPTIONS = [
   {
     id: "standard",
     label: "Standard",
-    description: "Branded layout with your accent color, summary, and totals.",
+    description: "Clean sans-serif layout that leads with the amount due. Uses your accent color sparingly.",
   },
   {
     id: "minimal",
     label: "Minimal",
-    description: "Monospace, typewriter-style layout. Clean and distraction-free.",
+    description: "Monochrome, monospaced receipt layout with dashed rules.",
   },
   {
     id: "classic",
     label: "Classic",
-    description: "Bold centered header with a prominent logo and tidy summary.",
+    description: "Editorial serif layout with a centered masthead and double-ruled totals.",
   },
 ] as const
 
@@ -1315,7 +1315,7 @@ function OrganizationTab() {
                       >
                         <div className="aspect-[3/4] w-full overflow-hidden border-b bg-muted/30">
                           <img
-                            src={`/invoice-templates/${template.id}.svg`}
+                            src={`/invoice-templates/${template.id}.png`}
                             alt={`${template.label} invoice template preview`}
                             className="h-full w-full object-cover object-top"
                             loading="lazy"

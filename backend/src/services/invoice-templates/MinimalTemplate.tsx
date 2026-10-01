@@ -1,74 +1,116 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { FONT } from "./fonts";
 import {
   amount,
+  customerLines,
+  documentStatus,
   formatDate,
+  imageSource,
   invoiceHasDiscount,
   invoiceHasTax,
+  lineItemMeta,
   money,
   orgContactLines,
   resolveBranding,
-  statusLabel,
+  shippingAddress,
 } from "./shared";
-import { imageSource } from "./shared";
 import type { InvoiceTemplateProps } from "./types";
 
-const INK = "#1a1a1a";
-const FAINT = "#000000";
+const INK = "#111111";
+const MUTED = "#6f6f6f";
+
+const PAD_X = 52;
+
+const dashed = { borderStyle: "dashed" as const, borderColor: INK };
 
 const styles = StyleSheet.create({
+  // No lineHeight on the page: react-pdf resolves a unitless page lineHeight
+  // against the base fontSize and children inherit the absolute value, so
+  // larger text overlaps the next line. Leading is set per-style instead.
   page: {
     paddingTop: 48,
-    paddingBottom: 56,
-    paddingHorizontal: 52,
-    fontFamily: "Courier",
-    fontSize: 8.5,
+    paddingBottom: 60,
+    paddingHorizontal: PAD_X,
+    fontFamily: FONT.mono,
+    fontSize: 8,
     color: INK,
-    lineHeight: 1.5,
   },
+  line: { fontSize: 8, lineHeight: 1.5 },
+  muted: { color: MUTED },
+  strong: { fontWeight: 600 },
+  caps: { textTransform: "uppercase", letterSpacing: 0.8 },
+
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  orgBlock: { maxWidth: 280 },
-  orgName: { fontFamily: "Courier-Bold", fontSize: 10 },
-  orgLine: { fontSize: 8.5 },
-  metaBox: { borderWidth: 1, borderColor: FAINT, padding: 8, width: 230 },
-  metaRow: { flexDirection: "row" },
-  metaKey: { fontFamily: "Courier-Bold", width: 96 },
-  metaValue: { flex: 1, textAlign: "right" },
-  section: { marginTop: 18 },
-  label: { fontFamily: "Courier-Bold" },
-  kvRow: { flexDirection: "row" },
-  kvKey: { width: 110 },
-  orderTitle: { textAlign: "center", fontFamily: "Courier-Bold", marginTop: 22, marginBottom: 6 },
-  hr: { borderTopWidth: 1, borderTopColor: FAINT, marginVertical: 4 },
-  hrThin: { borderTopWidth: 0.5, borderTopColor: FAINT, marginVertical: 4 },
-  tableRow: { flexDirection: "row" },
-  th: { fontFamily: "Courier-Bold" },
-  cNum: { width: 22 },
-  cSku: { width: 62 },
-  cDesc: { flex: 1, paddingRight: 6 },
+  orgBlock: { maxWidth: 270 },
+  logo: { height: 26, width: 110, objectFit: "contain", objectPosition: "left", marginBottom: 10 },
+  docBlock: { alignItems: "flex-end" },
+  docTitle: { fontSize: 18, fontWeight: 500, letterSpacing: 4, lineHeight: 1.1 },
+  docNumber: { fontSize: 9, marginTop: 4 },
+  stamp: {
+    marginTop: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: INK,
+    fontSize: 7.5,
+    fontWeight: 600,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+
+  rule: { borderTopWidth: 1, ...dashed, marginVertical: 14 },
+  ruleSolid: { borderTopWidth: 1, borderColor: INK },
+
+  grid: { flexDirection: "row", gap: 24 },
+  col: { flex: 1 },
+  label: { fontSize: 7.5, color: MUTED, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 },
+  kv: { flexDirection: "row" },
+  kvKey: { width: 64, color: MUTED },
+  kvValue: { flex: 1 },
+
+  th: { flexDirection: "row", paddingBottom: 5, borderBottomWidth: 1, ...dashed },
+  thText: { fontSize: 7.5, color: MUTED, textTransform: "uppercase", letterSpacing: 0.8 },
+  tr: { flexDirection: "row", paddingVertical: 6 },
+  cIdx: { width: 22, color: MUTED },
+  cItem: { flex: 1, paddingRight: 10 },
   cHsn: { width: 50 },
-  cRate: { width: 70, textAlign: "right" },
-  cQty: { width: 40, textAlign: "right" },
-  cGst: { width: 42, textAlign: "right" },
-  cAmt: { width: 78, textAlign: "right" },
-  totalsBlock: { marginTop: 6, alignItems: "flex-end" },
-  totalsRow: { flexDirection: "row", justifyContent: "flex-end", width: 280 },
-  totalsKey: { textAlign: "right", flex: 1, paddingRight: 16 },
-  totalsKeyBold: { textAlign: "right", flex: 1, paddingRight: 16, fontFamily: "Courier-Bold" },
-  totalsValue: { width: 96, textAlign: "right" },
-  totalsValueBold: { width: 96, textAlign: "right", fontFamily: "Courier-Bold" },
-  statusLine: { textAlign: "center", fontFamily: "Courier-Bold", letterSpacing: 3, marginVertical: 14 },
-  payLine: { marginTop: 14 },
-  upiWrap: { marginTop: 16, flexDirection: "row", gap: 12, alignItems: "center" },
-  qr: { width: 72, height: 72 },
-  thanks: { textAlign: "center", marginTop: 22 },
+  cQty: { width: 34, textAlign: "right" },
+  cRate: { width: 72, textAlign: "right" },
+  cDisc: { width: 40, textAlign: "right" },
+  cGst: { width: 36, textAlign: "right" },
+  cAmt: { width: 82, textAlign: "right" },
+  itemMeta: { fontSize: 7, color: MUTED, marginTop: 1.5 },
+
+  bottom: { flexDirection: "row", justifyContent: "space-between", gap: 28 },
+  pay: { flex: 1, flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  qr: { width: 70, height: 70, marginLeft: -3, marginTop: -3 },
+  totals: { width: 236 },
+  tRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.5 },
+  dueRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: INK,
+  },
+  dueText: { fontSize: 9.5, fontWeight: 600 },
+  doubleBottom: { borderTopWidth: 1, borderColor: INK, marginTop: 1.5 },
+
+  section: { marginTop: 22 },
+  noteText: { fontSize: 8, lineHeight: 1.55 },
+  end: { marginTop: 26, textAlign: "center", color: MUTED, letterSpacing: 2 },
+
   footer: {
     position: "absolute",
     bottom: 26,
-    left: 52,
-    right: 52,
+    left: PAD_X,
+    right: PAD_X,
     flexDirection: "row",
     justifyContent: "space-between",
-    fontSize: 7.5,
+    fontSize: 7,
+    color: MUTED,
   },
 });
 
@@ -76,176 +118,181 @@ export function MinimalTemplate({ invoice, branding, assets }: InvoiceTemplatePr
   const org = resolveBranding(invoice, branding);
   const showTax = invoiceHasTax(invoice);
   const showDiscount = invoiceHasDiscount(invoice);
+  const { totals } = invoice;
   const customer = invoice.customerSnapshot;
-  const contactLines = orgContactLines(org);
+  const shipTo = shippingAddress(invoice);
+  const logo = imageSource(org.logoBuffer);
   const qr = imageSource(assets?.upiQr?.buffer);
-  const isPaid = invoice.totals.balanceDue <= 0 && invoice.totals.grandTotal > 0;
+  const status = documentStatus(invoice.status);
 
-  const billedToLines = [
-    customer.name && customer.company && customer.name !== customer.company ? customer.name : null,
-    customer.billingAddress,
-    customer.email,
-    customer.contactNumber,
-  ].filter(Boolean) as string[];
+  const meta: [string, string][] = [
+    ["Issued", formatDate(invoice.issueDate)],
+    ["Due", invoice.dueDate ? formatDate(invoice.dueDate) : invoice.paymentTerms || "On receipt"],
+  ];
+  if (invoice.paymentTerms && invoice.dueDate) meta.push(["Terms", invoice.paymentTerms]);
+  if (invoice.poNumber) meta.push(["P.O.", invoice.poNumber]);
 
   return (
     <Document title={`Invoice ${invoice.invoiceNumber}`} author={org.name ?? "Invoice"}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <View style={styles.orgBlock}>
-            <Text style={styles.orgName}>{org.name || "Organization"}</Text>
-            {contactLines.map((line, index) => (
-              <Text key={index} style={styles.orgLine}>
+            {logo ? <Image src={logo} style={styles.logo} /> : null}
+            <Text style={[styles.line, styles.strong, styles.caps]}>{org.name || "Organization"}</Text>
+            {orgContactLines(org).map((line, index) => (
+              <Text key={index} style={[styles.line, styles.muted]}>
                 {line}
               </Text>
             ))}
           </View>
-          <View style={styles.metaBox}>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Invoice #:</Text>
-              <Text style={styles.metaValue}>{invoice.invoiceNumber}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Created:</Text>
-              <Text style={styles.metaValue}>{formatDate(invoice.issueDate)}</Text>
-            </View>
-            <View style={styles.metaRow}>
-              <Text style={styles.metaKey}>Due:</Text>
-              <Text style={styles.metaValue}>{formatDate(invoice.dueDate)}</Text>
-            </View>
+          <View style={styles.docBlock}>
+            <Text style={styles.docTitle}>INVOICE</Text>
+            <Text style={styles.docNumber}>{invoice.invoiceNumber}</Text>
+            {status ? <Text style={styles.stamp}>{status.label}</Text> : null}
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Billed To:</Text>
-          <Text style={styles.orgName}>{customer.company || customer.name || "-"}</Text>
-          {billedToLines.map((line, index) => (
-            <Text key={index}>{line}</Text>
-          ))}
+        <View style={styles.rule} />
+
+        <View style={styles.grid}>
+          <View style={styles.col}>
+            <Text style={styles.label}>Bill to</Text>
+            <Text style={[styles.line, styles.strong]}>{customer.company || customer.name || "-"}</Text>
+            {customerLines(invoice).map((line, index) => (
+              <Text key={index} style={styles.line}>
+                {line}
+              </Text>
+            ))}
+          </View>
+          {shipTo ? (
+            <View style={styles.col}>
+              <Text style={styles.label}>Ship to</Text>
+              <Text style={styles.line}>{shipTo}</Text>
+            </View>
+          ) : null}
+          <View style={{ width: 170 }}>
+            <Text style={styles.label}>Details</Text>
+            {meta.map(([key, value]) => (
+              <View key={key} style={styles.kv}>
+                <Text style={[styles.line, styles.kvKey]}>{key}</Text>
+                <Text style={[styles.line, styles.kvValue]}>{value}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {invoice.poNumber || invoice.paymentTerms ? (
-          <View style={styles.section}>
-            {invoice.poNumber ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvKey}>P.O. No.:</Text>
-                <Text>{invoice.poNumber}</Text>
+        <View style={styles.rule} />
+
+        <View style={styles.th} fixed>
+          <Text style={[styles.thText, styles.cIdx]}>#</Text>
+          <Text style={[styles.thText, styles.cItem]}>Item</Text>
+          {showTax ? <Text style={[styles.thText, styles.cHsn]}>HSN</Text> : null}
+          <Text style={[styles.thText, styles.cQty]}>Qty</Text>
+          <Text style={[styles.thText, styles.cRate]}>Rate</Text>
+          {showDiscount ? <Text style={[styles.thText, styles.cDisc]}>Disc</Text> : null}
+          {showTax ? <Text style={[styles.thText, styles.cGst]}>GST</Text> : null}
+          <Text style={[styles.thText, styles.cAmt]}>Amount</Text>
+        </View>
+        {invoice.lineItems.map((item, index) => {
+          const itemMeta = lineItemMeta(item);
+          return (
+            <View key={index} style={styles.tr} wrap={false}>
+              <Text style={[styles.line, styles.cIdx]}>{String(index + 1).padStart(2, "0")}</Text>
+              <View style={styles.cItem}>
+                <Text style={styles.line}>{item.description || "-"}</Text>
+                {itemMeta ? <Text style={styles.itemMeta}>{itemMeta}</Text> : null}
+              </View>
+              {showTax ? <Text style={[styles.line, styles.cHsn]}>{item.hsnCode || "-"}</Text> : null}
+              <Text style={[styles.line, styles.cQty]}>{item.quantity}</Text>
+              <Text style={[styles.line, styles.cRate]}>{amount(item.unitPrice)}</Text>
+              {showDiscount ? (
+                <Text style={[styles.line, styles.cDisc]}>{item.discountPercentage ? `${item.discountPercentage}%` : "-"}</Text>
+              ) : null}
+              {showTax ? <Text style={[styles.line, styles.cGst]}>{item.gstRate}%</Text> : null}
+              <Text style={[styles.line, styles.cAmt]}>{amount(item.totalAmount)}</Text>
+            </View>
+          );
+        })}
+
+        <View style={styles.rule} />
+
+        <View style={styles.bottom} wrap={false}>
+          {/* The pay block must be a direct flex child of the row: wrapping it
+              in an unsized View lets yoga collapse its width to almost nothing. */}
+          {qr && assets?.upiQr ? (
+            <View style={styles.pay}>
+              <Image src={qr} style={styles.qr} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Pay by UPI</Text>
+                <Text style={[styles.line, styles.strong]}>{assets.upiQr.upiId}</Text>
+                <Text style={[styles.line, styles.muted]}>Scan with any UPI app.</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+
+          <View style={styles.totals}>
+            <View style={styles.tRow}>
+              <Text style={[styles.line, styles.muted]}>Subtotal</Text>
+              <Text style={styles.line}>{money(totals.subtotal)}</Text>
+            </View>
+            {showDiscount ? (
+              <View style={styles.tRow}>
+                <Text style={[styles.line, styles.muted]}>Discount</Text>
+                <Text style={styles.line}>{money(-totals.discountTotal)}</Text>
               </View>
             ) : null}
-            {invoice.paymentTerms ? (
-              <View style={styles.kvRow}>
-                <Text style={styles.kvKey}>Terms:</Text>
-                <Text>{invoice.paymentTerms}</Text>
+            {showTax ? (
+              <>
+                {showDiscount ? (
+                  <View style={styles.tRow}>
+                    <Text style={[styles.line, styles.muted]}>Taxable</Text>
+                    <Text style={styles.line}>{money(totals.taxableTotal)}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.tRow}>
+                  <Text style={[styles.line, styles.muted]}>GST</Text>
+                  <Text style={styles.line}>{money(totals.taxTotal)}</Text>
+                </View>
+              </>
+            ) : null}
+            <View style={styles.tRow}>
+              <Text style={[styles.line, styles.strong]}>Total</Text>
+              <Text style={[styles.line, styles.strong]}>{money(totals.grandTotal)}</Text>
+            </View>
+            {totals.paidTotal > 0 ? (
+              <View style={styles.tRow}>
+                <Text style={[styles.line, styles.muted]}>Paid</Text>
+                <Text style={styles.line}>{money(-totals.paidTotal)}</Text>
               </View>
             ) : null}
-          </View>
-        ) : null}
-
-        <Text style={styles.orderTitle}>Invoice {invoice.invoiceNumber}</Text>
-
-        <View style={styles.hr} />
-        <View style={styles.tableRow} fixed>
-          <Text style={[styles.th, styles.cNum]}>#</Text>
-          <Text style={[styles.th, styles.cSku]}>SKU</Text>
-          <Text style={[styles.th, styles.cDesc]}>Desc.</Text>
-          {showTax ? <Text style={[styles.th, styles.cHsn]}>HSN</Text> : null}
-          <Text style={[styles.th, styles.cRate]}>Unit Rate</Text>
-          <Text style={[styles.th, styles.cQty]}>Count</Text>
-          {showTax ? <Text style={[styles.th, styles.cGst]}>GST</Text> : null}
-          <Text style={[styles.th, styles.cAmt]}>Amount</Text>
-        </View>
-        <View style={styles.hrThin} />
-
-        {invoice.lineItems.map((item, index) => (
-          <View key={index} style={styles.tableRow} wrap={false}>
-            <Text style={styles.cNum}>{index + 1}</Text>
-            <Text style={styles.cSku}>{item.productCode || "-"}</Text>
-            <Text style={styles.cDesc}>{item.description || "-"}</Text>
-            {showTax ? <Text style={styles.cHsn}>{item.hsnCode || "-"}</Text> : null}
-            <Text style={styles.cRate}>{amount(item.unitPrice)}</Text>
-            <Text style={styles.cQty}>{item.quantity}</Text>
-            {showTax ? <Text style={styles.cGst}>{item.gstRate}%</Text> : null}
-            <Text style={styles.cAmt}>{amount(item.totalAmount)}</Text>
-          </View>
-        ))}
-
-        <View style={styles.hr} />
-
-        <View style={styles.totalsBlock}>
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsKey}>Subtotal</Text>
-            <Text style={styles.totalsValue}>{amount(invoice.totals.subtotal)}</Text>
-          </View>
-          {showDiscount ? (
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsKey}>Discount</Text>
-              <Text style={styles.totalsValue}>-{amount(invoice.totals.discountTotal)}</Text>
+            <View style={styles.dueRow}>
+              <Text style={[styles.dueText, styles.caps]}>Balance due</Text>
+              <Text style={styles.dueText}>{money(totals.balanceDue)}</Text>
             </View>
-          ) : null}
-          {showDiscount || showTax ? (
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsKey}>Net Sales Total</Text>
-              <Text style={styles.totalsValue}>{amount(invoice.totals.taxableTotal)}</Text>
-            </View>
-          ) : null}
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsKey}>Tax</Text>
-            <Text style={styles.totalsValue}>{amount(invoice.totals.taxTotal)}</Text>
-          </View>
-          <View style={[styles.hrThin, { width: 280 }]} />
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsKeyBold}>Total</Text>
-            <Text style={styles.totalsValueBold}>{money(invoice.totals.grandTotal)}</Text>
+            <View style={styles.doubleBottom} />
           </View>
         </View>
-
-        {isPaid ? <Text style={styles.statusLine}>INVOICE STATUS: {statusLabel(invoice.status).toUpperCase()}</Text> : null}
-
-        <View style={styles.totalsBlock}>
-          {invoice.totals.paidTotal > 0 ? (
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsKey}>Paid</Text>
-              <Text style={styles.totalsValue}>-{amount(invoice.totals.paidTotal)}</Text>
-            </View>
-          ) : null}
-          <View style={styles.totalsRow}>
-            <Text style={styles.totalsKeyBold}>Balance</Text>
-            <Text style={styles.totalsValueBold}>{money(invoice.totals.balanceDue)}</Text>
-          </View>
-        </View>
-
-        {qr && assets?.upiQr ? (
-          <View style={styles.upiWrap}>
-            <Image src={qr} style={styles.qr} />
-            <View>
-              <Text style={styles.label}>Pay via UPI</Text>
-              <Text>{assets.upiQr.upiId}</Text>
-              <Text>Scan with any UPI app to pay the balance due.</Text>
-            </View>
-          </View>
-        ) : null}
 
         {invoice.notes ? (
           <View style={styles.section}>
-            <Text>{invoice.notes}</Text>
+            <Text style={styles.label}>Notes</Text>
+            <Text style={styles.noteText}>{invoice.notes}</Text>
           </View>
         ) : null}
         {invoice.termsAndConditions ? (
           <View style={styles.section}>
-            <Text style={styles.label}>Terms &amp; Conditions</Text>
-            <Text>{invoice.termsAndConditions}</Text>
+            <Text style={styles.label}>Terms</Text>
+            <Text style={styles.noteText}>{invoice.termsAndConditions}</Text>
           </View>
         ) : null}
 
-        <View style={styles.thanks}>
-          <Text>***</Text>
-          <Text>Thank you for your business.</Text>
-          <Text>{org.name || ""}</Text>
-        </View>
+        <Text style={styles.end}>* * *</Text>
 
         <View style={styles.footer} fixed>
           <Text>{invoice.invoiceNumber}</Text>
-          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <Text render={({ pageNumber, totalPages }) => `${pageNumber}/${totalPages}`} />
         </View>
       </Page>
     </Document>
