@@ -1147,8 +1147,8 @@ export function DashboardPage() {
     (dateFrom.trim() !== "" || dateTo.trim() !== "" ? 1 : 0) +
     (sortOption !== "created_desc" ? 1 : 0)
 
-  const fetchList = useCallback(async (p: number) => {
-    setListLoading(true)
+  const fetchList = useCallback(async (p: number, showLoading = true) => {
+    if (showLoading) setListLoading(true)
     setListError(null)
     try {
       const params = new URLSearchParams({
@@ -1173,7 +1173,7 @@ export function DashboardPage() {
       setListError(err.message || "Failed to load RFQs")
       return null
     } finally {
-      setListLoading(false)
+      if (showLoading) setListLoading(false)
     }
   }, [dateFrom, dateTo, sortOption, statusFilter])
 
@@ -1468,7 +1468,7 @@ export function DashboardPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await fetchList(page)
+    await fetchList(page, false)
     setRefreshing(false)
   }
 
@@ -2661,11 +2661,9 @@ export function DashboardPage() {
               <div className="flex items-center gap-2">
                 <FileTextIcon className="size-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold">Requests</h2>
-                {!listLoading && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
-                    {total}
-                  </span>
-                )}
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tabular-nums text-primary">
+                  {total}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <Tooltip>
