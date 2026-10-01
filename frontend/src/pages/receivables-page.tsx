@@ -6,14 +6,25 @@ import {
   CircleDollarSignIcon,
   RefreshCwIcon,
 } from "lucide-react"
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
 
 import { AppLayout } from "@/components/app-layout"
 import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { invalidateInvoiceStats, invoiceStatsQueryOptions } from "@/lib/queries"
+import { queryClient } from "@/lib/query-client"
 import { cn } from "@/lib/utils"
 
 import { API_ORIGIN } from "@/lib/env"
@@ -48,6 +59,19 @@ interface ReceivablesResponse {
     invoiceCount: number
   }
   customers: ReceivablesCustomer[]
+}
+
+interface InvoiceMonthlyPoint {
+  key: string
+  label: string
+  invoiced: number
+  collected: number
+}
+
+interface InvoiceStats {
+  outstanding: number
+  aging: ReceivablesAging
+  monthly: InvoiceMonthlyPoint[]
 }
 
 interface OpenInvoice {
@@ -87,6 +111,7 @@ function labelStatus(status: string) {
 
 export default function ReceivablesPage() {
   const [data, setData] = useState<ReceivablesResponse | null>(null)
+  const [stats, setStats] = useState<InvoiceStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -98,6 +123,12 @@ export default function ReceivablesPage() {
       const response = await fetch(`${INVOICE_API}/receivables`, { credentials: "include" })
       if (!response.ok) throw new Error("Unable to fetch receivables")
       setData((await response.json()) as ReceivablesResponse)
+      try {
+        await invalidateInvoiceStats()
+        setStats((await queryClient.fetchQuery(invoiceStatsQueryOptions)) as InvoiceStats)
+      } catch {
+        setStats(null)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to fetch receivables")
     } finally {
@@ -138,24 +169,42 @@ export default function ReceivablesPage() {
             </Tooltip>
           </div>
 
-          {/* Summary cards */}
-          <div className="grid gap-4 border-b p-4 sm:grid-cols-3">
-            <SummaryCard label="Total Outstanding" value={summary?.outstanding} loading={loading} />
-            <SummaryCard label="Overdue" value={summary?.overdue} loading={loading} destructive />
-            <div className="rounded-xl border bg-card p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Customers with Dues</p>
-              {loading ? (
-                <Skeleton className="mt-2 h-7 w-16" />
-              ) : (
-                <p className="mt-2 text-2xl font-semibold tabular-nums">{summary?.customerCount ?? 0}</p>
-              )}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {loading ? "" : `${summary?.invoiceCount ?? 0} open invoice${(summary?.invoiceCount ?? 0) === 1 ? "" : "s"}`}
-              </p>
+          {/* Receivables analytics */}
+          <div className="grid gap-4 border-b bg-muted/10 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
+            <ReceivablesOverviewCard
+              aging={stats?.aging}
+              total={summary?.outstanding}
+              loading={loading}
+            />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <SummaryCard label="Overdue" value={summary?.overdue} loading={loading} destructive />
+              <div className="rounded-xl border bg-card p-5">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Customers with Dues</p>
+                {loading ? (
+                  <Skeleton className="mt-2 h-7 w-16" />
+                ) : (
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">{summary?.customerCount ?? 0}</p>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {loading ? "" : `${summary?.invoiceCount ?? 0} open invoice${(summary?.invoiceCount ?? 0) === 1 ? "" : "s"}`}
+                </p>
+              </div>
             </div>
+            <MonthlyChartCard stats={stats} loading={loading} className="lg:col-span-2" />
           </div>
 
           {/* Content */}
+          <div className="flex items-center justify-between border-b px-5 py-3">
+            <div>
+              <h3 className="text-sm font-semibold">Customer balances</h3>
+              <p className="text-xs text-muted-foreground">Open amounts grouped by customer</p>
+            </div>
+            {!loading && summary && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {summary.invoiceCount} open invoice{summary.invoiceCount === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
           {error ? (
             <div className="flex flex-col items-center gap-2 p-8 text-center">
               <AlertCircleIcon className="size-5 text-destructive" />
@@ -215,6 +264,152 @@ export default function ReceivablesPage() {
         </div>
       </AppLayout>
     </TooltipProvider>
+  )
+}
+
+function ReceivablesOverviewCard({
+  aging,
+  total,
+  loading,
+}: {
+  aging: ReceivablesAging | undefined
+  total: number | undefined
+  loading: boolean
+}) {
+  const segmentsTotal = aging
+    ? AGING_BUCKETS.reduce((sum, bucket) => sum + aging[bucket.key], 0)
+    : 0
+
+  return (
+    <div className="rounded-xl border bg-card p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Receivables</p>
+          <p className="mt-1 text-xs text-muted-foreground">Outstanding balance by age</p>
+        </div>
+        {loading ? (
+          <Skeleton className="h-7 w-32" />
+        ) : (
+          <p className="text-2xl font-semibold tabular-nums">{formatMoney(total ?? 0)}</p>
+        )}
+      </div>
+
+      {loading ? (
+        <Skeleton className="mt-5 h-2.5 w-full rounded-full" />
+      ) : (
+        <div className="mt-5 flex h-2.5 w-full overflow-hidden rounded-full bg-muted">
+          {aging && segmentsTotal > 0
+            ? AGING_BUCKETS.map((bucket) => {
+                const value = aging[bucket.key]
+                if (value <= 0) return null
+                return (
+                  <div
+                    key={bucket.key}
+                    className={bucket.bar}
+                    style={{ width: `${(value / segmentsTotal) * 100}%` }}
+                  />
+                )
+              })
+            : null}
+        </div>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
+        {AGING_BUCKETS.map((bucket) => (
+          <div key={bucket.key} className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className={cn("size-2 shrink-0 rounded-full", bucket.bar)} />
+              <span className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {bucket.label}
+              </span>
+            </div>
+            {loading ? (
+              <Skeleton className="mt-1.5 h-4 w-16" />
+            ) : (
+              <p
+                className={cn(
+                  "mt-1 text-sm font-semibold tabular-nums",
+                  bucket.key !== "current" && (aging?.[bucket.key] ?? 0) > 0 && "text-destructive"
+                )}
+              >
+                {formatMoney(aging?.[bucket.key] ?? 0)}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const chartConfig = {
+  invoiced: { label: "Invoiced", color: "var(--chart-1)" },
+  collected: { label: "Collected", color: "var(--chart-2)" },
+} satisfies ChartConfig
+
+function MonthlyChartCard({
+  stats,
+  loading,
+  className,
+}: {
+  stats: InvoiceStats | null
+  loading: boolean
+  className?: string
+}) {
+  const monthly = stats?.monthly ?? []
+  const totalInvoiced = monthly.reduce((sum, point) => sum + point.invoiced, 0)
+  const totalCollected = monthly.reduce((sum, point) => sum + point.collected, 0)
+
+  return (
+    <div className={cn("rounded-xl border bg-card p-5", className)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Invoiced vs Collected</p>
+          <p className="mt-1 text-xs text-muted-foreground">Monthly billing and payment activity</p>
+        </div>
+        <div className="flex gap-6">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Invoiced</p>
+            {loading ? (
+              <Skeleton className="mt-1 h-5 w-24" />
+            ) : (
+              <p className="text-base font-semibold tabular-nums" style={{ color: "var(--chart-1)" }}>
+                {formatMoney(totalInvoiced)}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total Collected</p>
+            {loading ? (
+              <Skeleton className="mt-1 h-5 w-24" />
+            ) : (
+              <p className="text-base font-semibold tabular-nums" style={{ color: "var(--chart-2)" }}>
+                {formatMoney(totalCollected)}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <Skeleton className="mt-4 h-56 w-full" />
+      ) : monthly.length === 0 ? (
+        <div className="mt-4 flex h-40 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+          No invoice activity to chart yet.
+        </div>
+      ) : (
+        <ChartContainer config={chartConfig} className="mt-4 h-56 w-full">
+          <BarChart data={monthly} barGap={4}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="invoiced" fill="var(--color-invoiced)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="collected" fill="var(--color-collected)" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      )}
+    </div>
   )
 }
 
