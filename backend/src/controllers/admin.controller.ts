@@ -561,6 +561,50 @@ export async function updateAdminOrganization(req: Request, res: Response): Prom
   }
 }
 
+export async function deleteAdminOrganization(req: Request, res: Response): Promise<void> {
+  try {
+    const id = stringValue(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid organization id" });
+      return;
+    }
+
+    const organization = await Organization.findById(id).lean();
+    if (!organization) {
+      res.status(404).json({ error: "Organization not found" });
+      return;
+    }
+
+    if (stringValue(req.body?.confirmName) !== organization.name) {
+      res.status(400).json({ error: "Type the organization name to confirm deletion" });
+      return;
+    }
+
+    try {
+      await unlinkGmailAccountsForOrganization(id, "Organization deleted");
+    } catch (err) {
+      console.error("Failed to unlink Gmail accounts before deleting organization:", err);
+    }
+
+    const scopedModels = mongoose
+      .modelNames()
+      .map((name) => mongoose.model(name))
+      .filter((model) => model.schema.path("organizationId"));
+    const deleted: Record<string, number> = {};
+    for (const model of scopedModels) {
+      const result = await model.deleteMany({ organizationId: organization._id });
+      if (result.deletedCount) deleted[model.modelName] = result.deletedCount;
+    }
+
+    await Organization.deleteOne({ _id: organization._id });
+
+    res.json({ ok: true, deleted });
+  } catch (err) {
+    console.error("Error deleting admin organization:", err);
+    res.status(500).json({ error: "Failed to delete organization" });
+  }
+}
+
 export async function inviteAdminOrganizationMember(req: Request, res: Response): Promise<void> {
   try {
     const id = stringValue(req.params.id);

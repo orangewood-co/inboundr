@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth-client"
 import { API_ORIGIN } from "@/lib/env"
 import {
   ACTIVE_ORGANIZATION_CHANGED_EVENT,
+  ACTIVE_ORGANIZATION_ID_KEY,
   getActiveOrganizationId,
   setActiveOrganizationId,
 } from "@/lib/organization-context"
@@ -43,6 +44,12 @@ async function fetchOrganizationMe(): Promise<OrganizationMeResponse> {
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
+    const staleOrganization =
+      data?.error === "Organization not found" || data?.error === "Organization access denied"
+    if (staleOrganization && getActiveOrganizationId()) {
+      window.localStorage.removeItem(ACTIVE_ORGANIZATION_ID_KEY)
+      return fetchOrganizationMe()
+    }
     throw new Error(data?.error || "Failed to load organization")
   }
 

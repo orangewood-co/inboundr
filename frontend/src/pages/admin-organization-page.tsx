@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "@tanstack/react-router"
+import { useNavigate, useParams } from "@tanstack/react-router"
 import {
   ArrowRightLeftIcon,
   BanIcon,
@@ -179,6 +179,10 @@ function SummaryPill({
 
 export default function AdminOrganizationPage() {
   const { id } = useParams({ strict: false }) as { id: string }
+  const navigate = useNavigate()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirmName, setDeleteConfirmName] = useState("")
+  const [deleting, setDeleting] = useState(false)
   const [organization, setOrganization] = useState<OrganizationDetail | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [features, setFeatures] = useState<Feature[]>([])
@@ -508,6 +512,30 @@ export default function AdminOrganizationPage() {
       toast.error(error instanceof Error ? error.message : "Failed to update organization")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function deleteOrganization() {
+    if (!organization) return
+    setDeleting(true)
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/v1/admin/organizations/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: deleteConfirmName }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to delete organization")
+      }
+      toast.success("Organization deleted")
+      setDeleteOpen(false)
+      await navigate({ to: "/admin" })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete organization")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -977,7 +1005,7 @@ export default function AdminOrganizationPage() {
 
           <SectionCard
             title="Danger Zone"
-            description="Suspend access without deleting organization data. Suspended organizations can be restored later."
+            description="Suspend access temporarily, or permanently delete the organization and its data."
           >
             <div className="flex flex-col gap-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4 md:flex-row md:items-center md:justify-between">
               <div>
@@ -997,6 +1025,25 @@ export default function AdminOrganizationPage() {
               >
                 {organization.status === "suspended" ? <RotateCcwIcon className="mr-2 size-4" /> : <BanIcon className="mr-2 size-4" />}
                 {organization.status === "suspended" ? "Restore Organization" : "Suspend Organization"}
+              </Button>
+            </div>
+            <div className="mt-4 flex flex-col gap-4 rounded-xl border border-destructive/20 bg-destructive/5 p-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="font-semibold">Delete Organization</h3>
+                <p className="text-sm text-muted-foreground">
+                  Permanently delete this organization, its memberships, invitations, and all of its data. This cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setDeleteConfirmName("")
+                  setDeleteOpen(true)
+                }}
+                disabled={deleting}
+              >
+                <Trash2Icon className="mr-2 size-4" />
+                Delete Organization
               </Button>
             </div>
           </SectionCard>
@@ -1051,6 +1098,40 @@ export default function AdminOrganizationPage() {
             <Button onClick={() => void moveMember()} disabled={!moveOrganizationId || moving}>
               {moving && <Spinner className="mr-2 size-4" />}
               Move User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Organization</DialogTitle>
+            <DialogDescription>
+              This permanently deletes {organization.name} and everything in it. Members who belong to other organizations
+              will be switched to one of those.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-organization-name">Type {organization.name} to confirm</Label>
+            <Input
+              id="delete-organization-name"
+              value={deleteConfirmName}
+              onChange={(event) => setDeleteConfirmName(event.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void deleteOrganization()}
+              disabled={deleting || deleteConfirmName !== organization.name}
+            >
+              {deleting && <Spinner className="mr-2 size-4" />}
+              Delete Organization
             </Button>
           </DialogFooter>
         </DialogContent>

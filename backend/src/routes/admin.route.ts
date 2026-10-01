@@ -4,6 +4,7 @@ import {
   addAdminUserMembership,
   createAdminOrganization,
   createAdminOrganizationUser,
+  deleteAdminOrganization,
   getAdminFeedback,
   getAdminMe,
   getAdminOrganization,
@@ -49,6 +50,7 @@ router.post("/organizations", createAdminOrganization);
 router.post("/organizations/:id/users", createAdminOrganizationUser);
 router.get("/organizations/:id", getAdminOrganization);
 router.patch("/organizations/:id", updateAdminOrganization);
+router.delete("/organizations/:id", deleteAdminOrganization);
 router.post("/organizations/:id/invitations", inviteAdminOrganizationMember);
 router.delete("/organizations/:id/invitations/:invitationId", cancelAdminOrganizationInvitation);
 router.patch("/organizations/:id/members/:memberId", updateAdminOrganizationMember);
