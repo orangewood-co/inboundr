@@ -76,10 +76,38 @@ function labelStatus(status: string) {
 }
 
 function statusVariant(status: InvoiceStatus): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "paid") return "default"
-  if (status === "overdue" || status === "cancelled" || status === "written_off") return "destructive"
+  if (status === "cancelled" || status === "written_off") return "destructive"
   if (status === "draft") return "outline"
   return "secondary"
+}
+
+function statusBadgeClass(status: InvoiceStatus) {
+  if (status === "sent") return "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+  if (status === "partially_paid") return "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+  if (status === "overdue") return "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+  if (status === "paid") return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+  return ""
+}
+
+function formatDueDate(value: string | null) {
+  if (!value) return "-"
+
+  const dueDate = new Date(value)
+  if (Number.isNaN(dueDate.getTime())) return "-"
+
+  const today = new Date()
+  const dueDay = Date.UTC(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+  const currentDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  const daysUntilDue = Math.round((dueDay - currentDay) / 86_400_000)
+
+  const relativeDate =
+    daysUntilDue === 0
+      ? "today"
+      : daysUntilDue > 0
+        ? `in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`
+        : `${Math.abs(daysUntilDue)} day${daysUntilDue === -1 ? "" : "s"} ago`
+
+  return `${formatDate(dueDate)} · ${relativeDate}`
 }
 
 export default function InvoicesPage() {
@@ -411,9 +439,14 @@ export default function InvoicesPage() {
                         <div className="font-medium">{invoice.customerSnapshot.company || invoice.customerSnapshot.name || "Walk-in customer"}</div>
                         <div className="text-xs text-muted-foreground">{invoice.customerSnapshot.email || "-"}</div>
                       </td>
-                      <td className="px-5 py-3.5 align-top">{formatDate(invoice.dueDate)}</td>
+                      <td className="px-5 py-3.5 align-top">{formatDueDate(invoice.dueDate)}</td>
                       <td className="px-5 py-3.5 align-top">
-                        <Badge variant={statusVariant(invoice.status)} className="capitalize">{labelStatus(invoice.status)}</Badge>
+                        <Badge
+                          variant={statusVariant(invoice.status)}
+                          className={cn("capitalize", statusBadgeClass(invoice.status))}
+                        >
+                          {labelStatus(invoice.status)}
+                        </Badge>
                       </td>
                       <td className="px-5 py-3.5 text-right align-top font-medium">{formatMoney(invoice.totals.grandTotal)}</td>
                       <td className="px-5 py-3.5 text-right align-top">{formatMoney(invoice.totals.balanceDue)}</td>
