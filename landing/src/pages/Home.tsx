@@ -2,7 +2,6 @@ import { useRef } from "react"
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
 import { Link } from "react-router-dom"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
-import LightRays from "@/components/LightRays"
 import { FadeIn } from "@/components/FadeIn"
 import { CtaSection } from "@/components/CtaSection"
 import { Faq } from "@/components/Faq"
@@ -119,9 +118,7 @@ export default function Home() {
       <title>Inboundr — Turn inbound into revenue</title>
       {/* ── Hero ── */}
       {/* The width cap keeps the product shot bleeding off the bottom edge on tall windows. */}
-      <section className="noise relative isolate overflow-hidden lg:min-h-[min(88svh,60vw)]">
-        <LightRays />
-
+      <section className="noise relative isolate overflow-hidden bg-base bg-[radial-gradient(45%_40%_at_72%_0%,rgba(47,93,80,0.22),transparent_70%)] lg:min-h-[min(88svh,60vw)]">
         {/* Copy */}
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
           <div className="pt-16 sm:pt-20 lg:max-w-[44%] lg:pb-24 lg:pt-28 xl:pt-32">
@@ -197,13 +194,13 @@ export default function Home() {
 
         {/* Product shot — anchored bottom-right, bleeding off the right and bottom edges */}
         <motion.div
-          className="relative z-10 ml-6 mt-14 sm:ml-8 lg:absolute lg:left-[48%] lg:top-[32%] lg:m-0 lg:w-[62vw]"
+          className="relative z-10 -mr-6 ml-6 mt-14 sm:ml-8 lg:absolute lg:left-[48%] lg:top-[32%] lg:m-0 lg:w-[62vw]"
           initial={{ opacity: 0, y: reduceMotion ? 0 : 48 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="h-[320px] overflow-hidden shadow-[0_0_60px_rgba(62,207,142,0.16),0_0_160px_rgba(62,207,142,0.1)] sm:h-[460px] lg:h-auto lg:overflow-visible">
-            <div className="w-[135%] max-w-none bg-[linear-gradient(135deg,rgba(62,207,142,0.7),rgba(237,242,236,0.18)_35%,rgba(237,242,236,0.08))] p-px sm:w-[118%] lg:w-full">
+          <div className="h-[320px] overflow-hidden rounded-xl shadow-[0_0_60px_rgba(62,207,142,0.16),0_0_160px_rgba(62,207,142,0.1)] sm:h-[460px] lg:h-auto">
+            <div className="w-[135%] max-w-none sm:w-[118%] lg:w-full">
               <img
                 src="/screenshot.png"
                 alt="Inboundr RFQ workspace showing an inbound request, matched products, and a quote in progress"
@@ -216,7 +213,7 @@ export default function Home() {
           </div>
         </motion.div>
 
-        {/* Fade the rays and the product shot into the page below */}
+        {/* Fade the product shot into the page below */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-[linear-gradient(to_top,var(--color-base)_0%,rgba(6,9,6,0.85)_35%,transparent_100%)] sm:h-56"
