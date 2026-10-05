@@ -17,7 +17,7 @@ export default function Header() {
   return (
     <>
       {/* ── Banner ── */}
-      <div className="noise relative z-50 overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide">
+      <div className="noise relative z-50 hidden overflow-hidden bg-green px-4 py-2 text-center text-[13px] tracking-wide md:block">
         <span className="relative z-10 text-text/90">Introducing InboundrOS</span>
         <span className="relative z-10 mx-2 text-text/30">|</span>
         <Link
