@@ -1,6 +1,5 @@
 import { useRef } from "react"
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
-import { Link } from "react-router-dom"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
 import { FadeIn } from "@/components/FadeIn"
 import { CtaSection } from "@/components/CtaSection"
@@ -122,26 +121,7 @@ export default function Home() {
         {/* Copy */}
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
           <div className="pt-16 sm:pt-20 lg:max-w-[44%] lg:pb-24 lg:pt-28 xl:pt-32">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8 }}
-            >
-              <Link
-                to="/features"
-                className="group inline-flex items-center gap-2.5 border border-border bg-base/60 py-1.5 pl-3 pr-2.5 text-[13px] tracking-wide text-text-muted backdrop-blur-sm transition-colors duration-200 hover:border-text/20 hover:text-text"
-              >
-                <span
-                  className="size-1.5 shrink-0 bg-green-bright"
-                  style={{ boxShadow: "0 0 10px rgba(62, 207, 142, 0.6)" }}
-                  aria-hidden
-                />
-                AI-native sales infrastructure
-                <ArrowRight className="size-3 text-text-dim transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
-              </Link>
-            </motion.div>
-
-            <h1 className="mt-7 sm:mt-8">
+            <h1>
               <HeroLine className={heroLineClass} delay={0.15}>
                 The intelligent
               </HeroLine>
