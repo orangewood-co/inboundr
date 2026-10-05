@@ -108,6 +108,10 @@ function Em({ children }: { children: React.ReactNode }) {
   return <em className="font-medium not-italic text-text">{children}</em>
 }
 
+// Sized so the longest line ("modern businesses.") stays on one line in the copy column.
+const heroLineClass =
+  "block text-[clamp(2rem,3.75vw,3.375rem)] font-light leading-[1.02] tracking-[-0.04em] text-text"
+
 export default function Home() {
   const reduceMotion = useReducedMotion()
   return (
@@ -141,22 +145,13 @@ export default function Home() {
             </motion.div>
 
             <h1 className="mt-7 sm:mt-8">
-              <HeroLine
-                className="block text-[clamp(2.5rem,4.6vw,4.25rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
-                delay={0.15}
-              >
+              <HeroLine className={heroLineClass} delay={0.15}>
                 The intelligent
               </HeroLine>
-              <HeroLine
-                className="block text-[clamp(2.5rem,4.6vw,4.25rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
-                delay={0.25}
-              >
+              <HeroLine className={heroLineClass} delay={0.25}>
                 workspace for
               </HeroLine>
-              <HeroLine
-                className="block bg-gradient-to-r from-text via-green-bright to-gold bg-clip-text font-display text-[clamp(3rem,5.5vw,5rem)] italic leading-[0.95] tracking-[-0.02em] text-transparent"
-                delay={0.35}
-              >
+              <HeroLine className={heroLineClass} delay={0.35}>
                 modern businesses.
               </HeroLine>
             </h1>
@@ -185,7 +180,7 @@ export default function Home() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
               >
-                Book a demo
+                Book a Demo
                 <ArrowRight className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
               </motion.a>
               <motion.a
@@ -194,7 +189,7 @@ export default function Home() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
               >
-                Join waitlist
+                Join Waitlist
               </motion.a>
             </motion.div>
           </div>
@@ -207,7 +202,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="h-[320px] overflow-hidden sm:h-[460px] lg:h-auto lg:overflow-visible">
+          <div className="h-[320px] overflow-hidden shadow-[0_0_60px_rgba(62,207,142,0.16),0_0_160px_rgba(62,207,142,0.1)] sm:h-[460px] lg:h-auto lg:overflow-visible">
             <div className="w-[135%] max-w-none bg-[linear-gradient(135deg,rgba(62,207,142,0.7),rgba(237,242,236,0.18)_35%,rgba(237,242,236,0.08))] p-px sm:w-[118%] lg:w-full">
               <img
                 src="/screenshot.png"
