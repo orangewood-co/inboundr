@@ -144,16 +144,22 @@ export default function Home() {
 
             <h1 className="mt-7 sm:mt-8">
               <HeroLine
-                className="block text-[clamp(2.75rem,5.6vw,4.75rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
+                className="block text-[clamp(2.5rem,4.6vw,4.25rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
                 delay={0.15}
               >
-                Turn inbound
+                The intelligent
               </HeroLine>
               <HeroLine
-                className="block bg-gradient-to-r from-text via-green-bright to-gold bg-clip-text font-display text-[clamp(3.25rem,6.8vw,5.75rem)] italic leading-[0.95] tracking-[-0.02em] text-transparent"
-                delay={0.27}
+                className="block text-[clamp(2.5rem,4.6vw,4.25rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
+                delay={0.25}
               >
-                into revenue.
+                workspace for
+              </HeroLine>
+              <HeroLine
+                className="block bg-gradient-to-r from-text via-green-bright to-gold bg-clip-text font-display text-[clamp(3rem,5.5vw,5rem)] italic leading-[0.95] tracking-[-0.02em] text-transparent"
+                delay={0.35}
+              >
+                modern businesses.
               </HeroLine>
             </h1>
 
