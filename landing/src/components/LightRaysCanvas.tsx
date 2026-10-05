@@ -61,7 +61,7 @@ const fragmentShader = /* glsl */ `
 
     float atten = smoothstep(0.15, 0.75, r) * exp(-max(r - 2.1, 0.0) * 0.5);
     // Streaks gather intensity along their length, hottest at the far ends.
-    float reach = mix(0.55, 1.45, smoothstep(0.35, 1.9, r));
+    float reach = mix(0.5, 1.1, smoothstep(0.35, 1.9, r));
     // ...and only the cool right-hand ends bleach out to white.
     float hot = smoothstep(0.8, 2.2, r) * smoothstep(0.40, 1.0, vUv.x);
 
@@ -83,9 +83,9 @@ const fragmentShader = /* glsl */ `
       float q = min(abs(fanT - pos) / width, 16.0);
 
       float core = exp(-q * q);
-      float bloom = exp(-q * q / 8.0) * 0.30;
-      float halo = exp(-q * q / 45.0) * 0.10;
-      float wash = exp(-q * q / 240.0) * 0.045;
+      float bloom = exp(-q * q / 8.0) * 0.20;
+      float halo = exp(-q * q / 45.0) * 0.06;
+      float wash = exp(-q * q / 240.0) * 0.025;
 
       float bright = mix(0.10, 1.25, s3) * (0.80 + 0.20 * sin(uTime * 0.25 + s2 * 6.283)) * reach;
 
@@ -96,6 +96,10 @@ const fragmentShader = /* glsl */ `
 
     // Push the hue ramp back after all the overlapping glow washes it out.
     col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.3);
+
+    // Global exposure: the rays are a backdrop for the product shot, so the
+    // cores should land as saturated lines rather than blown-out white.
+    col *= 0.55;
 
     col += GREEN * 0.035 * exp(-length(p - vec2(0.18 * uAspect, -0.05)) * 2.2);
     col += GOLD * 0.018 * exp(-length(p - vec2(0.85 * uAspect, 0.02)) * 2.6);

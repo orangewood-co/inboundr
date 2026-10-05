@@ -8,8 +8,6 @@ import { CtaSection } from "@/components/CtaSection"
 import { Faq } from "@/components/Faq"
 import { ProcessSteps } from "@/components/ProcessSteps"
 
-const MotionLink = motion.create(Link)
-
 const faqs = [
   {
     q: "How does Inboundr connect to my inbox, website, and WhatsApp?",
@@ -122,7 +120,7 @@ export default function Home() {
 
         {/* Copy */}
         <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="pt-16 sm:pt-20 lg:max-w-[46%] lg:pb-24 lg:pt-28 xl:pt-32">
+          <div className="pt-16 sm:pt-20 lg:max-w-[44%] lg:pb-24 lg:pt-28 xl:pt-32">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -190,27 +188,27 @@ export default function Home() {
                 Book a demo
                 <ArrowRight className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
               </motion.a>
-              <MotionLink
-                to="/features"
+              <motion.a
+                href="mailto:hello@inboundr.ai?subject=Join the waitlist"
                 className="inline-flex items-center justify-center border border-border bg-base/40 px-6 py-3.5 text-sm font-medium text-text backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-text/20 hover:bg-surface"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
               >
-                Explore features
-              </MotionLink>
+                Join waitlist
+              </motion.a>
             </motion.div>
           </div>
         </div>
 
         {/* Product shot — anchored bottom-right, bleeding off the right and bottom edges */}
         <motion.div
-          className="relative z-10 ml-6 mt-14 sm:ml-8 lg:absolute lg:left-[52%] lg:top-[40%] lg:m-0 lg:w-[56vw]"
+          className="relative z-10 ml-6 mt-14 sm:ml-8 lg:absolute lg:left-[48%] lg:top-[32%] lg:m-0 lg:w-[62vw]"
           initial={{ opacity: 0, y: reduceMotion ? 0 : 48 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.1, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="h-[280px] overflow-hidden sm:h-[400px] lg:h-auto lg:overflow-visible">
-            <div className="w-[135%] max-w-none bg-[linear-gradient(135deg,rgba(62,207,142,0.55),rgba(237,242,236,0.14)_35%,rgba(237,242,236,0.07))] p-px sm:w-[118%] lg:w-full">
+          <div className="h-[320px] overflow-hidden sm:h-[460px] lg:h-auto lg:overflow-visible">
+            <div className="w-[135%] max-w-none bg-[linear-gradient(135deg,rgba(62,207,142,0.7),rgba(237,242,236,0.18)_35%,rgba(237,242,236,0.08))] p-px sm:w-[118%] lg:w-full">
               <img
                 src="/screenshot.png"
                 alt="Inboundr RFQ workspace showing an inbound request, matched products, and a quote in progress"
@@ -222,10 +220,16 @@ export default function Home() {
             </div>
           </div>
         </motion.div>
+
+        {/* Fade the rays and the product shot into the page below */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-[linear-gradient(to_top,var(--color-base)_0%,rgba(6,9,6,0.85)_35%,transparent_100%)] sm:h-56"
+        />
       </section>
 
       {/* ── Feature strip ── */}
-      <section id="features" className="border-y border-border">
+      <section id="features" className="border-b border-border">
         <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:px-8">
           <FadeIn>
             <p className="label mb-4 text-text-muted">

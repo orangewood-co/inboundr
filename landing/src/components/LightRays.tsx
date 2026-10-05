@@ -13,9 +13,9 @@ function Poster() {
       className="absolute inset-0 bg-base"
       style={{
         backgroundImage: [
-          "radial-gradient(70% 55% at 8% 92%, rgba(62,207,142,0.28), transparent 70%)",
-          "radial-gradient(55% 45% at 45% 100%, rgba(239,197,84,0.12), transparent 72%)",
-          "radial-gradient(90% 60% at 20% 105%, rgba(47,93,80,0.4), transparent 75%)",
+          "radial-gradient(70% 55% at 8% 92%, rgba(62,207,142,0.18), transparent 70%)",
+          "radial-gradient(55% 45% at 45% 100%, rgba(239,197,84,0.08), transparent 72%)",
+          "radial-gradient(90% 60% at 20% 105%, rgba(47,93,80,0.28), transparent 75%)",
         ].join(", "),
       }}
     />
