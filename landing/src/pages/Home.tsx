@@ -8,6 +8,8 @@ import { CtaSection } from "@/components/CtaSection"
 import { Faq } from "@/components/Faq"
 import { ProcessSteps } from "@/components/ProcessSteps"
 
+const MotionLink = motion.create(Link)
+
 const faqs = [
   {
     q: "How does Inboundr connect to my inbox, website, and WhatsApp?",
@@ -104,70 +106,116 @@ function HeroLine({
   )
 }
 
+function Em({ children }: { children: React.ReactNode }) {
+  return <em className="font-medium not-italic text-text">{children}</em>
+}
+
 export default function Home() {
   const reduceMotion = useReducedMotion()
   return (
     <>
       <title>Inboundr — Turn inbound into revenue</title>
       {/* ── Hero ── */}
-      <section className="noise relative isolate flex min-h-[88svh] flex-col justify-center overflow-hidden">
+      {/* The width cap keeps the product shot bleeding off the bottom edge on tall windows. */}
+      <section className="noise relative isolate overflow-hidden lg:min-h-[min(88svh,60vw)]">
         <LightRays />
-        <div className="relative z-10 mx-auto max-w-4xl px-6 pb-60 pt-24 text-center sm:pb-72 sm:pt-28 lg:px-8">
-          <motion.p
-            className="mb-8 text-[13px] tracking-wide text-text-muted"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-          >
-            AI-native sales infrastructure
-          </motion.p>
-          <h1>
-            <HeroLine
-              className="block text-[clamp(3rem,8vw,6rem)] font-light leading-[0.95] tracking-[-0.04em] text-text"
-              delay={0.15}
+
+        {/* Copy */}
+        <div className="relative z-10 mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="pt-16 sm:pt-20 lg:max-w-[46%] lg:pb-24 lg:pt-28 xl:pt-32">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
             >
-              Turn inbound
-            </HeroLine>
-            <HeroLine
-              className="block bg-gradient-to-r from-text via-green-bright to-gold bg-clip-text font-display text-[clamp(3.5rem,10vw,8rem)] italic leading-[0.9] tracking-[-0.02em] text-transparent"
-              delay={0.27}
+              <Link
+                to="/features"
+                className="group inline-flex items-center gap-2.5 border border-border bg-base/60 py-1.5 pl-3 pr-2.5 text-[13px] tracking-wide text-text-muted backdrop-blur-sm transition-colors duration-200 hover:border-text/20 hover:text-text"
+              >
+                <span
+                  className="size-1.5 shrink-0 bg-green-bright"
+                  style={{ boxShadow: "0 0 10px rgba(62, 207, 142, 0.6)" }}
+                  aria-hidden
+                />
+                AI-native sales infrastructure
+                <ArrowRight className="size-3 text-text-dim transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+              </Link>
+            </motion.div>
+
+            <h1 className="mt-7 sm:mt-8">
+              <HeroLine
+                className="block text-[clamp(2.75rem,5.6vw,4.75rem)] font-light leading-[0.98] tracking-[-0.04em] text-text"
+                delay={0.15}
+              >
+                Turn inbound
+              </HeroLine>
+              <HeroLine
+                className="block bg-gradient-to-r from-text via-green-bright to-gold bg-clip-text font-display text-[clamp(3.25rem,6.8vw,5.75rem)] italic leading-[0.95] tracking-[-0.02em] text-transparent"
+                delay={0.27}
+              >
+                into revenue.
+              </HeroLine>
+            </h1>
+
+            <motion.p
+              className="mt-7 max-w-md text-pretty text-[17px] leading-relaxed text-text-muted"
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
             >
-              into revenue.
-            </HeroLine>
-          </h1>
-          <motion.p
-            className="mx-auto mt-8 max-w-md text-pretty text-[17px] leading-relaxed text-text-muted"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            AI that replies, quotes, follows up, and closes — automatically.
-          </motion.p>
-          <motion.div
-            className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-4"
-            initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.55 }}
-          >
-            <motion.a
-              href="https://calendly.com/tushgaurav/15min"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block rounded-full bg-text px-7 py-3.5 text-sm font-semibold text-base transition-shadow duration-200 hover:shadow-[0_0_30px_rgba(62,207,142,0.25)]"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
+              AI that <Em>replies</Em>, <Em>quotes</Em>, <Em>follows up</Em>, and <Em>closes</Em> —
+              automatically.
+            </motion.p>
+
+            <motion.div
+              className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center"
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.55 }}
             >
-              Book a Demo
-            </motion.a>
-            <Link
-              to="/features"
-              className="group inline-flex items-center gap-2 text-sm font-medium text-text transition-colors duration-200 hover:text-green-bright"
-            >
-              Learn More
-              <ArrowRight className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-1" />
-            </Link>
-          </motion.div>
+              <motion.a
+                href="https://calendly.com/tushgaurav/15min"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center justify-center gap-2 bg-text px-6 py-3.5 text-sm font-semibold text-base transition-shadow duration-200 hover:shadow-[0_0_30px_rgba(62,207,142,0.25)]"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                Book a demo
+                <ArrowRight className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
+              </motion.a>
+              <MotionLink
+                to="/features"
+                className="inline-flex items-center justify-center border border-border bg-base/40 px-6 py-3.5 text-sm font-medium text-text backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-text/20 hover:bg-surface"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                Explore features
+              </MotionLink>
+            </motion.div>
+          </div>
         </div>
+
+        {/* Product shot — anchored bottom-right, bleeding off the right and bottom edges */}
+        <motion.div
+          className="relative z-10 ml-6 mt-14 sm:ml-8 lg:absolute lg:left-[52%] lg:top-[40%] lg:m-0 lg:w-[56vw]"
+          initial={{ opacity: 0, y: reduceMotion ? 0 : 48 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.1, delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="h-[280px] overflow-hidden sm:h-[400px] lg:h-auto lg:overflow-visible">
+            <div className="w-[135%] max-w-none bg-[linear-gradient(135deg,rgba(62,207,142,0.55),rgba(237,242,236,0.14)_35%,rgba(237,242,236,0.07))] p-px sm:w-[118%] lg:w-full">
+              <img
+                src="/screenshot.png"
+                alt="Inboundr RFQ workspace showing an inbound request, matched products, and a quote in progress"
+                width={1878}
+                height={1508}
+                fetchPriority="high"
+                className="block w-full"
+              />
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       {/* ── Feature strip ── */}

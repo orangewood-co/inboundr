@@ -18,7 +18,7 @@ const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uAspect;
 
-  const int RAY_COUNT = 22;
+  const int RAY_COUNT = 26;
 
   const vec3 BASE = vec3(0.024, 0.035, 0.024);
   const vec3 LIME = vec3(0.72, 0.93, 0.34);
@@ -29,9 +29,10 @@ const fragmentShader = /* glsl */ `
   const vec3 CORE = vec3(0.878, 0.968, 0.898);
 
   // Fan spans this angular slice, measured from the off-screen origin. The
-  // window is aimed so the full palette lands on screen rather than below it.
+  // window is aimed so the full palette lands on screen rather than below it,
+  // and opens wide enough that the shallow rays climb into the top-right.
   const float ANG_MIN = -0.81;
-  const float ANG_SPAN = 0.90;
+  const float ANG_SPAN = 1.08;
 
   float hash11(float n) {
     return fract(sin(n * 127.1) * 43758.5453123);
@@ -64,7 +65,7 @@ const fragmentShader = /* glsl */ `
     // ...and only the cool right-hand ends bleach out to white.
     float hot = smoothstep(0.8, 2.2, r) * smoothstep(0.40, 1.0, vUv.x);
 
-    vec3 tint = mix(fanPalette(clamp(vUv.x * 1.05, 0.0, 1.0)), vec3(1.0), hot * 0.6);
+    vec3 tint = mix(fanPalette(clamp(vUv.x * 1.05, 0.0, 1.0)), vec3(1.0), hot * 0.4);
 
     vec3 col = vec3(0.0);
 
@@ -99,15 +100,25 @@ const fragmentShader = /* glsl */ `
     col += GREEN * 0.035 * exp(-length(p - vec2(0.18 * uAspect, -0.05)) * 2.2);
     col += GOLD * 0.018 * exp(-length(p - vec2(0.85 * uAspect, 0.02)) * 2.6);
 
-    // Keep the copy area near-black so the headline and CTAs stay legible.
-    float maskStart = mix(0.18, 0.08, narrow);
-    float maskEnd = mix(0.62, 0.40, narrow);
-    col *= mix(0.03, 1.0, 1.0 - smoothstep(maskStart, maskEnd, vUv.y));
+    // The copy sits top-left and the product shot bottom-right, so the mask
+    // runs on a diagonal: the left edge goes dark early, the right edge stays
+    // lit almost to the top so the streaks sweep up behind the screenshot.
+    // Portrait layouts stack instead, so the mask flattens back to horizontal.
+    float slope = mix(0.5, 0.0, narrow);
+    float maskStart = mix(0.22, 0.30, narrow);
+    float maskEnd = mix(0.58, 0.72, narrow);
+    col *= mix(0.03, 1.0, 1.0 - smoothstep(maskStart, maskEnd, vUv.y - slope * vUv.x));
 
-    // Soft scrim under the copy block, since the streaks now run much hotter.
-    vec2 scrim = (vUv - vec2(0.5, mix(0.56, 0.62, narrow)))
-      / vec2(mix(0.62, 0.80, narrow), mix(0.27, 0.30, narrow));
-    col *= 1.0 - 0.85 * exp(-dot(scrim, scrim) * 1.6);
+    // The streaks that climb past the screenshot should read as fine lines,
+    // not a second light source. Ray cores sit far above 1.0 before clipping,
+    // so the exposure has to drop hard for them to stop bleaching to white.
+    col *= mix(1.0, 0.06, smoothstep(0.3, 0.85, vUv.y));
+
+    // Soft scrim under the copy column so the subtitle and CTAs stay legible;
+    // it runs tall so the rays only reach full strength below the buttons.
+    vec2 scrim = (vUv - vec2(mix(0.25, 0.5, narrow), mix(0.5, 0.62, narrow)))
+      / vec2(mix(0.36, 0.80, narrow), mix(0.5, 0.30, narrow));
+    col *= 1.0 - 0.88 * exp(-dot(scrim, scrim) * 1.6);
 
     float dither = (hash11(vUv.x * 371.0 + vUv.y * 913.0) - 0.5) * 0.008;
 
