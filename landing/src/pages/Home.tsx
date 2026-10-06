@@ -28,17 +28,20 @@ const faqs = [
 const testimonials = [
   {
     quote: "Inboundr replies to leads faster than our best rep. Quotes come back 95% ready to send.",
-    who: "VP Sales, Industrial MFG",
+    name: "Manan Gupta",
+    role: "VP Sales - RoboViewer",
     bg: "#1a5c3a",
   },
   {
     quote: "We stopped losing leads overnight. Inboundr handles the entire flow — reply, quote, follow-up.",
-    who: "Sales Ops, Distribution Co.",
+    name: "Rohit Kumar",
+    role: "OPS - RoboGPT",
     bg: "#8a6d1b",
   },
   {
     quote: "Like having a sales team that works 24/7. Instant replies, accurate quotes, persistent follow-ups.",
-    who: "CRO, Precision Parts",
+    name: "Debdatta Singha",
+    role: "OPS - VegaEducation",
     bg: "#1a6a5c",
   },
 ]
@@ -255,12 +258,15 @@ export default function Home() {
           </FadeIn>
           <div className="grid gap-4 sm:grid-cols-3">
             {testimonials.map((t, i) => (
-              <FadeIn key={i} delay={i * 0.1}>
-                <div className="noise relative overflow-hidden border border-border p-7 card-hover sm:p-8" style={{ backgroundColor: t.bg }}>
-                  <blockquote className="relative z-10 text-lg font-medium leading-snug text-white/95">
+              <FadeIn key={i} delay={i * 0.1} className="flex">
+                <div className="noise relative flex flex-1 flex-col overflow-hidden border border-border p-7 card-hover sm:p-8" style={{ backgroundColor: t.bg }}>
+                  <blockquote className="relative z-10 flex-1 text-lg font-medium leading-snug text-white/95">
                     &ldquo;{t.quote}&rdquo;
                   </blockquote>
-                  <p className="relative z-10 mt-6 label text-white/50">{t.who}</p>
+                  <div className="relative z-10 mt-6">
+                    <p className="text-sm font-semibold text-white/90">{t.name}</p>
+                    <p className="label-sm mt-1.5 text-white/50">{t.role}</p>
+                  </div>
                 </div>
               </FadeIn>
             ))}
