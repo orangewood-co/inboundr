@@ -30,18 +30,21 @@ const testimonials = [
     quote: "Inboundr replies to leads faster than our best rep. Quotes come back 95% ready to send.",
     name: "Manan Gupta",
     role: "VP Sales - RoboViewer",
+    avatar: "/testimonials/manan.webp",
     bg: "#1a5c3a",
   },
   {
     quote: "We stopped losing leads overnight. Inboundr handles the entire flow — reply, quote, follow-up.",
     name: "Rohit Kumar",
     role: "OPS - RoboGPT",
+    avatar: "/testimonials/rohit.webp",
     bg: "#8a6d1b",
   },
   {
     quote: "Like having a sales team that works 24/7. Instant replies, accurate quotes, persistent follow-ups.",
     name: "Debdatta Singha",
     role: "OPS - VegaEducation",
+    avatar: "/testimonials/debdatta.webp",
     bg: "#1a6a5c",
   },
 ]
@@ -263,9 +266,20 @@ export default function Home() {
                   <blockquote className="relative z-10 flex-1 text-lg font-medium leading-snug text-white/95">
                     &ldquo;{t.quote}&rdquo;
                   </blockquote>
-                  <div className="relative z-10 mt-6">
-                    <p className="text-sm font-semibold text-white/90">{t.name}</p>
-                    <p className="label-sm mt-1.5 text-white/50">{t.role}</p>
+                  <div className="relative z-10 mt-6 flex items-center gap-3">
+                    <img
+                      src={t.avatar}
+                      alt={t.name}
+                      width={192}
+                      height={192}
+                      loading="lazy"
+                      decoding="async"
+                      className="size-10 shrink-0 rounded-full object-cover ring-1 ring-white/20"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white/90">{t.name}</p>
+                      <p className="label-sm mt-1 text-white/50">{t.role}</p>
+                    </div>
                   </div>
                 </div>
               </FadeIn>
