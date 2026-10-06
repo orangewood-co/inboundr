@@ -120,7 +120,7 @@ export default function Home() {
   const reduceMotion = useReducedMotion()
   return (
     <>
-      <title>Inboundr — Turn inbound into revenue</title>
+      <title>Inboundr - Turn inbound into revenue</title>
       {/* ── Hero ── */}
       {/* The width cap keeps the product shot bleeding off the bottom edge on tall windows. */}
       <section className="noise relative isolate overflow-hidden bg-base bg-[radial-gradient(45%_40%_at_72%_0%,rgba(47,93,80,0.22),transparent_70%)] lg:min-h-[min(88svh,60vw)]">
