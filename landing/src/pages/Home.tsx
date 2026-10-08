@@ -110,10 +110,6 @@ function HeroLine({
   )
 }
 
-function Em({ children }: { children: React.ReactNode }) {
-  return <em className="font-medium not-italic text-text">{children}</em>
-}
-
 // Sized so the longest line ("modern businesses.") stays on one line in the copy column.
 const heroLineClass =
   "block text-[clamp(2rem,3.75vw,3.375rem)] font-light leading-[1.02] tracking-[-0.04em] text-text"
