@@ -46,6 +46,7 @@ import { SUPPORT_TICKET_TAG_COLORS, TAG_DOT_STYLES } from "@/components/support/
 import type { ResolutionReason, SupportTicketTag, SupportTicketTagColor } from "@/components/support/types"
 import { WhatsAppSettingsCardContent } from "@/components/integrations/whatsapp-settings-card"
 import { WhatsAppIcon } from "@/components/support/channel"
+import { ChatWidgetInstall } from "@/components/support/chat-widget-install"
 import { cn } from "@/lib/utils"
 import { MAX_LETTERHEADS, uploadLetterheadImage } from "@/lib/letterhead"
 import { resolveUploadedImageUrl } from "@/lib/uploaded-image"
@@ -3620,9 +3621,10 @@ function SupportTab() {
 
       <SettingsCard
         title="Chat Widget"
-        description="Control what visitors see in your embedded support chat."
+        description="Add the support chat bubble to your website and control what visitors see."
       >
         <div className="space-y-5 p-5">
+          <ChatWidgetInstall />
           {chatSettingsLoading ? (
             <div className="text-sm text-muted-foreground">Loading chat widget settings...</div>
           ) : (

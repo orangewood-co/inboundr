@@ -96,6 +96,32 @@ export async function getSupportOrganization(
   return serializeBranding(organization);
 }
 
+export type SupportWidgetConfig = {
+  name: string;
+  primaryColor: string;
+};
+
+/** Launcher config for the embeddable chat widget. Served publicly with HTTP caching, so it must stay visitor-agnostic. */
+export async function getSupportWidgetConfig(
+  organizationId: string
+): Promise<SupportWidgetConfig | null> {
+  if (!mongoose.Types.ObjectId.isValid(organizationId)) return null;
+
+  const organization = await Organization.findOne({
+    _id: organizationId,
+    status: "active",
+  })
+    .select("name preferences.primaryColor planSlug enabledFeatures disabledFeatures")
+    .lean();
+  if (!organization) return null;
+  if (!hasEffectiveFeature(organization, "support")) return null;
+
+  return {
+    name: organization.name,
+    primaryColor: organization.preferences?.primaryColor ?? "#f5b400",
+  };
+}
+
 async function serializeBranding(
   organization: Pick<IOrganization, "name" | "logoUrl" | "preferences"> & {
     _id: mongoose.Types.ObjectId;

@@ -11,6 +11,7 @@ import {
   createSupportSession,
   findSessionTicket,
   getSupportOrganization,
+  getSupportWidgetConfig,
   listSessionMessages,
   streamSupportReply,
   SUPPORT_MESSAGE_MAX_LENGTH,
@@ -140,6 +141,24 @@ export async function getSupportWorkspace(req: Request, res: ExpressResponse): P
   } catch (err) {
     console.error("Failed to load support workspace:", err);
     res.status(500).json({ error: "Failed to load support workspace" });
+  }
+}
+
+export async function getSupportWidget(req: Request, res: ExpressResponse): Promise<void> {
+  // Fetched by the launcher script on customers' own websites, so any origin may read it.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  try {
+    const widget = await getSupportWidgetConfig(String(req.params.organizationId ?? ""));
+    if (!widget) {
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.status(404).json({ error: "Support is not available for this workspace" });
+      return;
+    }
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.json({ widget });
+  } catch (err) {
+    console.error("Failed to load support widget config:", err);
+    res.status(500).json({ error: "Failed to load support widget" });
   }
 }
 

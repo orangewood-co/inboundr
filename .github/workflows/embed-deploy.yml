@@ -79,7 +79,19 @@ jobs:
           aws s3 sync embed/dist "s3://${{ vars.EMBED_S3_BUCKET }}" \
             --delete \
             --exclude "index.html" \
+            --exclude "*-widget.js" \
             --cache-control "public,max-age=31536000,immutable"
+
+      # Widget loaders live at stable URLs embedded on customer sites, so they
+      # must stay short-lived in browser caches to pick up new releases.
+      - name: Upload widget loaders
+        run: |
+          aws s3 cp embed/dist "s3://${{ vars.EMBED_S3_BUCKET }}" \
+            --recursive \
+            --exclude "*" \
+            --include "*-widget.js" \
+            --cache-control "public,max-age=300" \
+            --content-type "text/javascript; charset=utf-8"
 
       - name: Upload app shell
         run: |

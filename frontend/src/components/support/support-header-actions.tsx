@@ -20,7 +20,8 @@ export function ChatWidgetLink({ link }: { link: string }) {
       <PopoverContent align="end" className="w-80">
         <p className="text-sm font-medium">Public Chat Link</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Share this URL or embed it so visitors can start a support chat.
+          Share this URL so visitors can start a support chat. To add a chat bubble to your website,
+          copy the snippet from Settings → Support.
         </p>
         <div className="mt-3 flex items-center gap-2">
           <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 text-xs text-foreground">

@@ -3,6 +3,7 @@ import {
   createSupportUploadPresign,
   endSupportSession,
   getSupportSession,
+  getSupportWidget,
   getSupportWorkspace,
   postSupportSessionMessage,
   startSupportSession,
@@ -18,6 +19,7 @@ import {
 const router = Router();
 
 router.get("/workspace/:organizationId", publicReadLimiter, getSupportWorkspace);
+router.get("/widget/:organizationId", publicReadLimiter, getSupportWidget);
 router.post("/session", supportSessionStartLimiter, startSupportSession);
 router.get("/session/:token", publicReadLimiter, getSupportSession);
 router.post("/session/:token/end", supportSessionEndLimiter, endSupportSession);

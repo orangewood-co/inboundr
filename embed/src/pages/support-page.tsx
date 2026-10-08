@@ -3,6 +3,7 @@ import { motion } from "motion/react"
 import {
   AlertCircleIcon,
   CheckIcon,
+  ChevronDownIcon,
   CircleCheckIcon,
   EllipsisVerticalIcon,
   FileIcon,
@@ -96,10 +97,17 @@ type SupportTicket = {
 
 type Phase = "loading" | "unavailable" | "prechat" | "chat" | "ended"
 
+type EmbedContext = { parentOrigin: string; sessionToken: string }
+
+type Prefill = { name: string; email: string; phone: string }
+
 const MESSAGE_MAX_LENGTH = 4000
 const MUTE_STORAGE_KEY = "inboundr-support-muted"
 const THEME_STORAGE_KEY = "inboundr-support-theme"
 const DEFAULT_PHONE_COUNTRY: CountryCode = "IN"
+const WIDGET_CHANNEL = "inboundr:support:v1"
+const ICON_BUTTON_CLASSES =
+  "flex size-9 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
 
 const regionNames =
   typeof Intl !== "undefined" && "DisplayNames" in Intl
@@ -118,6 +126,45 @@ type Theme = "light" | "dark"
 
 function sessionStorageKey(organizationId: string) {
   return `inboundr-support-session:${organizationId}`
+}
+
+function readStoredSession(organizationId: string): string | null {
+  try {
+    return window.localStorage.getItem(sessionStorageKey(organizationId))
+  } catch {
+    return null
+  }
+}
+
+/** Present when the page runs inside the support-widget.js launcher on a customer's site. */
+function readEmbedContext(): EmbedContext | null {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get("embed") !== "1" || window.parent === window) return null
+  try {
+    const parentOrigin = new URL(params.get("parentOrigin") ?? "")
+    if (parentOrigin.protocol !== "https:" && parentOrigin.protocol !== "http:") return null
+    const hash = new URLSearchParams(window.location.hash.slice(1))
+    return { parentOrigin: parentOrigin.origin, sessionToken: hash.get("session")?.trim() ?? "" }
+  } catch {
+    return null
+  }
+}
+
+function isSupportReply(message: SupportMessage) {
+  return message.authorType === "agent" || message.authorType === "bot"
+}
+
+function messagePreview(message: SupportMessage) {
+  const text = message.bodyText.replace(/\s+/g, " ").trim()
+  if (text) return text.slice(0, 160)
+  return message.attachments?.length ? "Sent an attachment" : ""
+}
+
+function focusChatInput() {
+  requestAnimationFrame(() => {
+    const input = document.getElementById("support-message-input") ?? document.getElementById("support-issue")
+    input?.focus()
+  })
 }
 
 function TypingDots() {
@@ -337,6 +384,63 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const connectedPlayedRef = useRef(false)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const apiBase = `${API_ORIGIN}/api/v1/public/support`
+
+  const [embed] = useState(readEmbedContext)
+  const visibleRef = useRef(!embed)
+  const unreadRef = useRef(0)
+  const prefillRef = useRef<Prefill | null>(null)
+  const phoneEditedRef = useRef(false)
+
+  const postToParent = useCallback(
+    (message: Record<string, unknown>) => {
+      if (!embed) return
+      window.parent.postMessage({ channel: WIDGET_CHANNEL, ...message }, embed.parentOrigin)
+    },
+    [embed]
+  )
+
+  // Embedded chats keep the session token in the host site's storage (via the launcher), so it
+  // survives third-party storage partitioning and can be cleared by InboundrChat("shutdown").
+  const rememberSession = useCallback(
+    (token: string | null) => {
+      if (embed) {
+        postToParent({ type: "session", token })
+        return
+      }
+      try {
+        if (token) window.localStorage.setItem(sessionStorageKey(organizationId), token)
+        else window.localStorage.removeItem(sessionStorageKey(organizationId))
+      } catch {
+        // Ignore persistence failures (private mode, disabled storage, etc.).
+      }
+    },
+    [embed, organizationId, postToParent]
+  )
+
+  const reportUnread = useCallback(
+    (count: number, preview = "") => {
+      unreadRef.current = count
+      postToParent({ type: "unread", count, preview })
+    },
+    [postToParent]
+  )
+
+  const applyPrefill = useCallback(() => {
+    const prefill = prefillRef.current
+    if (!prefill) return
+    const { name: prefillName, email: prefillEmail, phone: prefillPhone } = prefill
+    if (prefillName) setName((current) => (current.trim() ? current : prefillName))
+    if (prefillEmail) setEmail((current) => (current.trim() ? current : prefillEmail))
+    if (prefillPhone && !phoneEditedRef.current) {
+      try {
+        const parsed = parsePhoneNumber(prefillPhone, DEFAULT_PHONE_COUNTRY)
+        if (parsed.country) setPhoneCountry(parsed.country)
+        setPhoneNational(parsed.nationalNumber)
+      } catch {
+        // Leave the phone field for the visitor when the host passes an unparseable number.
+      }
+    }
+  }, [])
   const latestVisitorMessage = [...messages].reverse().find((message) => message.authorType === "visitor") ?? null
   const latestVisitorSeenBySupport = Boolean(
     latestVisitorMessage &&
@@ -360,7 +464,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     async function bootstrap() {
       const params = new URLSearchParams(window.location.search)
       const urlToken = params.get("session")?.trim() ?? ""
-      const storedToken = urlToken || window.localStorage.getItem(sessionStorageKey(organizationId))
+      const storedToken = urlToken || (embed ? embed.sessionToken : readStoredSession(organizationId))
 
       if (storedToken) {
         try {
@@ -368,7 +472,14 @@ export default function SupportPage({ organizationId }: { organizationId: string
           const body = await response.json().catch(() => null)
           if (cancelled) return
           if (response.ok && body) {
-            window.localStorage.setItem(sessionStorageKey(organizationId), storedToken)
+            rememberSession(storedToken)
+            if (embed && !visibleRef.current) {
+              const readAt = body.ticket?.lastVisitorReadAt ? new Date(body.ticket.lastVisitorReadAt).getTime() : 0
+              const unseen = ((body.messages ?? []) as SupportMessage[]).filter(
+                (message) => isSupportReply(message) && new Date(message.createdAt).getTime() > readAt
+              )
+              if (unseen.length > 0) reportUnread(unseen.length, messagePreview(unseen[unseen.length - 1]))
+            }
             if (urlToken) {
               params.delete("session")
               const nextSearch = params.toString()
@@ -385,7 +496,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
             setPhase("chat")
             return
           }
-          window.localStorage.removeItem(sessionStorageKey(organizationId))
+          rememberSession(null)
           if (urlToken) {
             params.delete("session")
             const nextSearch = params.toString()
@@ -422,7 +533,60 @@ export default function SupportPage({ organizationId }: { organizationId: string
     return () => {
       cancelled = true
     }
-  }, [apiBase, organizationId])
+  }, [apiBase, organizationId, embed, rememberSession, reportUnread])
+
+  useEffect(() => {
+    if (embed && window.location.hash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`)
+    }
+  }, [embed])
+
+  useEffect(() => {
+    if (!embed) return
+    const { parentOrigin } = embed
+    const pick = (value: unknown, maxLength: number) =>
+      typeof value === "string" ? value.trim().slice(0, maxLength) : ""
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== parentOrigin) return
+      const data = event.data as Record<string, unknown> | null
+      if (!data || data.channel !== WIDGET_CHANNEL) return
+      if (data.type === "visibility") {
+        visibleRef.current = data.open === true
+        if (!visibleRef.current) return
+        if (unreadRef.current > 0) reportUnread(0)
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: "mark_read" }))
+        }
+        if (data.focus === true) focusChatInput()
+      } else if (data.type === "prefill") {
+        prefillRef.current = {
+          name: pick(data.name, 120),
+          email: pick(data.email, 254),
+          phone: pick(data.phone, 32),
+        }
+        applyPrefill()
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Radix layers (e.g. the country select) mark Escape as handled when they close themselves.
+      if (event.key !== "Escape" || event.defaultPrevented) return
+      setMenuOpen(false)
+      postToParent({ type: "close" })
+    }
+
+    window.addEventListener("message", onMessage)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      window.removeEventListener("message", onMessage)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [embed, postToParent, reportUnread, applyPrefill])
+
+  const loaded = phase !== "loading"
+  useEffect(() => {
+    if (loaded) postToParent({ type: "ready" })
+  }, [loaded, postToParent])
 
   useEffect(() => {
     for (const message of messages) seenIdsRef.current.add(message.id)
@@ -471,7 +635,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
       socket.addEventListener("open", () => {
         setSocketReady(true)
-        socket.send(JSON.stringify({ type: "mark_read" }))
+        if (visibleRef.current) socket.send(JSON.stringify({ type: "mark_read" }))
         if (!connectedPlayedRef.current) {
           connectedPlayedRef.current = true
           playConnected()
@@ -491,8 +655,9 @@ export default function SupportPage({ organizationId }: { organizationId: string
           if (!alreadySeen && incoming.authorType !== "visitor") {
             playReceived()
           }
-          if (incoming.authorType === "agent") {
-            socket.send(JSON.stringify({ type: "mark_read" }))
+          if (isSupportReply(incoming)) {
+            if (visibleRef.current) socket.send(JSON.stringify({ type: "mark_read" }))
+            else if (!alreadySeen) reportUnread(unreadRef.current + 1, messagePreview(incoming))
           }
         }
         if (payload.type === "ticket.updated") {
@@ -520,7 +685,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       if (reconnectRef.current) window.clearTimeout(reconnectRef.current)
       socketRef.current?.close()
     }
-  }, [phase, sessionToken, playConnected, playReceived])
+  }, [phase, sessionToken, playConnected, playReceived, reportUnread])
 
   async function startChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -552,7 +717,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       if (!response.ok || !body?.sessionToken) {
         throw new Error(body?.error ?? "Failed to start support chat")
       }
-      window.localStorage.setItem(sessionStorageKey(organizationId), body.sessionToken)
+      rememberSession(body.sessionToken)
       setVisitorName(name.trim())
       setSessionToken(body.sessionToken)
       setOrganization(body.organization)
@@ -648,7 +813,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
   }
 
   function startNewChat() {
-    window.localStorage.removeItem(sessionStorageKey(organizationId))
+    rememberSession(null)
     socketRef.current?.close()
     if (reconnectRef.current) window.clearTimeout(reconnectRef.current)
     connectedPlayedRef.current = false
@@ -672,6 +837,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
     setIssue("")
     setPhoneCountry(DEFAULT_PHONE_COUNTRY)
     setPhoneNational("")
+    phoneEditedRef.current = false
+    applyPrefill()
     setEmailCopy(false)
     setPhase("prechat")
   }
@@ -696,7 +863,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
     try {
       await persistSupportEnd()
       setEndPersisted(true)
-      window.localStorage.removeItem(sessionStorageKey(organizationId))
+      rememberSession(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to end chat")
       setEndPersisted(false)
@@ -719,7 +886,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
       await persistSupportEnd({ rating, feedbackComment: feedbackComment.trim() })
       setEndPersisted(true)
       setFeedbackSubmitted(true)
-      window.localStorage.removeItem(sessionStorageKey(organizationId))
+      rememberSession(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save feedback")
     } finally {
@@ -800,9 +967,21 @@ export default function SupportPage({ organizationId }: { organizationId: string
     }
   }
 
+  const pageBackground = embed ? "bg-white dark:bg-stone-900" : "bg-[#f5f3f0] dark:bg-[#0a0908]"
+  const minimizeButton = embed ? (
+    <button
+      type="button"
+      onClick={() => postToParent({ type: "close" })}
+      aria-label="Minimize chat"
+      className={ICON_BUTTON_CLASSES}
+    >
+      <ChevronDownIcon className="size-5" />
+    </button>
+  ) : null
+
   if (phase === "loading") {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] text-stone-400 dark:bg-[#0a0908] dark:text-stone-500">
+      <main className={`flex min-h-[100dvh] items-center justify-center text-stone-400 dark:text-stone-500 ${pageBackground}`}>
         <LoaderIcon className="size-6 animate-spin" />
       </main>
     )
@@ -810,7 +989,8 @@ export default function SupportPage({ organizationId }: { organizationId: string
 
   if (phase === "unavailable" || !organization) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] px-6 dark:bg-[#0a0908]">
+      <main className={`relative flex min-h-[100dvh] items-center justify-center px-6 ${pageBackground}`}>
+        {minimizeButton && <div className="absolute top-3 right-3">{minimizeButton}</div>}
         <div className="max-w-sm rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm dark:border-stone-800 dark:bg-stone-900">
           <AlertCircleIcon className="mx-auto size-8 text-red-500" />
           <p className="mt-3 text-sm font-medium text-stone-700 dark:text-stone-300">{unavailableMessage}</p>
@@ -856,15 +1036,12 @@ export default function SupportPage({ organizationId }: { organizationId: string
       </div>
     )
 
-  const iconButtonClasses =
-    "flex size-9 items-center justify-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-700 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-200"
-
   const themeToggle = (
     <button
       type="button"
       onClick={toggleTheme}
       aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      className={iconButtonClasses}
+      className={ICON_BUTTON_CLASSES}
     >
       {theme === "dark" ? <SunIcon className="size-[18px]" /> : <MoonIcon className="size-[18px]" />}
     </button>
@@ -888,7 +1065,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
             type="button"
             onClick={() => setMenuOpen((open) => !open)}
             aria-label="Chat options"
-            className={iconButtonClasses}
+            className={ICON_BUTTON_CLASSES}
           >
             <EllipsisVerticalIcon className="size-[18px]" />
           </button>
@@ -921,6 +1098,7 @@ export default function SupportPage({ organizationId }: { organizationId: string
           )}
         </div>
       )}
+      {minimizeButton}
     </header>
   )
 
@@ -945,8 +1123,20 @@ export default function SupportPage({ organizationId }: { organizationId: string
   const canSend = !sending && (draft.trim().length > 0 || files.length > 0)
 
   return (
-    <main className="flex min-h-[100dvh] items-center justify-center bg-[#f5f3f0] dark:bg-[#0a0908] sm:p-6">
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-stone-900 sm:h-[min(44rem,calc(100dvh-3rem))] sm:max-w-md sm:rounded-[20px] sm:ring-1 sm:ring-stone-900/5 sm:shadow-[0_24px_60px_-20px_rgba(28,25,23,0.35)] dark:sm:ring-white/10">
+    <main
+      className={
+        embed
+          ? `flex h-[100dvh] ${pageBackground}`
+          : `flex min-h-[100dvh] items-center justify-center sm:p-6 ${pageBackground}`
+      }
+    >
+      <div
+        className={
+          embed
+            ? "flex h-full w-full flex-col overflow-hidden bg-white dark:bg-stone-900"
+            : "flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-stone-900 sm:h-[min(44rem,calc(100dvh-3rem))] sm:max-w-md sm:rounded-[20px] sm:ring-1 sm:ring-stone-900/5 sm:shadow-[0_24px_60px_-20px_rgba(28,25,23,0.35)] dark:sm:ring-white/10"
+        }
+      >
         {phase === "prechat" && (
           <div className="flex flex-1 flex-col overflow-hidden">
             {renderHeader(availabilityStatus, false)}
@@ -998,7 +1188,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
                 <div className="flex items-stretch gap-2">
                   <Select
                     value={phoneCountry}
-                    onValueChange={(value) => setPhoneCountry(value as CountryCode)}
+                    onValueChange={(value) => {
+                      phoneEditedRef.current = true
+                      setPhoneCountry(value as CountryCode)
+                    }}
                   >
                     <SelectTrigger
                       aria-label="Country calling code"
@@ -1026,9 +1219,10 @@ export default function SupportPage({ organizationId }: { organizationId: string
                     type="tel"
                     inputMode="tel"
                     value={phoneNational}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      phoneEditedRef.current = true
                       setPhoneNational(event.target.value.replace(/[^\d]/g, "").slice(0, 15))
-                    }
+                    }}
                     placeholder="Phone number"
                     autoComplete="tel-national"
                     aria-invalid={phoneError}
