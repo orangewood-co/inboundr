@@ -39,7 +39,7 @@ export default function Header() {
               <Link
                 key={link.to}
                 to={link.to}
-                className="link-underline transition-colors duration-200 hover:text-text"
+                className="transition-colors duration-200 hover:text-text"
               >
                 {link.label}
               </Link>
