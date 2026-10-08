@@ -53,7 +53,7 @@ export function ChatWidgetInstall() {
           </SelectContent>
         </Select>
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-foreground p-3 text-[11px] leading-5 text-background">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg border bg-background p-3 font-mono text-[11px] leading-5 text-foreground">
         {snippet}
       </pre>
       <Button
@@ -75,7 +75,7 @@ export function ChatWidgetInstall() {
             Optional. Add <code>data-hide-launcher</code> to the script tag to use your own button instead
             of the bubble.
           </p>
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-foreground p-3 text-[11px] leading-5 text-background">
+          <pre className="mt-2 overflow-x-auto rounded-lg border bg-background p-3 font-mono text-[11px] leading-5 text-foreground">
             {API_EXAMPLE}
           </pre>
         </CollapsibleContent>
