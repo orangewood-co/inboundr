@@ -145,8 +145,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              AI that <Em>replies</Em>, <Em>quotes</Em>, <Em>follows up</Em>, and <Em>closes</Em> —
-              automatically.
+              Inboundr brings your workflows, tools, and AI agents together to automate work, streamline operations, and scale faster.
             </motion.p>
 
             <motion.div
