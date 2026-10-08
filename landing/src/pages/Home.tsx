@@ -166,7 +166,7 @@ export default function Home() {
                 <ArrowRight className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" />
               </motion.a>
               <motion.a
-                href="mailto:hello@inboundr.ai?subject=Join the waitlist"
+                href="https://app.inboundr.co/register"
                 className="inline-flex items-center justify-center border border-border bg-base/40 px-6 py-3.5 text-sm font-medium text-text backdrop-blur-sm transition-[border-color,background-color] duration-200 hover:border-text/20 hover:bg-surface"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
