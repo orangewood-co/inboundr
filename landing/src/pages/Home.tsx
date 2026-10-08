@@ -1,9 +1,11 @@
 import { useRef } from "react"
+import { Link } from "react-router-dom"
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
 import { FadeIn } from "@/components/FadeIn"
 import { CtaSection } from "@/components/CtaSection"
 import { Faq } from "@/components/Faq"
+import { FeatureGrid } from "@/components/FeatureGrid"
 import { ProcessSteps } from "@/components/ProcessSteps"
 
 const faqs = [
@@ -249,6 +251,27 @@ export default function Home() {
               </a>
             </FadeIn>
           </div>
+        </div>
+      </section>
+
+      {/* ── Workspace ── */}
+      <section id="workspace" className="border-b border-border px-6 py-20 sm:py-28 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <FadeIn className="mb-12 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="label mb-4 text-text-muted">Beyond the inbox</p>
+              <h2 className="text-balance text-2xl font-bold tracking-[-0.02em] text-text sm:text-3xl">
+                Everything else your team needs, built in.
+              </h2>
+            </div>
+            <Link
+              to="/features"
+              className="link-underline inline-flex shrink-0 items-center gap-2 self-start text-sm font-medium text-green-bright transition-colors duration-200 hover:text-text sm:self-auto"
+            >
+              All features <ArrowUpRight className="size-3.5" />
+            </Link>
+          </FadeIn>
+          <FeatureGrid />
         </div>
       </section>
 
