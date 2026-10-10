@@ -27,6 +27,7 @@ import {
 import { serializeSupportAiDraft, serializeTicket, serializeTicketMessage } from "./ticket.service";
 import { keyBelongsToPrefix } from "./storage.service";
 import { deliverTicketMessageViaWhatsApp } from "./whatsapp-support.service";
+import { deliverTicketMessageViaEmail } from "./email-ticket.service";
 
 type SupportSocketKind = "agent" | "visitor";
 
@@ -324,11 +325,16 @@ async function handleAgentMessage(ws: SupportSocket, payload: Record<string, unk
   await broadcastMessageCreated(message);
   await broadcastTicketById(String(ticket._id));
 
-  // WhatsApp customers aren't on a socket; relay through the Cloud API. The
-  // outcome is written back onto the message and broadcast as message.updated.
+  // WhatsApp and email customers aren't on a socket; relay through the Cloud
+  // API or Gmail. The outcome is written back onto the message and broadcast
+  // as message.updated.
   if (ticket.channel === "whatsapp") {
     void deliverTicketMessageViaWhatsApp(ticket, message).catch((err) => {
       console.error(`WhatsApp relay failed for ticket ${ticket._id}:`, err);
+    });
+  } else if (ticket.channel === "email") {
+    void deliverTicketMessageViaEmail(ticket, message).catch((err) => {
+      console.error(`Email relay failed for ticket ${ticket._id}:`, err);
     });
   }
 }

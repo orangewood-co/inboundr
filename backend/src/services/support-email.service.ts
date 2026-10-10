@@ -109,6 +109,9 @@ export async function sendSupportResolvedEmail(ticketId: string): Promise<boolea
   if (!ticket || ticket.resolvedEmailSentAt) return false;
   // Phone and WhatsApp requesters usually have no email on file.
   if (!ticket.requester?.email) return false;
+  // Email tickets already live in the customer's inbox; a separate no-reply
+  // notice would land outside that thread.
+  if (ticket.channel === "email") return false;
 
   const payload = await emailPayload(ticket);
   await sendEmail({

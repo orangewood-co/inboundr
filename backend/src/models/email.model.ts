@@ -7,6 +7,8 @@ export interface IEmailAttachment {
   mimeType: string;
   size: number;
   attachmentId: string;
+  inline?: boolean;
+  contentId?: string | null;
 }
 
 export interface IEmailPendingAttachment {
@@ -51,6 +53,10 @@ export interface IEmail extends Document {
   sendStatus: EmailSendStatus | null;
   sendError: string | null;
   pendingAttachments: IEmailPendingAttachment[];
+  /** Header/label signal that the message is machine-sent; null for human mail. */
+  automatedReason: string | null;
+  /** Support ticket this message was routed into or sent from. */
+  ticketId: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +67,8 @@ const emailAttachmentSchema = new Schema<IEmailAttachment>(
     mimeType: { type: String, required: true },
     size: { type: Number, required: true },
     attachmentId: { type: String, required: true },
+    inline: { type: Boolean, default: false },
+    contentId: { type: String, default: null },
   },
   { _id: false }
 );
@@ -148,6 +156,8 @@ const emailSchema = new Schema<IEmail>(
     },
     sendError: { type: String, default: null },
     pendingAttachments: { type: [emailPendingAttachmentSchema], default: [] },
+    automatedReason: { type: String, default: null },
+    ticketId: { type: Schema.Types.ObjectId, ref: "Ticket", default: null },
   },
   { timestamps: true }
 );

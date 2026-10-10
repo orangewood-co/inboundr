@@ -5,6 +5,9 @@ export const emailAttachmentSchema = z.object({
   mimeType: z.string(),
   size: z.number(),
   attachmentId: z.string(),
+  /** Embedded in the HTML body (signature logos, pasted screenshots) rather than attached. */
+  inline: z.boolean().optional(),
+  contentId: z.string().nullable().optional(),
 });
 
 export const parsedEmailSchema = z.object({
@@ -26,6 +29,8 @@ export const parsedEmailSchema = z.object({
   snippet: z.string().nullable(),
   labels: z.array(z.string()),
   attachments: z.array(emailAttachmentSchema),
+  /** Why the message looks machine-sent (auto-reply, newsletter, bounce); null for human mail. */
+  automatedReason: z.string().nullable(),
 });
 
 export type ParsedEmail = z.infer<typeof parsedEmailSchema>;

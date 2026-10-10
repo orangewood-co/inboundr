@@ -8,7 +8,7 @@ import { Organization, type IOrganization } from "../models/organization.model";
 import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft.model";
 import { SupportKnowledgeArticle } from "../models/support-knowledge-article.model";
 import { SupportTemplate } from "../models/support-template.model";
-import { Ticket, type ITicket } from "../models/ticket.model";
+import { Ticket, type ITicket, type TicketChannel } from "../models/ticket.model";
 import {
   TicketMessage,
   type ITicketMessage,
@@ -366,10 +366,28 @@ async function loadPromptContext(ticket: ITicket, latestText = ""): Promise<Supp
   return loadOrgPromptContext(ticket.organizationId, searchText);
 }
 
+function channelGuidelines(
+  channel: TicketChannel | undefined,
+  context: SupportPromptContext,
+  requesterName: string
+): string {
+  if (channel !== "email") return "";
+  const firstName = requesterName.trim().split(/\s+/)[0] || requesterName;
+  return `
+  # Channel
+
+  - This conversation is happening over email, so write a complete email reply body.
+  - Greet ${firstName} by name, answer in short plain-text paragraphs, and close with a sign-off from the ${context.organizationName} team. Never invent a person's name for the sign-off.
+  - Do not include a subject line, quoted history, or a signature block with contact details; those are added automatically.
+  - Only ask a follow-up question when it is genuinely needed to resolve the request; this overrides the follow-up guideline above.
+`;
+}
+
 function buildSystemPrompt(
   context: SupportPromptContext,
   requesterName: string,
-  mode: "autonomous" | "draft"
+  mode: "autonomous" | "draft",
+  channel?: TicketChannel
 ): string {
   const articleBlock =
     context.articles.length > 0
@@ -416,7 +434,7 @@ function buildSystemPrompt(
   - If the answer is not supported by the provided context, say the ${context.organizationName} team will follow up instead of guessing.
   - Stay on the topic of ${context.organizationName} and its products or services. Politely decline unrelated requests.
   - ${mode === "draft" ? "Return only the draft reply an agent can approve or edit." : "Return only the customer-facing reply."}
-
+${channelGuidelines(channel, context, requesterName)}
   # Constraints
 
   - Never mention that you have access to any training data, provided information, or context explicitly to the user.
@@ -526,7 +544,7 @@ export async function generateSupportBotMessage(ticket: ITicket): Promise<ITicke
   const context = await loadPromptContext(ticket, latest?.bodyText ?? "");
   const result = await generateText({
     model: supportModel(),
-    system: buildSystemPrompt(context, ticket.requester.name, "autonomous"),
+    system: buildSystemPrompt(context, ticket.requester.name, "autonomous", ticket.channel),
     messages: await modelMessagesForTicket(ticket),
   });
 
@@ -574,9 +592,10 @@ async function createSupportHandoffMessage(
   return message;
 }
 
+/** `requestedByUserId` is null when the draft is generated automatically on an inbound message. */
 export async function generateSupportAiDraft(
   ticket: ITicket,
-  requestedByUserId: string
+  requestedByUserId: string | null
 ): Promise<ISupportAiDraft | null> {
   const latest = await latestVisitorMessage(ticket);
   if (!latest) return null;
@@ -584,7 +603,7 @@ export async function generateSupportAiDraft(
   const model = process.env.SUPPORT_CHAT_MODEL ?? DEFAULT_SUPPORT_MODEL;
   const result = await generateText({
     model: supportModel(model),
-    system: buildSystemPrompt(context, ticket.requester.name, "draft"),
+    system: buildSystemPrompt(context, ticket.requester.name, "draft", ticket.channel),
     messages: await modelMessagesForTicket(ticket),
   });
   const bodyText = result.text.trim();
@@ -604,14 +623,18 @@ export async function generateSupportAiDraft(
 export async function appendVisitorMessage(
   ticket: ITicket,
   bodyText: string,
-  attachments: SupportMessageAttachmentInput[] = []
+  attachments: SupportMessageAttachmentInput[] = [],
+  options: { externalId?: string | null } = {}
 ): Promise<ITicketMessage> {
+  // Inserting the provider id with the message lets its unique index reject a
+  // duplicate delivery before the ticket is touched.
   const message = await TicketMessage.create({
     ticketId: ticket._id,
     organizationId: ticket.organizationId,
     authorType: "visitor",
     bodyText,
     attachments: attachments.map((attachment) => ({ ...attachment, url: attachment.url ?? null })),
+    ...(options.externalId ? { externalId: options.externalId } : {}),
   });
 
   const now = new Date();

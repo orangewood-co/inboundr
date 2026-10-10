@@ -21,6 +21,7 @@ import {
   serializeTicket,
 } from "../services/ticket.service";
 import { deliverTicketMessageViaWhatsApp } from "../services/whatsapp-support.service";
+import { deliverTicketMessageViaEmail } from "../services/email-ticket.service";
 
 const INSTRUCTIONS_MAX = 8000;
 const ARTICLE_TITLE_MAX = 160;
@@ -362,11 +363,15 @@ export async function approveTicketAiDraft(req: Request, res: Response): Promise
     broadcastSupportAiDraftUpdate(String(orgReq.organization._id), draft, "updated");
     res.json({ message, draft: serializedDraft });
 
-    if (freshTicket?.channel === "whatsapp") {
+    if (freshTicket?.channel === "whatsapp" || freshTicket?.channel === "email") {
       const ticketDoc = await Ticket.findById(draft.ticketId);
-      if (ticketDoc) {
+      if (ticketDoc?.channel === "whatsapp") {
         void deliverTicketMessageViaWhatsApp(ticketDoc, message).catch((err) => {
           console.error(`WhatsApp relay failed for approved draft ${draft._id}:`, err);
+        });
+      } else if (ticketDoc?.channel === "email") {
+        void deliverTicketMessageViaEmail(ticketDoc, message).catch((err) => {
+          console.error(`Email relay failed for approved draft ${draft._id}:`, err);
         });
       }
     }

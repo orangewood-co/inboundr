@@ -15,6 +15,8 @@ interface ProcessEmailForRFQOptions {
   resetExisting?: boolean;
   /** Gmail conversation id of the email, used to find an existing thread RFQ. */
   threadId?: string | null;
+  /** Outcome of an upstream classifier (mixed-purpose inbox triage); skips the RFQ check. */
+  classification?: { isRFQemail: boolean; reason: string };
 }
 
 async function isQuotationProcessingEnabled(organizationId?: string): Promise<boolean> {
@@ -270,7 +272,7 @@ export async function processEmailForRFQ(
   await updateEmailStatus(messageId, "processing", undefined, gmailAccountId);
 
   try {
-    const { isRFQemail, reason } = await classifyEmail(emailBody);
+    const { isRFQemail, reason } = options.classification ?? (await classifyEmail(emailBody));
 
     const rfqDoc = await RFQ.create({
       userId,
