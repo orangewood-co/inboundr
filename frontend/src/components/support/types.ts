@@ -78,6 +78,8 @@ export type Ticket = {
   resolution: TicketResolution | null
   isArchived: boolean
   archivedAt: string | null
+  /** Set for email tickets: the connected inbox the conversation runs through. */
+  emailThread?: { mailbox: string; subject: string } | null
   lastMessagePreview?: string | null
   lastMessageAuthorType?: MessageAuthorType | null
   lastMessageIsInternal?: boolean
@@ -114,11 +116,18 @@ export type TicketMessage = {
   bodyText: string
   attachments: TicketAttachment[]
   isInternal: boolean
-  /** Only set for messages relayed to an external channel (WhatsApp). */
+  /** Only set for messages relayed to an external channel (WhatsApp, email). */
   deliveryStatus?: MessageDeliveryStatus | null
   deliveryError?: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** Whether agent replies on an email ticket can be sent, and from which inbox. */
+export type EmailChannelState = {
+  mailbox: string
+  canSend: boolean
+  blockedReason: string | null
 }
 
 export type SupportAiDraft = {

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import {
+  AlertCircleIcon,
   ClockIcon,
   LoaderIcon,
+  MailIcon,
   MessageSquareIcon,
   PaperclipIcon,
   SendIcon,
@@ -16,10 +18,33 @@ import { EmojiPicker } from "./emoji-picker"
 import { TemplatePicker } from "./template-picker"
 import { VoiceRecorder } from "./voice-recorder"
 import { fileSize, SUPPORT_MESSAGE_MAX_LENGTH } from "./support-utils"
-import type { ComposerMode, PendingAttachment, Ticket } from "./types"
+import type { ComposerMode, EmailChannelState, PendingAttachment, Ticket } from "./types"
 
 const MAX_FILES = 5
 const WHATSAPP_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent)
+
+function EmailReplyNotice({ ticket, emailChannel }: { ticket: Ticket; emailChannel: EmailChannelState | null }) {
+  if (emailChannel && !emailChannel.canSend) {
+    return (
+      <div className="mb-2 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-xs text-destructive">
+        <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+        <span>{emailChannel.blockedReason ?? "Replies cannot be emailed right now."}</span>
+      </div>
+    )
+  }
+
+  const mailbox = emailChannel?.mailbox ?? ticket.emailThread?.mailbox
+  return (
+    <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+      <MailIcon className="size-3.5 shrink-0" />
+      <span className="truncate">
+        Replies are emailed to {ticket.requester.email || ticket.requester.name}
+        {mailbox ? ` from ${mailbox}` : ""}
+      </span>
+    </p>
+  )
+}
 
 /**
  * Meta only accepts free-form replies within 24h of the customer's last
@@ -56,12 +81,14 @@ export function Composer({
   ticket,
   sending,
   socketReady,
+  emailChannel = null,
   onSend,
   onDraftChange,
 }: {
   ticket: Ticket
   sending: boolean
   socketReady: boolean
+  emailChannel?: EmailChannelState | null
   onSend: (input: { text: string; files: File[]; isInternal: boolean }) => Promise<boolean>
   onDraftChange: (value: string) => void
 }) {
@@ -71,8 +98,11 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const isNote = mode === "note"
+  const isEmail = ticket.channel === "email"
+  const emailBlocked = isEmail && !isNote && emailChannel !== null && !emailChannel.canSend
   const overLimit = draft.length > SUPPORT_MESSAGE_MAX_LENGTH
-  const canSend = socketReady && !sending && !overLimit && (draft.trim().length > 0 || files.length > 0)
+  const canSend =
+    socketReady && !sending && !overLimit && !emailBlocked && (draft.trim().length > 0 || files.length > 0)
 
   function updateDraft(value: string) {
     setDraft(value)
@@ -181,6 +211,7 @@ export function Composer({
       {ticket.channel === "whatsapp" && !isNote && (
         <WhatsAppWindowNotice lastVisitorMessageAt={ticket.lastVisitorMessageAt} />
       )}
+      {isEmail && !isNote && <EmailReplyNotice ticket={ticket} emailChannel={emailChannel} />}
 
       {files.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
@@ -233,15 +264,20 @@ export function Composer({
           value={draft}
           onChange={(event) => updateDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault()
-              void submit()
-            }
+            if (event.key !== "Enter" || event.shiftKey) return
+            // Email replies run to several paragraphs, so Enter starts a new line there.
+            if (isEmail && !isNote && !(event.metaKey || event.ctrlKey)) return
+            event.preventDefault()
+            void submit()
           }}
           placeholder={
-            isNote ? "Add an internal note (only your team can see this)..." : "Write a reply..."
+            isNote
+              ? "Add an internal note (only your team can see this)..."
+              : isEmail
+                ? `Write an email reply... (${IS_MAC ? "⌘" : "Ctrl"}+Enter to send)`
+                : "Write a reply..."
           }
-          rows={2}
+          rows={isEmail && !isNote ? 4 : 2}
           className="max-h-40 min-h-10 w-full resize-none bg-transparent px-3.5 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
         />
         <div className="flex items-center justify-between gap-1 px-2 pb-2">

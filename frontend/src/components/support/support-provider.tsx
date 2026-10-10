@@ -20,6 +20,7 @@ import {
 import { queryClient } from "@/lib/query-client"
 import { previewFromMessage, ticketMatchesFilter } from "./support-utils"
 import type {
+  EmailChannelState,
   ResolutionReason,
   SocketEvent,
   SupportAiDraft,
@@ -162,6 +163,10 @@ function useSupportInboxValue() {
   const [resolutionReasons, setResolutionReasons] = useState<ResolutionReason[]>([])
   const [messages, setMessages] = useState<TicketMessage[]>([])
   const [aiDrafts, setAiDrafts] = useState<SupportAiDraft[]>([])
+  const [emailChannelState, setEmailChannelState] = useState<{
+    ticketId: string
+    state: EmailChannelState | null
+  } | null>(null)
   const [loadingTickets, setLoadingTickets] = useState(true)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [sending, setSending] = useState(false)
@@ -221,6 +226,8 @@ function useSupportInboxValue() {
     () => aiDrafts.filter((draft) => draft.ticketId === selectedTicketId && draft.status === "pending"),
     [aiDrafts, selectedTicketId]
   )
+  const emailChannel =
+    emailChannelState && emailChannelState.ticketId === selectedTicketId ? emailChannelState.state : null
 
   const latestVisitorMessage = useMemo(
     () => [...selectedMessages].reverse().find((message) => message.authorType === "visitor") ?? null,
@@ -298,6 +305,7 @@ function useSupportInboxValue() {
         setSelectedTicket(body.ticket)
         setMessages(body.messages ?? [])
         setAiDrafts(body.aiDrafts ?? [])
+        setEmailChannelState({ ticketId, state: body.emailChannel ?? null })
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load ticket")
       } finally {
@@ -911,6 +919,7 @@ function useSupportInboxValue() {
     selectedTicket,
     messages: selectedMessages,
     aiDrafts: selectedAiDrafts,
+    emailChannel,
     loadingDetail,
     socketReady,
     sending,
