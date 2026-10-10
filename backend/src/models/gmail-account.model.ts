@@ -1,6 +1,12 @@
 import mongoose, { Schema, type Document } from "mongoose";
 
 export type GmailAccountStatus = "connected" | "expired" | "revoked" | "error";
+/**
+ * What inbound mail on this inbox feeds: RFQ extraction, support tickets, or
+ * both (an AI classifier picks per email).
+ */
+export type GmailAccountPurpose = "quotations" | "support" | "both";
+export const GMAIL_ACCOUNT_PURPOSES: GmailAccountPurpose[] = ["quotations", "support", "both"];
 
 export interface IGmailAccount extends Document {
   userId: string;
@@ -15,6 +21,7 @@ export interface IGmailAccount extends Document {
   status: GmailAccountStatus;
   errorMessage: string | null;
   signatureHtml: string | null;
+  purpose: GmailAccountPurpose;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +50,11 @@ const gmailAccountSchema = new Schema<IGmailAccount>(
     },
     errorMessage: { type: String, default: null },
     signatureHtml: { type: String, default: null },
+    purpose: {
+      type: String,
+      enum: GMAIL_ACCOUNT_PURPOSES,
+      default: "quotations",
+    },
   },
   { timestamps: true }
 );

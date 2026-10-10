@@ -149,6 +149,8 @@ const normalizeDeliveryTermTemplates = (
   deliveryTerms: DeliveryTermTemplate[] | undefined,
 ): DeliveryTermTemplate[] => normalizeTermTemplates(deliveryTerms, "", createDeliveryTermId)
 
+type GmailAccountPurpose = "quotations" | "support" | "both"
+
 interface GmailAccount {
   _id: string
   emailAddress: string
@@ -157,9 +159,36 @@ interface GmailAccount {
   status: "connected" | "expired" | "revoked" | "error"
   errorMessage: string | null
   signatureHtml: string | null
+  purpose?: GmailAccountPurpose
   createdAt: string
   updatedAt: string
 }
+
+const GMAIL_PURPOSE_OPTIONS: {
+  value: GmailAccountPurpose
+  label: string
+  description: string
+  features: ("rfq" | "support")[]
+}[] = [
+  {
+    value: "quotations",
+    label: "Quotations",
+    description: "Incoming emails are checked for RFQs.",
+    features: ["rfq"],
+  },
+  {
+    value: "support",
+    label: "Support",
+    description: "Customer emails open or update support tickets.",
+    features: ["support"],
+  },
+  {
+    value: "both",
+    label: "Quotations and Support",
+    description: "Each email becomes an RFQ, a support ticket, or stays in the Inbox.",
+    features: ["rfq", "support"],
+  },
+]
 
 const INVOICE_TEMPLATE_OPTIONS = [
   {
@@ -1513,7 +1542,7 @@ function OrganizationTab() {
 
 function AccountTab() {
   const { data: session, isPending: loadingSession } = useSession()
-  const { hasFeature } = useEntitlements()
+  const { hasFeature, canManageOrganization } = useEntitlements()
   const [accounts, setAccounts] = useState<GmailAccount[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [connecting, setConnecting] = useState(false)
@@ -1525,6 +1554,22 @@ function AccountTab() {
   const [removingAvatar, setRemovingAvatar] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const quotationsEnabled = hasFeature("rfq")
+  const supportEnabled = hasFeature("support")
+  const mailboxEnabled = quotationsEnabled || supportEnabled
+  const gmailDescription = !mailboxEnabled
+    ? "Quotations and Support are disabled for this organization. Enable one of them before connecting Gmail."
+    : quotationsEnabled && supportEnabled
+      ? "Authorize Gmail inboxes for RFQ processing, quote replies and support tickets."
+      : quotationsEnabled
+        ? "Authorize Gmail inboxes for RFQ processing and quote replies."
+        : "Authorize Gmail inboxes to turn customer emails into support tickets."
+  const gmailEmptyDescription = !mailboxEnabled
+    ? "Gmail can be connected after Quotations or Support is enabled."
+    : quotationsEnabled && supportEnabled
+      ? "Connect Gmail to process incoming RFQs and answer customer emails as support tickets."
+      : quotationsEnabled
+        ? "Connect Gmail to process incoming RFQs and send quotes on the same thread."
+        : "Connect Gmail to answer customer emails as support tickets, replying on the same thread."
 
   const fetchGmailAccounts = useCallback(async () => {
     setLoadingAccounts(true)
@@ -1547,8 +1592,8 @@ function AccountTab() {
   }, [fetchGmailAccounts])
 
   const handleConnectGmail = async () => {
-    if (!quotationsEnabled) {
-      setGmailError("Quotations are not enabled for this organization.")
+    if (!mailboxEnabled) {
+      setGmailError("Enable Quotations or Support before connecting Gmail.")
       return
     }
 
@@ -1733,17 +1778,13 @@ function AccountTab() {
 
       <SettingsCard
         title="Connected Gmail"
-        description={
-          quotationsEnabled
-            ? "Authorize Gmail inboxes for RFQ processing and quote replies."
-            : "Quotations are disabled for this organization. Re-enable Quotations before connecting Gmail."
-        }
+        description={gmailDescription}
         action={
           <Button
             size="sm"
             className="gap-1.5"
             onClick={handleConnectGmail}
-            disabled={connecting || !quotationsEnabled}
+            disabled={connecting || !mailboxEnabled}
           >
             {connecting ? (
               <Spinner data-icon="inline-start" />
@@ -1769,11 +1810,7 @@ function AccountTab() {
               </div>
               <div>
                 <p className="text-sm font-medium">No Gmail account connected</p>
-                <p className="text-xs text-muted-foreground">
-                  {quotationsEnabled
-                    ? "Connect Gmail to process incoming RFQs and send quotes on the same thread."
-                    : "Gmail can be connected after Quotations are re-enabled."}
-                </p>
+                <p className="text-xs text-muted-foreground">{gmailEmptyDescription}</p>
               </div>
             </div>
           ) : (
@@ -1817,6 +1854,19 @@ function AccountTab() {
                   </Button>
                 </div>
 
+                {(supportEnabled || account.purpose === "support") && (
+                  <GmailPurposeControl
+                    account={account}
+                    canManage={canManageOrganization}
+                    enabledFeatures={{ rfq: quotationsEnabled, support: supportEnabled }}
+                    onSaved={(updated) =>
+                      setAccounts((current) =>
+                        current.map((item) => (item._id === updated._id ? updated : item))
+                      )
+                    }
+                  />
+                )}
+
                 <GmailSignatureEditor
                   account={account}
                   onSaved={(updated) =>
@@ -1839,6 +1889,85 @@ const LazyRichTextEditor = lazy(() =>
     default: module.RichTextEditor,
   }))
 )
+
+function GmailPurposeControl({
+  account,
+  canManage,
+  enabledFeatures,
+  onSaved,
+}: {
+  account: GmailAccount
+  canManage: boolean
+  enabledFeatures: Record<"rfq" | "support", boolean>
+  onSaved: (account: GmailAccount) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const purpose = account.purpose ?? "quotations"
+  const current = GMAIL_PURPOSE_OPTIONS.find((option) => option.value === purpose)
+  const available = GMAIL_PURPOSE_OPTIONS.filter((option) =>
+    option.features.every((feature) => enabledFeatures[feature])
+  )
+  const inactive = !available.some((option) => option.value === purpose)
+
+  async function handleChange(next: GmailAccountPurpose) {
+    if (next === purpose) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_ORIGIN}/api/v1/gmail/accounts/${account._id}/purpose`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose: next }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
+
+      void invalidateGmailAccounts()
+      onSaved(data.account as GmailAccount)
+      toast.success("Inbox use updated")
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : "Failed to update inbox use")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 ml-12 space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Used for</span>
+        {canManage ? (
+          <Select
+            value={inactive ? undefined : purpose}
+            onValueChange={(value) => void handleChange(value as GmailAccountPurpose)}
+            disabled={saving}
+          >
+            <SelectTrigger size="sm" className="w-56" aria-label={`Use of ${account.emailAddress}`}>
+              <SelectValue placeholder="Choose what this inbox feeds" />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-xs font-medium">{current?.label ?? "Quotations"}</span>
+        )}
+        {saving && <Spinner className="size-3.5" />}
+      </div>
+      <p className={`text-xs ${inactive ? "text-warning" : "text-muted-foreground"}`}>
+        {inactive
+          ? `${current?.label ?? "This use"} is not enabled for this organization, so this inbox is not being processed.${
+              canManage ? " Choose another use." : ""
+            }`
+          : current?.description}
+      </p>
+    </div>
+  )
+}
 
 function GmailSignatureEditor({
   account,

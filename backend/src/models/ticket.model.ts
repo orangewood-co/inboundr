@@ -17,6 +17,16 @@ export interface ITicketVisitorFeedback {
   submittedAt: Date | null;
 }
 
+/** The Gmail conversation an email-channel ticket mirrors. */
+export interface ITicketEmailThread {
+  gmailAccountId: mongoose.Types.ObjectId;
+  /** Gmail thread id; only unique within its inbox. */
+  threadId: string;
+  /** Connected inbox address that agent replies are sent from. */
+  mailbox: string;
+  subject: string;
+}
+
 export interface ITicketResolution {
   reasonId: string;
   /** Label snapshot taken at resolve time so later renames/deletes never rewrite history. */
@@ -39,6 +49,7 @@ export interface ITicket extends Document {
   tagIds: mongoose.Types.ObjectId[];
   /** Visitor resume key for chat-channel tickets. */
   sessionToken: string | null;
+  emailThread: ITicketEmailThread | null;
   emailTranscriptRequested: boolean;
   botEnabled: boolean;
   aiMode: TicketAiMode;
@@ -83,6 +94,16 @@ const ticketResolutionSchema = new Schema<ITicketResolution>(
     reasonId: { type: String, required: true, trim: true },
     reasonLabel: { type: String, required: true, trim: true },
     note: { type: String, default: null, trim: true, maxlength: 2000 },
+  },
+  { _id: false }
+);
+
+const ticketEmailThreadSchema = new Schema<ITicketEmailThread>(
+  {
+    gmailAccountId: { type: Schema.Types.ObjectId, ref: "GmailAccount", required: true },
+    threadId: { type: String, required: true, trim: true },
+    mailbox: { type: String, required: true, lowercase: true, trim: true },
+    subject: { type: String, default: "", trim: true },
   },
   { _id: false }
 );
@@ -135,6 +156,7 @@ const ticketSchema = new Schema<ITicket>(
       index: true,
     },
     sessionToken: { type: String, default: null },
+    emailThread: { type: ticketEmailThreadSchema, default: null },
     emailTranscriptRequested: { type: Boolean, default: false },
     botEnabled: { type: Boolean, default: true },
     aiMode: {
@@ -171,5 +193,9 @@ ticketSchema.index({ organizationId: 1, status: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, customerId: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, serviceRequestId: 1, lastMessageAt: -1 });
 ticketSchema.index({ organizationId: 1, isArchived: 1, lastMessageAt: -1 });
+ticketSchema.index(
+  { "emailThread.gmailAccountId": 1, "emailThread.threadId": 1, lastMessageAt: -1 },
+  { partialFilterExpression: { "emailThread.threadId": { $type: "string" } } }
+);
 
 export const Ticket = mongoose.model<ITicket>("Ticket", ticketSchema);

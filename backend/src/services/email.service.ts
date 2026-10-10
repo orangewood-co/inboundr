@@ -2,11 +2,7 @@ import type { gmail_v1 } from "googleapis";
 import { getGmailClientForAccount } from "../config/gmail.config";
 import { Email } from "../models/email.model";
 import type { ParsedEmail, EmailAttachment } from "../types/email.types";
-import { processEmailForRFQ } from "./rfq.service";
-import {
-  buildRFQProcessingInput,
-  hasRFQProcessableContent,
-} from "./rfq-input.service";
+import { routeInboundEmail } from "./email-routing.service";
 import {
   GmailAccount,
   type IGmailAccount,
@@ -16,7 +12,8 @@ import {
   SkippedGmailMessage,
   type SkippedGmailMessageReason,
 } from "../models/skipped-gmail-message.model";
-import { hasEffectiveFeature } from "./entitlement.service";
+import { hasMailboxFeature } from "./entitlement.service";
+import { detectAutomatedEmail } from "./email-triage.service";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -38,19 +35,19 @@ function isSelfSentEmail(
   return fromAddress === accountAddress || (labels.has("SENT") && !labels.has("INBOX"));
 }
 
-export async function canProcessQuotationInbox(account: IGmailAccount): Promise<boolean> {
+export async function canProcessInbox(account: IGmailAccount): Promise<boolean> {
   if (!account.organizationId) return false;
 
   const organization = await Organization.findById(account.organizationId)
     .select("planSlug enabledFeatures disabledFeatures")
     .lean();
 
-  return Boolean(organization && hasEffectiveFeature(organization, "rfq"));
+  return Boolean(organization && hasMailboxFeature(organization));
 }
 
 /**
- * Fetches a single Gmail message and stores it, kicking off RFQ processing for
- * newly saved inbound mail. Idempotent: already-stored, self-sent and
+ * Fetches a single Gmail message and stores it, routing newly saved inbound
+ * mail to RFQ processing or a support ticket. Idempotent: already-stored, self-sent and
  * duplicate messages are no-ops, so callers may safely retry after failures.
  * Throws when ingestion fails so callers can decide whether to advance their
  * sync cursor.
@@ -77,27 +74,6 @@ async function recordSkippedMessage(
 // broken and skipped. Without a cap, a single poison message pins the sync
 // cursor and every Gmail notification replays the whole range since it.
 const MAX_INGEST_ATTEMPTS = 5;
-
-// RFQ processing runs an LLM call plus Postgres product searches per email.
-// A backlog catch-up can ingest dozens of emails in seconds; firing all their
-// RFQ jobs at once exhausts the session-mode Postgres pooler (pool_size 20),
-// so queue them behind a small semaphore instead.
-const MAX_CONCURRENT_RFQ_JOBS = 2;
-let activeRfqJobs = 0;
-const rfqJobWaiters: Array<() => void> = [];
-
-async function withRfqSlot<T>(fn: () => Promise<T>): Promise<T> {
-  while (activeRfqJobs >= MAX_CONCURRENT_RFQ_JOBS) {
-    await new Promise<void>((resolve) => rfqJobWaiters.push(resolve));
-  }
-  activeRfqJobs++;
-  try {
-    return await fn();
-  } finally {
-    activeRfqJobs--;
-    rfqJobWaiters.shift()?.();
-  }
-}
 
 async function recordFailedIngestAttempt(
   account: IGmailAccount,
@@ -186,21 +162,22 @@ export async function ingestInboxMessage(
       gmailAccountId: account._id,
       messageId,
     }).lean();
-    if (emailDoc && hasRFQProcessableContent(emailDoc)) {
-      const body = await buildRFQProcessingInput(account, emailDoc);
-      withRfqSlot(() =>
-        processEmailForRFQ(
-          emailDoc._id.toString(),
-          body,
+    if (emailDoc) {
+      // Awaited so a mailbox's messages are routed in order (a quick reply must
+      // find the ticket its predecessor opened). The row is already saved, so a
+      // routing failure is recorded on it instead of failing ingestion, which
+      // would never retry it.
+      try {
+        await routeInboundEmail(account, emailDoc);
+      } catch (err: any) {
+        console.error(`Failed to route email ${messageId}:`, err);
+        await updateEmailStatus(
           messageId,
-          account.userId,
-          account._id.toString(),
-          account.organizationId?.toString(),
-          { threadId: emailDoc.threadId ?? null }
-        )
-      ).catch((err) =>
-        console.error(`RFQ processing failed for ${messageId}:`, err)
-      );
+          "failed",
+          err?.message || "Failed to route email",
+          account._id.toString()
+        ).catch(() => undefined);
+      }
     }
 
     return true;
@@ -280,11 +257,11 @@ async function runHistoryUpdate(
   account: IGmailAccount,
   newHistoryId: string
 ): Promise<void> {
-  if (!(await canProcessQuotationInbox(account))) {
-    // Keep the stored cursor so the backlog is ingested if the feature is
+  if (!(await canProcessInbox(account))) {
+    // Keep the stored cursor so the backlog is ingested if a feature is
     // re-enabled; advancing here would silently discard the mail.
     console.warn(
-      `Skipping Gmail history update for ${account.emailAddress}: Quotations feature is disabled`
+      `Skipping Gmail history update for ${account.emailAddress}: Quotations and Support are disabled`
     );
     return;
   }
@@ -414,6 +391,7 @@ function parseHeadersToEmail(
   const headers = message.payload?.headers ?? [];
   const getHeader = (name: string): string =>
     headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
+  const labels = message.labelIds ?? [];
 
   return {
     messageId: message.id!,
@@ -432,8 +410,14 @@ function parseHeadersToEmail(
     bodyText: parsed.bodyText,
     bodyHtml: parsed.bodyHtml,
     snippet: message.snippet ?? null,
-    labels: message.labelIds ?? [],
+    labels,
     attachments: parsed.attachments,
+    automatedReason: detectAutomatedEmail({
+      header: getHeader,
+      from: getHeader("From"),
+      labels,
+      mimeType: message.payload?.mimeType,
+    }),
   };
 }
 
@@ -557,11 +541,20 @@ async function parseMessagePayload(
     const mimeType = part.mimeType ?? "";
 
     if (part.filename && part.body?.attachmentId) {
+      const partHeader = (name: string): string =>
+        part.headers?.find((h) => h.name?.toLowerCase() === name)?.value?.trim() ?? "";
+      const disposition = partHeader("content-disposition").toLowerCase();
+      const contentId = partHeader("content-id").replace(/^<|>$/g, "") || null;
       attachments.push({
         filename: part.filename,
         mimeType,
         size: part.body.size ?? 0,
         attachmentId: part.body.attachmentId,
+        inline:
+          mimeType.startsWith("image/") &&
+          !disposition.startsWith("attachment") &&
+          (disposition.startsWith("inline") || Boolean(contentId)),
+        contentId,
       });
       return;
     }

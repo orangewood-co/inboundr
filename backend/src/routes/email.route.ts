@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createEmailDraft,
+  createTicketFromEmail,
   deleteEmailDraft,
   downloadEmailPdf,
   emailWebhookController,
@@ -31,6 +32,13 @@ router.get("/:id/attachments/:attachmentId", ...requireInbox, getEmailAttachment
 router.get("/:id/attachments/:attachmentId/download", ...requireInbox, getEmailAttachment);
 router.get("/:id/pdf", ...requireInbox, downloadEmailPdf);
 router.post("/:id/reprocess", ...requireInbox, reprocessEmail);
+router.post(
+  "/:id/ticket",
+  ...requireInbox,
+  requireFeature("support"),
+  requireEmployeeModule("support"),
+  createTicketFromEmail
+);
 
 router.get("/:id/thread", ...requireInbox, getEmailThread);
 router.post("/:id/thread/sync", ...requireInbox, syncEmailThread);

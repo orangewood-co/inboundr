@@ -119,6 +119,16 @@ export function hasEffectiveFeature(
   return isFeatureKey(feature) && getEffectiveFeatures(organization).includes(feature);
 }
 
+/**
+ * Connected Gmail inboxes feed Quotations (RFQ extraction) and Support (email
+ * tickets), so a mailbox stays usable while either feature is on.
+ */
+export function hasMailboxFeature(
+  organization: Pick<IOrganization, "planSlug" | "enabledFeatures" | "disabledFeatures">
+): boolean {
+  return hasEffectiveFeature(organization, "rfq") || hasEffectiveFeature(organization, "support");
+}
+
 export function serializeEntitlements(organization: Pick<IOrganization, "planSlug" | "enabledFeatures" | "disabledFeatures">) {
   return {
     planSlug: getPlanDefinition(organization.planSlug).slug,

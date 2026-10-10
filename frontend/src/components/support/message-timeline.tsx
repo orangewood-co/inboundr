@@ -7,6 +7,7 @@ import {
   HeadphonesIcon,
   LoaderIcon,
   LockIcon,
+  MailIcon,
   PhoneIcon,
   SparklesIcon,
   XIcon,
@@ -29,7 +30,13 @@ import {
   isImageAttachment,
   isVideoAttachment,
 } from "./support-utils"
-import type { SupportAiDraft, Ticket, TicketAttachment, TicketMessage } from "./types"
+import type {
+  EmailChannelState,
+  SupportAiDraft,
+  Ticket,
+  TicketAttachment,
+  TicketMessage,
+} from "./types"
 
 type RenderItem =
   | { kind: "divider"; key: string; label: string }
@@ -203,7 +210,7 @@ const DELIVERY_LABEL: Record<NonNullable<TicketMessage["deliveryStatus"]>, strin
   failed: "Not delivered",
 }
 
-/** Per-message relay state for external channels (WhatsApp). */
+/** Per-message relay state for external channels (WhatsApp, email). */
 function DeliveryStatus({ message, align }: { message: TicketMessage; align: "left" | "right" }) {
   const status = message.deliveryStatus
   if (!status) return null
@@ -331,6 +338,18 @@ function WhatsAppBanner({ phoneNumber }: { phoneNumber: string }) {
   )
 }
 
+function EmailBanner({ requester, mailbox }: { requester: string; mailbox: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+      <MailIcon className="size-3.5 shrink-0" />
+      <span className="truncate">
+        Email conversation{requester ? ` with ${requester}` : ""}
+        {mailbox ? ` via ${mailbox}` : ""}
+      </span>
+    </div>
+  )
+}
+
 function CallTranscriptBanner() {
   return (
     <div className="flex items-center justify-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -436,11 +455,13 @@ function TypingIndicator({ name }: { name: string }) {
 function AiDraftCard({
   draft,
   approving,
+  sendBlockedReason,
   onApprove,
   onReject,
 }: {
   draft: SupportAiDraft
   approving: boolean
+  sendBlockedReason: string | null
   onApprove: (draftId: string, bodyText: string) => Promise<boolean>
   onReject: (draftId: string) => Promise<boolean>
 }) {
@@ -465,6 +486,12 @@ function AiDraftCard({
             overLimit && "border-destructive focus-visible:border-destructive"
           )}
         />
+        {sendBlockedReason && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-destructive">
+            <AlertCircleIcon className="mt-0.5 size-3.5 shrink-0" />
+            {sendBlockedReason}
+          </p>
+        )}
         <div className="mt-3 flex items-center justify-between gap-3">
           <span className={cn("text-[11px] tabular-nums", overLimit ? "text-destructive" : "text-muted-foreground")}>
             {bodyText.length}/4000
@@ -485,7 +512,7 @@ function AiDraftCard({
               type="button"
               size="sm"
               onClick={() => void onApprove(draft.id, bodyText)}
-              disabled={approving || overLimit || !bodyText.trim()}
+              disabled={approving || overLimit || !bodyText.trim() || Boolean(sendBlockedReason)}
               className="gap-1.5"
             >
               {approving ? <LoaderIcon className="size-3.5 animate-spin" /> : <CheckIcon className="size-3.5" />}
@@ -509,6 +536,7 @@ export function MessageTimeline({
   latestVisitorSeenByAgent,
   aiDrafts,
   approvingDraft,
+  emailChannel = null,
   onApproveDraft,
   onRejectDraft,
 }: {
@@ -522,6 +550,7 @@ export function MessageTimeline({
   latestVisitorSeenByAgent: boolean
   aiDrafts: SupportAiDraft[]
   approvingDraft: boolean
+  emailChannel?: EmailChannelState | null
   onApproveDraft: (draftId: string, bodyText: string) => Promise<boolean>
   onRejectDraft: (draftId: string) => Promise<boolean>
 }) {
@@ -542,12 +571,23 @@ export function MessageTimeline({
   const items = buildRenderItems(messages)
   const isPhone = ticket.channel === "phone"
   const isWhatsApp = ticket.channel === "whatsapp"
+  const isEmail = ticket.channel === "email"
+  const draftSendBlockedReason =
+    isEmail && emailChannel && !emailChannel.canSend
+      ? (emailChannel.blockedReason ?? "Replies cannot be emailed right now.")
+      : null
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
         {isPhone && <CallTranscriptBanner />}
         {isWhatsApp && <WhatsAppBanner phoneNumber={ticket.requester.phoneNumber ?? ""} />}
+        {isEmail && (
+          <EmailBanner
+            requester={ticket.requester.email || ticket.requester.name}
+            mailbox={emailChannel?.mailbox ?? ticket.emailThread?.mailbox ?? ""}
+          />
+        )}
         {items.map((item) =>
           item.kind === "divider" ? (
             <div key={item.key} className="flex items-center gap-3 py-1">
@@ -568,7 +608,7 @@ export function MessageTimeline({
               key={item.key}
               group={item}
               requesterName={ticket.requester.name}
-              showDelivery={isWhatsApp}
+              showDelivery={isWhatsApp || isEmail}
               receiptForMessageId={
                 latestAgentMessage && latestAgentSeenByVisitor
                   ? latestAgentMessage.id
@@ -588,6 +628,7 @@ export function MessageTimeline({
             key={draft.id}
             draft={draft}
             approving={approvingDraft}
+            sendBlockedReason={draftSendBlockedReason}
             onApprove={onApproveDraft}
             onReject={onRejectDraft}
           />

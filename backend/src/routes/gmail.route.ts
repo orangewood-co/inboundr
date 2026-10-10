@@ -4,6 +4,7 @@ import {
   disconnectGmailAccount,
   gmailCallback,
   listGmailAccounts,
+  updateGmailPurpose,
   updateGmailSignature,
 } from "../controllers/gmail.controller";
 import {
@@ -15,30 +16,41 @@ import {
 
 const router = Router();
 
+// Mailboxes feed both Quotations and Support (email tickets).
+const requireMailboxFeature = requireFeature("rfq", "support");
+
 router.get(
   "/connect",
   requireAuth,
   requireOrganization,
-  requireFeature("rfq"),
+  requireMailboxFeature,
   requireOrganizationAdmin(),
   connectGmail
 );
 router.get("/callback", gmailCallback);
-router.get("/accounts", requireAuth, requireOrganization, requireFeature("rfq"), listGmailAccounts);
+router.get("/accounts", requireAuth, requireOrganization, requireMailboxFeature, listGmailAccounts);
 // A signature belongs to the connected identity, so its owner edits it without
 // needing organization admin rights.
 router.patch(
   "/accounts/:id/signature",
   requireAuth,
   requireOrganization,
-  requireFeature("rfq"),
+  requireMailboxFeature,
   updateGmailSignature
+);
+router.patch(
+  "/accounts/:id/purpose",
+  requireAuth,
+  requireOrganization,
+  requireMailboxFeature,
+  requireOrganizationAdmin(),
+  updateGmailPurpose
 );
 router.delete(
   "/accounts/:id",
   requireAuth,
   requireOrganization,
-  requireFeature("rfq"),
+  requireMailboxFeature,
   requireOrganizationAdmin(),
   disconnectGmailAccount
 );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useNavigate, useSearch } from "@tanstack/react-router"
+import { Link, useNavigate, useSearch } from "@tanstack/react-router"
 import * as XLSX from "xlsx"
 import { AppLayout } from "@/components/app-layout"
 import { ErrorState } from "@/components/list-states"
@@ -9,6 +9,7 @@ import { useDefaultLayout } from "react-resizable-panels"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText, CopyButton } from "@/components/copy-button"
@@ -35,6 +36,7 @@ import {
   ReplyIcon,
   ReplyAllIcon,
   ForwardIcon,
+  HeadsetIcon,
   SearchIcon,
 } from "lucide-react"
 
@@ -48,6 +50,7 @@ import {
   type ThreadMessage,
 } from "@/lib/email-reply"
 
+import { useEntitlements } from "@/lib/entitlements"
 import { API_ORIGIN } from "@/lib/env"
 import { gmailAccountsQueryOptions } from "@/lib/queries"
 import { queryClient } from "@/lib/query-client"
@@ -84,7 +87,15 @@ interface EmailSummary {
   isRFQ: boolean | null
   classificationReason: string | null
   rfqErrorMessage: string | null
+  /** Support ticket the email (or its thread) belongs to. */
+  ticket?: EmailTicketLink | null
   threadCount?: number
+}
+
+interface EmailTicketLink {
+  id: string
+  ticketReference: string
+  status: "open" | "pending" | "resolved" | "closed"
 }
 
 type EmailAttachment = EmailSummary["attachments"][number]
@@ -384,7 +395,48 @@ function StatusBadge({ status }: { status: EmailSummary["status"] }) {
   )
 }
 
-function ClassificationBadge({ email }: { email: EmailSummary }) {
+const TICKET_STATUS_LABEL: Record<EmailTicketLink["status"], string> = {
+  open: "Open",
+  pending: "Pending",
+  resolved: "Resolved",
+  closed: "Closed",
+}
+
+function TicketBadge({ ticket }: { ticket: EmailTicketLink }) {
+  const done = ticket.status === "resolved" || ticket.status === "closed"
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          to="/support/$ticketId"
+          params={{ ticketId: ticket.id }}
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums transition-colors ${
+            done
+              ? "bg-muted text-muted-foreground hover:text-foreground"
+              : "bg-primary/10 text-primary hover:bg-primary/15"
+          }`}
+        >
+          <HeadsetIcon className="size-2.5" />
+          {ticket.ticketReference}
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        Support ticket · {TICKET_STATUS_LABEL[ticket.status] ?? ticket.status}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function ClassificationBadge({
+  email,
+  ticketShown = false,
+}: {
+  email: EmailSummary
+  /** A ticket badge is shown alongside, standing in for an unclassified state. */
+  ticketShown?: boolean
+}) {
   const reason = email.classificationReason
 
   if (email.status === "failed" || email.rfqErrorMessage) {
@@ -392,7 +444,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-            RFQ failed
+            {email.rfqErrorMessage ? "RFQ failed" : "Failed"}
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
@@ -427,6 +479,24 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           {reason || "Not a Request for Quotation"}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  if (ticketShown) return null
+
+  if (email.status === "processed") {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+            Skipped
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          Not checked for RFQs, usually because it was automated mail or arrived before the inbox was
+          connected
         </TooltipContent>
       </Tooltip>
     )
@@ -851,7 +921,10 @@ export function EmailsPage() {
 
   const [refreshing, setRefreshing] = useState(false)
   const [reprocessingId, setReprocessingId] = useState<string | null>(null)
+  const [creatingTicketId, setCreatingTicketId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const { hasFeature, hasModuleAccess } = useEntitlements()
+  const supportAvailable = hasFeature("support") && hasModuleAccess("support")
 
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([])
   const [threadDrafts, setThreadDrafts] = useState<ThreadMessage[]>([])
@@ -1105,6 +1178,43 @@ export function EmailsPage() {
     }
   }
 
+  const handleCreateTicket = async (id: string, threadId: string) => {
+    setCreatingTicketId(id)
+    try {
+      const res = await fetch(`${API_BASE}/${id}/ticket`, {
+        method: "POST",
+        credentials: "include",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`)
+      }
+
+      const ticket = data.ticket as EmailTicketLink
+      setEmails((current) =>
+        current.map((email) =>
+          email._id === id || email.threadId === threadId ? { ...email, ticket } : email
+        )
+      )
+      setDetail((current) => (current?._id === id ? { ...current, ticket } : current))
+      toast.success(
+        data.created
+          ? `Ticket ${ticket.ticketReference} created`
+          : `This conversation is already ticket ${ticket.ticketReference}`,
+        {
+          action: {
+            label: "Open",
+            onClick: () => void navigate({ to: "/support/$ticketId", params: { ticketId: ticket.id } }),
+          },
+        }
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create a support ticket")
+    } finally {
+      setCreatingTicketId(null)
+    }
+  }
+
   const activeDraft = useMemo(
     () => threadDrafts.find((draft) => draft._id === activeDraftId) ?? null,
     [threadDrafts, activeDraftId]
@@ -1257,6 +1367,12 @@ export function EmailsPage() {
     detail && (detail.status === "failed" || detail.rfqErrorMessage)
   )
   const canOpenDetailRFQ = Boolean(detail?.isRFQ === true && detail.rfqId)
+  const canCreateDetailTicket = Boolean(
+    supportAvailable &&
+      detail &&
+      !detail.ticket &&
+      parseSender(detail.from).email.toLowerCase() !== (detail.gmailAccountEmail ?? "").toLowerCase()
+  )
 
   return (
     <AppLayout>
@@ -1412,7 +1528,11 @@ export function EmailsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 pl-[38px]">
-                          <ClassificationBadge email={email} />
+                          <ClassificationBadge
+                            email={email}
+                            ticketShown={supportAvailable && Boolean(email.ticket)}
+                          />
+                          {supportAvailable && email.ticket && <TicketBadge ticket={email.ticket} />}
                         </div>
                       </div>
                     )
@@ -1540,6 +1660,44 @@ export function EmailsPage() {
                           <TooltipContent>Open related RFQ</TooltipContent>
                         </Tooltip>
                       )}
+                      {supportAvailable && detail.ticket ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground/50 hover:text-foreground"
+                              asChild
+                            >
+                              <Link to="/support/$ticketId" params={{ ticketId: detail.ticket.id }}>
+                                <HeadsetIcon className="size-4" />
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Open ticket {detail.ticket.ticketReference}</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        canCreateDetailTicket && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7 text-muted-foreground/50 hover:text-foreground"
+                                onClick={() => void handleCreateTicket(detail._id, detail.threadId)}
+                                disabled={creatingTicketId === detail._id}
+                              >
+                                {creatingTicketId === detail._id ? (
+                                  <Spinner />
+                                ) : (
+                                  <HeadsetIcon className="size-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Create Support Ticket</TooltipContent>
+                          </Tooltip>
+                        )
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1601,6 +1759,7 @@ export function EmailsPage() {
                                 </span>
                               </SenderHoverCard>
                               <StatusBadge status={detail.status} />
+                              {supportAvailable && detail.ticket && <TicketBadge ticket={detail.ticket} />}
                             </div>
                             <CopyableText value={senderEmail} label="Email copied">
                               <p className="truncate text-[11px] text-muted-foreground/60">

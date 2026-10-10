@@ -2,18 +2,27 @@ import mongoose from "mongoose";
 
 import { Customer } from "../models/customer.model";
 import { SupportTicketTag } from "../models/support-ticket-tag.model";
-import { Ticket, type ITicket, type TicketStatus } from "../models/ticket.model";
+import {
+  Ticket,
+  type ITicket,
+  type TicketChannel,
+  type TicketStatus,
+} from "../models/ticket.model";
 import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft.model";
 import {
   TicketMessage,
   type ITicketMessage,
   type ITicketMessageAttachment,
 } from "../models/ticket-message.model";
+import { describeEmailChannel } from "./email-ticket.service";
 import { createPresignedViewUrl, deleteObject } from "./storage.service";
 import { sendSupportResolvedEmail } from "./support-email.service";
 import { resolveUsersByIds } from "./user-lookup.service";
 
 export type TicketListStatus = TicketStatus | "all" | "archived";
+
+/** Channels that surface in the support inbox ("form" tickets are not created yet). */
+const SUPPORT_INBOX_CHANNELS: TicketChannel[] = ["chat", "email", "phone", "whatsapp"];
 
 export interface TicketAgent {
   userId: string;
@@ -115,6 +124,12 @@ export function serializeTicket(ticket: ITicket | any) {
     priority: ticket.priority,
     channel: ticket.channel,
     requester: ticket.requester,
+    emailThread: ticket.emailThread
+      ? {
+          mailbox: ticket.emailThread.mailbox,
+          subject: ticket.emailThread.subject ?? "",
+        }
+      : null,
     tags: serializeTicketTags(ticket),
     customerId: customerIdFromTicket(ticket),
     serviceRequestId: ticket.serviceRequestId ? String(ticket.serviceRequestId) : null,
@@ -249,7 +264,7 @@ export async function listTickets(input: {
 }) {
   const match: Record<string, unknown> = {
     organizationId: input.organizationId,
-    channel: { $in: ["chat", "phone", "whatsapp"] },
+    channel: { $in: SUPPORT_INBOX_CHANNELS },
   };
   if (input.status === "archived") {
     match.isArchived = true;
@@ -475,6 +490,7 @@ export async function getTicketWithMessages(input: {
     ticket: serializeTicket(ticket),
     messages: await Promise.all(messages.map(serializeTicketMessage)),
     aiDrafts: drafts.map(serializeSupportAiDraft),
+    emailChannel: ticket.channel === "email" ? await describeEmailChannel(ticket) : null,
   };
 }
 
@@ -501,7 +517,7 @@ export async function listRelatedTickets(input: {
 
   const related = await Ticket.find({
     organizationId: input.organizationId,
-    channel: { $in: ["chat", "phone", "whatsapp"] },
+    channel: { $in: SUPPORT_INBOX_CHANNELS },
     _id: { $ne: ticket._id },
     $or: identity,
   })

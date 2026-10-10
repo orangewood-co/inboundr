@@ -111,7 +111,8 @@ export async function requireSuperAdmin(
   }
 }
 
-export function requireFeature(feature: FeatureKey) {
+/** Passes when the organization has at least one of the given features. */
+export function requireFeature(...features: [FeatureKey, ...FeatureKey[]]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const organization = (req as OrganizationRequest).organization;
 
@@ -125,7 +126,10 @@ export function requireFeature(feature: FeatureKey) {
       return;
     }
 
-    if (!isFeatureKey(feature) || !hasEffectiveFeature(organization, feature)) {
+    const allowed = features.some(
+      (feature) => isFeatureKey(feature) && hasEffectiveFeature(organization, feature)
+    );
+    if (!allowed) {
       res.status(403).json({ error: "Feature is not enabled for this organization" });
       return;
     }

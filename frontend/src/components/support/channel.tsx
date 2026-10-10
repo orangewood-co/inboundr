@@ -1,5 +1,5 @@
 import type { ComponentType, SVGProps } from "react"
-import { MessageCircleIcon, PhoneIcon } from "lucide-react"
+import { MailIcon, MessageCircleIcon, PhoneIcon } from "lucide-react"
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -34,6 +34,7 @@ const CHANNEL_META: Record<string, ChannelMeta> = {
   phone: { icon: PhoneIcon, label: "Phone call" },
   chat: { icon: MessageCircleIcon, label: "Live chat" },
   whatsapp: { icon: WhatsAppIcon, label: "WhatsApp" },
+  email: { icon: MailIcon, label: "Email" },
 }
 
 export function getChannelMeta(channel: string | null | undefined): ChannelMeta {

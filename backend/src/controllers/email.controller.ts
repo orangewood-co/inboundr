@@ -26,6 +26,7 @@ import {
   buildQuotedOriginal,
   canReplyAll,
   deriveRecipients,
+  extractAddress,
   normalizeSubject,
   persistOutboundEmail,
   resolveOutboundAttachments,
@@ -39,6 +40,13 @@ import {
 import { GUIDANCE_MAX_LENGTH, generateReplyDraft } from "../services/email-ai.service";
 import { emitDomainEvent } from "../events/domain-events";
 import { GMAIL_SEND_SCOPE } from "../config/gmail.config";
+import { Ticket } from "../models/ticket.model";
+import {
+  findEmailTicket,
+  findTicketIdForCapturedEmail,
+  openEmailTicket,
+} from "../services/email-ticket.service";
+import { formatTicketReference } from "../services/ticket.service";
 
 const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -60,7 +68,18 @@ function buildContentDisposition(filename: string, forceDownload: boolean): stri
   return `${disposition}; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`;
 }
 
-function attachClassification(email: any, rfq: any | undefined, gmailAccountEmail: string | null = null) {
+interface EmailTicketLink {
+  id: string;
+  ticketReference: string;
+  status: string;
+}
+
+function attachClassification(
+  email: any,
+  rfq: any | undefined,
+  gmailAccountEmail: string | null = null,
+  ticket: EmailTicketLink | null = null
+) {
   return {
     ...email,
     gmailAccountEmail,
@@ -68,6 +87,55 @@ function attachClassification(email: any, rfq: any | undefined, gmailAccountEmai
     isRFQ: rfq?.isRFQ ?? null,
     classificationReason: rfq?.reason ?? null,
     rfqErrorMessage: rfq?.errorMessage ?? null,
+    ticket,
+  };
+}
+
+function serializeTicketLink(ticket: any): EmailTicketLink {
+  return {
+    id: String(ticket._id),
+    ticketReference: ticket.ticketReference || formatTicketReference(ticket.ticketNumber),
+    status: ticket.status,
+  };
+}
+
+/**
+ * Support tickets for a page of emails: the ticket an email was routed into,
+ * else the newest ticket on its Gmail thread (covers replies, like
+ * auto-replies, that were deliberately not added to the ticket).
+ */
+async function loadTicketLinks(
+  organizationId: RequestScope["organizationId"],
+  emails: Array<{ gmailAccountId: unknown; threadId?: string | null; ticketId?: unknown }>
+): Promise<(email: (typeof emails)[number]) => EmailTicketLink | null> {
+  const ticketIds = [...new Set(emails.map((email) => email.ticketId).filter(Boolean).map(String))];
+  const threadIds = [...new Set(emails.map((email) => email.threadId).filter(Boolean))] as string[];
+  if (ticketIds.length === 0 && threadIds.length === 0) return () => null;
+
+  const tickets = await Ticket.find({
+    organizationId,
+    $or: [
+      ...(ticketIds.length > 0 ? [{ _id: { $in: ticketIds } }] : []),
+      ...(threadIds.length > 0 ? [{ "emailThread.threadId": { $in: threadIds } }] : []),
+    ],
+  })
+    .sort({ lastMessageAt: -1 })
+    .select("ticketNumber ticketReference status emailThread")
+    .lean();
+
+  const byId = new Map(tickets.map((ticket) => [String(ticket._id), ticket]));
+  const byThread = new Map<string, (typeof tickets)[number]>();
+  for (const ticket of tickets) {
+    if (!ticket.emailThread) continue;
+    const key = `${ticket.emailThread.gmailAccountId}:${ticket.emailThread.threadId}`;
+    if (!byThread.has(key)) byThread.set(key, ticket);
+  }
+
+  return (email) => {
+    const ticket =
+      (email.ticketId ? byId.get(String(email.ticketId)) : undefined) ??
+      (email.threadId ? byThread.get(`${email.gmailAccountId}:${email.threadId}`) : undefined);
+    return ticket ? serializeTicketLink(ticket) : null;
   };
 }
 
@@ -405,13 +473,15 @@ export const listEmails = async (
     const accountEmailById = new Map(
       accounts.map((account) => [account._id.toString(), account.emailAddress])
     );
+    const resolveTicket = await loadTicketLinks(organization._id, emails);
 
     res.json({
       emails: emails.map((email) => ({
         ...attachClassification(
           email,
           resolveRFQ(email),
-          accountEmailById.get(email.gmailAccountId.toString()) ?? null
+          accountEmailById.get(email.gmailAccountId.toString()) ?? null,
+          resolveTicket(email)
         ),
         threadCount: email.threadId
           ? threadCountByKey.get(`${email.gmailAccountId}:${email.threadId}`) ?? 1
@@ -471,11 +541,58 @@ export const getEmail = async (
     })
       .select("emailAddress")
       .lean();
+    const resolveTicket = await loadTicketLinks(organization._id, [email]);
 
-    res.json(attachClassification(email, rfq, account?.emailAddress ?? null));
+    res.json(
+      attachClassification(email, rfq, account?.emailAddress ?? null, resolveTicket(email))
+    );
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });
+  }
+};
+
+/**
+ * Manual escape hatch for mail the router left in the Inbox (classified as
+ * neither RFQ nor support, or on a Quotations-only inbox). Returns the
+ * existing ticket when the email or its conversation already has one.
+ */
+export const createTicketFromEmail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const scope = requestScope(req);
+    const email = await Email.findOne({
+      _id: req.params.id,
+      ...scope,
+      direction: { $ne: "outbound" },
+    }).lean();
+    if (!email) {
+      res.status(404).json({ error: "Email not found" });
+      return;
+    }
+
+    const account = await GmailAccount.findOne({ _id: email.gmailAccountId, ...scope });
+    if (!account) {
+      res.status(404).json({ error: "Gmail account not found" });
+      return;
+    }
+    if (extractAddress(email.replyTo || email.from) === account.emailAddress.toLowerCase()) {
+      res.status(400).json({ error: "Emails you sent cannot become support tickets" });
+      return;
+    }
+
+    const capturedId = await findTicketIdForCapturedEmail(scope.organizationId, email);
+    const existing = capturedId
+      ? await Ticket.findOne({ _id: capturedId, organizationId: scope.organizationId })
+      : await findEmailTicket(scope.organizationId, email);
+
+    const { ticket, created } = existing
+      ? { ticket: existing, created: false }
+      : await openEmailTicket(account, email, { notify: false });
+
+    res.status(created ? 201 : 200).json({ ticket: serializeTicketLink(ticket), created });
+  } catch (err) {
+    console.error("Error creating ticket from email:", err);
+    res.status(500).json({ error: "Failed to create a support ticket from this email" });
   }
 };
 

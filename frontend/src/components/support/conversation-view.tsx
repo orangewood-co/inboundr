@@ -69,12 +69,17 @@ export function ConversationView({
         latestVisitorSeenByAgent={inbox.latestVisitorSeenByAgent}
         aiDrafts={inbox.aiDrafts}
         approvingDraft={inbox.sending}
+        emailChannel={inbox.emailChannel}
         onApproveDraft={inbox.approveAiDraft}
         onRejectDraft={inbox.rejectAiDraft}
       />
       {ticket.aiMode === "review" && (
         <div className="flex items-center justify-between gap-3 border-t bg-accent/30 px-4 py-2 text-xs text-muted-foreground">
-          <span>Human review mode is on. Generate an AI suggestion when you want help drafting.</span>
+          <span>
+            {ticket.channel === "email"
+              ? "Human review mode is on. AI drafts a reply to each new email for you to edit and send."
+              : "Human review mode is on. Generate an AI suggestion when you want help drafting."}
+          </span>
           <Button
             type="button"
             size="sm"
@@ -92,6 +97,7 @@ export function ConversationView({
         ticket={ticket}
         sending={inbox.sending}
         socketReady={inbox.socketReady}
+        emailChannel={inbox.emailChannel}
         onSend={inbox.sendMessage}
         onDraftChange={inbox.handleDraftChange}
       />
