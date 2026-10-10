@@ -16,7 +16,7 @@ import {
   SkippedGmailMessage,
   type SkippedGmailMessageReason,
 } from "../models/skipped-gmail-message.model";
-import { hasEffectiveFeature } from "./entitlement.service";
+import { hasMailboxFeature } from "./entitlement.service";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -38,14 +38,14 @@ function isSelfSentEmail(
   return fromAddress === accountAddress || (labels.has("SENT") && !labels.has("INBOX"));
 }
 
-export async function canProcessQuotationInbox(account: IGmailAccount): Promise<boolean> {
+export async function canProcessInbox(account: IGmailAccount): Promise<boolean> {
   if (!account.organizationId) return false;
 
   const organization = await Organization.findById(account.organizationId)
     .select("planSlug enabledFeatures disabledFeatures")
     .lean();
 
-  return Boolean(organization && hasEffectiveFeature(organization, "rfq"));
+  return Boolean(organization && hasMailboxFeature(organization));
 }
 
 /**
@@ -280,11 +280,11 @@ async function runHistoryUpdate(
   account: IGmailAccount,
   newHistoryId: string
 ): Promise<void> {
-  if (!(await canProcessQuotationInbox(account))) {
-    // Keep the stored cursor so the backlog is ingested if the feature is
+  if (!(await canProcessInbox(account))) {
+    // Keep the stored cursor so the backlog is ingested if a feature is
     // re-enabled; advancing here would silently discard the mail.
     console.warn(
-      `Skipping Gmail history update for ${account.emailAddress}: Quotations feature is disabled`
+      `Skipping Gmail history update for ${account.emailAddress}: Quotations and Support are disabled`
     );
     return;
   }

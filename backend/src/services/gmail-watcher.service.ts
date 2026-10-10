@@ -6,7 +6,7 @@ import {
 } from "../models/gmail-account.model";
 import { Organization } from "../models/organization.model";
 import { processHistoryUpdate } from "./email.service";
-import { hasEffectiveFeature } from "./entitlement.service";
+import { hasMailboxFeature } from "./entitlement.service";
 
 const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
 
@@ -20,19 +20,19 @@ export interface GmailUnlinkResult {
   errorMessage: string | null;
 }
 
-async function isQuotationEnabledForAccount(account: IGmailAccount): Promise<boolean> {
+async function isMailboxEnabledForAccount(account: IGmailAccount): Promise<boolean> {
   if (!account.organizationId) return false;
 
   const organization = await Organization.findById(account.organizationId)
     .select("planSlug enabledFeatures disabledFeatures")
     .lean();
 
-  return Boolean(organization && hasEffectiveFeature(organization, "rfq"));
+  return Boolean(organization && hasMailboxFeature(organization));
 }
 
 export async function startWatch(account: IGmailAccount): Promise<void> {
-  if (!(await isQuotationEnabledForAccount(account))) {
-    throw new Error("Quotations feature is not enabled for this organization");
+  if (!(await isMailboxEnabledForAccount(account))) {
+    throw new Error("Neither Quotations nor Support is enabled for this organization");
   }
 
   const gmail = await getGmailClientForAccount(account);

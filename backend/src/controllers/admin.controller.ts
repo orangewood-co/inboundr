@@ -29,8 +29,8 @@ import {
 import {
   FEATURE_CATALOG,
   PLAN_DEFINITIONS,
-  getEffectiveFeatures,
   getPlanDefinition,
+  hasMailboxFeature,
   normalizeFeatures,
   serializeEntitlements,
 } from "../services/entitlement.service";
@@ -520,29 +520,31 @@ export async function updateAdminOrganization(req: Request, res: Response): Prom
       return;
     }
 
-    const hadRFQAccess = getEffectiveFeatures(beforeOrganization).includes("rfq");
+    const hadMailboxAccess = hasMailboxFeature(beforeOrganization);
     const organization = await Organization.findByIdAndUpdate(id, { $set: update }, { returnDocument: "after" });
     if (!organization) {
       res.status(404).json({ error: "Organization not found" });
       return;
     }
 
-    const hasRFQAccess = getEffectiveFeatures(organization).includes("rfq");
+    // Gmail inboxes serve both Quotations and Support, so they are only
+    // unlinked once neither feature remains.
+    const hasMailboxAccess = hasMailboxFeature(organization);
     let quotationsCleanup:
       | { triggered: boolean; accounts: Awaited<ReturnType<typeof unlinkGmailAccountsForOrganization>>; error?: string }
       | undefined;
 
-    if (hadRFQAccess && !hasRFQAccess) {
+    if (hadMailboxAccess && !hasMailboxAccess) {
       try {
         quotationsCleanup = {
           triggered: true,
           accounts: await unlinkGmailAccountsForOrganization(
             organization._id.toString(),
-            "Quotations feature disabled"
+            "Quotations and Support features disabled"
           ),
         };
       } catch (err: any) {
-        console.error("Failed to clean up Gmail accounts after disabling Quotations:", err);
+        console.error("Failed to clean up Gmail accounts after disabling Quotations and Support:", err);
         quotationsCleanup = {
           triggered: true,
           accounts: [],

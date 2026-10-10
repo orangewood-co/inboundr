@@ -1,13 +1,33 @@
 import type { Request, Response } from "express";
 import { getGmailAuthUrl, exchangeGmailCode, getGmailProfileEmail } from "../config/gmail.config";
-import { GmailAccount } from "../models/gmail-account.model";
+import {
+  GMAIL_ACCOUNT_PURPOSES,
+  GmailAccount,
+  type GmailAccountPurpose,
+} from "../models/gmail-account.model";
 import { Organization } from "../models/organization.model";
 import { createGmailOAuthState, verifyGmailOAuthState } from "../lib/oauth-state";
 import { startWatch, unlinkGmailAccount } from "../services/gmail-watcher.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { frontendOrigin } from "../config/origins.config";
-import { hasEffectiveFeature } from "../services/entitlement.service";
+import { hasEffectiveFeature, hasMailboxFeature } from "../services/entitlement.service";
 import { sanitizeComposedHtml } from "../services/email-reply.service";
+
+/**
+ * Keeps a (re)connected inbox pointed at a feature the organization actually
+ * has, so it never silently ingests mail that nothing processes.
+ */
+function purposeForOrganization(
+  organization: Parameters<typeof hasEffectiveFeature>[0],
+  current: GmailAccountPurpose | null
+): GmailAccountPurpose {
+  const quotations = hasEffectiveFeature(organization, "rfq");
+  const support = hasEffectiveFeature(organization, "support");
+  if (current === "both" && quotations && support) return "both";
+  if (current === "support" && support) return "support";
+  if (current === "quotations" && quotations) return "quotations";
+  return quotations ? "quotations" : "support";
+}
 
 export async function connectGmail(req: Request, res: Response): Promise<void> {
   try {
@@ -38,7 +58,7 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
           .lean()
       : null;
 
-    if (!organization || !hasEffectiveFeature(organization, "rfq")) {
+    if (!organization || !hasMailboxFeature(organization)) {
       res.redirect(`${frontendOrigin}/settings?gmail=disabled`);
       return;
     }
@@ -46,6 +66,7 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
     const tokens = await exchangeGmailCode(code);
     const emailAddress = (await getGmailProfileEmail(tokens)).toLowerCase();
 
+    const existing = await GmailAccount.findOne({ userId, emailAddress }).select("purpose").lean();
     const account = await GmailAccount.findOneAndUpdate(
       { userId, emailAddress },
       {
@@ -58,6 +79,7 @@ export async function gmailCallback(req: Request, res: Response): Promise<void> 
         tokenExpiry: tokens.tokenExpiry,
         status: "connected",
         errorMessage: null,
+        purpose: purposeForOrganization(organization, existing?.purpose ?? null),
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
@@ -127,6 +149,55 @@ export async function updateGmailSignature(
   } catch (err) {
     console.error("Failed to update Gmail signature:", err);
     res.status(500).json({ error: "Failed to update signature" });
+  }
+}
+
+/**
+ * Inboxes are connected per user but their purpose decides where the whole
+ * organization's inbound mail lands, so only admins may change it.
+ */
+export async function updateGmailPurpose(req: Request, res: Response): Promise<void> {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const organization = (req as OrganizationRequest).organization;
+    const purpose = (req.body ?? {}).purpose as GmailAccountPurpose;
+
+    if (!GMAIL_ACCOUNT_PURPOSES.includes(purpose)) {
+      res.status(400).json({ error: "Purpose must be quotations, support, or both" });
+      return;
+    }
+    const needsQuotations = purpose === "quotations" || purpose === "both";
+    const needsSupport = purpose === "support" || purpose === "both";
+    if (needsQuotations && !hasEffectiveFeature(organization, "rfq")) {
+      res.status(400).json({ error: "Quotations is not enabled for this organization" });
+      return;
+    }
+    if (needsSupport && !hasEffectiveFeature(organization, "support")) {
+      res.status(400).json({ error: "Support is not enabled for this organization" });
+      return;
+    }
+
+    const account = await GmailAccount.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: authReq.user.id,
+        organizationId: organization._id,
+      },
+      { purpose },
+      { returnDocument: "after" }
+    )
+      .select("-accessToken -refreshToken")
+      .lean();
+
+    if (!account) {
+      res.status(404).json({ error: "Gmail account not found" });
+      return;
+    }
+
+    res.json({ account });
+  } catch (err) {
+    console.error("Failed to update Gmail purpose:", err);
+    res.status(500).json({ error: "Failed to update inbox purpose" });
   }
 }
 
