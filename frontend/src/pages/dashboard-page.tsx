@@ -3199,7 +3199,7 @@ export function DashboardPage() {
 
                           {/* Product cards */}
                           {!regrettedLine && sr.matches.length > 0 ? (
-                            <div className="grid gap-2">
+                            <div className="grid grid-cols-1 gap-2">
                               {sr.matches.map((m, j) => {
                                 const isSelected = selectedProducts[i]?.includes(j) ?? false
                                 const overrideKey = `${i}-${j}`
