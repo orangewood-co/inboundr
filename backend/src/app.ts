@@ -50,6 +50,7 @@ import recruitmentRouter from "./routes/recruitment.route";
 import publicRecruitmentRouter from "./routes/public-recruitment.route";
 import publicWaitlistRouter from "./routes/public-waitlist.route";
 import { connectDB, disconnectDB } from "./config/database.config";
+import { closePostgresPool } from "./db/postgres";
 import { ensureKnowledgeSchema } from "./db/knowledge-schema";
 import { embedOrigin, frontendOrigin, landingOrigin } from "./config/origins.config";
 import {
@@ -209,7 +210,7 @@ export async function initializeServices(): Promise<void> {
 async function shutdown(): Promise<void> {
   console.log("Shutting down...");
   stopWatchRenewal();
-  await disconnectDB();
+  await Promise.allSettled([disconnectDB(), closePostgresPool()]);
   process.exit(0);
 }
 

@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 
-import { getDatabaseConfigFromEnv } from "../utils/product-search";
+import { getDatabaseConfigFromEnv } from "../db/postgres";
 
 type LeftoverRow = {
   id: string;

@@ -7,7 +7,6 @@ import {
   extractDimensionTokens,
   extractNormalizedCodeHints,
   extractProductFamilyAnchorTokens,
-  getDatabaseConfigFromEnv,
   normalizeProductSearchText,
   productMatchesAnchorTokens,
   resolveProductMatchStatus,
@@ -19,8 +18,7 @@ import { Types } from "mongoose";
 import { getOrCreateProductSettings } from "../services/product-settings.service";
 
 const model = new ChatOpenRouter({
-  model: "deepseek/deepseek-v4-flash",
-  temperature: 0,
+  model: "anthropic/claude-haiku-5.5",
 });
 
 const customer = z.object({
@@ -230,7 +228,7 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
   const synonyms = rawSynonyms instanceof Map
     ? Object.fromEntries(rawSynonyms.entries())
     : { ...(rawSynonyms as Record<string, string[]>) };
-  const searcher = new TextProductSearcher(getDatabaseConfigFromEnv(), {
+  const searcher = new TextProductSearcher({
     synonyms,
     stopWords: settings.search.stopWords,
     matchThreshold: settings.search.matchThreshold,
@@ -241,55 +239,51 @@ const searchProducts: GraphNode<typeof State> = async (state) => {
       .map((field) => field.key),
   });
 
-  try {
-    const searchResults = [];
+  const searchResults = [];
 
-    for (const product of state.queryProducts) {
-      const requestedSearchText = [
-        product.name,
-        product.manufacturer,
-        product.code,
-        ...Object.entries(product.specifications).flatMap(([key, value]) => [key, value]),
-      ].filter(isNonEmptyString).join(" ");
-      const expansion = await expandProductSearchQuery(
-        product,
-        state.organizationContext.searchInstructions || settings.search.instructions
-      );
-      const searchQueries = buildProductSearchQueries(requestedSearchText, expansion);
-      const originalAnchorTokens = getAnchorTokensForSearchText(requestedSearchText);
-      const candidateGroups = await Promise.all(
-        searchQueries.map((searchQuery) =>
-          searcher.searchProduct({ ...product, name: searchQuery }, state.organizationId!, SEARCH_CANDIDATE_LIMIT)
-        )
-      );
-      const mergedResult = filterSearchResultByAnchor(
-        mergeSearchResults(product, candidateGroups),
-        originalAnchorTokens
-      );
-      const result = limitSearchResultMatches(
-        await rerankProductMatches(product, expansion, mergedResult),
-        FINAL_MATCH_LIMIT
-      );
+  for (const product of state.queryProducts) {
+    const requestedSearchText = [
+      product.name,
+      product.manufacturer,
+      product.code,
+      ...Object.entries(product.specifications).flatMap(([key, value]) => [key, value]),
+    ].filter(isNonEmptyString).join(" ");
+    const expansion = await expandProductSearchQuery(
+      product,
+      state.organizationContext.searchInstructions || settings.search.instructions
+    );
+    const searchQueries = buildProductSearchQueries(requestedSearchText, expansion);
+    const originalAnchorTokens = getAnchorTokensForSearchText(requestedSearchText);
+    const candidateGroups = await Promise.all(
+      searchQueries.map((searchQuery) =>
+        searcher.searchProduct({ ...product, name: searchQuery }, state.organizationId!, SEARCH_CANDIDATE_LIMIT)
+      )
+    );
+    const mergedResult = filterSearchResultByAnchor(
+      mergeSearchResults(product, candidateGroups),
+      originalAnchorTokens
+    );
+    const result = limitSearchResultMatches(
+      await rerankProductMatches(product, expansion, mergedResult),
+      FINAL_MATCH_LIMIT
+    );
 
-      console.log(`SEARCH QUERY: ${product.name}`);
-      console.log(
-        "SEARCH RESPONSE:",
-        result.matches.map((match) => ({
-          id: match.id,
-          brand: match.brand,
-          code: match.code,
-          score: match.score,
-        }))
-      );
-      searchResults.push(result);
-    }
-
-    return {
-      searchResults,
-    };
-  } finally {
-    await searcher.close();
+    console.log(`SEARCH QUERY: ${product.name}`);
+    console.log(
+      "SEARCH RESPONSE:",
+      result.matches.map((match) => ({
+        id: match.id,
+        brand: match.brand,
+        code: match.code,
+        score: match.score,
+      }))
+    );
+    searchResults.push(result);
   }
+
+  return {
+    searchResults,
+  };
 };
 
 async function expandProductSearchQuery(

@@ -1,5 +1,4 @@
-import { Pool } from "pg";
-import type { DatabaseConfig } from "../types";
+import { getPostgresPool } from "../db/postgres";
 
 const DEFAULT_STOP_WORDS = new Set([
   "a",
@@ -306,14 +305,9 @@ const TEXT_SEARCH_SQL = `
 `;
 
 export class TextProductSearcher {
-  private pool: Pool;
   private profile: ProductSearchProfile;
 
-  constructor(dbConfig: DatabaseConfig, profile: ProductSearchProfile = {}) {
-    // Searcher instances are short-lived and created per job; the pg default
-    // of 10 connections each exhausts session-mode poolers (pool_size 20)
-    // whenever a few jobs overlap.
-    this.pool = new Pool({ ...dbConfig, max: 3 });
+  constructor(profile: ProductSearchProfile = {}) {
     this.profile = profile;
   }
 
@@ -336,7 +330,7 @@ export class TextProductSearcher {
       };
     }
 
-    const client = await this.pool.connect();
+    const client = await getPostgresPool().connect();
 
     try {
       const result = await client.query<RankedProductRow>(TEXT_SEARCH_SQL, [
@@ -391,10 +385,6 @@ export class TextProductSearcher {
     } finally {
       client.release();
     }
-  }
-
-  async close(): Promise<void> {
-    await this.pool.end();
   }
 
   private buildSearchQuery(query: string): SearchQueryParts {
@@ -463,24 +453,6 @@ export class TextProductSearcher {
   private resolveStatus(matches: ProductSearchMatch[]): ProductMatchStatus {
     return resolveProductMatchStatus(matches, this.profile.ambiguityGap);
   }
-}
-
-export function getDatabaseConfigFromEnv(): DatabaseConfig {
-  const database = process.env.DB_NAME;
-  const user = process.env.DB_USER;
-  const password = process.env.DB_PASSWORD;
-
-  if (!database || !user || !password) {
-    throw new Error("Missing required database environment variables.");
-  }
-
-  return {
-    host: process.env.DB_HOST || "localhost",
-    port: Number(process.env.DB_PORT || "5432"),
-    database,
-    user,
-    password,
-  };
 }
 
 export function normalizeProductSearchText(input: string): string {

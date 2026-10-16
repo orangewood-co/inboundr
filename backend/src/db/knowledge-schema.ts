@@ -1,23 +1,6 @@
-import { Pool } from "pg";
-
-import { getDatabaseConfigFromEnv } from "../utils/product-search";
+import { getPostgresPool } from "./postgres";
 
 export const KNOWLEDGE_EMBEDDING_DIMENSIONS = 1536;
-
-let pool: Pool | null = null;
-
-/**
- * Shared connection pool for the RAG knowledge store. Reuses the same
- * PostgreSQL instance/credentials as the product catalog.
- */
-export function getKnowledgePool(): Pool {
-  if (!pool) {
-    // Bounded: several module-level pools plus per-job searcher pools share a
-    // session-mode pooler capped at 20 clients.
-    pool = new Pool({ ...getDatabaseConfigFromEnv(), max: 4 });
-  }
-  return pool;
-}
 
 let schemaReady: Promise<void> | null = null;
 
@@ -37,7 +20,7 @@ export function ensureKnowledgeSchema(): Promise<void> {
 }
 
 async function provisionSchema(): Promise<void> {
-  const client = await getKnowledgePool().connect();
+  const client = await getPostgresPool().connect();
   try {
     await client.query("CREATE EXTENSION IF NOT EXISTS vector");
     await client.query(`

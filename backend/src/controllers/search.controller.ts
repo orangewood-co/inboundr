@@ -1,4 +1,3 @@
-import { Pool } from "pg";
 import type { Request, Response } from "express";
 import { Customer } from "../models/customer.model";
 import { RFQ, type IRFQ } from "../models/rfq.model";
@@ -16,7 +15,8 @@ import {
 } from "../services/project-access.service";
 import { canRoleView, getEffectiveDriveRole } from "../services/drive-access.service";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
-import type { DatabaseConfig, Product } from "../types";
+import { getPostgresPool } from "../db/postgres";
+import type { Product } from "../types";
 
 type SearchType =
   | "customer"
@@ -52,18 +52,6 @@ const PRODUCT_SEARCH_COLUMNS = [
   "unit",
   "addeduser",
 ] as const;
-
-const dbConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "5432"),
-  database: process.env.DB_NAME!,
-  user: process.env.DB_USER!,
-  password: process.env.DB_PASSWORD!,
-};
-
-// Bounded: several module-level pools plus per-job searcher pools share a
-// session-mode pooler capped at 20 clients.
-const pool = new Pool({ ...dbConfig, max: 4 });
 
 function parseLimit(value: unknown): number {
   const parsed = parseInt(String(value ?? ""), 10);
@@ -133,7 +121,7 @@ async function searchProducts(
     (column) => `lower(COALESCE(${column}::text, '')) LIKE $2`
   );
 
-  const result = await pool.query<
+  const result = await getPostgresPool().query<
     Pick<
       Product,
       "id" | "brand" | "productdescription" | "productcode" | "unitprice" | "hsncode" | "gstrate"

@@ -4,9 +4,8 @@ import { StateSchema, type GraphNode, StateGraph, START, END } from "@langchain/
 import { z } from "zod";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { TextProductSearcher, getDatabaseConfigFromEnv } from "../utils/product-search";
-
 import { connectDB, disconnectDB } from "../config/database.config";
+import { closePostgresPool } from "../db/postgres";
 import { generateRFQ } from "./generate_rfq";
 import { generateQuoteReply } from "./generate_quote";
 
@@ -96,4 +95,5 @@ try {
        console.error("ERROR:", error);
 } finally {
        await disconnectDB();
+       await closePostgresPool();
 }

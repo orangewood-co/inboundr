@@ -78,11 +78,12 @@ async function recordSkippedMessage(
 // cursor and every Gmail notification replays the whole range since it.
 const MAX_INGEST_ATTEMPTS = 5;
 
-// RFQ processing runs an LLM call plus Postgres product searches per email.
-// A backlog catch-up can ingest dozens of emails in seconds; firing all their
-// RFQ jobs at once exhausts the session-mode Postgres pooler (pool_size 20),
-// so queue them behind a small semaphore instead.
-const MAX_CONCURRENT_RFQ_JOBS = 2;
+// RFQ processing runs a chain of LLM calls plus Postgres product searches per
+// email. A backlog catch-up can ingest dozens of emails in seconds; firing all
+// their RFQ jobs at once floods the LLM provider and lets the searches starve
+// the shared 10-connection Postgres pool that HTTP requests also use, so
+// queue them behind a semaphore instead.
+const MAX_CONCURRENT_RFQ_JOBS = 5;
 let activeRfqJobs = 0;
 const rfqJobWaiters: Array<() => void> = [];
 

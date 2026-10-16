@@ -1,6 +1,5 @@
-import { Pool } from "pg";
 import type { Request, Response } from "express";
-import type { DatabaseConfig, Product } from "../types";
+import type { Product } from "../types";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
 import {
   EDITABLE_PRODUCT_COLUMNS,
@@ -9,6 +8,7 @@ import {
   serializeProductRecord,
 } from "../services/product.service";
 import { encodeProductValues } from "../db/product-columns";
+import { getPostgresPool } from "../db/postgres";
 import {
   adjustmentsFromDefinitions,
   getOrCreateProductSettings,
@@ -55,18 +55,6 @@ const SEARCH_COLUMNS = [
   "attributes",
   "tags",
 ] as const;
-
-const dbConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "5432"),
-  database: process.env.DB_NAME!,
-  user: process.env.DB_USER!,
-  password: process.env.DB_PASSWORD!,
-};
-
-// Bounded: several module-level pools plus per-job searcher pools share a
-// session-mode pooler capped at 20 clients.
-const pool = new Pool({ ...dbConfig, max: 4 });
 
 function parsePositiveInt(value: unknown, fallback: number, max?: number): number {
   const parsed = parseInt(String(value ?? ""), 10);
@@ -230,7 +218,7 @@ export const listProducts = async (
     const offsetParam = values.length;
 
     const [productsResult, totalResult] = await Promise.all([
-      pool.query<Product>(
+      getPostgresPool().query<Product>(
         `SELECT ${PRODUCT_COLUMNS.join(", ")}
          FROM products
          ${whereClause}
@@ -238,7 +226,7 @@ export const listProducts = async (
          LIMIT $${limitParam} OFFSET $${offsetParam}`,
         values
       ),
-      pool.query<{ count: string }>(
+      getPostgresPool().query<{ count: string }>(
         `SELECT COUNT(*)::text AS count
          FROM products
          ${whereClause}`,
@@ -300,7 +288,7 @@ export const getProduct = async (
       return;
     }
 
-    const result = await pool.query<Product>(
+    const result = await getPostgresPool().query<Product>(
       `SELECT ${PRODUCT_COLUMNS.join(", ")}
        FROM products
        WHERE id = $1 AND organization_id = $2`,
@@ -351,7 +339,7 @@ export const createProduct = async (
     );
     const placeholders = columns.map((_, index) => `$${index + 1}`);
 
-    const result = await pool.query<Product>(
+    const result = await getPostgresPool().query<Product>(
       `INSERT INTO products (${columns.join(", ")})
        VALUES (${placeholders.join(", ")})
        RETURNING ${PRODUCT_COLUMNS.join(", ")}`,
@@ -374,7 +362,7 @@ export const importProducts = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const client = await pool.connect();
+  const client = await getPostgresPool().connect();
 
   try {
     const organizationId = (req as OrganizationRequest).organization._id.toString();
@@ -548,7 +536,7 @@ export const updateProduct = async (
     const assignments = columns.map((column, index) => `${column} = $${index + 1}`);
     values.push(id, organizationId);
 
-    let result = await pool.query<Product>(
+    let result = await getPostgresPool().query<Product>(
       `UPDATE products
        SET ${assignments.join(", ")}
        WHERE id = $${values.length - 1} AND organization_id = $${values.length}
@@ -562,7 +550,7 @@ export const updateProduct = async (
         columns.map((column) => input[column])
       );
       fallbackValues.push(input.productcode, organizationId);
-      result = await pool.query<Product>(
+      result = await getPostgresPool().query<Product>(
         `UPDATE products
          SET ${assignments.join(", ")}
          WHERE productcode = $${fallbackValues.length - 1} AND organization_id = $${fallbackValues.length}
@@ -601,7 +589,7 @@ export const deleteProduct = async (
       return;
     }
 
-    const result = await pool.query<{ id: string }>(
+    const result = await getPostgresPool().query<{ id: string }>(
       `DELETE FROM products
        WHERE id = $1 AND organization_id = $2
        RETURNING id::text AS id`,
@@ -628,14 +616,14 @@ export const getProductFacets = async (
     const organizationId = (req as OrganizationRequest).organization._id.toString();
 
     const [brandsResult, categoriesResult] = await Promise.all([
-      pool.query<{ brand: string }>(
+      getPostgresPool().query<{ brand: string }>(
         `SELECT DISTINCT brand
          FROM products
          WHERE organization_id = $1 AND brand IS NOT NULL AND brand <> ''
          ORDER BY brand ASC`,
         [organizationId]
       ),
-      pool.query<{ category: string }>(
+      getPostgresPool().query<{ category: string }>(
         `SELECT DISTINCT category
          FROM products
          WHERE organization_id = $1 AND category IS NOT NULL AND category <> ''
@@ -661,7 +649,7 @@ export const getProductStats = async (
   try {
     const organizationId = (req as OrganizationRequest).organization._id.toString();
 
-    const result = await pool.query<{
+    const result = await getPostgresPool().query<{
       total_products: string;
       unique_brands: string;
       avg_unit_price: string | null;
@@ -715,7 +703,7 @@ export const listProductDuplicates = async (
     const nameKeyExpr = `NULLIF(lower(trim(regexp_replace(COALESCE(productdescription, ''), '[[:space:]]+', ' ', 'g'))), '')`;
     const brandKeyExpr = `lower(trim(COALESCE(brand, '')))`;
 
-    const result = await pool.query<ProductDuplicateRow>(
+    const result = await getPostgresPool().query<ProductDuplicateRow>(
       `WITH keyed AS (
          SELECT
            ${PRODUCT_COLUMNS.join(", ")},

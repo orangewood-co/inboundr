@@ -1,10 +1,10 @@
-import { Pool } from "pg";
 import { Types } from "mongoose";
 
-import type { DatabaseConfig, Product } from "../types";
+import type { Product } from "../types";
 import type { CatalogProduct } from "../catalog/catalog.types";
 import { mapProductRow, withLegacyProductAliases } from "../catalog/product.mapper";
 import { encodeProductValues } from "../db/product-columns";
+import { getPostgresPool } from "../db/postgres";
 import {
   adjustmentsFromDefinitions,
   getOrCreateProductSettings,
@@ -12,7 +12,6 @@ import {
 } from "./product-settings.service";
 import {
   TextProductSearcher,
-  getDatabaseConfigFromEnv,
   type ProductSearchGroup,
 } from "../utils/product-search";
 
@@ -74,18 +73,6 @@ export const EDITABLE_PRODUCT_COLUMNS = [
   "addedtime",
   "addeduser",
 ] as const;
-
-const dbConfig: DatabaseConfig = {
-  host: process.env.DB_HOST || "localhost",
-  port: parseInt(process.env.DB_PORT || "5432"),
-  database: process.env.DB_NAME!,
-  user: process.env.DB_USER!,
-  password: process.env.DB_PASSWORD!,
-};
-
-// Bounded: several module-level pools plus per-job searcher pools share a
-// session-mode pooler capped at 20 clients.
-const pool = new Pool({ ...dbConfig, max: 4 });
 
 export function parseBoolean(value: unknown): boolean {
   if (typeof value === "boolean") return value;
@@ -181,7 +168,7 @@ export async function createProductRecord(
   );
   const placeholders = columns.map((_, index) => `$${index + 1}`);
 
-  const result = await pool.query<Product>(
+  const result = await getPostgresPool().query<Product>(
     `INSERT INTO products (${columns.join(", ")})
      VALUES (${placeholders.join(", ")})
      RETURNING ${PRODUCT_COLUMNS.join(", ")}`,
@@ -211,7 +198,7 @@ export async function searchProductRecords(input: {
   const synonyms = rawSynonyms instanceof Map
     ? Object.fromEntries(rawSynonyms.entries())
     : { ...(rawSynonyms as Record<string, string[]>) };
-  const searcher = new TextProductSearcher(getDatabaseConfigFromEnv(), {
+  const searcher = new TextProductSearcher({
     synonyms,
     stopWords: settings.search.stopWords,
     matchThreshold: settings.search.matchThreshold,
@@ -222,16 +209,12 @@ export async function searchProductRecords(input: {
       .map((field) => field.key),
   });
 
-  try {
-    return await searcher.searchProduct(
-      { name: input.query, quantity: 1 },
-      input.organizationId,
-      input.limit,
-      { topSellerOnly: input.topSellerOnly }
-    );
-  } finally {
-    await searcher.close();
-  }
+  return searcher.searchProduct(
+    { name: input.query, quantity: 1 },
+    input.organizationId,
+    input.limit,
+    { topSellerOnly: input.topSellerOnly }
+  );
 }
 
 export class ProductServiceError extends Error {

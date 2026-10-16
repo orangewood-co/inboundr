@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import type { Types } from "mongoose";
 
-import { ensureKnowledgeSchema, getKnowledgePool } from "../db/knowledge-schema";
+import { ensureKnowledgeSchema } from "../db/knowledge-schema";
+import { getPostgresPool } from "../db/postgres";
 import {
   DriveDocumentIndex,
   type DriveDocumentIndexStatus,
@@ -84,7 +85,7 @@ async function upsertIndexStatus(input: {
 }
 
 async function deleteChunks(nodeId: string): Promise<void> {
-  await getKnowledgePool().query(
+  await getPostgresPool().query(
     "DELETE FROM drive_document_chunks WHERE node_id = $1",
     [nodeId]
   );
@@ -98,7 +99,7 @@ async function replaceChunks(input: {
   chunks: string[];
   embeddings: number[][];
 }): Promise<void> {
-  const client = await getKnowledgePool().connect();
+  const client = await getPostgresPool().connect();
   try {
     await client.query("BEGIN");
     await client.query("DELETE FROM drive_document_chunks WHERE node_id = $1", [
@@ -362,7 +363,7 @@ export async function searchKnowledge(input: {
   const embedding = await embedQuery(input.query);
   const literal = toVectorLiteral(embedding);
 
-  const result = await getKnowledgePool().query<{
+  const result = await getPostgresPool().query<{
     node_id: string;
     file_name: string;
     content: string;
