@@ -13,6 +13,7 @@ import { DatePicker } from "@/components/date-picker"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ import {
   EllipsisVerticalIcon,
   FileTextIcon,
   RefreshCwIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   XIcon,
@@ -1097,6 +1099,7 @@ export function DashboardPage() {
   const [productResults, setProductResults] = useState<CatalogProduct[]>([])
   const [productSearchLoading, setProductSearchLoading] = useState(false)
   const [productSearchError, setProductSearchError] = useState<string | null>(null)
+  const [customLineOpen, setCustomLineOpen] = useState(false)
   const [topSellerPickers, setTopSellerPickers] = useState<Record<number, TopSellerPickerState>>({})
   const [manualFallbacks, setManualFallbacks] = useState<Record<number, ManualFallbackState>>({})
   const [customProduct, setCustomProduct] = useState<ManualProduct>({
@@ -1569,11 +1572,10 @@ export function DashboardPage() {
   }
 
   const searchCatalogProducts = async (search: string): Promise<CatalogProduct[]> => {
-    if (!search) {
-      return []
-    }
+    const params = new URLSearchParams({ page: "1", limit: "8" })
+    if (search) params.set("search", search)
 
-    const res = await fetch(`${PRODUCTS_API_BASE}?page=1&limit=8&search=${encodeURIComponent(search)}`, {
+    const res = await fetch(`${PRODUCTS_API_BASE}?${params}`, {
       credentials: "include",
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -1581,13 +1583,7 @@ export function DashboardPage() {
     return data.products
   }
 
-  const handleSearchProducts = async () => {
-    const search = productSearch.trim()
-    if (!search) {
-      setProductResults([])
-      return
-    }
-
+  const handleSearchProducts = async (search = productSearch.trim()) => {
     setProductSearchLoading(true)
     setProductSearchError(null)
     try {
@@ -1606,24 +1602,26 @@ export function DashboardPage() {
   }
 
   const handleToggleManualProductPanel = (searchResultIndex: number) => {
-    setActiveManualProductQueryIndex((prev) => {
-      if (prev === searchResultIndex) return null
+    if (activeManualProductQueryIndex === searchResultIndex) {
+      setActiveManualProductQueryIndex(null)
+      return
+    }
 
-      const query = detail?.searchResults[searchResultIndex]?.query
-      if (query) {
-        setCustomProduct((current) => ({
-          ...current,
-          searchResultIndex,
-          queryName: query.name,
-          quantity: String(query.quantity),
-        }))
-        setProductSearch(query.name)
-        setProductResults([])
-        setProductSearchError(null)
-      }
+    const query = detail?.searchResults[searchResultIndex]?.query
+    if (query) {
+      setCustomProduct((current) => ({
+        ...current,
+        searchResultIndex,
+        queryName: query.name,
+        quantity: String(query.quantity),
+      }))
+      setProductSearch("")
+      setProductResults([])
+      setCustomLineOpen(false)
+      void handleSearchProducts("")
+    }
 
-      return searchResultIndex
-    })
+    setActiveManualProductQueryIndex(searchResultIndex)
   }
 
   const handleAddCatalogProduct = (product: CatalogProduct) => {
@@ -2464,15 +2462,15 @@ export function DashboardPage() {
           Add Product
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[420px] space-y-3 p-3">
-        <div>
+      <PopoverContent align="end" className="w-[420px] overflow-hidden p-0">
+        <div className="border-b px-3 py-2.5">
           <p className="truncate text-sm font-semibold">{query.name}</p>
           <p className="text-[11px] text-muted-foreground">Qty: {query.quantity}</p>
         </div>
 
-        <div className="rounded-lg border bg-muted/20 p-2.5">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Search catalog
+        <div className="space-y-2 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Search Catalog
           </p>
         <div className="flex gap-2">
           <Input
@@ -2491,7 +2489,7 @@ export function DashboardPage() {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={handleSearchProducts}
+            onClick={() => handleSearchProducts()}
             disabled={productSearchLoading}
           >
             {productSearchLoading && <Spinner data-icon="inline-start" />}
@@ -2499,14 +2497,14 @@ export function DashboardPage() {
           </Button>
         </div>
         {productSearchError && (
-          <p className="mt-2 text-xs text-destructive">{productSearchError}</p>
+          <p className="text-xs text-destructive">{productSearchError}</p>
         )}
         {productResults.length > 0 && (
-          <div className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
+          <div className="max-h-56 divide-y overflow-y-auto rounded-md border">
             {productResults.map((product) => (
               <div
                 key={product.id}
-                className="flex items-center justify-between gap-3 rounded-md border bg-card px-2.5 py-2"
+                className="flex items-center justify-between gap-3 px-2.5 py-2 transition-colors hover:bg-muted/40"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
@@ -2540,12 +2538,21 @@ export function DashboardPage() {
             ))}
           </div>
         )}
+        {!productSearchLoading && !productSearchError && productResults.length === 0 && (
+          <p className="text-xs text-muted-foreground">No products found.</p>
+        )}
       </div>
 
-      <div className="rounded-lg border bg-muted/20 p-2.5">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Custom line
-        </p>
+      <Collapsible
+        open={customLineOpen}
+        onOpenChange={setCustomLineOpen}
+        className="border-t"
+      >
+        <CollapsibleTrigger className="group flex w-full items-center justify-between px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+          Custom Line
+          <ChevronDownIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-3 pb-3">
         <div className="grid grid-cols-2 gap-1.5">
           <Input
             value={customProduct.queryName}
@@ -2646,7 +2653,8 @@ export function DashboardPage() {
             Add to Catalogue
           </Button>
         </div>
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
       </PopoverContent>
     </Popover>
   )
