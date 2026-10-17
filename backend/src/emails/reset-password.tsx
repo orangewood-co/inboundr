@@ -17,10 +17,6 @@ import {
 import { barebonesBoxedTailwindConfig } from "./theme";
 import { BarebonesFonts } from "./theme-fonts";
 
-const baseUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : process.env.FRONTEND_ORIGIN ?? "";
-
 interface ResetPasswordEmailProps {
   name?: string | null;
   resetUrl: string;
