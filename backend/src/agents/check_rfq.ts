@@ -25,7 +25,7 @@ const State = new StateSchema({
 const checkRFQ: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Check RFQ");
 
-  const response = await classifier.invoke({ email: state.emailBody });
+  const response = await classifier.invoke( state.emailBody );
   const answer = response.nouls.isRFQ;
   if (!answer) {
     throw new Error("TypeSafe response did not include an isRFQ answer");
