@@ -39,6 +39,14 @@ import {
 import { GUIDANCE_MAX_LENGTH, generateReplyDraft } from "../services/email-ai.service";
 import { emitDomainEvent } from "../events/domain-events";
 import { GMAIL_SEND_SCOPE } from "../config/gmail.config";
+import { InboxConversation } from "../models/inbox-conversation.model";
+import {
+  CONVERSATION_RFQ_CONDITION,
+  conversationClassificationCondition,
+  conversationScopeFilter,
+  hasWhatsAppInbox,
+  loadConversationRows,
+} from "../services/inbox-conversation.service";
 
 const INLINE_ATTACHMENT_MIME_TYPES = new Set([
   "application/pdf",
@@ -130,6 +138,15 @@ const EMAIL_SEARCH_MAX_LENGTH = 200;
 function parseEmailListFilter(value: unknown): EmailListFilter {
   return EMAIL_LIST_FILTERS.includes(value as EmailListFilter)
     ? (value as EmailListFilter)
+    : "all";
+}
+
+const INBOX_CHANNEL_FILTERS = ["all", "email", "whatsapp"] as const;
+type InboxChannelFilter = (typeof INBOX_CHANNEL_FILTERS)[number];
+
+function parseInboxChannel(value: unknown): InboxChannelFilter {
+  return INBOX_CHANNEL_FILTERS.includes(value as InboxChannelFilter)
+    ? (value as InboxChannelFilter)
     : "all";
 }
 
@@ -250,12 +267,16 @@ export const listEmails = async (
     const skip = (page - 1) * limit;
 
     const filter = parseEmailListFilter(req.query.filter);
+    const channel = parseInboxChannel(req.query.channel);
     const withAttachments = parseBooleanFlag(req.query.attachments);
     const search = parseSearchQuery(req.query.q);
     const accountId =
       typeof req.query.account === "string" && mongoose.isValidObjectId(req.query.account)
         ? new mongoose.Types.ObjectId(req.query.account)
         : null;
+    // A Gmail account filter only applies to email, so it hides chats.
+    const includeEmail = channel !== "whatsapp";
+    const includeConversations = channel !== "email" && !accountId;
 
     // Legacy rows predate `direction`, so $ne matches them as inbound. The INBOX
     // label keeps messages the user archived in Gmail out of the list, but rows
@@ -296,32 +317,80 @@ export const listEmails = async (
       ? { $and: [scopeFilter, classification] }
       : scopeFilter;
 
+    const conversationScope = conversationScopeFilter(scope, { search, withAttachments });
+    const conversationClassification = includeConversations
+      ? await conversationClassificationCondition(scope, filter)
+      : null;
+    const conversationListFilter = conversationClassification
+      ? { $and: [conversationScope, conversationClassification] }
+      : conversationScope;
+
+    // With both sources in play, each contributes its newest skip+limit rows
+    // and the page is cut from the merged order, so pagination stays exact.
+    const merging = includeEmail && includeConversations;
+    const sourceSkip = merging ? 0 : skip;
+    const sourceLimit = merging ? skip + limit : limit;
+
     // Sorting/grouping full documents (with bodies) blows MongoDB's 32MB
     // in-memory sort limit on large mailboxes, so the pipeline works on slim
     // key tuples only and the page of full documents is fetched afterwards.
-    const [pageRows, total, rfqCount] = await Promise.all([
-      Email.aggregate([
-        { $match: listFilter },
-        { $project: { date: 1, gmailAccountId: 1, threadId: 1 } },
-        { $sort: { date: -1, _id: -1 } },
-        {
-          $group: {
-            _id: THREAD_KEY_EXPR,
-            emailId: { $first: "$_id" },
-            date: { $first: "$date" },
-          },
-        },
-        { $sort: { date: -1, emailId: -1 } },
-        { $skip: skip },
-        { $limit: limit },
-      ]).allowDiskUse(true),
-      countThreads(listFilter),
-      countThreads({ $and: [scopeFilter, rfqMembershipCondition(classificationSets)] }),
-    ]);
+    const [pageRows, emailTotal, emailRfqCount, conversationRows, conversationTotal, conversationRfqCount, hasWhatsApp] =
+      await Promise.all([
+        includeEmail
+          ? Email.aggregate<{ emailId: mongoose.Types.ObjectId; date: Date }>([
+              { $match: listFilter },
+              { $project: { date: 1, gmailAccountId: 1, threadId: 1 } },
+              { $sort: { date: -1, _id: -1 } },
+              {
+                $group: {
+                  _id: THREAD_KEY_EXPR,
+                  emailId: { $first: "$_id" },
+                  date: { $first: "$date" },
+                },
+              },
+              { $sort: { date: -1, emailId: -1 } },
+              { $skip: sourceSkip },
+              { $limit: sourceLimit },
+            ]).allowDiskUse(true)
+          : [],
+        includeEmail ? countThreads(listFilter) : 0,
+        includeEmail
+          ? countThreads({ $and: [scopeFilter, rfqMembershipCondition(classificationSets)] })
+          : 0,
+        includeConversations
+          ? InboxConversation.find(conversationListFilter)
+              .sort({ lastMessageAt: -1, _id: -1 })
+              .skip(sourceSkip)
+              .limit(sourceLimit)
+              .select("_id lastMessageAt")
+              .lean()
+          : [],
+        includeConversations ? InboxConversation.countDocuments(conversationListFilter) : 0,
+        includeConversations
+          ? InboxConversation.countDocuments({ $and: [conversationScope, CONVERSATION_RFQ_CONDITION] })
+          : 0,
+        hasWhatsAppInbox(scope),
+      ]);
+    const total = emailTotal + conversationTotal;
+    const rfqCount = emailRfqCount + conversationRfqCount;
     const authReq = req as AuthenticatedRequest;
     const organization = (req as OrganizationRequest).organization;
 
-    const pageEmailIds = pageRows.map((row) => row.emailId);
+    const pageEntries = [
+      ...pageRows.map((row) => ({ channel: "email" as const, id: row.emailId, date: new Date(row.date) })),
+      ...conversationRows.map((row) => ({
+        channel: "whatsapp" as const,
+        id: row._id,
+        date: new Date(row.lastMessageAt),
+      })),
+    ];
+    if (merging) pageEntries.sort((left, right) => right.date.getTime() - left.date.getTime());
+    const pageSlice = merging ? pageEntries.slice(skip, skip + limit) : pageEntries;
+
+    const pageEmailIds = pageSlice.filter((entry) => entry.channel === "email").map((entry) => entry.id);
+    const conversationRowById = await loadConversationRows(
+      pageSlice.filter((entry) => entry.channel === "whatsapp").map((entry) => entry.id)
+    );
     const pageDocs = await Email.find({ _id: { $in: pageEmailIds } })
       .select("-bodyText -bodyHtml")
       .lean();
@@ -406,19 +475,34 @@ export const listEmails = async (
       accounts.map((account) => [account._id.toString(), account.emailAddress])
     );
 
+    const emailRowById = new Map(
+      emails.map((email) => [
+        email._id.toString(),
+        {
+          ...attachClassification(
+            email,
+            resolveRFQ(email),
+            accountEmailById.get(email.gmailAccountId.toString()) ?? null
+          ),
+          channel: "email" as const,
+          threadCount: email.threadId
+            ? threadCountByKey.get(`${email.gmailAccountId}:${email.threadId}`) ?? 1
+            : 1,
+        },
+      ])
+    );
+
     res.json({
-      emails: emails.map((email) => ({
-        ...attachClassification(
-          email,
-          resolveRFQ(email),
-          accountEmailById.get(email.gmailAccountId.toString()) ?? null
-        ),
-        threadCount: email.threadId
-          ? threadCountByKey.get(`${email.gmailAccountId}:${email.threadId}`) ?? 1
-          : 1,
-      })),
+      emails: pageSlice.flatMap((entry) => {
+        const row =
+          entry.channel === "email"
+            ? emailRowById.get(entry.id.toString())
+            : conversationRowById.get(entry.id.toString());
+        return row ? [row] : [];
+      }),
       total,
       rfqCount,
+      hasWhatsApp,
       page,
       limit,
       totalPages: Math.ceil(total / limit),

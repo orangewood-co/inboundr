@@ -81,6 +81,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ContactHoverCard, SenderHoverCard } from "@/components/contact-hover-card"
 import { DeliveryTermCombobox } from "@/components/delivery-term-combobox"
 import { CopyableText } from "@/components/copy-button"
+import { WhatsAppChatTranscript } from "@/components/inbox/whatsapp-conversation-panel"
+import { WhatsAppIcon } from "@/components/support/channel"
 import { openDownload } from "@/lib/downloads"
 import { StatusBadge, type StatusTone } from "@/components/status-badge"
 import { formatFullDateTime, formatListTimestamp, formatMoney } from "@/lib/format"
@@ -155,6 +157,15 @@ interface RFQEmail {
   bodyHtml?: string | null
   status: string
   attachments?: RFQEmailAttachment[]
+}
+
+interface RFQConversation {
+  _id: string
+  channel: "whatsapp"
+  externalId: string
+  participant?: { name: string | null; phoneNumber: string | null; email: string | null } | null
+  lastMessageAt: string | null
+  lastInboundAt: string | null
 }
 
 interface RFQEmailAttachment {
@@ -237,7 +248,8 @@ interface RFQManualInput {
 interface RFQSummary {
   _id: string
   emailId: RFQEmail | null
-  source?: "email" | "manual"
+  source?: "email" | "manual" | "whatsapp"
+  inboxConversationId?: RFQConversation | null
   manualInput?: RFQManualInput | null
   isRFQ: boolean
   reason: string
@@ -294,10 +306,12 @@ interface RFQReply {
   subject: string
   body: string
   to: string
+  channel?: "email" | "whatsapp"
   generatedAt: string
   sendStatus: "draft" | "sending" | "sent" | "failed"
   sentAt: string | null
   gmailMessageId: string | null
+  whatsappMessageId?: string | null
   sendErrorMessage: string | null
 }
 
@@ -393,6 +407,29 @@ function manualRFQTitle(rfq: Pick<RFQSummary, "manualInput">): string {
   const firstLine = rfq.manualInput?.text?.trim().split("\n")[0]?.trim()
   if (firstLine) return firstLine.length > 90 ? `${firstLine.slice(0, 90)}…` : firstLine
   return rfq.manualInput?.attachments?.[0]?.filename || "Manually Added RFQ"
+}
+
+function conversationName(conversation: RFQConversation): string {
+  return conversation.participant?.name?.trim() || conversation.externalId
+}
+
+function rfqConversation(rfq: Pick<RFQSummary, "source" | "inboxConversationId">): RFQConversation | null {
+  return rfq.source === "whatsapp" ? rfq.inboxConversationId ?? null : null
+}
+
+function rfqTitle(rfq: Pick<RFQSummary, "emailId" | "source" | "inboxConversationId" | "manualInput">): string {
+  if (rfq.emailId) return rfq.emailId.subject || "(no subject)"
+  const conversation = rfqConversation(rfq)
+  if (conversation) return `WhatsApp RFQ from ${conversationName(conversation)}`
+  if (rfq.source === "whatsapp") return "WhatsApp RFQ"
+  return manualRFQTitle(rfq)
+}
+
+const WHATSAPP_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000
+
+function isWithinWhatsAppWindow(conversation: RFQConversation): boolean {
+  if (!conversation.lastInboundAt) return false
+  return Date.now() - new Date(conversation.lastInboundAt).getTime() < WHATSAPP_SERVICE_WINDOW_MS
 }
 
 const RFQ_UPLOAD_MAX_FILE_SIZE = 8 * 1024 * 1024
@@ -1232,6 +1269,16 @@ export function DashboardPage() {
       void navigate({
         to: "/emails",
         search: { email: emailId },
+      })
+    },
+    [navigate],
+  )
+
+  const openOriginalChat = useCallback(
+    (conversationId: string) => {
+      void navigate({
+        to: "/emails",
+        search: { conversation: conversationId },
       })
     },
     [navigate],
@@ -2093,9 +2140,12 @@ export function DashboardPage() {
         throw new Error(data?.error || `HTTP ${res.status}`)
       }
       setReply(data)
-      toast.success("Quote sent successfully")
+      toast.success(data?.channel === "whatsapp" ? "Quote sent on WhatsApp" : "Quote sent successfully")
     } catch (err) {
-      toast.error("Failed to send quote")
+      // WhatsApp failures (closed window, unapproved template) need the reason to be actionable.
+      toast.error(
+        detail.source === "whatsapp" && err instanceof Error ? err.message : "Failed to send quote"
+      )
       console.error("Failed to send quote:", err)
     } finally {
       setSendingQuote(false)
@@ -2135,6 +2185,7 @@ export function DashboardPage() {
   const hasDeliveryTerms = deliveryTermsText.trim().length > 0
   // Manual RFQs (pasted text / uploaded files) have no source email.
   const detailEmail = detail?.emailId ?? null
+  const detailConversation = detail ? rfqConversation(detail) : null
   const canUseCompletedRFQActions = Boolean(detail?.isProcessed && !detail.errorMessage)
 
   const renderManualProductEditor = (product: ManualProduct) => {
@@ -2821,7 +2872,12 @@ export function DashboardPage() {
                   {rfqs.map((rfq) => {
                     const email = rfq.emailId
                     const sender = email ? parseSender(email.from) : null
-                    const senderName = rfq.customer?.company || sender?.name || "Manual Entry"
+                    const conversation = rfqConversation(rfq)
+                    const senderName =
+                      rfq.customer?.company ||
+                      sender?.name ||
+                      (conversation ? conversationName(conversation) : null) ||
+                      "Manual Entry"
                     const avatarColors = getAvatarColor(senderName)
                     const initial = senderName.charAt(0).toUpperCase()
                     const isSelected = selectedId === rfq._id
@@ -2857,8 +2913,11 @@ export function DashboardPage() {
                           </span>
                         </div>
                         <div className="pl-[42px]">
-                          <p className="truncate text-sm font-medium leading-snug">
-                            {email ? email.subject || "(no subject)" : manualRFQTitle(rfq)}
+                          <p className="flex items-center gap-1.5 text-sm font-medium leading-snug">
+                            {rfq.source === "whatsapp" && (
+                              <WhatsAppIcon className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            )}
+                            <span className="truncate">{rfqTitle(rfq)}</span>
                           </p>
                           <div className="mt-1.5 flex items-center gap-2">
                             <Tooltip>
@@ -2939,8 +2998,11 @@ export function DashboardPage() {
                 <div className="space-y-3 border-b px-6 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-lg font-semibold leading-snug">
-                        {detailEmail ? detailEmail.subject || "(no subject)" : manualRFQTitle(detail)}
+                      <h1 className="flex items-center gap-2 text-lg font-semibold leading-snug">
+                        {detail.source === "whatsapp" && (
+                          <WhatsAppIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        {rfqTitle(detail)}
                       </h1>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {formatFullDateTime(detail.createdAt)}
@@ -2968,8 +3030,29 @@ export function DashboardPage() {
                             <PaperclipIcon className="size-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{detailEmail ? "View source attachments" : "View source submission"}</TooltipContent>
+                        <TooltipContent>
+                          {detailEmail
+                            ? "View source attachments"
+                            : detailConversation
+                              ? "View source chat"
+                              : "View source submission"}
+                        </TooltipContent>
                       </Tooltip>
+                      {detailConversation && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 shrink-0"
+                              onClick={() => openOriginalChat(detailConversation._id)}
+                            >
+                              <ExternalLinkIcon className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Open chat in Inbox</TooltipContent>
+                        </Tooltip>
+                      )}
                       {detailEmail && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -3617,12 +3700,17 @@ export function DashboardPage() {
                       <div className="space-y-2 border-b px-4 py-3">
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-medium text-muted-foreground">To:</span>
+                          {reply.channel === "whatsapp" && (
+                            <WhatsAppIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          )}
                           <span>{reply.to}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-muted-foreground">Subject:</span>
-                          <span className="font-medium">{reply.subject}</span>
-                        </div>
+                        {reply.channel !== "whatsapp" && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-medium text-muted-foreground">Subject:</span>
+                            <span className="font-medium">{reply.subject}</span>
+                          </div>
+                        )}
                         <div className="text-[11px] text-muted-foreground">
                           Generated {formatFullDateTime(reply.generatedAt)}
                           {reply.sentAt && ` · Sent ${formatFullDateTime(reply.sentAt)}`}
@@ -3641,7 +3729,7 @@ export function DashboardPage() {
                       </p>
                     )}
                     <div className="mt-3 flex items-center gap-3">
-                      {detailEmail ? (
+                      {detailEmail || detailConversation ? (
                         <>
                           <Button
                             onClick={handleSendQuote}
@@ -3660,10 +3748,16 @@ export function DashboardPage() {
                             )}
                             {reply.sendStatus === "sent"
                               ? "Quote Sent"
-                              : "Send Quote"}
+                              : detailConversation
+                                ? "Send on WhatsApp"
+                                : "Send Quote"}
                           </Button>
                           <p className="text-xs text-muted-foreground">
-                            Sends from the connected Gmail account on the original thread with a quote PDF attached.
+                            {detailConversation
+                              ? isWithinWhatsAppWindow(detailConversation)
+                                ? "Sends this message and the quote PDF from the RFQ WhatsApp number."
+                                : "The customer last wrote more than 24 hours ago, so the quote PDF goes out with the approved quotation template."
+                              : "Sends from the connected Gmail account on the original thread with a quote PDF attached."}
                           </p>
                         </>
                       ) : (
@@ -3677,7 +3771,9 @@ export function DashboardPage() {
                             Download Quote PDF
                           </Button>
                           <p className="text-xs text-muted-foreground">
-                            This RFQ was added manually, so there is no email thread to reply on. Share the PDF instead.
+                            {detail.source === "whatsapp"
+                              ? "The WhatsApp chat for this RFQ is no longer available. Share the PDF instead."
+                              : "This RFQ was added manually, so there is no email thread to reply on. Share the PDF instead."}
                           </p>
                         </>
                       )}
@@ -3774,15 +3870,52 @@ export function DashboardPage() {
           {detail && (
             <>
               <SheetHeader className="border-b border-border/50 px-5 py-4 pr-12">
-                <SheetTitle>{detailEmail ? "Source Email" : "Source Submission"}</SheetTitle>
+                <SheetTitle>
+                  {detailEmail ? "Source Email" : detailConversation ? "Source Chat" : "Source Submission"}
+                </SheetTitle>
                 <SheetDescription>
                   {detailEmail
                     ? "Review the original RFQ email context and attachments without leaving this quote."
-                    : "Review the pasted text and uploaded files this RFQ was created from."}
+                    : detailConversation
+                      ? "Review the WhatsApp chat this RFQ was created from without leaving this quote."
+                      : "Review the pasted text and uploaded files this RFQ was created from."}
                 </SheetDescription>
               </SheetHeader>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                {!detailEmail ? (
+                {detailConversation ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/20 p-4">
+                      {(() => {
+                        const name = conversationName(detailConversation)
+                        const colors = getAvatarColor(name)
+                        return (
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-[13px] font-semibold ${colors.bg} ${colors.text}`}>
+                              {name.replace(/^\+/, "").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-[13px] font-medium">{name}</p>
+                              <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                                <WhatsAppIcon className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                {detailConversation.externalId}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 gap-1.5"
+                        onClick={() => openOriginalChat(detailConversation._id)}
+                      >
+                        <ExternalLinkIcon className="size-3.5" />
+                        Open in Inbox
+                      </Button>
+                    </div>
+                    <WhatsAppChatTranscript conversationId={detailConversation._id} />
+                  </div>
+                ) : !detailEmail ? (
                   <div className="space-y-4">
                     {detail.manualInput?.text && (
                       <div className="rounded-xl border border-border/50 p-4">

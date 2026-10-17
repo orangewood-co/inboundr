@@ -79,6 +79,8 @@ import { startCrmActivityReminderCron } from "./jobs/crm-activity-reminder-cron"
 import { startRecruitmentRankingWorker } from "./services/recruitment-ranking.service";
 import { startRecruitmentAcknowledgementWorker } from "./services/recruitment-acknowledgement.service";
 import { backfillRFQThreadIds } from "./services/rfq.service";
+import { startWhatsAppRfqWorker } from "./services/whatsapp-rfq.service";
+import inboxRouter from "./routes/inbox.route";
 
 const app: Application = express();
 
@@ -121,6 +123,7 @@ app.get("/health", (req: Request, res: Response) => {
 app.use("/api/v1", generalApiLimiter);
 
 app.use("/api/v1/email", emailRouter);
+app.use("/api/v1/inbox", inboxRouter);
 app.use("/api/v1/gmail", gmailRouter);
 app.use("/api/v1/products", productsRouter);
 app.use("/api/v1/rfq", rfqRouter);
@@ -205,6 +208,7 @@ export async function initializeServices(): Promise<void> {
   startCallRecordingCron();
   startRecruitmentRankingWorker();
   startRecruitmentAcknowledgementWorker();
+  startWhatsAppRfqWorker();
 }
 
 async function shutdown(): Promise<void> {

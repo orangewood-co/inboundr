@@ -17,7 +17,7 @@ interface ProcessEmailForRFQOptions {
   threadId?: string | null;
 }
 
-async function isQuotationProcessingEnabled(organizationId?: string): Promise<boolean> {
+export async function isQuotationProcessingEnabled(organizationId?: string): Promise<boolean> {
   if (!organizationId) return true;
 
   const organization = await Organization.findById(organizationId)
@@ -27,7 +27,7 @@ async function isQuotationProcessingEnabled(organizationId?: string): Promise<bo
   return Boolean(organization && hasEffectiveFeature(organization, "rfq"));
 }
 
-async function getOrganizationContext(organizationId?: string) {
+export async function getOrganizationContext(organizationId?: string) {
   const organization = await Organization.findById(organizationId)
     .select("name description")
     .lean();

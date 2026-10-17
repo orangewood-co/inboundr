@@ -16,6 +16,7 @@ import {
 import { Customer } from "../models/customer.model";
 import { Types } from "mongoose";
 import { getOrCreateProductSettings } from "../services/product-settings.service";
+import { findCustomerByPhone } from "../services/customer-lookup.service";
 
 const model = new ChatOpenRouter({
   model: "anthropic/claude-haiku-5.5",
@@ -107,14 +108,39 @@ const SEARCH_CANDIDATE_LIMIT = 8;
 const RERANK_CANDIDATE_LIMIT = 12;
 const MAX_SEARCH_VARIANTS = 6;
 
+const knownSender = z.object({
+  name: z.string().nullable(),
+  phoneNumber: z.string().nullable(),
+});
+
 const State = new StateSchema({
   emailBody: z.string(),
+  channel: z.enum(["email", "whatsapp"]),
+  knownSender: knownSender.nullable(),
   organizationContext: organizationContext,
   organizationId: z.string().nullable(),
   customer: customer,
   queryProducts: z.array(queryProduct),
   searchResults: z.array(searchResult).nullable(),
 });
+
+type InputChannel = "email" | "whatsapp";
+
+function sourceDescription(channel: InputChannel): string {
+  return channel === "whatsapp"
+    ? `You are given a WhatsApp chat with a potential customer asking for a quote for the products they are interested in.
+       Messages labelled OUR REPLY are from our own team; every other message is from the customer.`
+    : `You are given a email from a potential customer asking for a quote for the products they are interested in.
+       The input may also be a whole email conversation; messages labelled OUR REPLY are from our own team.`;
+}
+
+function knownSenderHint(sender: z.infer<typeof knownSender> | null): string {
+  if (!sender?.phoneNumber && !sender?.name) return "";
+  return `The customer is writing from the WhatsApp number ${sender.phoneNumber ?? "unknown"}${
+    sender.name ? ` with the profile name "${sender.name}"` : ""
+  }. Use the number as the contact number unless the chat gives a different one; the profile name is often a nickname,
+       so prefer a name or company stated in the chat.`;
+}
 
 const identifyCustomer: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Identify Customer");
@@ -125,47 +151,71 @@ const identifyCustomer: GraphNode<typeof State> = async (state) => {
        You work for ${state.organizationContext.name}.
        ${state.organizationContext.description ?? ""}
 
-        You are given a email from a potential customer asking for a quote for the products they are interested in.
-        The input may also be a whole email conversation; messages labelled OUR REPLY are from our own team, so identify the external customer, never our own team.
-        Your task is to identify the customer from the email and return the customer details in the structured output format.`
+        ${sourceDescription(state.channel)}
+        Identify the external customer, never our own team.
+        ${knownSenderHint(state.knownSender)}
+        Your task is to identify the customer and return the customer details in the structured output format.`
     ),
     new HumanMessage(state.emailBody),
   ]);
 
   console.log("RESPONSE: ", response);
 
-  // Check if the customer already exists
-  const customerFilter = {
-    email: response.email ?? "",
-    ...(state.organizationId ? { organizationId: state.organizationId } : {}),
-  };
-  const existingCustomer = await Customer.findOne(customerFilter);
+  const contactNumber = response.contactNumber ?? state.knownSender?.phoneNumber ?? null;
+  const email = response.email?.trim() || null;
+  const existingCustomer = await findExistingCustomer(state.organizationId, email, state.knownSender?.phoneNumber ?? null);
+
   if (existingCustomer) {
     return {
       customer: {
-        name: response.name,
-        company: response.company,
-        email: response.email ?? "",
-        contactNumber: response.contactNumber ?? null,
-        address: response.address ?? "",
+        name: response.name || existingCustomer.name,
+        company: response.company || existingCustomer.company,
+        email: email ?? existingCustomer.email ?? "",
+        contactNumber: contactNumber ?? existingCustomer.contactNumber ?? null,
+        address: response.address ?? existingCustomer.address ?? "",
       },
     };
   }
-  else {
-    await Customer.create({
-      ...(state.organizationId ? { organizationId: state.organizationId } : {}),
-      name: response.name,
-      company: response.company,
-      email: response.email ?? "",
-      contactNumber: response.contactNumber ?? undefined,
-      address: response.address ?? "",
-    });
+
+  // A customer record needs an email; chat customers often never share one,
+  // and saving the contact must never fail the RFQ itself.
+  if (email && response.company && response.name) {
+    try {
+      await Customer.create({
+        ...(state.organizationId ? { organizationId: state.organizationId } : {}),
+        name: response.name,
+        company: response.company,
+        email,
+        contactNumber: contactNumber ?? undefined,
+        address: response.address ?? "",
+      });
+    } catch (error) {
+      console.warn("Could not save RFQ customer:", error);
+    }
   }
 
   return {
-    customer: response,
+    customer: { ...response, email: email ?? "", contactNumber },
   };
 };
+
+async function findExistingCustomer(
+  organizationId: string | null,
+  email: string | null,
+  phoneNumber: string | null
+) {
+  if (email) {
+    const byEmail = await Customer.findOne({
+      email,
+      ...(organizationId ? { organizationId } : {}),
+    }).lean();
+    if (byEmail) return byEmail;
+  }
+  if (phoneNumber && organizationId) {
+    return findCustomerByPhone(organizationId, phoneNumber);
+  }
+  return null;
+}
 
 // Specifications are stored as a Mongoose Map, and MongoDB map keys cannot
 // contain "." or start with "$" (e.g. "Model No." fails with a CastError).
@@ -194,10 +244,10 @@ const identifyProducts: GraphNode<typeof State> = async (state) => {
        You work for ${state.organizationContext.name}.
        ${state.organizationContext.description ? `${state.organizationContext.description}` : ""}
 
-       You are given a email from a potential customer asking for a quote for the products they are interested in.
-       The input may also be a whole email conversation; extract the customer's latest agreed request, letting
+       ${sourceDescription(state.channel)}
+       When there are several messages, extract the customer's latest agreed request, letting
        later messages override earlier quantities and details (e.g. a quantity confirmed in a follow-up reply).
-       Your task is to identify the products from the email and return the products details in the structured output format.
+       Your task is to identify the requested products and return the products details in the structured output format.
        
        Extract each requested catalog item separately. Preserve an exact SKU/model/part number,
        manufacturer, quantity, and named specifications when provided. Keep a readable summary in name.
@@ -597,12 +647,23 @@ const graph = new StateGraph(State)
   .addEdge("searchProducts", END)
   .compile();
 
-export async function generateRFQ(currentOrganizationContext: z.infer<typeof organizationContext>, emailBody: string, organizationId?: string): Promise<{
+export async function generateRFQ(
+  currentOrganizationContext: z.infer<typeof organizationContext>,
+  emailBody: string,
+  organizationId?: string,
+  options: { channel?: InputChannel; knownSender?: z.infer<typeof knownSender> } = {}
+): Promise<{
   customer: z.infer<typeof customer>;
   queryProducts: z.infer<typeof queryProduct>[];
   searchResults: z.infer<typeof searchResult>[];
 }> {
-  const result = await graph.invoke({ emailBody, organizationContext: currentOrganizationContext, organizationId: organizationId ?? null });
+  const result = await graph.invoke({
+    emailBody,
+    channel: options.channel ?? "email",
+    knownSender: options.knownSender ?? null,
+    organizationContext: currentOrganizationContext,
+    organizationId: organizationId ?? null,
+  });
   return {
     customer: result.customer,
     queryProducts: result.queryProducts,

@@ -17,6 +17,7 @@ import {
   type SkippedGmailMessageReason,
 } from "../models/skipped-gmail-message.model";
 import { hasEffectiveFeature } from "./entitlement.service";
+import { withRfqSlot } from "./rfq-job-queue";
 
 function extractEmailAddress(value: string | null | undefined): string {
   if (!value) return "";
@@ -77,28 +78,6 @@ async function recordSkippedMessage(
 // broken and skipped. Without a cap, a single poison message pins the sync
 // cursor and every Gmail notification replays the whole range since it.
 const MAX_INGEST_ATTEMPTS = 5;
-
-// RFQ processing runs a chain of LLM calls plus Postgres product searches per
-// email. A backlog catch-up can ingest dozens of emails in seconds; firing all
-// their RFQ jobs at once floods the LLM provider and lets the searches starve
-// the shared 10-connection Postgres pool that HTTP requests also use, so
-// queue them behind a semaphore instead.
-const MAX_CONCURRENT_RFQ_JOBS = 5;
-let activeRfqJobs = 0;
-const rfqJobWaiters: Array<() => void> = [];
-
-async function withRfqSlot<T>(fn: () => Promise<T>): Promise<T> {
-  while (activeRfqJobs >= MAX_CONCURRENT_RFQ_JOBS) {
-    await new Promise<void>((resolve) => rfqJobWaiters.push(resolve));
-  }
-  activeRfqJobs++;
-  try {
-    return await fn();
-  } finally {
-    activeRfqJobs--;
-    rfqJobWaiters.shift()?.();
-  }
-}
 
 async function recordFailedIngestAttempt(
   account: IGmailAccount,

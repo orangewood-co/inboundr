@@ -38,7 +38,9 @@ export interface IRFQReply extends Document {
   generatedAt: Date;
   sendStatus: "draft" | "sending" | "sent" | "failed";
   sentAt: Date | null;
+  channel: "email" | "whatsapp";
   gmailMessageId: string | null;
+  whatsappMessageId: string | null;
   sendErrorMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -106,7 +108,7 @@ const rfqReplySchema = new Schema<IRFQReply>(
     subject: { type: String, required: true },
     body: { type: String, required: true },
     // Empty when a manual RFQ yields no customer email; such quotes are shared
-    // as a PDF instead of sent.
+    // as a PDF instead of sent. The customer's +E.164 number for WhatsApp RFQs.
     to: { type: String, default: "" },
     generatedAt: { type: Date, required: true },
     sendStatus: {
@@ -116,7 +118,9 @@ const rfqReplySchema = new Schema<IRFQReply>(
       index: true,
     },
     sentAt: { type: Date, default: null },
+    channel: { type: String, enum: ["email", "whatsapp"], default: "email" },
     gmailMessageId: { type: String, default: null },
+    whatsappMessageId: { type: String, default: null },
     sendErrorMessage: { type: String, default: null },
   },
   { timestamps: true }

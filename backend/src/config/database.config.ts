@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Email } from "../models/email.model";
 import { RFQ } from "../models/rfq.model";
+import { WhatsAppAccount } from "../models/whatsapp-account.model";
 
 export async function connectDB(): Promise<void> {
   const uri = process.env.MONGODB_URI;
@@ -29,6 +30,7 @@ export async function connectDB(): Promise<void> {
   });
   await reconcileEmailIndexes();
   await reconcileRFQIndexes();
+  await reconcileWhatsAppAccountIndexes();
 }
 
 /**
@@ -119,6 +121,48 @@ async function reconcileRFQIndexes(): Promise<void> {
     await RFQ.createIndexes();
   } catch (err) {
     console.error("Failed to reconcile RFQ indexes:", err);
+  }
+}
+
+/**
+ * Organizations used to have exactly one WhatsApp number, enforced by a unique
+ * index on organizationId. A second, RFQ-only number is now allowed, so that
+ * index is dropped in favour of the (organizationId, purpose) one the schema
+ * declares. Accounts saved before purposes existed are the primary number;
+ * they are tagged explicitly so purpose-filtered queries find them.
+ */
+async function reconcileWhatsAppAccountIndexes(): Promise<void> {
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  try {
+    const collections = await db.listCollections({ name: "whatsappaccounts" }).toArray();
+    if (collections.length === 0) return;
+
+    const accounts = db.collection("whatsappaccounts");
+    const tagged = await accounts.updateMany(
+      { purpose: { $exists: false } },
+      { $set: { purpose: "primary" } }
+    );
+    if (tagged.modifiedCount > 0) {
+      console.log(`Tagged ${tagged.modifiedCount} WhatsApp account(s) as primary`);
+    }
+
+    const indexes = await accounts.indexes();
+    const stale = indexes.filter(
+      (index) => index.name === "organizationId_1" && index.unique === true
+    );
+    if (stale.length === 0) return;
+
+    for (const index of stale) {
+      await accounts.dropIndex(index.name!);
+      console.log(`Dropped stale unique index whatsappaccounts.${index.name}`);
+    }
+
+    await WhatsAppAccount.init().catch(() => undefined);
+    await WhatsAppAccount.createIndexes();
+  } catch (err) {
+    console.error("Failed to reconcile WhatsApp account indexes:", err);
   }
 }
 

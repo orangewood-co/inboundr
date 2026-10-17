@@ -4210,7 +4210,7 @@ export function SettingsPage() {
 // ─── Integrations Tab ────────────────────────────────────────
 
 function IntegrationsTab() {
-  const { canManageOrganization } = useEntitlements()
+  const { canManageOrganization, hasFeature } = useEntitlements()
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -4224,6 +4224,15 @@ function IntegrationsTab() {
       >
         <WhatsAppSettingsCardContent canManage={canManageOrganization} />
       </SettingsCard>
+
+      {hasFeature("rfq") && (
+        <SettingsCard
+          title="WhatsApp for RFQs"
+          description="A separate number customers message with quotation requests. Chats land in the Inbox and become RFQs."
+        >
+          <WhatsAppSettingsCardContent canManage={canManageOrganization} purpose="rfq" />
+        </SettingsCard>
+      )}
 
       <div className="rounded-xl border border-dashed p-4 text-xs text-muted-foreground">
         Gmail accounts are connected per person under <span className="font-medium text-foreground">Account</span>,

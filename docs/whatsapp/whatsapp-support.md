@@ -1,14 +1,22 @@
 # WhatsApp Runbook (Meta Cloud API)
 
-This guide covers connecting a WhatsApp Business number and the two things
-built on top of it:
+This guide covers connecting WhatsApp Business numbers and what is built on
+top of them. An organization can connect up to two numbers:
 
-1. **Support** — an inbound message opens (or continues) a `whatsapp`-channel
-   ticket, the AI agent replies automatically when enabled, and agents answer
-   from the same inbox as live chat and phone calls.
-2. **Invoices and payment reminders** — business-initiated messages that send
-   the invoice PDF via Meta-approved message templates (see
-   [Templates, invoices and reminders](#templates-invoices-and-reminders)).
+- The **support number** (`purpose: "primary"`) handles:
+  1. **Support** — an inbound message opens (or continues) a `whatsapp`-channel
+     ticket, the AI agent replies automatically when enabled, and agents answer
+     from the same inbox as live chat and phone calls.
+  2. **Invoices and payment reminders** — business-initiated messages that send
+     the invoice PDF via Meta-approved message templates (see
+     [Templates, invoices and reminders](#templates-invoices-and-reminders)).
+- The **RFQ number** (`purpose: "rfq"`) is a separate number customers message
+  with quotation requests. Its chats land in the RFQ owner's Inbox next to
+  email, become RFQs, and quotes are sent back on WhatsApp (see
+  [RFQ number](#rfq-number)).
+
+Keeping RFQs on their own number means a support conversation is never
+mistaken for an RFQ, and an RFQ chat never opens a support ticket.
 
 ## Architecture
 
@@ -46,15 +54,23 @@ signature verification requires the exact raw request bytes.
 | Org WhatsApp settings (app UI) | `GET`/`PATCH`/`DELETE` | `/api/v1/organization/whatsapp` |
 | Create/refresh message templates | `POST` | `/api/v1/organization/whatsapp/templates/sync` |
 | Send an invoice PDF on WhatsApp | `POST` | `/api/v1/invoices/:id/send-whatsapp` |
+| RFQ number settings (app UI) | `GET`/`PATCH`/`DELETE` | `/api/v1/organization/whatsapp/rfq` |
+| Create/refresh templates for the RFQ number | `POST` | `/api/v1/organization/whatsapp/rfq/templates/sync` |
+| Read an RFQ chat (marks it read) | `GET` | `/api/v1/inbox/conversations/:id` |
+| Reply in an RFQ chat | `POST` | `/api/v1/inbox/conversations/:id/messages` |
+| Create or refresh the RFQ for a chat | `POST` | `/api/v1/inbox/conversations/:id/rfq` |
+| Send a quote (email or WhatsApp, by RFQ source) | `POST` | `/api/v1/rfq/:id/send-quote` |
 
 With `API_ORIGIN=https://api.example.com` the callback URL to paste into Meta is
 `https://api.example.com/api/v1/whatsapp/webhook`.
 
 ## Connection models
 
-Each organization stores one `WhatsAppAccount` (`backend/src/models/whatsapp-account.model.ts`)
-with its phone number id and an encrypted permanent access token. Two ways to
-own the Meta app that the number sits under are supported:
+Each organization stores one `WhatsAppAccount` per purpose (`primary`, `rfq`;
+unique on `organizationId + purpose`) in `backend/src/models/whatsapp-account.model.ts`,
+with its phone number id and an encrypted permanent access token. A phone
+number id can only be connected once across the platform. Two ways to own the
+Meta app that a number sits under are supported:
 
 1. **Org brings its own Meta app** (default, zero platform config). The org
    creates a Meta app, adds the WhatsApp product, generates a System User token,
@@ -157,16 +173,105 @@ credentials; existing tickets remain.
 - **Notifications.** Owners/admins get a `support.new_chat` notification titled
   "New WhatsApp conversation" for each new ticket.
 
+## RFQ number
+
+### Setup
+
+1. Register a **second phone number** in Meta (it can sit in the same WABA and
+   Meta app as the support number, or a different one).
+2. Settings → **Integrations** → **WhatsApp for RFQs** (owners/admins; shown
+   when the org has Quotations). Connect it exactly like the support number.
+   If the number sits under the same Meta app, the existing webhook already
+   covers it; otherwise paste this card's Callback URL and Verify token into
+   that app. Events for both numbers arrive at the same endpoint and are
+   routed by `metadata.phone_number_id`.
+3. Pick the **RFQ owner**. It defaults to whoever connected the number. Every
+   chat on this number, and every RFQ it produces, belongs to the owner and
+   shows up in their Inbox and RFQ list. Changing the owner moves existing
+   chats, WhatsApp RFQs and their quotes to the new owner.
+4. Click **Create & Sync Templates** on this card too. The RFQ number uses
+   `inboundr_quotation` (see the template table below); templates belong to
+   the WABA, so a shared WABA only creates each template once.
+
+### How chats become RFQs
+
+```
+Customer ──▶ RFQ number ──▶ webhook ──▶ account.purpose === "rfq"
+                                          │
+          dedupe by wamid ▶ InboxConversation (one per customer number)
+                                          │
+        mirror media to S3 ▶ InboxMessage ▶ rfqDueAt = now + 60s
+                                          │
+     sweeper (every 15s) claims due chats ▶ open RFQ? ─ yes ▶ re-extract whole chat
+                                          │ no
+                       classify latest messages (+24h context) ▶ RFQ? ▶ create RFQ (source "whatsapp")
+```
+
+- **Storage.** Chats are `InboxConversation` / `InboxMessage` documents
+  (channel `whatsapp`), separate from support tickets. Media is stored under
+  `inbox/{org}/{conversation}/inbound/`; quote PDFs under `.../outbound/`.
+- **Quiet period.** Customers usually send a request as several messages
+  (text, a photo, a PDF). Each new message pushes processing back 60 seconds,
+  so the whole burst is read once.
+- **Open RFQ.** While the chat's RFQ is open, new messages re-extract the RFQ
+  from the full chat since it started, so "also add 10 of X" updates the same
+  RFQ. The RFQ closes when the quote is sent, it is marked processed, it is
+  archived, or the customer has been quiet for 7 days. After that, a new
+  request starts a new RFQ.
+- **Classification.** With no open RFQ, the new messages are classified with
+  up to 24 hours of earlier messages as context. Small talk ("thanks",
+  "ok") does not create an RFQ; the reason is shown on the chat in the Inbox.
+- **Attachments.** PDFs, spreadsheets and images are read like email
+  attachments, and the extracted text is cached on the message. Voice notes
+  are stored and playable but not transcribed.
+- **Customers.** Matched by email if the customer gives one, otherwise by the
+  trailing 10 digits of the phone number (only when exactly one customer
+  matches). A new CRM customer is only created when the chat includes an
+  email address.
+- **Manual override.** In the Inbox, **Create RFQ** turns the customer's
+  recent messages into an RFQ even if the classifier said no, and
+  **Reprocess** re-reads the chat for an open RFQ.
+- **Paused number.** With **Create RFQs** switched off (or Quotations not on
+  the plan), chats are still stored and shown in the Inbox, but no RFQs are
+  created.
+
+### Inbox and replies
+
+The Inbox lists WhatsApp chats alongside email with a **WhatsApp** label and a
+channel filter (shown once an RFQ number is connected). Opening a chat sends a
+read receipt for the latest customer message. Team members can reply with
+text while the 24-hour window is open; after it closes the composer explains
+that WhatsApp only allows replies once the customer writes again.
+
+### Sending the quote
+
+On a WhatsApp RFQ, **Send on WhatsApp** renders the quote PDF and sends it to
+the chat:
+
+- **Within 24 hours** of the customer's last message: the short message is
+  sent as the PDF's caption (or as a text followed by the PDF when it is
+  longer than 1,024 characters).
+- **After 24 hours:** the `inboundr_quotation` template is used, with the PDF
+  in the header. It must be **Approved** for the send to succeed.
+
+The send is recorded as an `RFQReply` with `channel: "whatsapp"` and the
+`whatsappMessageId`; a later `failed` status webhook marks the quote as failed
+with Meta's reason.
+
 ## Templates, invoices and reminders
 
 WhatsApp only lets a business start a conversation (or write after the 24-hour
 window) with a **message template** that Meta has reviewed. Inboundr manages
-two UTILITY templates, both with a document header carrying the invoice PDF:
+these UTILITY templates, each with a document header carrying the PDF:
 
-| Template | Used by | Body variables |
-| --- | --- | --- |
-| `inboundr_invoice` | Invoice → **WhatsApp** button, AI chat `sendInvoice` with `channel: "whatsapp"` | name, invoice no., org, amount due, due date |
-| `inboundr_payment_reminder` | Hourly payment-reminder cron when the `whatsapp` channel is enabled | name, invoice no., org, "due today / N days past due", amount due, due date |
+| Template | Numbers | Used by | Body variables |
+| --- | --- | --- | --- |
+| `inboundr_invoice` | Support, RFQ | Invoice → **WhatsApp** button, AI chat `sendInvoice` with `channel: "whatsapp"` | name, invoice no., org, amount due, due date |
+| `inboundr_payment_reminder` | Support, RFQ | Hourly payment-reminder cron when the `whatsapp` channel is enabled | name, invoice no., org, "due today / N days past due", amount due, due date |
+| `inboundr_quotation` | RFQ | **Send on WhatsApp** on an RFQ when the 24-hour window has closed | name, quote reference, org |
+
+Invoices and reminders are sent from the support number, falling back to the
+RFQ number when it is the only one connected.
 
 Definitions live in `backend/src/services/whatsapp-template.service.ts`
 (`WHATSAPP_TEMPLATE_CATALOG`). Changing body text requires creating a new
@@ -221,6 +326,8 @@ Organizations saved before channels existed behave as email-only.
 - [ ] Callback URL + verify token saved in Meta; `messages` field subscribed.
 - [ ] Test message creates a `whatsapp` ticket; bot reply arrives on the phone.
 - [ ] Agent reply from the inbox arrives on the phone and shows **Delivered**.
+- [ ] (RFQ number) A product request sent to the RFQ number appears in the owner's Inbox and becomes an RFQ about a minute later.
+- [ ] (RFQ number) **Send on WhatsApp** delivers the quote PDF; `inboundr_quotation` is **Approved** for sends after 24 hours.
 
 ## Troubleshooting
 
@@ -239,6 +346,10 @@ Organizations saved before channels existed behave as email-only.
 | Invoice **WhatsApp** button returns "template is not approved yet" | Wait for Meta's review (minutes to hours) and refresh status; sends are blocked until **Approved**. |
 | Invoice **WhatsApp** button returns "not a valid mobile number" | `customerSnapshot.contactNumber` is a landline, has extra digits, or a non-Indian number without a `+country` prefix. Fix the customer's contact number. |
 | Reminder cron logs "WhatsApp payment reminders skipped" | Account disconnected/paused or `inboundr_payment_reminder` not approved; email reminders still go out if enabled. |
+| RFQ number chats show in the Inbox but no RFQ is created | **Create RFQs** is off, the org lacks Quotations, or the classifier decided the messages were not a request (the reason shows on the chat). Use **Create RFQ** to override. |
+| RFQ number messages open support tickets instead | The number is connected on the **WhatsApp Business** (support) card. Disconnect it there and connect it under **WhatsApp for RFQs**. |
+| RFQ chats are missing from everyone's Inbox | Chats belong to the RFQ owner. If the owner left the organization, pick a new owner on the RFQ card; existing chats and RFQs move with it. |
+| **Send on WhatsApp** fails with "WhatsApp needs the approved "inboundr_quotation" template" | The customer's 24-hour window closed and `inboundr_quotation` is not **Approved** yet. Sync templates on the RFQ card and wait for Meta's review, or ask the customer to message first. |
 
 ## Local testing
 

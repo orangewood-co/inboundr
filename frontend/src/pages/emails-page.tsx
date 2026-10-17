@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import * as XLSX from "xlsx"
 import { AppLayout } from "@/components/app-layout"
@@ -36,9 +36,13 @@ import {
   ReplyAllIcon,
   ForwardIcon,
   SearchIcon,
+  LayersIcon,
+  MailIcon,
 } from "lucide-react"
 
 import { ReplyComposer } from "@/components/email/reply-composer"
+import { WhatsAppConversationPanel } from "@/components/inbox/whatsapp-conversation-panel"
+import { WhatsAppIcon } from "@/components/support/channel"
 import { ThreadStack } from "@/components/email/thread-stack"
 import {
   createDraft,
@@ -60,15 +64,21 @@ const SEARCH_DEBOUNCE_MS = 300
 export const EMAIL_LIST_FILTERS = ["rfq", "not_rfq", "pending", "failed"] as const
 export type EmailListFilter = (typeof EMAIL_LIST_FILTERS)[number]
 
+/** Channel filters the list endpoint understands; absent means every channel. */
+export const INBOX_CHANNEL_FILTERS = ["email", "whatsapp"] as const
+export type InboxChannelFilter = (typeof INBOX_CHANNEL_FILTERS)[number]
+
 type InboxChip = "all" | "rfq" | "failed"
 
 interface InboxListParams {
   q?: string
   filter?: EmailListFilter
+  channel?: InboxChannelFilter
 }
 
 interface EmailSummary {
   _id: string
+  channel?: "email"
   messageId: string
   threadId: string
   gmailAccountEmail: string | null
@@ -96,13 +106,34 @@ interface EmailDetail extends EmailSummary {
   bodyHtml: string | null
 }
 
+/** A WhatsApp chat on the RFQ number, listed alongside emails. */
+interface WhatsAppConversationSummary {
+  _id: string
+  channel: "whatsapp"
+  from: string
+  participantName: string | null
+  phoneNumber: string
+  snippet: string | null
+  date: string
+  status: "processing" | "processed" | "failed"
+  hasAttachments: boolean
+  threadCount: number
+  rfqId: string | null
+  isRFQ: boolean | null
+  classificationReason: string | null
+  rfqErrorMessage: string | null
+}
+
+type InboxRow = EmailSummary | WhatsAppConversationSummary
+
 interface ListResponse {
-  emails: EmailSummary[]
+  emails: InboxRow[]
   total: number
   rfqCount: number
   page: number
   limit: number
   totalPages: number
+  hasWhatsApp?: boolean
 }
 
 const EMAIL_VIEWER_STYLE = `
@@ -384,8 +415,13 @@ function StatusBadge({ status }: { status: EmailSummary["status"] }) {
   )
 }
 
-function ClassificationBadge({ email }: { email: EmailSummary }) {
+function ClassificationBadge({ email }: { email: InboxRow }) {
   const reason = email.classificationReason
+
+  // A chat nobody has scheduled for RFQ processing (e.g. while the RFQ number is paused) is not pending.
+  if (email.channel === "whatsapp" && email.isRFQ == null && email.status === "processed") {
+    return null
+  }
 
   if (email.status === "failed" || email.rfqErrorMessage) {
     return (
@@ -681,7 +717,7 @@ function EmptyState({ filtered, onClear }: { filtered: boolean; onClear: () => v
       </div>
       <div className="space-y-1.5">
         <p className="font-heading text-[13px] font-semibold text-muted-foreground">
-          {filtered ? "No Emails Match" : "No Emails Yet"}
+          {filtered ? "No Conversations Match" : "No Emails Yet"}
         </p>
         <p className="text-[11px] text-muted-foreground/60">
           {filtered
@@ -757,6 +793,63 @@ function InboxChips({
   )
 }
 
+const CHANNEL_OPTIONS: {
+  value: InboxChannelFilter | undefined
+  label: string
+  icon: ComponentType<{ className?: string }>
+}[] = [
+  { value: undefined, label: "All channels", icon: LayersIcon },
+  { value: "email", label: "Email only", icon: MailIcon },
+  { value: "whatsapp", label: "WhatsApp only", icon: WhatsAppIcon },
+]
+
+function ChannelFilter({
+  active,
+  onChange,
+}: {
+  active: InboxChannelFilter | undefined
+  onChange: (channel: InboxChannelFilter | undefined) => void
+}) {
+  return (
+    <div role="radiogroup" aria-label="Filter by channel" className="flex shrink-0 items-center rounded-full bg-muted/60 p-0.5">
+      {CHANNEL_OPTIONS.map((option) => {
+        const isActive = option.value === active
+        const Icon = option.icon
+        return (
+          <Tooltip key={option.label}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                aria-label={option.label}
+                onClick={() => onChange(option.value)}
+                className={`flex size-6 items-center justify-center rounded-full transition-colors ${
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                } ${option.value === "whatsapp" && isActive ? "text-emerald-600 dark:text-emerald-400" : ""}`}
+              >
+                <Icon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{option.label}</TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </div>
+  )
+}
+
+function WhatsAppChannelBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+      <WhatsAppIcon className="size-3" />
+      WhatsApp
+    </span>
+  )
+}
+
 function ListSkeleton() {
   return (
     <div className="space-y-1 p-2">
@@ -816,17 +909,20 @@ export function EmailsPage() {
   const navigate = useNavigate()
   const {
     email: selectedEmailId,
+    conversation: selectedConversationId,
     q: listQuery,
     filter: listFilter,
+    channel: listChannel,
   } = useSearch({ from: "/emails" })
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "inboundr:layout:inbox",
     storage: localStorage,
   })
 
-  const [emails, setEmails] = useState<EmailSummary[]>([])
+  const [emails, setEmails] = useState<InboxRow[]>([])
   const [total, setTotal] = useState(0)
   const [chipCounts, setChipCounts] = useState<Partial<Record<InboxChip, number>>>({})
+  const [hasWhatsApp, setHasWhatsApp] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [listLoading, setListLoading] = useState(true)
@@ -840,7 +936,7 @@ export function EmailsPage() {
   // can tell its own writes apart from external navigation.
   const pushedQueryRef = useRef(listQuery ?? "")
   const activeChip = chipFromParams({ filter: listFilter })
-  const hasActiveFilters = Boolean(listQuery || listFilter)
+  const hasActiveFilters = Boolean(listQuery || listFilter || listChannel)
 
   const [selectedId, setSelectedId] = useState<string | null>(selectedEmailId ?? null)
   const [detail, setDetail] = useState<EmailDetail | null>(null)
@@ -869,6 +965,7 @@ export function EmailsPage() {
         const params = new URLSearchParams({ page: String(p), limit: "20" })
         if (listQuery) params.set("q", listQuery)
         if (listFilter) params.set("filter", listFilter)
+        if (listChannel) params.set("channel", listChannel)
         const res = await fetch(`${API_BASE}?${params}`, {
           credentials: "include",
         })
@@ -877,6 +974,7 @@ export function EmailsPage() {
         setEmails(data.emails)
         setTotal(data.total)
         setChipCounts({ rfq: data.rfqCount })
+        setHasWhatsApp(Boolean(data.hasWhatsApp))
         setPage(data.page)
         setTotalPages(data.totalPages)
       } catch (err: any) {
@@ -885,7 +983,7 @@ export function EmailsPage() {
         setListLoading(false)
       }
     },
-    [listQuery, listFilter]
+    [listQuery, listFilter, listChannel]
   )
 
   /** Merge into the URL so the list state survives refresh and is shareable. */
@@ -905,10 +1003,15 @@ export function EmailsPage() {
     [updateListParams]
   )
 
+  const setChannel = useCallback(
+    (channel: InboxChannelFilter | undefined) => updateListParams({ channel }),
+    [updateListParams]
+  )
+
   const clearFilters = useCallback(() => {
     setSearchInput("")
     pushedQueryRef.current = ""
-    updateListParams({ q: undefined, filter: undefined })
+    updateListParams({ q: undefined, filter: undefined, channel: undefined })
   }, [updateListParams])
 
   useEffect(() => {
@@ -953,11 +1056,32 @@ export function EmailsPage() {
       }
       void navigate({
         to: "/emails",
-        search: (prev) => ({ ...prev, email: id ?? undefined }),
+        search: (prev) => ({ ...prev, email: id ?? undefined, conversation: undefined }),
         replace: true,
       })
     },
     [navigate],
+  )
+
+  const selectConversation = useCallback(
+    (id: string | null) => {
+      setSelectedId(null)
+      setDetail(null)
+      void navigate({
+        to: "/emails",
+        search: (prev) => ({ ...prev, conversation: id ?? undefined, email: undefined }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const selectRow = useCallback(
+    (row: InboxRow) => {
+      if (row.channel === "whatsapp") selectConversation(row._id)
+      else selectEmail(row._id)
+    },
+    [selectConversation, selectEmail],
   )
 
   const openRFQ = useCallback(
@@ -1197,6 +1321,8 @@ export function EmailsPage() {
           setActiveDraftId(null)
         } else if (detail) {
           selectEmail(null)
+        } else if (selectedConversationId) {
+          selectConversation(null)
         }
         return
       }
@@ -1213,10 +1339,11 @@ export function EmailsPage() {
 
       if (e.key === "j" || e.key === "k") {
         e.preventDefault()
-        const currentIndex = emails.findIndex((em) => em._id === selectedId)
+        const activeId = selectedId ?? selectedConversationId
+        const currentIndex = emails.findIndex((em) => em._id === activeId)
         const next = e.key === "j" ? currentIndex + 1 : currentIndex - 1
         if (next >= 0 && next < emails.length) {
-          selectEmail(emails[next]._id)
+          selectRow(emails[next])
         }
       }
 
@@ -1247,7 +1374,7 @@ export function EmailsPage() {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [emails, selectedId, selectedAttachment, detail, page, selectEmail, startCompose, activeDraftId])
+  }, [emails, selectedId, selectedConversationId, selectedAttachment, detail, page, selectEmail, selectConversation, selectRow, startCompose, activeDraftId])
 
   const senderInitial = (from: string) => {
     const { name } = parseSender(from)
@@ -1321,7 +1448,10 @@ export function EmailsPage() {
                   </button>
                 )}
               </div>
-              <InboxChips active={activeChip} counts={chipCounts} onChange={setChip} />
+              <div className="flex items-center justify-between gap-2">
+                <InboxChips active={activeChip} counts={chipCounts} onChange={setChip} />
+                {(hasWhatsApp || listChannel) && <ChannelFilter active={listChannel} onChange={setChannel} />}
+              </div>
             </div>
 
             <div ref={listRef} className="flex-1 overflow-y-auto">
@@ -1339,6 +1469,74 @@ export function EmailsPage() {
                   aria-busy={listLoading}
                 >
                   {emails.map((email) => {
+                    if (email.channel === "whatsapp") {
+                      const isSelected = selectedConversationId === email._id
+                      const chatName = email.participantName || email.phoneNumber
+                      const colors = getAvatarColor(chatName)
+                      return (
+                        <div
+                          key={email._id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => selectConversation(email._id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault()
+                              selectConversation(email._id)
+                            }
+                          }}
+                          className={`group flex w-full cursor-pointer flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition-all duration-150 ${
+                            isSelected
+                              ? "surface-raised glow-primary"
+                              : "hover:bg-card/80 dark:hover:bg-card/60"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              <div
+                                className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold ${colors.bg} ${colors.text}`}
+                              >
+                                {chatName.replace(/^\+/, "").charAt(0).toUpperCase()}
+                              </div>
+                              <span className="truncate text-[13px] font-medium" title={email.phoneNumber}>
+                                {chatName}
+                              </span>
+                              {email.threadCount > 1 && (
+                                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
+                                  {email.threadCount}
+                                </span>
+                              )}
+                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                  {formatListTimestamp(email.date)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="left">{formatFullDateTime(email.date)}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-start justify-between gap-2 pl-[38px]">
+                            <p className="min-w-0 flex-1 truncate text-[13px] leading-snug text-foreground/80">
+                              {email.snippet || "(no messages)"}
+                            </p>
+                            {email.hasAttachments && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <PaperclipIcon className="mt-0.5 size-3 shrink-0 text-muted-foreground/40" />
+                                </TooltipTrigger>
+                                <TooltipContent side="left">Has attachments</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 pl-[38px]">
+                            <WhatsAppChannelBadge />
+                            <ClassificationBadge email={email} />
+                          </div>
+                        </div>
+                      )
+                    }
+
                     const { name, email: senderEmail } = parseSender(email.from)
                     const isSelected = selectedId === email._id
                     const colors = getAvatarColor(name)
@@ -1452,7 +1650,15 @@ export function EmailsPage() {
 
           {/* ── Email Detail Panel ── */}
           <ResizablePanel id="detail" defaultSize="72%" minSize="40%" className="hidden flex-col overflow-hidden md:flex">
-            {detailLoading ? (
+            {selectedConversationId ? (
+              <WhatsAppConversationPanel
+                key={selectedConversationId}
+                conversationId={selectedConversationId}
+                onClose={() => selectConversation(null)}
+                onOpenRFQ={openRFQ}
+                onChanged={() => void fetchList(page)}
+              />
+            ) : detailLoading ? (
               <DetailSkeleton />
             ) : !detail ? (
               <DetailPlaceholder />

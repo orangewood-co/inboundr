@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 import { WHATSAPP_SERVICE_WINDOW_MS } from "../config/whatsapp.config";
-import { Customer } from "../models/customer.model";
 import { Organization } from "../models/organization.model";
 import { OrganizationMember } from "../models/organization-member.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
@@ -11,7 +10,12 @@ import {
   type ITicketMessageAttachment,
   type TicketMessageDeliveryStatus,
 } from "../models/ticket-message.model";
-import { WhatsAppAccount, type IWhatsAppAccount } from "../models/whatsapp-account.model";
+import {
+  WhatsAppAccount,
+  type IWhatsAppAccount,
+  type WhatsAppAccountPurpose,
+} from "../models/whatsapp-account.model";
+import { findCustomerIdByPhone } from "./customer-lookup.service";
 import { hasEffectiveFeature } from "./entitlement.service";
 import { createNotificationForRecipient } from "./notification.service";
 import { createPresignedViewUrl, createUploadKey, putObjectBuffer } from "./storage.service";
@@ -36,66 +40,23 @@ import {
   toE164,
   whatsAppMediaKindForContentType,
 } from "./whatsapp.service";
+import {
+  deliveryErrorFromWebhook,
+  deliveryStatusFromWebhook,
+  fallbackFilename,
+  mediaOf,
+  shouldApplyDeliveryStatus,
+  textForMessage,
+  type WebhookMessage,
+  type WebhookMessagesValue,
+  type WebhookStatus,
+} from "./whatsapp-webhook";
 
 /**
  * A resolved/closed WhatsApp ticket is reopened (rather than a new ticket
  * created) when the customer writes again within this window.
  */
 const REOPEN_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-// ---------------------------------------------------------------------------
-// Webhook payload shapes (subset of Meta's `messages` field)
-// ---------------------------------------------------------------------------
-
-interface WebhookMedia {
-  id: string;
-  mime_type?: string;
-  sha256?: string;
-  caption?: string;
-  filename?: string;
-  voice?: boolean;
-}
-
-interface WebhookMessage {
-  id: string;
-  from: string;
-  timestamp: string;
-  type: string;
-  text?: { body: string };
-  image?: WebhookMedia;
-  video?: WebhookMedia;
-  audio?: WebhookMedia;
-  document?: WebhookMedia;
-  sticker?: WebhookMedia;
-  location?: { latitude: number; longitude: number; name?: string; address?: string };
-  contacts?: Array<{ name?: { formatted_name?: string }; phones?: Array<{ phone?: string }> }>;
-  button?: { text?: string; payload?: string };
-  interactive?: {
-    type?: string;
-    button_reply?: { id?: string; title?: string };
-    list_reply?: { id?: string; title?: string; description?: string };
-  };
-  reaction?: { message_id?: string; emoji?: string };
-  errors?: Array<{ code?: number; title?: string; message?: string }>;
-  context?: { from?: string; id?: string };
-}
-
-interface WebhookStatus {
-  id: string;
-  status: "sent" | "delivered" | "read" | "failed" | "deleted" | string;
-  timestamp: string;
-  recipient_id?: string;
-  errors?: Array<{ code?: number; title?: string; message?: string; error_data?: { details?: string } }>;
-}
-
-export interface WebhookMessagesValue {
-  messaging_product?: string;
-  metadata?: { display_phone_number?: string; phone_number_id?: string };
-  contacts?: Array<{ profile?: { name?: string }; wa_id?: string }>;
-  messages?: WebhookMessage[];
-  statuses?: WebhookStatus[];
-  errors?: Array<{ code?: number; title?: string; message?: string }>;
-}
 
 // ---------------------------------------------------------------------------
 // Account lookup
@@ -110,19 +71,20 @@ export async function findWhatsAppAccountByPhoneNumberId(
 }
 
 export async function findWhatsAppAccountForOrganization(
-  organizationId: mongoose.Types.ObjectId | string
+  organizationId: mongoose.Types.ObjectId | string,
+  purpose: WhatsAppAccountPurpose = "primary"
 ): Promise<IWhatsAppAccount | null> {
-  return WhatsAppAccount.findOne({ organizationId });
+  return WhatsAppAccount.findOne({ organizationId, purpose });
 }
 
-async function markAccountError(account: IWhatsAppAccount, message: string): Promise<void> {
+export async function markAccountError(account: IWhatsAppAccount, message: string): Promise<void> {
   await WhatsAppAccount.updateOne(
     { _id: account._id },
     { status: "error", errorMessage: message.slice(0, 500) }
   );
 }
 
-async function markAccountHealthy(
+export async function markAccountHealthy(
   account: IWhatsAppAccount,
   direction: "inbound" | "outbound"
 ): Promise<void> {
@@ -155,33 +117,6 @@ export function isWhatsAppServiceWindowOpen(
 // ---------------------------------------------------------------------------
 // Ticket threading
 // ---------------------------------------------------------------------------
-
-function digitsOf(value: string): string {
-  return String(value ?? "").replace(/[^0-9]/g, "");
-}
-
-/**
- * Matches a customer by phone. `Customer.contactNumber` is free text, so the
- * comparison is on the national significant number (trailing 10 digits),
- * mirroring the voice-support matcher.
- */
-async function findCustomerIdByPhone(
-  organizationId: mongoose.Types.ObjectId,
-  phoneNumber: string
-): Promise<mongoose.Types.ObjectId | null> {
-  const nsn = digitsOf(phoneNumber).slice(-10);
-  if (nsn.length < 7) return null;
-  const candidates = await Customer.find({
-    organizationId,
-    isArchived: { $ne: true },
-    contactNumber: { $regex: `${nsn}\\s*$` },
-  })
-    .select("_id contactNumber")
-    .limit(5)
-    .lean();
-  const exact = candidates.filter((customer) => digitsOf(customer.contactNumber ?? "").slice(-10) === nsn);
-  return exact.length === 1 && exact[0] ? exact[0]._id : null;
-}
 
 async function nextTicketNumber(organizationId: mongoose.Types.ObjectId): Promise<number> {
   const latest = await Ticket.findOne({ organizationId })
@@ -292,85 +227,8 @@ async function notifyOwnersAndAdmins(ticket: ITicket, preview: string): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Inbound: message normalization
+// Inbound: media
 // ---------------------------------------------------------------------------
-
-function mediaOf(message: WebhookMessage): WebhookMedia | null {
-  return message.image ?? message.video ?? message.audio ?? message.document ?? message.sticker ?? null;
-}
-
-function extensionForMime(mime: string): string {
-  const base = mime.toLowerCase().split(";")[0]!.trim();
-  const map: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "video/mp4": "mp4",
-    "video/3gpp": "3gp",
-    "audio/ogg": "ogg",
-    "audio/mpeg": "mp3",
-    "audio/mp4": "m4a",
-    "audio/aac": "aac",
-    "audio/amr": "amr",
-    "application/pdf": "pdf",
-  };
-  return map[base] ?? "bin";
-}
-
-function fallbackFilename(message: WebhookMessage, mime: string): string {
-  const stamp = new Date(Number(message.timestamp) * 1000 || Date.now())
-    .toISOString()
-    .replace(/[:.]/g, "-");
-  const label =
-    message.type === "audio" && message.audio?.voice
-      ? "voice-note"
-      : message.type === "sticker"
-        ? "sticker"
-        : message.type;
-  return `whatsapp-${label}-${stamp}.${extensionForMime(mime)}`;
-}
-
-/** Turns a non-text message into something an agent can read. */
-function textForMessage(message: WebhookMessage): string {
-  switch (message.type) {
-    case "text":
-      return message.text?.body ?? "";
-    case "image":
-    case "video":
-    case "document":
-      return mediaOf(message)?.caption ?? "";
-    case "audio":
-    case "sticker":
-      return "";
-    case "location": {
-      const loc = message.location;
-      if (!loc) return "";
-      const label = [loc.name, loc.address].filter(Boolean).join(", ");
-      const coords = `${loc.latitude},${loc.longitude}`;
-      return `📍 ${label ? `${label} — ` : ""}https://maps.google.com/?q=${coords}`;
-    }
-    case "contacts": {
-      const cards = (message.contacts ?? []).map((card) => {
-        const name = card.name?.formatted_name ?? "Contact";
-        const phones = (card.phones ?? []).map((phone) => phone.phone).filter(Boolean).join(", ");
-        return phones ? `${name}: ${phones}` : name;
-      });
-      return cards.length ? `Shared contact${cards.length > 1 ? "s" : ""}: ${cards.join("; ")}` : "";
-    }
-    case "button":
-      return message.button?.text ?? message.button?.payload ?? "";
-    case "interactive": {
-      const reply = message.interactive?.button_reply ?? message.interactive?.list_reply;
-      return reply?.title ?? "";
-    }
-    case "reaction":
-      return message.reaction?.emoji ? `Reacted ${message.reaction.emoji}` : "";
-    case "unsupported":
-      return "[Message type not supported by WhatsApp Business API]";
-    default:
-      return `[${message.type} message]`;
-  }
-}
 
 async function mirrorMediaToStorage(
   account: IWhatsAppAccount,
@@ -498,21 +356,6 @@ async function handleInboundMessage(
   }
 }
 
-function deliveryStatusFromWebhook(status: string): TicketMessageDeliveryStatus | null {
-  if (status === "sent" || status === "delivered" || status === "read" || status === "failed") {
-    return status;
-  }
-  return null;
-}
-
-const STATUS_RANK: Record<TicketMessageDeliveryStatus, number> = {
-  pending: 0,
-  sent: 1,
-  delivered: 2,
-  read: 3,
-  failed: 4,
-};
-
 async function handleStatusUpdate(
   account: IWhatsAppAccount,
   status: WebhookStatus
@@ -525,18 +368,10 @@ async function handleStatusUpdate(
     externalId: status.id,
   });
   if (!message) return;
-
-  // Statuses can arrive out of order (read before delivered); never regress.
-  const currentRank = message.deliveryStatus ? STATUS_RANK[message.deliveryStatus] : -1;
-  if (next !== "failed" && STATUS_RANK[next] <= currentRank) return;
+  if (!shouldApplyDeliveryStatus(message.deliveryStatus, next)) return;
 
   message.deliveryStatus = next;
-  if (next === "failed") {
-    const error = status.errors?.[0];
-    message.deliveryError = (error?.error_data?.details || error?.message || error?.title || "Delivery failed").slice(0, 1000);
-  } else {
-    message.deliveryError = null;
-  }
+  message.deliveryError = next === "failed" ? deliveryErrorFromWebhook(status) : null;
   await message.save();
   await broadcastMessageUpdated(message);
 

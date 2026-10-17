@@ -2,6 +2,15 @@ import mongoose, { Schema, type Document } from "mongoose";
 
 export type WhatsAppAccountStatus = "connected" | "error" | "disabled";
 
+/**
+ * `primary` serves support tickets, invoices and payment reminders. `rfq` is a
+ * dedicated sales number whose chats land in the Inbox and become RFQs; it
+ * never opens support tickets.
+ */
+export type WhatsAppAccountPurpose = "primary" | "rfq";
+
+export const WHATSAPP_ACCOUNT_PURPOSES: WhatsAppAccountPurpose[] = ["primary", "rfq"];
+
 /** Meta template review states, plus our own marker for "not created yet". */
 export type WhatsAppTemplateStatus =
   | "APPROVED"
@@ -25,11 +34,18 @@ export interface IWhatsAppAccountTemplate {
 
 /**
  * A WhatsApp Business phone number connected to an organization via the Meta
- * Cloud API. One number per organization for now. Inbound webhooks are routed
- * by `phoneNumberId`; outbound sends use the stored (encrypted) access token.
+ * Cloud API. An organization has at most one number per purpose. Inbound
+ * webhooks are routed by `phoneNumberId`; outbound sends use the stored
+ * (encrypted) access token.
  */
 export interface IWhatsAppAccount extends Document {
   organizationId: mongoose.Types.ObjectId;
+  purpose: WhatsAppAccountPurpose;
+  /**
+   * RFQ numbers only: the user whose Inbox and RFQ list new chats land in, the
+   * same way a Gmail account belongs to the person who connected it.
+   */
+  ownerUserId: string | null;
   /** Meta phone number id (`metadata.phone_number_id` on webhooks). */
   phoneNumberId: string;
   /** WhatsApp Business Account id; required for template management. */
@@ -90,8 +106,13 @@ const whatsAppAccountSchema = new Schema<IWhatsAppAccount>(
       type: Schema.Types.ObjectId,
       ref: "Organization",
       required: true,
-      unique: true,
     },
+    purpose: {
+      type: String,
+      enum: WHATSAPP_ACCOUNT_PURPOSES,
+      default: "primary",
+    },
+    ownerUserId: { type: String, default: null },
     phoneNumberId: { type: String, required: true, trim: true, unique: true },
     wabaId: { type: String, default: null, trim: true, index: true },
     appId: { type: String, default: null, trim: true },
@@ -117,6 +138,8 @@ const whatsAppAccountSchema = new Schema<IWhatsAppAccount>(
   },
   { timestamps: true }
 );
+
+whatsAppAccountSchema.index({ organizationId: 1, purpose: 1 }, { unique: true });
 
 export const WhatsAppAccount = mongoose.model<IWhatsAppAccount>(
   "WhatsAppAccount",

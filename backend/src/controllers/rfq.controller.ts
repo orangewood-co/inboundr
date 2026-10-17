@@ -25,6 +25,14 @@ import { resolveOrganizationPdfBranding } from "../services/organization-pdf-bra
 import { renderRFQQuotePdfBuffer, rfqQuotePdfFilename } from "../services/rfq-quote-pdf.service";
 import type { IRFQ } from "../models/rfq.model";
 import { emitDomainEvent } from "../events/domain-events";
+import { InboxConversation } from "../models/inbox-conversation.model";
+import {
+  InboxChannelError,
+  reprocessWhatsAppRFQ,
+  sendQuoteOnWhatsApp,
+} from "../services/whatsapp-rfq.service";
+
+const RFQ_CONVERSATION_FIELDS = "channel externalId participant lastMessageAt lastInboundAt";
 
 export const archiveRFQ = async (
   req: Request,
@@ -619,6 +627,7 @@ export const listRFQs = async (
     const [rfqs, total] = await Promise.all([
       RFQ.find(listFilter)
         .populate("emailId", "subject from date snippet status")
+        .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
         .sort(sortOptions[sort])
         .skip(skip)
         .limit(limit)
@@ -646,6 +655,7 @@ export const getRFQ = async (
       organizationId: organization._id,
     })
       .populate("emailId")
+      .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
       .lean();
 
     if (!rfq) {
@@ -676,6 +686,7 @@ export const listDraftRFQs = async (
       workflowStatus: "draft",
     })
       .populate("emailId", "subject from date snippet status")
+      .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
       .sort({ draftSavedAt: -1, updatedAt: -1 })
       .lean();
 
@@ -747,6 +758,7 @@ export const saveRFQDraft = async (
 
     const saved = await RFQ.findById(rfq._id)
       .populate("emailId", "subject from date snippet status")
+      .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
       .lean();
 
     if (!wasDraft) {
@@ -796,6 +808,7 @@ export const setRFQQuoteNumber = async (
       { returnDocument: "after" }
     )
       .populate("emailId", "subject from date snippet status")
+      .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
       .lean();
 
     if (!rfq) {
@@ -829,6 +842,7 @@ export const downloadRFQPdf = async (
       organizationId: organization._id,
     })
       .populate("emailId", "subject from date snippet status")
+      .populate("inboxConversationId", RFQ_CONVERSATION_FIELDS)
       .lean();
 
     if (!rfq) {
@@ -996,6 +1010,15 @@ export const retryRFQ = async (
       return;
     }
 
+    if (rfq.source === "whatsapp") {
+      await RFQ.updateOne({ _id: rfq._id }, { $set: { isProcessed: false, errorMessage: null } });
+      reprocessWhatsAppRFQ(rfq._id.toString()).catch((err) =>
+        console.error(`WhatsApp RFQ retry failed for ${rfq._id}:`, err)
+      );
+      res.json({ message: "RFQ reprocessing started" });
+      return;
+    }
+
     const email = await Email.findOne({
       _id: rfq.emailId,
       userId: authReq.user.id,
@@ -1044,6 +1067,33 @@ export const retryRFQ = async (
     res.status(500).json({ error: "Failed to retry RFQ" });
   }
 };
+
+/**
+ * WhatsApp quotes go out as a short chat message with the PDF attached; the
+ * PDF carries the line items, so there is no need for the long email body.
+ */
+function whatsAppQuoteMessage(input: {
+  customerName?: string | null;
+  organizationName: string;
+  contactName?: string | null;
+  itemCount: number;
+  paymentTerms?: string | null;
+  deliveryTerms?: string | null;
+}): { subject: string; body: string } {
+  const name = input.customerName?.trim();
+  const lines = [
+    name ? `Hello ${name},` : "Hello,",
+    "",
+    `Thank you for your enquiry. Please find our quotation for ${input.itemCount} item${input.itemCount === 1 ? "" : "s"} attached.`,
+  ];
+  if (input.paymentTerms?.trim() || input.deliveryTerms?.trim()) lines.push("");
+  if (input.paymentTerms?.trim()) lines.push(`Payment terms: ${input.paymentTerms.trim()}`);
+  if (input.deliveryTerms?.trim()) lines.push(`Delivery: ${input.deliveryTerms.trim()}`);
+  lines.push("", "Reply here if you have any questions or would like to place an order.");
+  const signature = [input.contactName?.trim(), input.organizationName].filter(Boolean).join("\n");
+  if (signature) lines.push("", signature);
+  return { subject: `Quotation from ${input.organizationName}`, body: lines.join("\n") };
+}
 
 export const generateQuote = async (
   req: Request,
@@ -1095,56 +1145,71 @@ export const generateQuote = async (
     const email = rfq.emailId as any;
     const originalSenderEmail = extractEmailAddress(email?.from);
     const customerEmail = extractEmailAddress(rfq.customer.email) || originalSenderEmail;
+    const conversation =
+      rfq.source === "whatsapp" && rfq.inboxConversationId
+        ? await InboxConversation.findById(rfq.inboxConversationId).select("externalId customerId").lean()
+        : null;
     const [savedCustomer, customerSettings] = await Promise.all([
       customerEmail
         ? Customer.findOne({
             email: customerEmail,
             organizationId: organization._id,
           }).lean()
-        : null,
+        : conversation?.customerId
+          ? Customer.findOne({ _id: conversation.customerId, organizationId: organization._id }).lean()
+          : null,
       getOrCreateCustomerSettings(organization._id),
     ]);
     const customerDiscountEnabled = isSpecialDiscountEnabled([
       ...customerSettings.fieldDefinitions,
     ]);
 
-    const { subject, body } = await generateQuoteReply({
-      customerName: savedCustomer?.name || rfq.customer.name,
-      customerCompany: savedCustomer?.company || rfq.customer.company,
-      customerEmail,
-      customerNotes: savedCustomer?.notes ?? null,
-      specialDiscountPercentage: customerDiscountEnabled
-        ? savedCustomer?.specialDiscountPercentage ?? null
-        : null,
-      organizationName: organization.name,
-      organizationContactName: organization.defaultContact?.name,
-      organizationContactEmail: organization.defaultContact?.email,
-      organizationContactPhone: organization.defaultContact?.phoneNumber,
-      currency: organization.preferences?.pricing || "INR",
-      quotePaymentTerms: paymentTerms.paymentTerms,
-      quoteDeliveryTerms: deliveryTerms.deliveryTerms,
-      originalSubject: email?.subject || "",
-      products: quotedProducts.map((p) => ({
-        queryName: p.queryName,
-        quantity: p.quantity,
-        brand: p.brand,
-        description: p.description,
-        code: p.code,
-        basePrice: p.basePrice,
-        price: p.price,
-        hsnCode: p.hsnCode,
-        gstRate: p.gstRate,
-        tax: p.tax ?? { code: p.hsnCode, rate: p.gstRate, label: "Tax" },
-        adjustments: p.adjustments ?? quoteAdjustments(
-          [],
-          p.quantity,
-          p.price,
-          p.calibrationCharges
-        ),
-        discountPercent: p.discountPercent ?? 0,
-        deliveryTimeline: p.deliveryTimeline,
-      })),
-    });
+    const { subject, body } = conversation
+      ? whatsAppQuoteMessage({
+          customerName: savedCustomer?.name || rfq.customer.name,
+          organizationName: organization.name,
+          contactName: organization.defaultContact?.name,
+          itemCount: quotedProducts.length,
+          paymentTerms: paymentTerms.paymentTerms,
+          deliveryTerms: deliveryTerms.deliveryTerms,
+        })
+      : await generateQuoteReply({
+          customerName: savedCustomer?.name || rfq.customer.name,
+          customerCompany: savedCustomer?.company || rfq.customer.company,
+          customerEmail,
+          customerNotes: savedCustomer?.notes ?? null,
+          specialDiscountPercentage: customerDiscountEnabled
+            ? savedCustomer?.specialDiscountPercentage ?? null
+            : null,
+          organizationName: organization.name,
+          organizationContactName: organization.defaultContact?.name,
+          organizationContactEmail: organization.defaultContact?.email,
+          organizationContactPhone: organization.defaultContact?.phoneNumber,
+          currency: organization.preferences?.pricing || "INR",
+          quotePaymentTerms: paymentTerms.paymentTerms,
+          quoteDeliveryTerms: deliveryTerms.deliveryTerms,
+          originalSubject: email?.subject || "",
+          products: quotedProducts.map((p) => ({
+            queryName: p.queryName,
+            quantity: p.quantity,
+            brand: p.brand,
+            description: p.description,
+            code: p.code,
+            basePrice: p.basePrice,
+            price: p.price,
+            hsnCode: p.hsnCode,
+            gstRate: p.gstRate,
+            tax: p.tax ?? { code: p.hsnCode, rate: p.gstRate, label: "Tax" },
+            adjustments: p.adjustments ?? quoteAdjustments(
+              [],
+              p.quantity,
+              p.price,
+              p.calibrationCharges
+            ),
+            discountPercent: p.discountPercent ?? 0,
+            deliveryTimeline: p.deliveryTimeline,
+          })),
+        });
 
     const wasDraft = rfq.workflowStatus === "draft";
 
@@ -1188,11 +1253,13 @@ export const generateQuote = async (
         deliveryTerms: deliveryTerms.deliveryTerms ?? "",
         subject,
         body,
-        to: originalSenderEmail || customerEmail,
+        to: conversation ? conversation.externalId : originalSenderEmail || customerEmail,
+        channel: conversation ? "whatsapp" : "email",
         generatedAt: new Date(),
         sendStatus: "draft",
         sentAt: null,
         gmailMessageId: null,
+        whatsappMessageId: null,
         sendErrorMessage: null,
       },
       { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
@@ -1238,6 +1305,98 @@ export const getQuoteReply = async (
   }
 };
 
+async function sendQuoteReplyOnWhatsApp(
+  res: Response,
+  rfq: IRFQ,
+  organization: OrganizationRequest["organization"],
+  userId: string
+): Promise<void> {
+  const [conversation, reply] = await Promise.all([
+    rfq.inboxConversationId
+      ? InboxConversation.findOne({ _id: rfq.inboxConversationId, organizationId: organization._id })
+      : null,
+    RFQReply.findOne({ rfqId: rfq._id, userId, organizationId: organization._id }),
+  ]);
+  if (!conversation) {
+    res.status(404).json({ error: "The WhatsApp chat for this RFQ no longer exists" });
+    return;
+  }
+  if (!reply) {
+    res.status(404).json({ error: "Generate a quote before sending" });
+    return;
+  }
+  if (reply.sendStatus === "sent") {
+    res.json(reply);
+    return;
+  }
+
+  const paymentTerms = reply.paymentTerms || rfq.paymentTerms;
+  if (!paymentTerms?.trim()) {
+    res.status(400).json({ error: "Payment terms are required to send a quote" });
+    return;
+  }
+  const deliveryTerms = reply.deliveryTerms || rfq.deliveryTerms;
+  if (!deliveryTerms?.trim()) {
+    res.status(400).json({ error: "Delivery terms are required to send a quote" });
+    return;
+  }
+
+  await RFQReply.updateOne({ _id: reply._id }, { sendStatus: "sending", sendErrorMessage: null });
+
+  try {
+    const quotePdf = await renderRFQQuotePdfBuffer({
+      rfq: rfq as any,
+      reply: reply as any,
+      organization: await resolveOrganizationPdfBranding(organization),
+      paymentTerms,
+      deliveryTerms,
+      currency: organization.preferences?.pricing || "INR",
+    });
+    const whatsappMessageId = await sendQuoteOnWhatsApp({
+      conversation,
+      rfqId: rfq._id as any,
+      pdf: quotePdf,
+      filename: rfqQuotePdfFilename(rfq as any),
+      body: reply.body,
+      quoteReference: rfq.quoteNumber || String(rfq._id),
+      customerName: rfq.customer?.name || conversation.participant.name || "",
+      organizationName: organization.name,
+      authorUserId: userId,
+    });
+
+    const sentReply = await RFQReply.findOneAndUpdate(
+      { _id: reply._id },
+      {
+        sendStatus: "sent",
+        sentAt: new Date(),
+        channel: "whatsapp",
+        whatsappMessageId,
+        sendErrorMessage: null,
+      },
+      { returnDocument: "after" }
+    ).lean();
+
+    void emitDomainEvent("rfq.quote_sent", {
+      rfqId: String(rfq._id),
+      organizationId: String(organization._id),
+      userId,
+    });
+
+    res.json(sentReply);
+  } catch (err: any) {
+    if (!(err instanceof InboxChannelError)) console.error("Error sending WhatsApp quote:", err);
+    const failedReply = await RFQReply.findOneAndUpdate(
+      { _id: reply._id },
+      { sendStatus: "failed", sendErrorMessage: err.message || "Failed to send quote" },
+      { returnDocument: "after" }
+    ).lean();
+    res.status(err instanceof InboxChannelError ? err.status : 500).json({
+      error: err.message || "Failed to send quote",
+      reply: failedReply,
+    });
+  }
+}
+
 export const sendQuoteReply = async (
   req: Request,
   res: Response
@@ -1253,6 +1412,11 @@ export const sendQuoteReply = async (
     }).lean();
     if (!rfq) {
       res.status(404).json({ error: "RFQ not found" });
+      return;
+    }
+
+    if (rfq.source === "whatsapp") {
+      await sendQuoteReplyOnWhatsApp(res, rfq, organization, authReq.user.id);
       return;
     }
 

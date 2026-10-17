@@ -93,13 +93,17 @@ export interface IRFQManualInput {
   attachments: IRFQManualAttachment[];
 }
 
+export type RFQSource = "email" | "manual" | "whatsapp";
+
 export interface IRFQ extends Document {
   userId: string;
   organizationId: Types.ObjectId;
-  source: "email" | "manual";
+  source: RFQSource;
   gmailAccountId: Types.ObjectId | null;
   emailId: Types.ObjectId | null;
   manualInput: IRFQManualInput | null;
+  inboxConversationId: Types.ObjectId | null;
+  conversationStartedAt: Date | null;
   threadId: string | null;
   latestEmailId: Types.ObjectId | null;
   isRFQ: boolean;
@@ -232,10 +236,11 @@ const rfqSchema = new Schema<IRFQ>(
       index: true,
     },
     // "email" RFQs come from a linked Gmail account; "manual" RFQs are created
-    // from pasted text or uploaded files and have no source email or account.
+    // from pasted text or uploaded files and have no source email or account;
+    // "whatsapp" RFQs come from a chat on the organization's RFQ number.
     source: {
       type: String,
-      enum: ["email", "manual"],
+      enum: ["email", "manual", "whatsapp"],
       default: "email",
     },
     gmailAccountId: {
@@ -271,6 +276,15 @@ const rfqSchema = new Schema<IRFQ>(
       },
       default: null,
     },
+    inboxConversationId: {
+      type: Schema.Types.ObjectId,
+      ref: "InboxConversation",
+      default: null,
+      index: true,
+    },
+    // A WhatsApp chat holds many requests over time; this RFQ covers the
+    // messages from this point on, so re-extraction reads only those.
+    conversationStartedAt: { type: Date, default: null },
     // Gmail conversation id of the source email, so replies on the same
     // thread can find and update this RFQ instead of spawning a new one.
     threadId: { type: String, default: null },

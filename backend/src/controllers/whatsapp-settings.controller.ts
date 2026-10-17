@@ -1,15 +1,24 @@
 import crypto from "node:crypto";
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
+import type mongoose from "mongoose";
 
 import { apiOrigin } from "../config/origins.config";
 import { getWhatsAppPlatformConfig } from "../config/whatsapp.config";
 import { decryptSecret, encryptSecret } from "../lib/crypto";
 import type { OrganizationRequest } from "../middleware/auth.middleware";
-import { WhatsAppAccount, type IWhatsAppAccount } from "../models/whatsapp-account.model";
+import { InboxConversation } from "../models/inbox-conversation.model";
+import { OrganizationMember } from "../models/organization-member.model";
+import { RFQ } from "../models/rfq.model";
+import { RFQReply } from "../models/rfq-reply.model";
 import {
-  WHATSAPP_TEMPLATE_CATALOG,
+  WhatsAppAccount,
+  type IWhatsAppAccount,
+  type WhatsAppAccountPurpose,
+} from "../models/whatsapp-account.model";
+import {
   WHATSAPP_TEMPLATE_LANGUAGE,
   syncWhatsAppTemplates,
+  templateCatalogFor,
 } from "../services/whatsapp-template.service";
 import {
   WhatsAppApiError,
@@ -17,15 +26,27 @@ import {
   subscribeWhatsAppWebhooks,
 } from "../services/whatsapp.service";
 
+/** Routes the same handlers at the support number ("/") or the RFQ number ("/rfq"). */
+export function forWhatsAppPurpose(purpose: WhatsAppAccountPurpose) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    res.locals.whatsAppPurpose = purpose;
+    next();
+  };
+}
+
+function purposeOf(res: Response): WhatsAppAccountPurpose {
+  return res.locals.whatsAppPurpose === "rfq" ? "rfq" : "primary";
+}
+
 function webhookUrl(): string {
   return `${apiOrigin}/api/v1/whatsapp/webhook`;
 }
 
-function serializeTemplates(account: IWhatsAppAccount | any) {
+function serializeTemplates(account: IWhatsAppAccount | any, purpose: WhatsAppAccountPurpose) {
   const stored = new Map<string, any>(
     (account.templates ?? []).map((template: any) => [template.name, template])
   );
-  return WHATSAPP_TEMPLATE_CATALOG.map((catalog) => {
+  return templateCatalogFor(purpose).map((catalog) => {
     const template = stored.get(catalog.name);
     return {
       key: catalog.key,
@@ -39,11 +60,12 @@ function serializeTemplates(account: IWhatsAppAccount | any) {
   });
 }
 
-function serializeAccount(account: IWhatsAppAccount | any | null) {
+function serializeAccount(account: IWhatsAppAccount | any | null, purpose: WhatsAppAccountPurpose) {
   const platform = getWhatsAppPlatformConfig();
   if (!account) {
     return {
       account: null,
+      purpose,
       webhookUrl: webhookUrl(),
       // Before connecting, the org can only use the platform token (if any);
       // a per-account token is generated on connect.
@@ -66,10 +88,12 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
       hasAppSecret: Boolean(account.appSecret),
       lastInboundAt: account.lastInboundAt ?? null,
       lastOutboundAt: account.lastOutboundAt ?? null,
-      templates: serializeTemplates(account),
+      ownerUserId: purpose === "rfq" ? account.ownerUserId ?? account.createdBy ?? null : null,
+      templates: serializeTemplates(account, purpose),
       templatesSyncedAt: account.templatesSyncedAt ?? null,
       updatedAt: account.updatedAt ?? null,
     },
+    purpose,
     webhookUrl: webhookUrl(),
     verifyToken: account.verifyToken,
     platformAppSecretConfigured: Boolean(platform.appSecret),
@@ -80,8 +104,9 @@ function serializeAccount(account: IWhatsAppAccount | any | null) {
 export async function getWhatsAppSettings(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
-    const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id }).lean();
-    res.json(serializeAccount(account));
+    const purpose = purposeOf(res);
+    const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id, purpose }).lean();
+    res.json(serializeAccount(account, purpose));
   } catch (err) {
     console.error("Failed to load WhatsApp settings:", err);
     res.status(500).json({ error: "Failed to load WhatsApp settings" });
@@ -89,14 +114,30 @@ export async function getWhatsAppSettings(req: Request, res: Response): Promise<
 }
 
 /**
- * Connects or updates the organization's WhatsApp number. The token is
+ * Everything that arrives on the RFQ number belongs to its owner, so a new
+ * owner takes over the existing chats, their RFQs and drafted quotes too.
+ */
+async function transferRfqNumberOwnership(
+  organizationId: mongoose.Types.ObjectId,
+  userId: string
+): Promise<void> {
+  await InboxConversation.updateMany({ organizationId, channel: "whatsapp" }, { $set: { userId } });
+  const rfqIds = await RFQ.find({ organizationId, source: "whatsapp" }).distinct("_id");
+  if (rfqIds.length === 0) return;
+  await RFQ.updateMany({ _id: { $in: rfqIds } }, { $set: { userId } });
+  await RFQReply.updateMany({ rfqId: { $in: rfqIds } }, { $set: { userId } });
+}
+
+/**
+ * Connects or updates one of the organization's WhatsApp numbers. The token is
  * validated against Meta before anything is stored so a typo surfaces
  * immediately rather than on the first customer message.
  */
 export async function updateWhatsAppSettings(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
-    const existing = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id });
+    const purpose = purposeOf(res);
+    const existing = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id, purpose });
 
     const phoneNumberId = String(req.body?.phoneNumberId ?? existing?.phoneNumberId ?? "").trim();
     const wabaId = req.body?.wabaId !== undefined
@@ -122,14 +163,35 @@ export async function updateWhatsAppSettings(req: Request, res: Response): Promi
       return;
     }
 
+    let ownerUserId: string | null = null;
+    if (purpose === "rfq") {
+      ownerUserId =
+        String(req.body?.ownerUserId ?? "").trim() || existing?.ownerUserId || existing?.createdBy || orgReq.user.id;
+      const isMember = await OrganizationMember.exists({
+        organizationId: orgReq.organization._id,
+        userId: ownerUserId,
+      });
+      if (!isMember) {
+        res.status(400).json({ error: "The RFQ owner must be a member of this organization" });
+        return;
+      }
+    }
+
     const conflict = await WhatsAppAccount.findOne({
       phoneNumberId,
-      organizationId: { $ne: orgReq.organization._id },
+      ...(existing ? { _id: { $ne: existing._id } } : {}),
     })
-      .select("_id")
+      .select("organizationId purpose")
       .lean();
     if (conflict) {
-      res.status(409).json({ error: "This WhatsApp number is already connected to another organization" });
+      const sameOrganization = String(conflict.organizationId) === String(orgReq.organization._id);
+      res.status(409).json({
+        error: sameOrganization
+          ? conflict.purpose === "rfq"
+            ? "This number is already connected as your RFQ number. Use a different number for support."
+            : "This number is already connected as your support number. RFQs need their own number."
+          : "This WhatsApp number is already connected to another organization",
+      });
       return;
     }
 
@@ -167,7 +229,9 @@ export async function updateWhatsAppSettings(req: Request, res: Response): Promi
     };
     if (newAccessToken) update.accessToken = encryptSecret(newAccessToken);
     if (newAppSecret !== null) update.appSecret = newAppSecret ? encryptSecret(newAppSecret) : null;
+    if (purpose === "rfq") update.ownerUserId = ownerUserId;
 
+    const previousOwner = existing ? existing.ownerUserId || existing.createdBy : null;
     let account: IWhatsAppAccount;
     if (existing) {
       account = (await WhatsAppAccount.findByIdAndUpdate(existing._id, update, {
@@ -177,10 +241,15 @@ export async function updateWhatsAppSettings(req: Request, res: Response): Promi
       account = await WhatsAppAccount.create({
         ...update,
         organizationId: orgReq.organization._id,
+        purpose,
         verifyToken: crypto.randomBytes(18).toString("base64url"),
         createdBy: orgReq.user.id,
         createdAt: now,
       });
+    }
+
+    if (purpose === "rfq" && ownerUserId && ownerUserId !== previousOwner) {
+      await transferRfqNumberOwnership(orgReq.organization._id, ownerUserId);
     }
 
     // Best effort: pick up template status (and create missing ones) whenever
@@ -193,7 +262,7 @@ export async function updateWhatsAppSettings(req: Request, res: Response): Promi
       }
     }
 
-    res.json(serializeAccount(account));
+    res.json(serializeAccount(account, purpose));
   } catch (err) {
     console.error("Failed to update WhatsApp settings:", err);
     res.status(500).json({ error: "Failed to save WhatsApp settings" });
@@ -204,7 +273,8 @@ export async function updateWhatsAppSettings(req: Request, res: Response): Promi
 export async function syncWhatsAppTemplatesForOrganization(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
-    const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id });
+    const purpose = purposeOf(res);
+    const account = await WhatsAppAccount.findOne({ organizationId: orgReq.organization._id, purpose });
     if (!account) {
       res.status(404).json({ error: "WhatsApp is not connected" });
       return;
@@ -229,7 +299,7 @@ export async function syncWhatsAppTemplatesForOrganization(req: Request, res: Re
     }
 
     res.json({
-      ...serializeAccount(account),
+      ...serializeAccount(account, purpose),
       sync: { created: result.created, errors: result.errors },
     });
   } catch (err) {
@@ -241,8 +311,9 @@ export async function syncWhatsAppTemplatesForOrganization(req: Request, res: Re
 export async function disconnectWhatsApp(req: Request, res: Response): Promise<void> {
   try {
     const orgReq = req as OrganizationRequest;
-    await WhatsAppAccount.deleteOne({ organizationId: orgReq.organization._id });
-    res.json(serializeAccount(null));
+    const purpose = purposeOf(res);
+    await WhatsAppAccount.deleteOne({ organizationId: orgReq.organization._id, purpose });
+    res.json(serializeAccount(null, purpose));
   } catch (err) {
     console.error("Failed to disconnect WhatsApp:", err);
     res.status(500).json({ error: "Failed to disconnect WhatsApp" });

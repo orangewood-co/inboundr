@@ -15,13 +15,16 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { formatDateTime } from "@/lib/format"
 import {
-  WHATSAPP_SETTINGS_URL,
   invalidateWhatsAppSettings,
-  whatsAppSettingsQueryOptions,
+  organizationMembersQueryOptions,
+  whatsAppSettingsQueryOptionsFor,
+  whatsAppSettingsUrl,
+  type WhatsAppNumberPurpose,
 } from "@/lib/queries"
 import { queryClient } from "@/lib/query-client"
 import { copyToClipboard } from "@/lib/utils"
@@ -61,6 +64,7 @@ type WhatsAppAccount = {
   hasAppSecret: boolean
   lastInboundAt: string | null
   lastOutboundAt: string | null
+  ownerUserId: string | null
   updatedAt: string | null
 }
 
@@ -73,8 +77,58 @@ type WhatsAppSettingsResponse = {
   sync?: { created: string[]; errors: Array<{ name: string; message: string }> }
 }
 
-const SETTINGS_URL = WHATSAPP_SETTINGS_URL
-const TEMPLATE_SYNC_URL = `${WHATSAPP_SETTINGS_URL}/templates/sync`
+type OrganizationMember = { userId: string; userName: string | null; userEmail: string | null }
+
+const COPY: Record<
+  WhatsAppNumberPurpose,
+  {
+    intro: string
+    wabaHint: string
+    templatesHint: string
+    connectLabel: string
+    connectedToast: string
+    pausedToast: string
+    resumedToast: string
+    disconnectTitle: string
+    disconnectDescription: string
+    disconnectedToast: string
+  }
+> = {
+  primary: {
+    intro:
+      "Connect a WhatsApp Business number through the Meta Cloud API. Customer messages open support conversations here, your AI agent can reply automatically, and your team answers from the same inbox as live chat and calls.",
+    wabaHint: "Needed to create and track the message templates used for invoices and payment reminders.",
+    templatesHint:
+      "WhatsApp only allows business-initiated messages (invoices, payment reminders) through templates approved by Meta. Inboundr creates these on your account; approval usually takes minutes to a few hours.",
+    connectLabel: "Connect WhatsApp",
+    connectedToast: "WhatsApp connected",
+    pausedToast: "WhatsApp inbox paused",
+    resumedToast: "WhatsApp inbox resumed",
+    disconnectTitle: "Disconnect WhatsApp",
+    disconnectDescription:
+      "New WhatsApp messages will no longer create conversations and agents will not be able to reply to existing WhatsApp tickets. Existing conversations stay in the inbox.",
+    disconnectedToast: "WhatsApp disconnected",
+  },
+  rfq: {
+    intro:
+      "Connect a separate WhatsApp Business number for quotation requests. Customer chats show up in the Inbox, requests become RFQs automatically, and quotes can be sent back on WhatsApp. Use a different number from your support number.",
+    wabaHint: "Needed to create the template used to send quotes when the customer last wrote more than 24 hours ago.",
+    templatesHint:
+      "WhatsApp only allows business-initiated messages (quotes sent after the 24-hour reply window, invoices, payment reminders) through templates approved by Meta. Inboundr creates these on your account; approval usually takes minutes to a few hours.",
+    connectLabel: "Connect RFQ Number",
+    connectedToast: "RFQ WhatsApp number connected",
+    pausedToast: "RFQ number paused. Chats are still recorded but no RFQs are created.",
+    resumedToast: "RFQ number resumed",
+    disconnectTitle: "Disconnect RFQ Number",
+    disconnectDescription:
+      "Messages to this number will no longer reach the Inbox or create RFQs, and quotes can no longer be sent on WhatsApp. Existing chats and RFQs stay.",
+    disconnectedToast: "RFQ WhatsApp number disconnected",
+  },
+}
+
+function memberLabel(member: OrganizationMember) {
+  return member.userName || member.userEmail || member.userId
+}
 
 const TEMPLATE_STATUS_META: Record<WhatsAppTemplateStatus, { label: string; className: string }> = {
   APPROVED: { label: "Approved", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
@@ -141,12 +195,25 @@ function StatusBadge({ account }: { account: WhatsAppAccount }) {
 }
 
 /**
- * Connects a Meta Cloud API number to the organization so inbound WhatsApp
- * messages become support tickets and invoices/reminders can be sent. Rendered
+ * Connects a Meta Cloud API number to the organization. The support number
+ * turns inbound messages into support tickets and sends invoices/reminders;
+ * the RFQ number feeds chats into the owner's Inbox and RFQ list. Rendered
  * inside the Settings → Integrations tab.
  */
-export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean }) {
-  const query = useQuery(whatsAppSettingsQueryOptions)
+export function WhatsAppSettingsCardContent({
+  canManage,
+  purpose = "primary",
+}: {
+  canManage: boolean
+  purpose?: WhatsAppNumberPurpose
+}) {
+  const settingsQueryOptions = whatsAppSettingsQueryOptionsFor(purpose)
+  const query = useQuery(settingsQueryOptions)
+  const membersQuery = useQuery({ ...organizationMembersQueryOptions, enabled: purpose === "rfq" })
+  const members = (membersQuery.data?.members ?? []) as OrganizationMember[]
+  const copy = COPY[purpose]
+  const SETTINGS_URL = whatsAppSettingsUrl(purpose)
+  const TEMPLATE_SYNC_URL = `${SETTINGS_URL}/templates/sync`
   const data = (query.data ?? null) as WhatsAppSettingsResponse | null
   const loading = query.isPending
   const [saving, setSaving] = useState(false)
@@ -165,7 +232,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
   const showForm = !account || editing
 
   function setData(next: WhatsAppSettingsResponse) {
-    queryClient.setQueryData(whatsAppSettingsQueryOptions.queryKey, next)
+    queryClient.setQueryData(settingsQueryOptions.queryKey, next)
   }
 
   function startEditing() {
@@ -233,13 +300,22 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
       ...(appSecret.trim() ? { appSecret: appSecret.trim() } : {}),
       enabled: account?.enabled ?? true,
     })
-    if (ok) toast.success(account ? "WhatsApp settings updated" : "WhatsApp connected")
+    if (ok) toast.success(account ? "WhatsApp settings updated" : copy.connectedToast)
   }
 
   async function toggleEnabled(enabled: boolean) {
     if (!account) return
     const ok = await save({ phoneNumberId: account.phoneNumberId, enabled })
-    if (ok) toast.success(enabled ? "WhatsApp inbox resumed" : "WhatsApp inbox paused")
+    if (ok) toast.success(enabled ? copy.resumedToast : copy.pausedToast)
+  }
+
+  async function changeOwner(ownerUserId: string) {
+    if (!account || ownerUserId === account.ownerUserId) return
+    const ok = await save({ phoneNumberId: account.phoneNumberId, ownerUserId })
+    if (ok) {
+      const member = members.find((candidate) => candidate.userId === ownerUserId)
+      toast.success(`WhatsApp chats and RFQs now go to ${member ? memberLabel(member) : "the new owner"}`)
+    }
   }
 
   async function disconnect() {
@@ -257,7 +333,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
       setEditing(false)
       void invalidateWhatsAppSettings()
       setConfirmDisconnect(false)
-      toast.success("WhatsApp disconnected")
+      toast.success(copy.disconnectedToast)
     } catch (err) {
       toast.error(errorMessage(err, "Failed to disconnect WhatsApp"))
     } finally {
@@ -314,11 +390,11 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Label htmlFor="whatsappEnabled" className="text-xs text-muted-foreground">
-              Accept messages
+            <Label htmlFor={`whatsappEnabled-${purpose}`} className="text-xs text-muted-foreground">
+              {purpose === "rfq" ? "Create RFQs" : "Accept messages"}
             </Label>
             <Switch
-              id="whatsappEnabled"
+              id={`whatsappEnabled-${purpose}`}
               checked={account.enabled}
               disabled={!canManage || saving}
               onCheckedChange={(enabled) => void toggleEnabled(enabled)}
@@ -327,20 +403,49 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
         </div>
       )}
 
+      {account && purpose === "rfq" && (
+        <div className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <Label htmlFor="whatsappRfqOwner" className="text-sm font-medium">
+              RFQ owner
+            </Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Chats on this number appear in this person's Inbox and RFQ list. Changing the owner
+              moves existing WhatsApp chats, RFQs and drafted quotes to them too.
+            </p>
+          </div>
+          <Select
+            value={account.ownerUserId ?? undefined}
+            onValueChange={(value) => void changeOwner(value)}
+            disabled={!canManage || saving || membersQuery.isPending}
+          >
+            <SelectTrigger id="whatsappRfqOwner" className="w-full sm:w-56">
+              <SelectValue placeholder={membersQuery.isPending ? "Loading members..." : "Select a member"} />
+            </SelectTrigger>
+            <SelectContent>
+              {members.map((member) => (
+                <SelectItem key={member.userId} value={member.userId}>
+                  {memberLabel(member)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {showForm && (
         <div className="space-y-4">
-          {!account && (
-            <p className="text-sm text-muted-foreground">
-              Connect a WhatsApp Business number through the Meta Cloud API. Customer messages
-              open support conversations here, your AI agent can reply automatically, and your
-              team answers from the same inbox as live chat and calls.
+          {!account && <p className="text-sm text-muted-foreground">{copy.intro}</p>}
+          {!account && purpose === "rfq" && (
+            <p className="text-xs text-muted-foreground">
+              Chats and RFQs go to you once connected; you can pick a different owner afterwards.
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="whatsappPhoneNumberId">Phone number ID</Label>
+              <Label htmlFor={`whatsappPhoneNumberId-${purpose}`}>Phone number ID</Label>
               <Input
-                id="whatsappPhoneNumberId"
+                id={`whatsappPhoneNumberId-${purpose}`}
                 value={phoneNumberId}
                 onChange={(event) => setPhoneNumberId(event.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="e.g. 106540352242922"
@@ -352,25 +457,22 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="whatsappWabaId">WhatsApp Business Account ID (optional)</Label>
+              <Label htmlFor={`whatsappWabaId-${purpose}`}>WhatsApp Business Account ID (optional)</Label>
               <Input
-                id="whatsappWabaId"
+                id={`whatsappWabaId-${purpose}`}
                 value={wabaId}
                 onChange={(event) => setWabaId(event.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="e.g. 102290129340398"
                 disabled={!canManage || saving}
                 className="font-mono"
               />
-              <p className="text-xs text-muted-foreground">
-                Needed to create and track the message templates used for invoices and
-                payment reminders.
-              </p>
+              <p className="text-xs text-muted-foreground">{copy.wabaHint}</p>
             </div>
             {!data.platformAppIdConfigured || account?.appId ? (
               <div className="space-y-1.5">
-                <Label htmlFor="whatsappAppId">Meta App ID (optional)</Label>
+                <Label htmlFor={`whatsappAppId-${purpose}`}>Meta App ID (optional)</Label>
                 <Input
-                  id="whatsappAppId"
+                  id={`whatsappAppId-${purpose}`}
                   value={appId}
                   onChange={(event) => setAppId(event.target.value.replace(/[^0-9]/g, ""))}
                   placeholder="e.g. 1264793705777779"
@@ -385,11 +487,11 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
             ) : null}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="whatsappAccessToken">
+            <Label htmlFor={`whatsappAccessToken-${purpose}`}>
               {account ? "New access token (leave blank to keep the current one)" : "Permanent access token"}
             </Label>
             <Input
-              id="whatsappAccessToken"
+              id={`whatsappAccessToken-${purpose}`}
               type="password"
               value={accessToken}
               onChange={(event) => setAccessToken(event.target.value)}
@@ -407,11 +509,11 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
           </div>
           {!data.platformAppSecretConfigured || account?.hasAppSecret ? (
             <div className="space-y-1.5">
-              <Label htmlFor="whatsappAppSecret">
+              <Label htmlFor={`whatsappAppSecret-${purpose}`}>
                 {account?.hasAppSecret ? "New app secret (leave blank to keep the current one)" : "App secret"}
               </Label>
               <Input
-                id="whatsappAppSecret"
+                id={`whatsappAppSecret-${purpose}`}
                 type="password"
                 value={appSecret}
                 onChange={(event) => setAppSecret(event.target.value)}
@@ -429,7 +531,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
           <div className="flex items-center gap-2">
             <Button onClick={() => void connect()} disabled={!canSubmit}>
               {saving && <Spinner data-icon="inline-start" />}
-              {account ? "Save Changes" : "Connect WhatsApp"}
+              {account ? "Save Changes" : copy.connectLabel}
             </Button>
             {account && (
               <Button variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
@@ -468,11 +570,7 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">Message templates</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  WhatsApp only allows business-initiated messages (invoices, payment reminders)
-                  through templates approved by Meta. Inboundr creates these on your account;
-                  approval usually takes minutes to a few hours.
-                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{copy.templatesHint}</p>
               </div>
               {canManage && (
                 <Button
@@ -548,11 +646,8 @@ export function WhatsAppSettingsCardContent({ canManage }: { canManage: boolean 
       <Dialog open={confirmDisconnect} onOpenChange={setConfirmDisconnect}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disconnect WhatsApp</DialogTitle>
-            <DialogDescription>
-              New WhatsApp messages will no longer create conversations and agents will not be
-              able to reply to existing WhatsApp tickets. Existing conversations stay in the inbox.
-            </DialogDescription>
+            <DialogTitle>{copy.disconnectTitle}</DialogTitle>
+            <DialogDescription>{copy.disconnectDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDisconnect(false)} disabled={disconnecting}>

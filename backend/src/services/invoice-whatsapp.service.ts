@@ -104,7 +104,11 @@ async function requireAccount(
   organizationId: mongoose.Types.ObjectId,
   templateKey: WhatsAppTemplateKey
 ): Promise<IWhatsAppAccount> {
-  const account = await findWhatsAppAccountForOrganization(organizationId);
+  // Orgs with only an RFQ number still get invoices on WhatsApp; the catalog
+  // templates are synced onto every connected number.
+  const account =
+    (await findWhatsAppAccountForOrganization(organizationId, "primary")) ??
+    (await findWhatsAppAccountForOrganization(organizationId, "rfq"));
   if (!account || !account.enabled || account.status === "disabled") {
     throw new InvoiceWhatsAppError(
       "not_connected",

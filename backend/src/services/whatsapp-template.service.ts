@@ -3,6 +3,7 @@ import {
   WhatsAppAccount,
   type IWhatsAppAccount,
   type IWhatsAppAccountTemplate,
+  type WhatsAppAccountPurpose,
   type WhatsAppTemplateStatus,
 } from "../models/whatsapp-account.model";
 import {
@@ -16,7 +17,7 @@ import {
 /**
  * Inboundr-managed message templates. Meta requires every business-initiated
  * message (anything outside the 24h customer-service window) to be an approved
- * template, so invoices and payment reminders are defined here once and
+ * template, so invoices, payment reminders and quotes are defined here once and
  * created on each connected WABA.
  *
  * Rules to keep Meta's reviewer happy: body must start and end with literal
@@ -29,6 +30,7 @@ export const WHATSAPP_TEMPLATE_LANGUAGE = "en";
 export const WHATSAPP_TEMPLATE_NAMES = {
   invoice: "inboundr_invoice",
   paymentReminder: "inboundr_payment_reminder",
+  quotation: "inboundr_quotation",
 } as const;
 
 export type WhatsAppTemplateKey = keyof typeof WHATSAPP_TEMPLATE_NAMES;
@@ -40,6 +42,8 @@ interface CatalogTemplate {
   bodyText: string;
   bodyExample: string[];
   headerFormat: "DOCUMENT";
+  /** Numbers this template is created on. */
+  purposes: WhatsAppAccountPurpose[];
 }
 
 export const WHATSAPP_TEMPLATE_CATALOG: CatalogTemplate[] = [
@@ -48,6 +52,7 @@ export const WHATSAPP_TEMPLATE_CATALOG: CatalogTemplate[] = [
     name: WHATSAPP_TEMPLATE_NAMES.invoice,
     description: "Sends a new invoice with the PDF attached.",
     headerFormat: "DOCUMENT",
+    purposes: ["primary", "rfq"],
     bodyText:
       "Hello {{1}}, please find invoice {{2}} from {{3}} attached. Amount due: {{4}}. Due date: {{5}}. Reply to this message if you have any questions about the invoice.",
     bodyExample: ["Rahul", "INV-0042", "Acme Tools Pvt. Ltd.", "₹12,500.00", "30 Sep 2026"],
@@ -57,6 +62,7 @@ export const WHATSAPP_TEMPLATE_CATALOG: CatalogTemplate[] = [
     name: WHATSAPP_TEMPLATE_NAMES.paymentReminder,
     description: "Automatic reminder for due and overdue invoices, with the PDF attached.",
     headerFormat: "DOCUMENT",
+    purposes: ["primary", "rfq"],
     bodyText:
       "Hello {{1}}, this is a reminder that invoice {{2}} from {{3}} is {{4}}. Amount due: {{5}}. Due date: {{6}}. The invoice is attached for reference. If you have already made this payment, please ignore this message.",
     bodyExample: [
@@ -68,7 +74,21 @@ export const WHATSAPP_TEMPLATE_CATALOG: CatalogTemplate[] = [
       "23 Sep 2026",
     ],
   },
+  {
+    key: "quotation",
+    name: WHATSAPP_TEMPLATE_NAMES.quotation,
+    description: "Sends a quote with the PDF attached when the customer last wrote more than 24 hours ago.",
+    headerFormat: "DOCUMENT",
+    purposes: ["rfq"],
+    bodyText:
+      "Hello {{1}}, thank you for your enquiry. Please find quotation {{2}} from {{3}} attached. Reply to this message if you have any questions or would like to place an order.",
+    bodyExample: ["Rahul", "Q-0042", "Acme Tools Pvt. Ltd."],
+  },
 ];
+
+export function templateCatalogFor(purpose: WhatsAppAccountPurpose): CatalogTemplate[] {
+  return WHATSAPP_TEMPLATE_CATALOG.filter((template) => template.purposes.includes(purpose));
+}
 
 /** Minimal single-page PDF used as the media-header sample when creating templates. */
 const SAMPLE_PDF = Buffer.from(
@@ -153,8 +173,10 @@ export async function syncWhatsAppTemplates(account: IWhatsAppAccount): Promise<
   const created: string[] = [];
   const now = new Date();
 
+  const catalog = templateCatalogFor(account.purpose);
+
   if (!account.wabaId) {
-    const templates = WHATSAPP_TEMPLATE_CATALOG.map<IWhatsAppAccountTemplate>((template) => ({
+    const templates = catalog.map<IWhatsAppAccountTemplate>((template) => ({
       name: template.name,
       language: WHATSAPP_TEMPLATE_LANGUAGE,
       category: "UTILITY",
@@ -180,11 +202,11 @@ export async function syncWhatsAppTemplates(account: IWhatsAppAccount): Promise<
   let headerHandle: string | null = null;
 
   const templates: IWhatsAppAccountTemplate[] = [];
-  for (const catalog of WHATSAPP_TEMPLATE_CATALOG) {
-    const existing = remoteByName.get(catalog.name);
+  for (const template of catalog) {
+    const existing = remoteByName.get(template.name);
     if (existing) {
       templates.push({
-        name: catalog.name,
+        name: template.name,
         language: WHATSAPP_TEMPLATE_LANGUAGE,
         category: existing.category || "UTILITY",
         status: normalizeStatus(existing.status),
@@ -197,7 +219,7 @@ export async function syncWhatsAppTemplates(account: IWhatsAppAccount): Promise<
 
     if (!appId) {
       templates.push({
-        name: catalog.name,
+        name: template.name,
         language: WHATSAPP_TEMPLATE_LANGUAGE,
         category: "UTILITY",
         status: "MISSING",
@@ -214,10 +236,10 @@ export async function syncWhatsAppTemplates(account: IWhatsAppAccount): Promise<
         contentType: "application/pdf",
         data: SAMPLE_PDF,
       });
-      const result = await createWhatsAppTemplate(scoped, buildDefinition(catalog, headerHandle));
-      created.push(catalog.name);
+      const result = await createWhatsAppTemplate(scoped, buildDefinition(template, headerHandle));
+      created.push(template.name);
       templates.push({
-        name: catalog.name,
+        name: template.name,
         language: WHATSAPP_TEMPLATE_LANGUAGE,
         category: result.category || "UTILITY",
         status: normalizeStatus(result.status),
@@ -228,10 +250,10 @@ export async function syncWhatsAppTemplates(account: IWhatsAppAccount): Promise<
     } catch (err) {
       const message =
         err instanceof WhatsAppApiError ? err.details || err.message : (err as Error)?.message || "Failed";
-      console.error(`Failed to create WhatsApp template ${catalog.name} on WABA ${account.wabaId}:`, err);
-      errors.push({ name: catalog.name, message });
+      console.error(`Failed to create WhatsApp template ${template.name} on WABA ${account.wabaId}:`, err);
+      errors.push({ name: template.name, message });
       templates.push({
-        name: catalog.name,
+        name: template.name,
         language: WHATSAPP_TEMPLATE_LANGUAGE,
         category: "UTILITY",
         status: "MISSING",
@@ -263,7 +285,7 @@ export async function applyTemplateStatusUpdate(
   }
 ): Promise<void> {
   const name = String(update.message_template_name ?? "");
-  if (!Object.values(WHATSAPP_TEMPLATE_NAMES).includes(name as never)) return;
+  if (!templateCatalogFor(account.purpose).some((template) => template.name === name)) return;
   if (update.message_template_language && update.message_template_language !== WHATSAPP_TEMPLATE_LANGUAGE) return;
 
   const status = normalizeStatus(String(update.event ?? ""));
