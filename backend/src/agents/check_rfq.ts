@@ -18,6 +18,7 @@ const classifier = new TypeSafeClassifier({
 
 const State = new StateSchema({
   isRFQ: z.boolean(),
+  probability: z.number(),
   emailBody: z.string(),
 });
 
@@ -32,6 +33,7 @@ const checkRFQ: GraphNode<typeof State> = async (state) => {
 
   return {
     isRFQ: answer.noul >= RFQ_THRESHOLD,
+    probability: answer.noul,
   };
 };
 
@@ -43,7 +45,7 @@ const graph = new StateGraph(State)
 
 export async function classifyEmail(
   emailBody: string
-): Promise<{ isRFQ: boolean }> {
+): Promise<{ isRFQ: boolean; probability: number }> {
   const result = await graph.invoke({ emailBody });
-  return { isRFQ: result.isRFQ };
+  return { isRFQ: result.isRFQ, probability: result.probability };
 }

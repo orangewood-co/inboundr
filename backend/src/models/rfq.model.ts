@@ -103,7 +103,7 @@ export interface IRFQ extends Document {
   threadId: string | null;
   latestEmailId: Types.ObjectId | null;
   isRFQ: boolean;
-  reason: string;
+  rfqProbability: number | null;
   isProcessed: boolean;
   customer: IRFQCustomer | null;
   queryProducts: IRFQProduct[];
@@ -281,7 +281,7 @@ const rfqSchema = new Schema<IRFQ>(
       default: null,
     },
     isRFQ: { type: Boolean, required: true },
-    reason: { type: String, required: true },
+    rfqProbability: { type: Number, default: null },
     isProcessed: { type: Boolean, default: false },
     customer: {
       type: {

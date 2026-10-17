@@ -66,7 +66,6 @@ function attachClassification(email: any, rfq: any | undefined, gmailAccountEmai
     gmailAccountEmail,
     rfqId: rfq?._id ?? null,
     isRFQ: rfq?.isRFQ ?? null,
-    classificationReason: rfq?.reason ?? null,
     rfqErrorMessage: rfq?.errorMessage ?? null,
   };
 }
@@ -373,7 +372,7 @@ export const listEmails = async (
         ...(threadIds.length > 0 ? [{ threadId: { $in: threadIds } }] : []),
       ],
     })
-      .select("emailId threadId gmailAccountId isRFQ reason errorMessage")
+      .select("emailId threadId gmailAccountId isRFQ errorMessage")
       .lean();
     const rfqByEmailId = new Map(
       rfqs.flatMap((rfq) => (rfq.emailId ? [[rfq.emailId.toString(), rfq] as const] : []))
@@ -450,7 +449,7 @@ export const getEmail = async (
       userId: authReq.user.id,
       organizationId: organization._id,
     })
-      .select("emailId isRFQ reason errorMessage")
+      .select("emailId isRFQ errorMessage")
       .lean();
     // A reply carries no RFQ row of its own; surface the thread's RFQ instead.
     if (!rfq && email.threadId) {
@@ -461,7 +460,7 @@ export const getEmail = async (
         threadId: email.threadId,
       })
         .sort({ isRFQ: -1, createdAt: -1 })
-        .select("emailId isRFQ reason errorMessage")
+        .select("emailId isRFQ errorMessage")
         .lean();
     }
     const account = await GmailAccount.findOne({
@@ -576,7 +575,7 @@ export const downloadEmailPdf = async (
       userId: authReq.user.id,
       organizationId: organization._id,
     })
-      .select("isRFQ reason errorMessage")
+      .select("isRFQ errorMessage")
       .lean();
 
     const branding = await resolveOrganizationPdfBranding(organization);

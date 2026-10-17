@@ -82,7 +82,6 @@ interface EmailSummary {
   attachments: { filename: string; mimeType: string; size: number; attachmentId: string }[]
   rfqId: string | null
   isRFQ: boolean | null
-  classificationReason: string | null
   rfqErrorMessage: string | null
   threadCount?: number
 }
@@ -385,8 +384,6 @@ function StatusBadge({ status }: { status: EmailSummary["status"] }) {
 }
 
 function ClassificationBadge({ email }: { email: EmailSummary }) {
-  const reason = email.classificationReason
-
   if (email.status === "failed" || email.rfqErrorMessage) {
     return (
       <Tooltip>
@@ -411,7 +408,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
-          {reason || "Classified as a Request for Quotation"}
+          Classified as a Request for Quotation
         </TooltipContent>
       </Tooltip>
     )
@@ -426,7 +423,7 @@ function ClassificationBadge({ email }: { email: EmailSummary }) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
-          {reason || "Not a Request for Quotation"}
+          Not a Request for Quotation
         </TooltipContent>
       </Tooltip>
     )
@@ -1071,7 +1068,6 @@ export function EmailsPage() {
     const nextState = {
       status: "processing" as const,
       rfqErrorMessage: null,
-      classificationReason: null,
       isRFQ: null,
     }
 
@@ -1657,7 +1653,7 @@ export function EmailsPage() {
                     </div>
                   )}
 
-                  {(detail.classificationReason || detail.rfqErrorMessage || detail.isRFQ !== null) && (
+                  {(detail.rfqErrorMessage || detail.isRFQ !== null) && (
                     <div className="surface-inset rounded-xl border border-border/40 p-3">
                       <div className="mb-1.5 flex items-center gap-2">
                         <ClassificationBadge email={detail} />
@@ -1666,7 +1662,8 @@ export function EmailsPage() {
                         </span>
                       </div>
                       <p className="text-[12px] leading-relaxed text-muted-foreground">
-                        {detail.rfqErrorMessage || detail.classificationReason || "RFQ classification is pending."}
+                        {detail.rfqErrorMessage ||
+                          (detail.isRFQ ? "Classified as a Request for Quotation" : "Not a Request for Quotation")}
                       </p>
                     </div>
                   )}

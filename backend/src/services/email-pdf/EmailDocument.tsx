@@ -221,12 +221,11 @@ export function EmailDocument({ email, branding, classification }: EmailDocument
   const body = selectBody(email);
   const attachments = email.attachments ?? [];
   const labels = (email.labels ?? []).map(formatEmailLabel).filter(Boolean);
-  const classificationNote = [classification?.reason, classification?.errorMessage]
-    .map((value) => toPdfSafeText(value ?? "").replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .join(" ");
+  const rfqErrorNote = toPdfSafeText(classification?.errorMessage ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  const showFootnotes = Boolean(classificationNote) || body.hasImages || body.truncated;
+  const showFootnotes = Boolean(rfqErrorNote) || body.hasImages || body.truncated;
 
   return (
     <Document
@@ -313,15 +312,10 @@ export function EmailDocument({ email, branding, classification }: EmailDocument
 
         {showFootnotes ? (
           <View style={styles.footnotes}>
-            {classificationNote ? (
-              <Text
-                style={[
-                  styles.footnote,
-                  classification?.errorMessage ? { color: COLORS.danger } : {},
-                ]}
-              >
-                <Text style={styles.footnoteLabel}>RFQ classification: </Text>
-                {classificationNote}
+            {rfqErrorNote ? (
+              <Text style={[styles.footnote, { color: COLORS.danger }]}>
+                <Text style={styles.footnoteLabel}>RFQ processing error: </Text>
+                {rfqErrorNote}
               </Text>
             ) : null}
             {body.hasImages ? (

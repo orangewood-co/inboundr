@@ -270,7 +270,7 @@ export async function processEmailForRFQ(
   await updateEmailStatus(messageId, "processing", undefined, gmailAccountId);
 
   try {
-    const { isRFQemail, reason } = await classifyEmail(emailBody);
+    const { isRFQ, probability } = await classifyEmail(emailBody);
 
     const rfqDoc = await RFQ.create({
       userId,
@@ -278,18 +278,18 @@ export async function processEmailForRFQ(
       gmailAccountId,
       emailId,
       threadId,
-      isRFQ: isRFQemail,
-      reason,
-      isProcessed: !isRFQemail,
+      isRFQ,
+      rfqProbability: probability,
+      isProcessed: !isRFQ,
     });
 
-    if (!isRFQemail) {
+    if (!isRFQ) {
       await updateEmailStatus(messageId, "processed", undefined, gmailAccountId);
-      console.log(`Email ${messageId} classified as non-RFQ: ${reason}`);
+      console.log(`Email ${messageId} classified as non-RFQ (probability ${probability})`);
       return;
     }
 
-    console.log(`Email ${messageId} classified as RFQ: ${reason}`);
+    console.log(`Email ${messageId} classified as RFQ (probability ${probability})`);
 
     const currentOrganizationContext = await getOrganizationContext(organizationId);
 

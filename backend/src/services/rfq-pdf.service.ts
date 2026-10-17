@@ -27,7 +27,6 @@ type PdfRFQ = {
   _id: unknown;
   emailId?: PdfRFQEmail | null;
   isRFQ: boolean;
-  reason: string;
   isProcessed: boolean;
   customer?: {
     name: string;
@@ -212,8 +211,10 @@ export function createRFQPdfDocument(options: {
     ["RFQ Status", rfq.errorMessage ? "Error" : rfq.isRFQ ? "RFQ" : "Not RFQ"],
   ]);
 
-  y = drawPdfSectionTitle(doc, "Classification", y);
-  y = drawParagraph(doc, rfq.errorMessage || rfq.reason || "-", y, rfq.errorMessage ? PDF_COLORS.danger : PDF_COLORS.text);
+  if (rfq.errorMessage) {
+    y = drawPdfSectionTitle(doc, "Processing Error", y);
+    y = drawParagraph(doc, rfq.errorMessage, y, PDF_COLORS.danger);
+  }
 
   if (email?.snippet) {
     y = drawPdfSectionTitle(doc, "Source Email Snippet", y);
