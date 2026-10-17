@@ -14,7 +14,7 @@ import { SenderHoverCard } from "@/components/contact-hover-card"
 import { CopyableText, CopyButton } from "@/components/copy-button"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { openDownload } from "@/lib/downloads"
-import { formatFullDateTime, formatListTimestamp } from "@/lib/format"
+import { formatFullDateTime, formatListTimestamp, formatRelativeTime } from "@/lib/format"
 import { getAvatarColor } from "@/lib/utils"
 import { toast } from "sonner"
 import {
@@ -367,6 +367,11 @@ const statusConfig = {
     dotClass: "bg-destructive",
     pillClass: "bg-destructive/10 text-destructive",
   },
+}
+
+// Rendered inside TooltipContent so it recomputes each time the tooltip mounts instead of going stale.
+function RelativeTime({ value }: { value: string }) {
+  return <>{formatRelativeTime(value)}</>
 }
 
 function StatusBadge({ status }: { status: EmailSummary["status"] }) {
@@ -1618,7 +1623,9 @@ export function EmailsPage() {
                           {formatFullDateTime(detail.date)}
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent>{new Date(detail.date).toISOString()}</TooltipContent>
+                      <TooltipContent>
+                        <RelativeTime value={detail.date} />
+                      </TooltipContent>
                     </Tooltip>
                   </div>
 
