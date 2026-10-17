@@ -71,6 +71,16 @@ export function getSupportedRFQAttachments(
   return attachments.filter(isSupportedRFQAttachment).slice(0, MAX_ATTACHMENTS);
 }
 
+/**
+ * Ids of the attachments RFQ extraction actually reads. An oversized file still
+ * takes one of the slots, but its text is never extracted.
+ */
+export function getRFQScanAttachmentIds(attachments: EmailAttachment[]): string[] {
+  return getSupportedRFQAttachments(attachments)
+    .filter((attachment) => attachment.size <= MAX_ATTACHMENT_BYTES)
+    .map((attachment) => attachment.attachmentId);
+}
+
 function trimExtractedText(text: string): string {
   return text.trim().slice(0, MAX_EXTRACTED_CHARS_PER_ATTACHMENT);
 }

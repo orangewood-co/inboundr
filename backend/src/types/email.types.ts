@@ -7,6 +7,10 @@ export const emailAttachmentSchema = z.object({
   attachmentId: z.string(),
 });
 
+export const emailInlineImageSchema = emailAttachmentSchema.extend({
+  contentId: z.string(),
+});
+
 export const parsedEmailSchema = z.object({
   messageId: z.string(),
   threadId: z.string(),
@@ -26,7 +30,9 @@ export const parsedEmailSchema = z.object({
   snippet: z.string().nullable(),
   labels: z.array(z.string()),
   attachments: z.array(emailAttachmentSchema),
+  inlineImages: z.array(emailInlineImageSchema),
 });
 
 export type ParsedEmail = z.infer<typeof parsedEmailSchema>;
 export type EmailAttachment = z.infer<typeof emailAttachmentSchema>;
+export type EmailInlineImage = z.infer<typeof emailInlineImageSchema>;

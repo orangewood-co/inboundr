@@ -4,6 +4,7 @@ import { Email } from "../models/email.model";
 import { RFQReply } from "../models/rfq-reply.model";
 import { processEmailForRFQ, processManualRFQ } from "../services/rfq.service";
 import { keyBelongsToPrefix } from "../services/storage.service";
+import { getRFQScanAttachmentIds } from "../services/rfq-attachment.service";
 import { generateQuoteReply } from "../agents/generate_quote";
 import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/auth.middleware";
 import { GmailAccount } from "../models/gmail-account.model";
@@ -653,7 +654,18 @@ export const getRFQ = async (
       return;
     }
 
-    res.json(rfq);
+    const email = rfq.emailId as any;
+    res.json(
+      email
+        ? {
+            ...rfq,
+            emailId: {
+              ...email,
+              rfqScanAttachmentIds: getRFQScanAttachmentIds(email.attachments ?? []),
+            },
+          }
+        : rfq
+    );
   } catch (err) {
     console.error("Error fetching RFQ:", err);
     res.status(500).json({ error: "Failed to fetch RFQ" });

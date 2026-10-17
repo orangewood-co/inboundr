@@ -13,7 +13,12 @@ import { CollapsibleChipRow } from "@/components/email/collapsible-chip-row"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatFullDateTime, formatListTimestamp } from "@/lib/format"
 import { getAvatarColor, cn } from "@/lib/utils"
-import { formatFileSize, type EmailAttachmentRef, type ThreadMessage } from "@/lib/email-reply"
+import {
+  formatFileSize,
+  resolveInlineImages,
+  type EmailAttachmentRef,
+  type ThreadMessage,
+} from "@/lib/email-reply"
 
 function parseSender(from: string): { name: string; email: string } {
   const match = from.match(/^"?(.+?)"?\s*<(.+)>$/)
@@ -24,14 +29,19 @@ function parseSender(from: string): { name: string; email: string } {
 function MessageBody({
   message,
   buildDocument,
+  buildAttachmentUrl,
 }: {
   message: ThreadMessage
   buildDocument: (html: string) => string
+  buildAttachmentUrl: (emailId: string, attachmentId: string, download?: boolean) => string
 }) {
-  const document = useMemo(
-    () => (message.bodyHtml ? buildDocument(message.bodyHtml) : null),
-    [message.bodyHtml, buildDocument]
-  )
+  const document = useMemo(() => {
+    if (!message.bodyHtml) return null
+    const html = resolveInlineImages(message.bodyHtml, message.inlineImages, (attachmentId) =>
+      buildAttachmentUrl(message._id, attachmentId)
+    )
+    return buildDocument(html)
+  }, [message._id, message.bodyHtml, message.inlineImages, buildDocument, buildAttachmentUrl])
 
   if (document) {
     return (
@@ -210,7 +220,11 @@ function ThreadMessageCard({
             </span>
           </div>
           <div className="border-t border-border/30">
-            <MessageBody message={message} buildDocument={buildDocument} />
+            <MessageBody
+              message={message}
+              buildDocument={buildDocument}
+              buildAttachmentUrl={buildAttachmentUrl}
+            />
           </div>
           <AttachmentChips
             message={message}

@@ -46,6 +46,11 @@ export interface EmailAttachmentRef {
   attachmentId: string
 }
 
+/** An image the HTML body embeds through a `cid:` reference. */
+export interface EmailInlineImageRef extends EmailAttachmentRef {
+  contentId: string
+}
+
 export interface PendingAttachment {
   key: string
   filename: string
@@ -74,6 +79,7 @@ export interface ThreadMessage {
   snippet: string | null
   labels: string[]
   attachments: EmailAttachmentRef[]
+  inlineImages: EmailInlineImageRef[]
   pendingAttachments: PendingAttachment[]
   updatedAt: string
   /**
@@ -214,6 +220,21 @@ export async function uploadEmailAttachment(file: File): Promise<PendingAttachme
     contentType: file.type || "application/octet-stream",
     size: file.size,
   }
+}
+
+/** Points the body's `cid:` references at the stored inline image parts. */
+export function resolveInlineImages(
+  html: string,
+  images: EmailInlineImageRef[],
+  urlFor: (attachmentId: string) => string
+): string {
+  if (images.length === 0) return html
+
+  const byContentId = new Map(images.map((image) => [image.contentId.toLowerCase(), image]))
+  return html.replace(/cid:([^"'\s)>]+)/gi, (match, contentId: string) => {
+    const image = byContentId.get(contentId.toLowerCase())
+    return image ? urlFor(image.attachmentId) : match
+  })
 }
 
 export function formatFileSize(bytes: number): string {

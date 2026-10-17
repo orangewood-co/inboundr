@@ -155,6 +155,8 @@ interface RFQEmail {
   bodyHtml?: string | null
   status: string
   attachments?: RFQEmailAttachment[]
+  /** Attachments RFQ extraction reads; it caps how many files it scans. */
+  rfqScanAttachmentIds?: string[]
 }
 
 interface RFQEmailAttachment {
@@ -465,15 +467,6 @@ function isSpreadsheetAttachment(att: RFQEmailAttachment) {
   const extension = getAttachmentExtension(att.filename)
 
   return SPREADSHEET_MIME_TYPES.has(mimeType) || extension === "csv" || extension === "xls" || extension === "xlsx"
-}
-
-function isRFQSupportedAttachment(att: RFQEmailAttachment) {
-  const mimeType = att.mimeType.toLowerCase()
-  return (
-    mimeType === "application/pdf" ||
-    ["image/jpeg", "image/png", "image/webp"].includes(mimeType) ||
-    isSpreadsheetAttachment(att)
-  )
 }
 
 function isPreviewableAttachment(att: RFQEmailAttachment) {
@@ -3938,7 +3931,7 @@ export function DashboardPage() {
                                   <span className="truncate text-[13px] font-medium">
                                     {attachment.filename}
                                   </span>
-                                  {isRFQSupportedAttachment(attachment) && (
+                                  {detailEmail.rfqScanAttachmentIds?.includes(attachment.attachmentId) && (
                                     <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
                                       RFQ scan
                                     </span>

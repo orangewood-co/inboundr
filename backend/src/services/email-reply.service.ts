@@ -291,7 +291,14 @@ export async function resolveOutboundAttachments({
   }
 
   if (includeOriginalFrom) {
-    for (const original of includeOriginalFrom.attachments ?? []) {
+    // Inline images go along as plain files: the outbound MIME builder has no
+    // multipart/related support, and dropping them would lose pasted
+    // screenshots the forwarded body refers to.
+    const originals = [
+      ...(includeOriginalFrom.attachments ?? []),
+      ...(includeOriginalFrom.inlineImages ?? []),
+    ];
+    for (const original of originals) {
       if (isBlockedAttachmentFilename(original.filename)) continue;
       attachments.push({
         filename: original.filename,
@@ -356,6 +363,7 @@ export async function persistOutboundEmail({
       snippet: parsed.snippet,
       labels: parsed.labels,
       attachments: parsed.attachments,
+      inlineImages: parsed.inlineImages,
     });
   } catch (err) {
     // The message is already delivered at this point; a failed readback should

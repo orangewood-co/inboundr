@@ -94,6 +94,8 @@ interface EmailDetail extends EmailSummary {
   bcc: string | null
   bodyText: string | null
   bodyHtml: string | null
+  /** Attachments RFQ extraction reads; it caps how many files it scans. */
+  rfqScanAttachmentIds?: string[]
 }
 
 interface ListResponse {
@@ -463,14 +465,6 @@ function isSpreadsheetAttachment(att: EmailAttachment) {
   const extension = getAttachmentExtension(att.filename)
 
   return SPREADSHEET_MIME_TYPES.has(mimeType) || extension === "csv" || extension === "xls" || extension === "xlsx"
-}
-
-function isRFQSupportedAttachment(att: EmailAttachment) {
-  return (
-    att.mimeType === "application/pdf" ||
-    ["image/jpeg", "image/png", "image/webp"].includes(att.mimeType) ||
-    isSpreadsheetAttachment(att)
-  )
 }
 
 function isPreviewableAttachment(att: EmailAttachment) {
@@ -1649,7 +1643,7 @@ export function EmailsPage() {
                               <span className="shrink-0 text-[10px] opacity-50">
                                 ({(att.size / 1024).toFixed(0)}KB)
                               </span>
-                              {isRFQSupportedAttachment(att) && (
+                              {detail.rfqScanAttachmentIds?.includes(att.attachmentId) && (
                                 <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
                                   RFQ scan
                                 </span>

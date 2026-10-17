@@ -18,6 +18,7 @@ import type { AuthenticatedRequest, OrganizationRequest } from "../middleware/au
 import { streamEmailPdf } from "../services/email-pdf.service";
 import { resolveOrganizationPdfBranding } from "../services/organization-pdf-branding.service";
 import { buildRFQProcessingInput, hasRFQProcessableContent } from "../services/rfq-input.service";
+import { getRFQScanAttachmentIds } from "../services/rfq-attachment.service";
 import { processEmailForRFQ } from "../services/rfq.service";
 import { buildReferences, sendComposedMessage } from "../services/gmail-send.service";
 import {
@@ -322,7 +323,7 @@ export const listEmails = async (
 
     const pageEmailIds = pageRows.map((row) => row.emailId);
     const pageDocs = await Email.find({ _id: { $in: pageEmailIds } })
-      .select("-bodyText -bodyHtml")
+      .select("-bodyText -bodyHtml -inlineImages")
       .lean();
     const pageDocById = new Map(
       pageDocs.map((doc) => [doc._id.toString(), doc])
@@ -471,7 +472,11 @@ export const getEmail = async (
       .select("emailAddress")
       .lean();
 
-    res.json(attachClassification(email, rfq, account?.emailAddress ?? null));
+    res.json({
+      ...attachClassification(email, rfq, account?.emailAddress ?? null),
+      rfqScanAttachmentIds:
+        email.direction === "outbound" ? [] : getRFQScanAttachmentIds(email.attachments ?? []),
+    });
   } catch (err) {
     console.error("Error fetching email:", err);
     res.status(500).json({ error: "Failed to fetch email" });
@@ -605,7 +610,7 @@ export const getEmailAttachment = async (
       return;
     }
 
-    const attachment = email.attachments.find(
+    const attachment = [...email.attachments, ...(email.inlineImages ?? [])].find(
       (item) => item.attachmentId === req.params.attachmentId
     );
     if (!attachment) {
@@ -634,6 +639,9 @@ export const getEmailAttachment = async (
       buildContentDisposition(attachment.filename, shouldDownload)
     );
     res.setHeader("X-Content-Type-Options", "nosniff");
+    // Message parts never change, and inline images are re-requested every
+    // time a message body is rendered.
+    res.setHeader("Cache-Control", "private, max-age=86400");
     res.send(data);
   } catch (err) {
     console.error("Error fetching email attachment:", err);
@@ -665,13 +673,14 @@ function requestScope(req: Request): RequestScope {
  */
 function serializeMessage(email: IEmail | Record<string, any>, accountAddress?: string) {
   const doc = "toObject" in email ? (email as IEmail).toObject() : email;
-  const { pendingAttachments, ...rest } = doc as Record<string, any>;
+  const { pendingAttachments, inlineImages, ...rest } = doc as Record<string, any>;
   const direction: EmailDirection = rest.direction === "outbound" ? "outbound" : "inbound";
 
   return {
     ...rest,
     direction,
     pendingAttachments: pendingAttachments ?? [],
+    inlineImages: inlineImages ?? [],
     canReplyAll: accountAddress
       ? canReplyAll({ ...(rest as IEmail), direction }, accountAddress)
       : false,

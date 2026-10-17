@@ -9,6 +9,15 @@ export interface IEmailAttachment {
   attachmentId: string;
 }
 
+/**
+ * An image part the HTML body embeds via a `cid:` reference (signature logos,
+ * pasted screenshots). Kept apart from `attachments` so it is rendered in the
+ * body instead of being listed or scanned as a file.
+ */
+export interface IEmailInlineImage extends IEmailAttachment {
+  contentId: string;
+}
+
 export interface IEmailPendingAttachment {
   key: string;
   filename: string;
@@ -42,6 +51,7 @@ export interface IEmail extends Document {
   snippet: string | null;
   labels: string[];
   attachments: IEmailAttachment[];
+  inlineImages: IEmailInlineImage[];
   status: "received" | "processing" | "processed" | "failed";
   processedAt: Date | null;
   errorMessage: string | null;
@@ -61,6 +71,17 @@ const emailAttachmentSchema = new Schema<IEmailAttachment>(
     mimeType: { type: String, required: true },
     size: { type: Number, required: true },
     attachmentId: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const emailInlineImageSchema = new Schema<IEmailInlineImage>(
+  {
+    filename: { type: String, required: true },
+    mimeType: { type: String, required: true },
+    size: { type: Number, required: true },
+    attachmentId: { type: String, required: true },
+    contentId: { type: String, required: true },
   },
   { _id: false }
 );
@@ -117,6 +138,7 @@ const emailSchema = new Schema<IEmail>(
     snippet: { type: String, default: null },
     labels: { type: [String], default: [] },
     attachments: { type: [emailAttachmentSchema], default: [] },
+    inlineImages: { type: [emailInlineImageSchema], default: [] },
     status: {
       type: String,
       enum: ["received", "processing", "processed", "failed"],

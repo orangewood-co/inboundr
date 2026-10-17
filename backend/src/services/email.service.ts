@@ -1,7 +1,11 @@
 import type { gmail_v1 } from "googleapis";
 import { getGmailClientForAccount } from "../config/gmail.config";
 import { Email } from "../models/email.model";
-import type { ParsedEmail, EmailAttachment } from "../types/email.types";
+import type {
+  ParsedEmail,
+  EmailAttachment,
+  EmailInlineImage,
+} from "../types/email.types";
 import { processEmailForRFQ } from "./rfq.service";
 import {
   buildRFQProcessingInput,
@@ -435,6 +439,7 @@ function parseHeadersToEmail(
     snippet: message.snippet ?? null,
     labels: message.labelIds ?? [],
     attachments: parsed.attachments,
+    inlineImages: parsed.inlineImages,
   };
 }
 
@@ -519,6 +524,21 @@ interface PayloadParseResult {
   bodyText: string | null;
   bodyHtml: string | null;
   attachments: EmailAttachment[];
+  inlineImages: EmailInlineImage[];
+}
+
+function readContentId(part: gmail_v1.Schema$MessagePart): string | null {
+  const value = part.headers?.find((h) => h.name?.toLowerCase() === "content-id")?.value;
+  const contentId = value?.trim().replace(/^<|>$/g, "").trim();
+  return contentId || null;
+}
+
+function referencedContentIds(html: string | null): Set<string> {
+  const ids = new Set<string>();
+  for (const match of html?.matchAll(/cid:([^"'\s)>]+)/gi) ?? []) {
+    ids.add(match[1]!.toLowerCase());
+  }
+  return ids;
 }
 
 async function parseMessagePayload(
@@ -528,10 +548,10 @@ async function parseMessagePayload(
 ): Promise<PayloadParseResult> {
   const textCandidates: string[] = [];
   const htmlCandidates: string[] = [];
-  const attachments: EmailAttachment[] = [];
+  const files: (EmailAttachment & { contentId: string | null })[] = [];
 
   if (!payload) {
-    return { bodyText: null, bodyHtml: null, attachments };
+    return { bodyText: null, bodyHtml: null, attachments: [], inlineImages: [] };
   }
 
   async function readPartBody(
@@ -558,11 +578,12 @@ async function parseMessagePayload(
     const mimeType = part.mimeType ?? "";
 
     if (part.filename && part.body?.attachmentId) {
-      attachments.push({
+      files.push({
         filename: part.filename,
         mimeType,
         size: part.body.size ?? 0,
         attachmentId: part.body.attachmentId,
+        contentId: readContentId(part),
       });
       return;
     }
@@ -586,10 +607,27 @@ async function parseMessagePayload(
 
   await walk(payload);
 
+  const bodyHtml = chooseBestBody(htmlCandidates);
+
+  // A Content-ID alone does not make a part inline: Apple Mail and Outlook tag
+  // ordinary attached files with one too. Only parts the body actually embeds
+  // are kept out of the attachment list.
+  const embedded = referencedContentIds(bodyHtml);
+  const attachments: EmailAttachment[] = [];
+  const inlineImages: EmailInlineImage[] = [];
+  for (const { contentId, ...file } of files) {
+    if (contentId && embedded.has(contentId.toLowerCase())) {
+      inlineImages.push({ ...file, contentId });
+    } else {
+      attachments.push(file);
+    }
+  }
+
   return {
     bodyText: chooseBestBody(textCandidates),
-    bodyHtml: chooseBestBody(htmlCandidates),
+    bodyHtml,
     attachments,
+    inlineImages,
   };
 }
 
