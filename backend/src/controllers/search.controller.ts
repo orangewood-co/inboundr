@@ -172,14 +172,13 @@ async function searchRFQs(
     isArchived: { $ne: true },
     $or: [
       { quoteNumber: regex },
-      { reason: regex },
       { "customer.name": regex },
       { "customer.company": regex },
       { "customer.email": regex },
       { "queryProducts.name": regex },
     ],
   })
-    .select("customer queryProducts reason isProcessed errorMessage createdAt emailId quoteNumber")
+    .select("customer queryProducts isProcessed errorMessage createdAt emailId quoteNumber")
     .populate({
       path: "emailId",
       select: "subject from date snippet status",

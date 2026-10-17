@@ -59,7 +59,6 @@ export type PdfEmail = {
 
 export type PdfEmailClassification = {
   isRFQ?: boolean | null;
-  reason?: string | null;
   errorMessage?: string | null;
 };
 

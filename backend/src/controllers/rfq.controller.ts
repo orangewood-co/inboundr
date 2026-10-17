@@ -915,16 +915,14 @@ export const createManualRFQ = async (
     // Reject random pastes that clearly are not a request for quotation. If
     // the classifier itself is unavailable, let the submission through rather
     // than blocking a legitimate RFQ.
-    let reason = "Added manually";
+    let rfqProbability: number | null = null;
     try {
       const classification = await classifyEmail(processingInput);
-      if (!classification.isRFQemail) {
-        res.status(400).json({
-          error: `This doesn't look like an RFQ. ${classification.reason}`,
-        });
+      if (!classification.isRFQ) {
+        res.status(400).json({ error: "This doesn't look like an RFQ." });
         return;
       }
-      reason = classification.reason;
+      rfqProbability = classification.probability;
     } catch (classifyErr) {
       console.warn("Manual RFQ classification failed, accepting submission:", classifyErr);
     }
@@ -934,7 +932,7 @@ export const createManualRFQ = async (
       organizationId: organization._id,
       source: "manual",
       isRFQ: true,
-      reason,
+      rfqProbability,
       isProcessed: false,
       manualInput,
     });

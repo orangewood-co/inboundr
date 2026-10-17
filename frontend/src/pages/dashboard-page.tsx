@@ -240,7 +240,6 @@ interface RFQSummary {
   source?: "email" | "manual"
   manualInput?: RFQManualInput | null
   isRFQ: boolean
-  reason: string
   isProcessed: boolean
   customer: RFQCustomer | null
   queryProducts: RFQProduct[]
@@ -3685,7 +3684,7 @@ export function DashboardPage() {
                   </div>
                 )}
 
-                {/* Classification Reason */}
+                {/* Classification */}
                 <div className="border-b px-6 py-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -3726,7 +3725,7 @@ export function DashboardPage() {
                     )}
                   </div>
                   <p className="rounded-lg border bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
-                    {detail.reason}
+                    {detail.source === "manual" ? "Added manually" : "Classified as a Request for Quotation"}
                   </p>
                 </div>
 
