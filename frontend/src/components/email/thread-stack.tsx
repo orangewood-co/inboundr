@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import { CopyableText } from "@/components/copy-button"
+import { CollapsibleChipRow } from "@/components/email/collapsible-chip-row"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatFullDateTime, formatListTimestamp } from "@/lib/format"
 import { getAvatarColor, cn } from "@/lib/utils"
@@ -74,30 +75,33 @@ function AttachmentChips({
   if (message.attachments.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-2 px-8 pb-4">
-      {message.attachments.map((attachment) => (
-        <Tooltip key={attachment.attachmentId}>
+    <CollapsibleChipRow
+      className="px-8 pb-4"
+      items={message.attachments}
+      getKey={(attachment) => attachment.attachmentId}
+      renderItem={(attachment) => (
+        <Tooltip>
           <TooltipTrigger asChild>
             {isPreviewable(attachment) ? (
               <button
                 type="button"
                 onClick={() => onPreview(message, attachment)}
-                className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                className="surface-inset inline-flex max-w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
-                <PaperclipIcon className="size-3" />
-                {attachment.filename}
-                <span className="text-[10px] opacity-50">{formatFileSize(attachment.size)}</span>
-                <EyeIcon className="size-3 opacity-60" />
+                <PaperclipIcon className="size-3 shrink-0" />
+                <span className="truncate">{attachment.filename}</span>
+                <span className="shrink-0 text-[10px] opacity-50">{formatFileSize(attachment.size)}</span>
+                <EyeIcon className="size-3 shrink-0 opacity-60" />
               </button>
             ) : (
               <a
                 href={buildAttachmentUrl(message._id, attachment.attachmentId, true)}
-                className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                className="surface-inset inline-flex max-w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               >
-                <PaperclipIcon className="size-3" />
-                {attachment.filename}
-                <span className="text-[10px] opacity-50">{formatFileSize(attachment.size)}</span>
-                <DownloadIcon className="size-3 opacity-60" />
+                <PaperclipIcon className="size-3 shrink-0" />
+                <span className="truncate">{attachment.filename}</span>
+                <span className="shrink-0 text-[10px] opacity-50">{formatFileSize(attachment.size)}</span>
+                <DownloadIcon className="size-3 shrink-0 opacity-60" />
               </a>
             )}
           </TooltipTrigger>
@@ -105,8 +109,8 @@ function AttachmentChips({
             {isPreviewable(attachment) ? "Click to preview" : "Click to download"}
           </TooltipContent>
         </Tooltip>
-      ))}
-    </div>
+      )}
+    />
   )
 }
 

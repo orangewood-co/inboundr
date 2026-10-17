@@ -38,6 +38,7 @@ import {
   SearchIcon,
 } from "lucide-react"
 
+import { CollapsibleChipRow } from "@/components/email/collapsible-chip-row"
 import { ReplyComposer } from "@/components/email/reply-composer"
 import { ThreadStack } from "@/components/email/thread-stack"
 import {
@@ -1624,36 +1625,39 @@ export function EmailsPage() {
                   <RecipientsBar to={detail.to} cc={detail.cc} />
 
                   {detail.attachments.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {detail.attachments.map((att, i) => (
-                        <Tooltip key={i}>
+                    <CollapsibleChipRow
+                      key={detail._id}
+                      items={detail.attachments}
+                      getKey={(att) => att.attachmentId}
+                      renderItem={(att) => (
+                        <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              className="surface-inset inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/60"
+                              className="surface-inset inline-flex max-w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/60"
                               onClick={() => previewAttachment(detail._id, att)}
                             >
-                              <PaperclipIcon className="size-3" />
-                              {att.filename}
-                              <span className="text-[10px] opacity-50">
+                              <PaperclipIcon className="size-3 shrink-0" />
+                              <span className="truncate">{att.filename}</span>
+                              <span className="shrink-0 text-[10px] opacity-50">
                                 ({(att.size / 1024).toFixed(0)}KB)
                               </span>
                               {isRFQSupportedAttachment(att) && (
-                                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                                <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
                                   RFQ scan
                                 </span>
                               )}
                               {isPreviewableAttachment(att) ? (
-                                <EyeIcon className="size-3 opacity-60" />
+                                <EyeIcon className="size-3 shrink-0 opacity-60" />
                               ) : (
-                                <ExternalLinkIcon className="size-3 opacity-60" />
+                                <ExternalLinkIcon className="size-3 shrink-0 opacity-60" />
                               )}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent>Click to preview {att.mimeType.split("/")[1]?.toUpperCase()}</TooltipContent>
                         </Tooltip>
-                      ))}
-                    </div>
+                      )}
+                    />
                   )}
 
                   {detail.rfqErrorMessage && (
