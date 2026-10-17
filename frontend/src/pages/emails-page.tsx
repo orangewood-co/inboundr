@@ -1597,6 +1597,9 @@ export function EmailsPage() {
                                 </span>
                               </SenderHoverCard>
                               <StatusBadge status={detail.status} />
+                              {detail.isRFQ !== null && detail.status !== "failed" && (
+                                <ClassificationBadge email={detail} />
+                              )}
                             </div>
                             <CopyableText value={senderEmail} label="Email copied">
                               <p className="truncate text-[11px] text-muted-foreground/60">
@@ -1653,19 +1656,10 @@ export function EmailsPage() {
                     </div>
                   )}
 
-                  {(detail.rfqErrorMessage || detail.isRFQ !== null) && (
-                    <div className="surface-inset rounded-xl border border-border/40 p-3">
-                      <div className="mb-1.5 flex items-center gap-2">
-                        <ClassificationBadge email={detail} />
-                        <span className="font-heading text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                          Classification
-                        </span>
-                      </div>
-                      <p className="text-[12px] leading-relaxed text-muted-foreground">
-                        {detail.rfqErrorMessage ||
-                          (detail.isRFQ ? "Classified as a Request for Quotation" : "Not a Request for Quotation")}
-                      </p>
-                    </div>
+                  {detail.rfqErrorMessage && (
+                    <p className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-[12px] leading-relaxed text-destructive">
+                      {detail.rfqErrorMessage}
+                    </p>
                   )}
                 </div>
 
