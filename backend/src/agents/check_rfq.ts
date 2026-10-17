@@ -1,35 +1,38 @@
 import { END, START, StateGraph, StateSchema, type GraphNode } from "@langchain/langgraph";
 import { z } from "zod";
-import { ChatOpenRouter } from "@langchain/openrouter";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { TypeSafeClassifier } from "@langchain/typesafe";
 
-const model = new ChatOpenRouter({
-  model: "openai/gpt-oss-120b",
-  temperature: 0,
+const RFQ_THRESHOLD = 0.7;
+
+const classifier = new TypeSafeClassifier({
+  model: "typesafe/jev-1.14",
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseUrl: "https://openrouter.ai/api",
+  questions: {
+    isRFQ: {
+      type: "noul",
+      instructions: "Is the person asking for a quote?",
+    },
+  },
 });
 
 const State = new StateSchema({
-  isRFQemail: z.boolean(),
+  isRFQ: z.boolean(),
   emailBody: z.string(),
-  reason: z.string(),
 });
 
 const checkRFQ: GraphNode<typeof State> = async (state) => {
   console.log("NODE: Check RFQ");
 
-  const isRFQemail = z.object({
-    isRFQemail: z.boolean(),
-    reason: z.string(),
-  });
+  const response = await classifier.invoke({ email: state.emailBody });
+  const answer = response.nouls.isRFQ;
+  if (!answer) {
+    throw new Error("TypeSafe response did not include an isRFQ answer");
+  }
 
-  const response = await model.withStructuredOutput(isRFQemail).invoke([
-    new SystemMessage(
-      `You are a RFQ email checker.
-       You are given an email and you need to check if it is an RFQ email.`
-    ),
-    new HumanMessage(state.emailBody),
-  ]);
-  return { isRFQemail: response.isRFQemail, reason: response.reason };
+  return {
+    isRFQ: answer.noul >= RFQ_THRESHOLD,
+  };
 };
 
 const graph = new StateGraph(State)
@@ -40,7 +43,7 @@ const graph = new StateGraph(State)
 
 export async function classifyEmail(
   emailBody: string
-): Promise<{ isRFQemail: boolean; reason: string }> {
+): Promise<{ isRFQ: boolean }> {
   const result = await graph.invoke({ emailBody });
-  return { isRFQemail: result.isRFQemail, reason: result.reason };
+  return { isRFQ: result.isRFQ };
 }
