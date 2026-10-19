@@ -1,58 +1,30 @@
 import { useTheme } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import { CheckIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
 import type { ThemeConfig } from "@/lib/themes"
 
 function ThemeSwatch({
   theme,
   mode,
-  active,
-  onClick,
 }: {
   theme: ThemeConfig
   mode: "light" | "dark"
-  active: boolean
-  onClick: () => void
 }) {
   const palette = mode === "dark" ? theme.dark : theme.light
-  const primary = palette["--primary"]
-  const background = palette["--background"]
-  const accent = palette["--accent"]
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "group relative flex flex-col items-center gap-1.5 rounded-lg border p-2.5 transition-all hover:bg-muted/50",
-        active
-          ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-          : "border-border"
-      )}
-    >
-      <div className="flex h-8 w-full items-center justify-center gap-1 rounded-md overflow-hidden">
-        <div
-          className="h-full flex-1 rounded-l-md"
-          style={{ backgroundColor: primary }}
-        />
-        <div
-          className="h-full flex-1"
-          style={{ backgroundColor: accent }}
-        />
-        <div
-          className="h-full flex-1 rounded-r-md"
-          style={{ backgroundColor: background }}
-        />
-      </div>
-      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground">
-        {theme.label}
-      </span>
-      {active && (
-        <div className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-primary">
-          <CheckIcon className="size-2.5 text-primary-foreground" />
-        </div>
-      )}
-    </button>
+    <span className="flex h-4 w-9 shrink-0 overflow-hidden rounded-sm border">
+      <span className="flex-1" style={{ backgroundColor: palette["--primary"] }} />
+      <span className="flex-1" style={{ backgroundColor: palette["--accent"] }} />
+      <span className="flex-1" style={{ backgroundColor: palette["--background"] }} />
+    </span>
   )
 }
 
@@ -77,22 +49,19 @@ export function ThemePicker({
       : mode
 
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[repeat(auto-fit,minmax(5.5rem,1fr))] gap-2",
-        className
-      )}
-    >
-      {availableThemes.map((theme) => (
-        <ThemeSwatch
-          key={theme.name}
-          theme={theme}
-          mode={resolvedMode}
-          active={activeTheme === theme.name}
-          onClick={() => handleChange(theme.name)}
-        />
-      ))}
-    </div>
+    <Select value={activeTheme} onValueChange={handleChange}>
+      <SelectTrigger className={cn("w-56", className)}>
+        <SelectValue placeholder="Select a Theme" />
+      </SelectTrigger>
+      <SelectContent>
+        {availableThemes.map((theme) => (
+          <SelectItem key={theme.name} value={theme.name}>
+            <ThemeSwatch theme={theme} mode={resolvedMode} />
+            {theme.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

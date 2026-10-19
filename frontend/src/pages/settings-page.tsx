@@ -1483,7 +1483,6 @@ function OrganizationTab() {
                 <ThemePicker
                   value={form.preferences.colorTheme}
                   onChange={updateColorThemePreference}
-                  className="pt-1"
                 />
               </div>
 
