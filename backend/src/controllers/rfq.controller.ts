@@ -848,7 +848,7 @@ export const downloadRFQPdf = async (
       return;
     }
 
-    streamRFQPdf(
+    await streamRFQPdf(
       rfq as any,
       await resolveOrganizationPdfBranding(organization),
       res,
