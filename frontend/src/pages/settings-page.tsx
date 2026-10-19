@@ -56,6 +56,7 @@ import {
   CheckCircle2Icon,
   CrownIcon,
   CheckIcon,
+  ChevronRightIcon,
   ContactRoundIcon,
   ImageIcon,
   KeyIcon,
@@ -325,6 +326,143 @@ function SectionHeader({
         <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
       </div>
       {action}
+    </div>
+  )
+}
+
+function TermTemplateList({
+  label,
+  description,
+  terms,
+  emptyText,
+  namePlaceholder,
+  textPlaceholder,
+  onAdd,
+  onUpdate,
+  onSetDefault,
+  onDelete,
+}: {
+  label: string
+  description: string
+  terms: TermTemplate[]
+  emptyText: string
+  namePlaceholder: string
+  textPlaceholder: string
+  onAdd: () => string
+  onUpdate: (id: string, field: "name" | "text", value: string) => void
+  onSetDefault: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set())
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleAdd = () => {
+    const id = onAdd()
+    setExpandedIds((current) => new Set(current).add(id))
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Label>{label}</Label>
+          <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={handleAdd} className="gap-2">
+          <PlusIcon className="size-3.5" />
+          Add Term
+        </Button>
+      </div>
+
+      {terms.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{emptyText}</div>
+      ) : (
+        <div className="divide-y overflow-hidden rounded-lg border bg-card/70">
+          {terms.map((term) => {
+            const isInvalid = !term.name.trim() || !term.text.trim()
+            const isExpanded = expandedIds.has(term.id) || isInvalid
+            const preview = term.text.trim().replace(/\s+/g, " ")
+
+            return (
+              <div key={term.id} className="group">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => !isInvalid && toggleExpanded(term.id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    aria-expanded={isExpanded}
+                  >
+                    <ChevronRightIcon
+                      className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        isExpanded && "rotate-90",
+                      )}
+                    />
+                    <span className="shrink-0 text-sm font-medium">
+                      {term.name.trim() || <span className="text-muted-foreground italic">Untitled</span>}
+                    </span>
+                    {preview && preview !== term.name.trim() && !isExpanded && (
+                      <span className="min-w-0 truncate text-[13px] text-muted-foreground">{preview}</span>
+                    )}
+                  </button>
+                  {term.isDefault ? (
+                    <Badge variant="secondary" className="gap-1">
+                      <CheckCircle2Icon className="size-3" />
+                      Default
+                    </Badge>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSetDefault(term.id)}
+                      className="h-7 px-2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      Make Default
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(term.id)}
+                    disabled={term.isDefault}
+                    className="h-7 px-2 text-muted-foreground hover:text-destructive"
+                    aria-label="Delete term"
+                  >
+                    <Trash2Icon className="size-3.5" />
+                  </Button>
+                </div>
+                {isExpanded && (
+                  <div className="space-y-2 px-3 pb-3 pl-9">
+                    <Input
+                      value={term.name}
+                      onChange={(event) => onUpdate(term.id, "name", event.target.value)}
+                      placeholder={namePlaceholder}
+                      className="h-8"
+                    />
+                    <textarea
+                      rows={2}
+                      value={term.text}
+                      onChange={(event) => onUpdate(term.id, "text", event.target.value)}
+                      placeholder={textPlaceholder}
+                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -876,6 +1014,7 @@ function OrganizationTab() {
       isDefault: form.preferences.paymentTerms.length === 0,
     }
     updatePaymentTerms([...form.preferences.paymentTerms, nextTerm])
+    return nextTerm.id
   }
 
   const updatePaymentTerm = (
@@ -927,6 +1066,7 @@ function OrganizationTab() {
       isDefault: form.preferences.deliveryTerms.length === 0,
     }
     updateDeliveryTerms([...form.preferences.deliveryTerms, nextTerm])
+    return nextTerm.id
   }
 
   const updateDeliveryTerm = (
@@ -1347,68 +1487,19 @@ function OrganizationTab() {
                 />
               </div>
 
-              <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <Label>Payment terms</Label>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Save reusable templates for RFQs. The default is preselected when a quote is created.
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addPaymentTerm} className="gap-2">
-                    <PlusIcon className="size-3.5" />
-                    Add Term
-                  </Button>
-                </div>
-
-                {paymentTerms.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    Add a payment term template to make it available in RFQs.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {paymentTerms.map((term) => (
-                      <div key={term.id} className="rounded-lg border bg-card/70 p-3">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <Input
-                            value={term.name}
-                            onChange={(event) => updatePaymentTerm(term.id, "name", event.target.value)}
-                            placeholder="Term name, e.g. Net 30"
-                            className="h-9 min-w-44 flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant={term.isDefault ? "secondary" : "outline"}
-                            size="sm"
-                            onClick={() => setDefaultPaymentTerm(term.id)}
-                            className="gap-1.5"
-                          >
-                            {term.isDefault && <CheckCircle2Icon className="size-3.5" />}
-                            {term.isDefault ? "Default" : "Make default"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deletePaymentTerm(term.id)}
-                            disabled={term.isDefault}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2Icon className="size-4" />
-                          </Button>
-                        </div>
-                        <textarea
-                          rows={4}
-                          value={term.text}
-                          onChange={(event) => updatePaymentTerm(term.id, "text", event.target.value)}
-                          placeholder="Payment due within 30 days from invoice date..."
-                          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
+              <div className="space-y-1.5">
+                <TermTemplateList
+                  label="Payment terms"
+                  description="Save reusable templates for RFQs. The default is preselected when a quote is created."
+                  terms={paymentTerms}
+                  emptyText="Add a payment term template to make it available in RFQs."
+                  namePlaceholder="Term name, e.g. Net 30"
+                  textPlaceholder="Payment due within 30 days from invoice date..."
+                  onAdd={addPaymentTerm}
+                  onUpdate={updatePaymentTerm}
+                  onSetDefault={setDefaultPaymentTerm}
+                  onDelete={deletePaymentTerm}
+                />
                 {hasInvalidPaymentTerms && (
                   <p className="text-xs text-destructive">Each payment term needs a name and text before saving.</p>
                 )}
@@ -1417,68 +1508,19 @@ function OrganizationTab() {
                 )}
               </div>
 
-              <div className="space-y-3 rounded-xl border bg-muted/15 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <Label>Delivery terms</Label>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      Save reusable delivery templates for RFQs. The default is preselected when a quote is created.
-                    </p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={addDeliveryTerm} className="gap-2">
-                    <PlusIcon className="size-3.5" />
-                    Add Term
-                  </Button>
-                </div>
-
-                {deliveryTerms.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                    Add a delivery term template to make it available in RFQs.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {deliveryTerms.map((term) => (
-                      <div key={term.id} className="rounded-lg border bg-card/70 p-3">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <Input
-                            value={term.name}
-                            onChange={(event) => updateDeliveryTerm(term.id, "name", event.target.value)}
-                            placeholder="Term name, e.g. Standard delivery"
-                            className="h-9 min-w-44 flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant={term.isDefault ? "secondary" : "outline"}
-                            size="sm"
-                            onClick={() => setDefaultDeliveryTerm(term.id)}
-                            className="gap-1.5"
-                          >
-                            {term.isDefault && <CheckCircle2Icon className="size-3.5" />}
-                            {term.isDefault ? "Default" : "Make default"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteDeliveryTerm(term.id)}
-                            disabled={term.isDefault}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2Icon className="size-4" />
-                          </Button>
-                        </div>
-                        <textarea
-                          rows={4}
-                          value={term.text}
-                          onChange={(event) => updateDeliveryTerm(term.id, "text", event.target.value)}
-                          placeholder="Delivery will be completed within 2-3 weeks from order confirmation..."
-                          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
+              <div className="space-y-1.5">
+                <TermTemplateList
+                  label="Delivery terms"
+                  description="Save reusable delivery templates for RFQs. The default is preselected when a quote is created."
+                  terms={deliveryTerms}
+                  emptyText="Add a delivery term template to make it available in RFQs."
+                  namePlaceholder="Term name, e.g. Standard delivery"
+                  textPlaceholder="Delivery will be completed within 2-3 weeks from order confirmation..."
+                  onAdd={addDeliveryTerm}
+                  onUpdate={updateDeliveryTerm}
+                  onSetDefault={setDefaultDeliveryTerm}
+                  onDelete={deleteDeliveryTerm}
+                />
                 {hasInvalidDeliveryTerms && (
                   <p className="text-xs text-destructive">Each delivery term needs a name and text before saving.</p>
                 )}
