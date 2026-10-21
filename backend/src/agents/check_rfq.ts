@@ -38,7 +38,14 @@ const checkRFQ: GraphNode<typeof State> = async (state) => {
 };
 
 const graph = new StateGraph(State)
-  .addNode("checkRFQ", checkRFQ)
+  .addNode(
+    "checkRFQ", 
+    checkRFQ,
+    {
+      retryPolicy: { maxAttempts: 5, initialInterval: 1000, backoffFactor: 2, maxInterval: 120000, jitter: true },
+      timeout: { runTimeout: 120000 },
+    }
+  )
   .addEdge(START, "checkRFQ")
   .addEdge("checkRFQ", END)
   .compile();

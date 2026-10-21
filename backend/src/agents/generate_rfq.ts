@@ -588,9 +588,18 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 const graph = new StateGraph(State)
-  .addNode("identifyCustomer", identifyCustomer)
-  .addNode("identifyProducts", identifyProducts)
-  .addNode("searchProducts", searchProducts)
+  .addNode("identifyCustomer", identifyCustomer,{
+    retryPolicy: { maxAttempts: 5, initialInterval: 1000, backoffFactor: 2, maxInterval: 120000, jitter: true },
+    timeout: { runTimeout: 120000 },
+  })
+  .addNode("identifyProducts", identifyProducts,{
+    retryPolicy: { maxAttempts: 5, initialInterval: 1000, backoffFactor: 2, maxInterval: 120000, jitter: true },
+    timeout: { runTimeout: 120000 },
+  })
+  .addNode("searchProducts", searchProducts,{
+    retryPolicy: { maxAttempts: 5, initialInterval: 1000, backoffFactor: 2, maxInterval: 120000, jitter: true },
+    timeout: { runTimeout: 120000 },
+  })
   .addEdge(START, "identifyCustomer")
   .addEdge("identifyCustomer", "identifyProducts")
   .addEdge("identifyProducts", "searchProducts")
