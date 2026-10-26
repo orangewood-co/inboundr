@@ -1,4 +1,4 @@
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatOpenRouter } from "@langchain/openrouter";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { PDFParse } from "pdf-parse";
 import * as XLSX from "xlsx";
@@ -6,13 +6,16 @@ import type { EmailAttachment } from "../types/email.types";
 
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 const MAX_ATTACHMENTS = 4;
+const MAX_INLINE_IMAGES = 3;
+// Tracking pixels, spacers and social icons in signatures sit well below this.
+const MIN_INLINE_IMAGE_BYTES = 5 * 1024;
 const MAX_PDF_PAGES = 4;
 const MAX_EXTRACTED_CHARS_PER_ATTACHMENT = 12000;
 const MAX_SPREADSHEET_SHEETS = 2;
 const MAX_SPREADSHEET_ROWS_PER_SHEET = 100;
 
-const imageModel = new ChatOpenAI({
-  model: "gpt-4o-mini",
+const imageModel = new ChatOpenRouter({
+  model: "anthropic/claude-haiku-5.5",
   temperature: 0,
 });
 
@@ -69,6 +72,25 @@ export function getSupportedRFQAttachments(
   attachments: EmailAttachment[]
 ): EmailAttachment[] {
   return attachments.filter(isSupportedRFQAttachment).slice(0, MAX_ATTACHMENTS);
+}
+
+/**
+ * Inline images RFQ extraction reads. Customers often paste the requirement
+ * table into the body as a screenshot, but signature logos arrive the same way,
+ * so tiny images are skipped and only the largest few are read.
+ */
+export function getSupportedRFQInlineImages<T extends EmailAttachment>(
+  inlineImages: T[]
+): T[] {
+  return inlineImages
+    .filter(
+      (image) =>
+        SUPPORTED_IMAGE_MIME_TYPES.has(image.mimeType) &&
+        image.size >= MIN_INLINE_IMAGE_BYTES &&
+        image.size <= MAX_ATTACHMENT_BYTES
+    )
+    .sort((a, b) => b.size - a.size)
+    .slice(0, MAX_INLINE_IMAGES);
 }
 
 /**
@@ -200,7 +222,7 @@ async function extractImageText(input: AttachmentExtractionInput): Promise<strin
     }),
   ]);
 
-  return trimExtractedText(String(response.content ?? ""));
+  return trimExtractedText(response.text);
 }
 
 export async function extractRFQAttachmentText(

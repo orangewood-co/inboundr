@@ -1249,9 +1249,7 @@ export function EmailsPage() {
     const { name } = parseSender(from)
     return name.charAt(0).toUpperCase()
   }
-  const canReprocessDetail = Boolean(
-    detail && (detail.status === "failed" || detail.rfqErrorMessage)
-  )
+  const canReprocessDetail = Boolean(detail && detail.status !== "processing")
   const canOpenDetailRFQ = Boolean(detail?.isRFQ === true && detail.rfqId)
 
   return (

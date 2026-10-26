@@ -6,6 +6,7 @@ import { getObjectBuffer } from "./storage.service";
 import {
   extractRFQAttachmentText,
   getSupportedRFQAttachments,
+  getSupportedRFQInlineImages,
 } from "./rfq-attachment.service";
 
 type EmailForRFQInput = Pick<
@@ -18,6 +19,7 @@ type EmailForRFQInput = Pick<
   | "bodyText"
   | "bodyHtml"
   | "attachments"
+  | "inlineImages"
 >;
 
 async function getAttachmentData(
@@ -117,6 +119,31 @@ export async function buildRFQProcessingInput(
 
   if (attachmentSections.length > 0) {
     sections.push(`SUPPORTED ATTACHMENTS:\n${attachmentSections.join("\n\n")}`);
+  }
+
+  const inlineImageSections: string[] = [];
+
+  for (const image of getSupportedRFQInlineImages(email.inlineImages ?? [])) {
+    const data = await getAttachmentData(account, email.messageId, image.attachmentId);
+    const extraction = await extractRFQAttachmentText({ attachment: image, data });
+
+    if (extraction.text) {
+      inlineImageSections.push(
+        `INLINE IMAGE: ${extraction.filename} (cid:${image.contentId})\n${extraction.text}`
+      );
+    } else if (extraction.warning) {
+      // Logos and other decorative images extract to nothing, so the warning
+      // stays out of the model input, but a failed read must still be visible.
+      console.warn(
+        `Inline image ${image.contentId} on email ${email.messageId} not read: ${extraction.warning}`
+      );
+    }
+  }
+
+  if (inlineImageSections.length > 0) {
+    sections.push(
+      `IMAGES EMBEDDED IN THE EMAIL BODY (the body refers to each by its cid):\n${inlineImageSections.join("\n\n")}`
+    );
   }
 
   return sections.join("\n\n");

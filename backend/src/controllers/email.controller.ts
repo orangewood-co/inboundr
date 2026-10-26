@@ -502,15 +502,25 @@ export const reprocessEmail = async (
       return;
     }
 
-    const rfq = await RFQ.findOne({
+    // The status flips to "processing" before this responds, so a repeat click
+    // is turned away instead of racing the first run into a duplicate RFQ.
+    if (email.status === "processing") {
+      res.status(409).json({ error: "Email is already being processed" });
+      return;
+    }
+
+    // Reprocessing deletes this email's RFQ and extracts a fresh one, which
+    // would silently discard a quote the team already drafted or sent.
+    const hasQuoteWork = await RFQ.exists({
       emailId: email._id,
       userId: authReq.user.id,
       organizationId: organization._id,
+      workflowStatus: { $in: ["draft", "processed"] },
     });
-    const hasFailedRFQ = Boolean(rfq?.errorMessage);
-
-    if (email.status !== "failed" && !hasFailedRFQ) {
-      res.status(400).json({ error: "Only failed emails can be reprocessed" });
+    if (hasQuoteWork) {
+      res.status(409).json({
+        error: "This RFQ already has a drafted or sent quote, which reprocessing would discard",
+      });
       return;
     }
 
