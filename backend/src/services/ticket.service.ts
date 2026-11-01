@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { Customer } from "../models/customer.model";
 import { SupportTicketTag } from "../models/support-ticket-tag.model";
 import { Ticket, type ITicket, type TicketStatus } from "../models/ticket.model";
+import { emitDomainEvent } from "../events/domain-events";
 import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft.model";
 import {
   TicketMessage,
@@ -654,6 +655,11 @@ export async function resolveTicket(input: {
     { returnDocument: "after" }
   ).lean();
   if (!ticket) return null;
+  void emitDomainEvent("support.ticket_resolved", {
+    ticketId: String(ticket._id),
+    organizationId: String(ticket.organizationId),
+    channel: ticket.channel,
+  });
   try {
     await sendSupportResolvedEmail(String(ticket._id));
   } catch (err) {

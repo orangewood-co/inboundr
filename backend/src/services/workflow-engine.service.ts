@@ -2,10 +2,12 @@ import {
   registerDomainEventHandler,
   type FormDomainEventPayload,
   type RFQDomainEventPayload,
+  type SupportDomainEventPayload,
 } from "../events/domain-events";
 import {
   Workflow,
   WORKFLOW_TRIGGER_EVENTS,
+  isSupportTriggerNodeType,
   type IWorkflow,
   type IWorkflowNode,
   type WorkflowTriggerEvent,
@@ -15,12 +17,39 @@ import { RFQ } from "../models/rfq.model";
 import { Form } from "../models/form.model";
 import { FormSubmission } from "../models/form-submission.model";
 import { Organization } from "../models/organization.model";
+import { Ticket } from "../models/ticket.model";
+import { TicketMessage } from "../models/ticket-message.model";
 import {
   WORKFLOW_NODE_EXECUTORS,
   type WorkflowNodeContext,
 } from "./workflow-nodes";
 
-type WorkflowTriggerPayload = RFQDomainEventPayload | FormDomainEventPayload;
+type WorkflowTriggerPayload =
+  | RFQDomainEventPayload
+  | FormDomainEventPayload
+  | SupportDomainEventPayload;
+
+function isFormPayload(payload: WorkflowTriggerPayload): payload is FormDomainEventPayload {
+  return "submissionId" in payload;
+}
+
+function isSupportPayload(payload: WorkflowTriggerPayload): payload is SupportDomainEventPayload {
+  return "ticketId" in payload;
+}
+
+function findTriggerNode(workflow: IWorkflow): IWorkflowNode | undefined {
+  return workflow.nodes.find((node) => node.type.startsWith("trigger."));
+}
+
+/** Applies per-trigger filters that can't be expressed in the workflow query. */
+function triggerMatchesPayload(workflow: IWorkflow, payload: WorkflowTriggerPayload): boolean {
+  if (!isSupportPayload(payload)) return true;
+  const triggerNode = findTriggerNode(workflow);
+  if (!triggerNode || !isSupportTriggerNodeType(triggerNode.type)) return false;
+  const channel = triggerNode.config?.channel;
+  if (typeof channel !== "string" || !channel || channel === "any") return true;
+  return channel === payload.channel;
+}
 
 const MAX_STEPS_PER_RUN = 50;
 
@@ -50,6 +79,24 @@ async function loadNodeContext(
     organizationId: String(run.organizationId),
     userId: run.context.userId,
   };
+
+  if (run.ticketId) {
+    const [ticket, ticketMessage, organization] = await Promise.all([
+      Ticket.findById(run.ticketId).lean(),
+      run.ticketMessageId ? TicketMessage.findById(run.ticketMessageId).lean() : null,
+      Organization.findById(run.organizationId).select("name").lean(),
+    ]);
+    if (!ticket) return { context: null, missing: "Support ticket no longer exists" };
+
+    return {
+      context: {
+        ...base,
+        ticket: ticket as WorkflowNodeContext["ticket"],
+        ticketMessage: ticketMessage as WorkflowNodeContext["ticketMessage"],
+        organizationName: organization?.name ?? "",
+      },
+    };
+  }
 
   if (run.formSubmissionId) {
     const [form, submission, organization] = await Promise.all([
@@ -190,17 +237,21 @@ async function startWorkflowRun(
   event: WorkflowTriggerEvent,
   payload: WorkflowTriggerPayload
 ): Promise<void> {
-  const triggerNode = workflow.nodes.find((node) => node.type.startsWith("trigger."));
+  const triggerNode = findTriggerNode(workflow);
   if (!triggerNode) return;
 
-  const isFormPayload = "submissionId" in payload;
+  const supportPayload = isSupportPayload(payload) ? payload : null;
+  const formPayload = isFormPayload(payload) ? payload : null;
+  const rfqPayload = supportPayload || formPayload ? null : (payload as RFQDomainEventPayload);
 
   const run = await WorkflowRun.create({
     workflowId: workflow._id,
     organizationId: workflow.organizationId,
-    rfqId: isFormPayload ? null : payload.rfqId,
-    formId: isFormPayload ? payload.formId : null,
-    formSubmissionId: isFormPayload ? payload.submissionId : null,
+    rfqId: rfqPayload?.rfqId ?? null,
+    formId: formPayload?.formId ?? null,
+    formSubmissionId: formPayload?.submissionId ?? null,
+    ticketId: supportPayload?.ticketId ?? null,
+    ticketMessageId: supportPayload?.messageId ?? null,
     status: "running",
     currentNodeId: triggerNode.id,
     steps: [
@@ -216,8 +267,8 @@ async function startWorkflowRun(
     ],
     context: {
       triggerEvent: event,
-      // Public form submissions have no acting user; notify the workflow owner.
-      userId: isFormPayload ? workflow.createdBy : payload.userId,
+      // Form submitters and support visitors have no user account; notify the workflow owner.
+      userId: rfqPayload ? rfqPayload.userId : workflow.createdBy,
     },
     startedAt: new Date(),
   });
@@ -234,13 +285,14 @@ async function handleTriggerEvent(
     enabled: true,
     "trigger.event": event,
   };
-  if ("submissionId" in payload) {
+  if (isFormPayload(payload)) {
     filter["trigger.formId"] = payload.formId;
   }
 
   const workflows = await Workflow.find(filter);
 
   for (const workflow of workflows) {
+    if (!triggerMatchesPayload(workflow, payload)) continue;
     try {
       await startWorkflowRun(workflow, event, payload);
     } catch (err) {

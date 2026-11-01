@@ -4,6 +4,7 @@ import { Customer } from "../models/customer.model";
 import { Ticket, type ITicket, type TicketPriority } from "../models/ticket.model";
 import { TicketMessage } from "../models/ticket-message.model";
 import { CallSession } from "../models/call-session.model";
+import { emitDomainEvent } from "../events/domain-events";
 import { loadOrgPromptContext } from "./support-chat.service";
 import { formatTicketReference } from "./ticket.service";
 
@@ -187,6 +188,11 @@ export async function ensureCallTicket(
     }
   }
   if (!ticket) throw new Error("Failed to create phone support ticket");
+  void emitDomainEvent("support.ticket_created", {
+    ticketId: String(ticket._id),
+    organizationId: String(ctx.organizationId),
+    channel: ticket.channel,
+  });
 
   if (callSession) {
     callSession.ticketId = ticket._id as mongoose.Types.ObjectId;

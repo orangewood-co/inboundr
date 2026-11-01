@@ -5,6 +5,7 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { auth } from "../lib/auth";
 import { Ticket } from "../models/ticket.model";
+import { emitDomainEvent } from "../events/domain-events";
 import { TicketMessage, type ITicketMessageAttachment } from "../models/ticket-message.model";
 import { getOrganizationContextForUser } from "./organization.service";
 import { hasEffectiveFeature } from "./entitlement.service";
@@ -425,6 +426,11 @@ async function handleResolve(ws: SupportSocket, payload: Record<string, unknown>
   ).lean();
   if (!ticket) return;
   if (resolved) {
+    void emitDomainEvent("support.ticket_resolved", {
+      ticketId: String(ticket._id),
+      organizationId: String(ticket.organizationId),
+      channel: ticket.channel,
+    });
     try {
       await sendSupportResolvedEmail(String(ticket._id));
     } catch (err) {

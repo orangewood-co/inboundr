@@ -9,6 +9,9 @@ export type WorkflowTriggerEvent =
   | "rfq.quote_sent"
   | "rfq.archived"
   | "form.submitted"
+  | "support.ticket_created"
+  | "support.message_received"
+  | "support.ticket_resolved"
 
 export interface WorkflowNodeData {
   id: string
@@ -77,6 +80,14 @@ export interface WorkflowRunRecord {
     slug: string
   } | null
   formSubmissionId: string | null
+  ticketId: {
+    _id: string
+    ticketReference: string
+    ticketNumber: number
+    subject: string
+    requester: { name: string; email: string; phoneNumber?: string } | null
+    channel: string
+  } | null
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

@@ -26,6 +26,9 @@ export interface IWorkflowRun extends Document {
   rfqId: Types.ObjectId | null;
   formId: Types.ObjectId | null;
   formSubmissionId: Types.ObjectId | null;
+  ticketId: Types.ObjectId | null;
+  /** Visitor message that fired a `support.message_received` run. */
+  ticketMessageId: Types.ObjectId | null;
   status: WorkflowRunStatus;
   currentNodeId: string | null;
   steps: IWorkflowRunStep[];
@@ -92,6 +95,17 @@ const workflowRunSchema = new Schema<IWorkflowRun>(
       ref: "FormSubmission",
       default: null,
       index: true,
+    },
+    ticketId: {
+      type: Schema.Types.ObjectId,
+      ref: "Ticket",
+      default: null,
+      index: true,
+    },
+    ticketMessageId: {
+      type: Schema.Types.ObjectId,
+      ref: "TicketMessage",
+      default: null,
     },
     status: {
       type: String,

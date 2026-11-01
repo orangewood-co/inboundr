@@ -3,6 +3,8 @@ import type { Types } from "mongoose";
 import { RFQ, type IRFQ } from "../models/rfq.model";
 import type { IForm } from "../models/form.model";
 import type { IFormSubmission } from "../models/form-submission.model";
+import type { ITicket } from "../models/ticket.model";
+import type { ITicketMessage } from "../models/ticket-message.model";
 import type { IWorkflow, IWorkflowNode } from "../models/workflow.model";
 import { sendEmail } from "../lib/email";
 import { WorkflowNotificationEmail } from "../emails/workflow-notification";
@@ -19,6 +21,10 @@ export interface WorkflowNodeContext {
   /** Present for form-triggered runs. */
   form?: IForm | null;
   submission?: IFormSubmission | null;
+  /** Present for support-triggered runs. */
+  ticket?: ITicket | null;
+  /** Present for `support.message_received` runs: the message that fired it. */
+  ticketMessage?: ITicketMessage | null;
   organizationId: string;
   organizationName: string;
   userId: string;
@@ -75,6 +81,14 @@ function formatSubmissionValue(value: unknown): string {
   }
   return String(value);
 }
+
+const TICKET_CHANNEL_LABELS: Record<string, string> = {
+  chat: "Live chat",
+  whatsapp: "WhatsApp",
+  phone: "Phone",
+  email: "Email",
+  form: "Form",
+};
 
 export function buildTemplateVariables(context: WorkflowNodeContext): Record<string, unknown> {
   const variables: Record<string, unknown> = {
@@ -135,6 +149,40 @@ export function buildTemplateVariables(context: WorkflowNodeContext): Record<str
     variables.submission = submissionVars;
   }
 
+  const { ticket, ticketMessage } = context;
+
+  if (ticket) {
+    variables.ticket = {
+      id: String(ticket._id),
+      reference: ticket.ticketReference || `#${ticket.ticketNumber}`,
+      subject: ticket.subject ?? "",
+      issue: ticket.initialIssue ?? "",
+      channel: TICKET_CHANNEL_LABELS[ticket.channel] ?? ticket.channel,
+      status: ticket.status,
+      priority: ticket.priority,
+      link: `${frontendOrigin}/support/${String(ticket._id)}`,
+      requester: {
+        name: ticket.requester?.name ?? "",
+        email: ticket.requester?.email ?? "",
+        phone: ticket.requester?.phoneNumber ?? "",
+      },
+      resolution: {
+        reason: ticket.resolution?.reasonLabel ?? "",
+        note: ticket.resolution?.note ?? "",
+      },
+    };
+  }
+
+  if (ticketMessage) {
+    const attachmentNames = (ticketMessage.attachments ?? [])
+      .map((attachment) => attachment.originalName)
+      .filter(Boolean);
+    variables.message = {
+      text: ticketMessage.bodyText ?? "",
+      attachments: attachmentNames.join(", "),
+    };
+  }
+
   return variables;
 }
 
@@ -169,13 +217,30 @@ async function executeSendEmail(context: WorkflowNodeContext): Promise<WorkflowN
   return { output: `Email sent to ${to.join(", ")}` };
 }
 
+/** Short human label for whatever triggered the run, used in fallback copy. */
+function describeRunSubject(context: WorkflowNodeContext): string {
+  if (context.rfq) {
+    const email =
+      context.rfq.emailId && typeof context.rfq.emailId === "object" && "subject" in context.rfq.emailId
+        ? context.rfq.emailId
+        : null;
+    return email?.subject || "RFQ";
+  }
+  if (context.ticket) {
+    const reference = context.ticket.ticketReference || `#${context.ticket.ticketNumber}`;
+    return context.ticket.subject ? `${reference} ${context.ticket.subject}` : reference;
+  }
+  if (context.form) return context.form.title || "Form submission";
+  return context.workflow.name;
+}
+
 async function executeRequestApproval(context: WorkflowNodeContext): Promise<WorkflowNodeResult> {
   const config = context.node.config ?? {};
   const variables = buildTemplateVariables(context);
   const to = parseRecipients(interpolateTemplate(configString(config, "to"), variables));
   const subject =
     interpolateTemplate(configString(config, "subject"), variables) ||
-    `Approval needed: ${String(lookupPath(variables, "rfq.subject") ?? "RFQ")}`;
+    `Approval needed: ${describeRunSubject(context)}`;
   const message =
     interpolateTemplate(configString(config, "message"), variables) ||
     "A workflow run is waiting for your decision.";
@@ -256,14 +321,18 @@ async function executeNotify(context: WorkflowNodeContext): Promise<WorkflowNode
 
   const actionUrl = context.rfq
     ? `/rfq?rfq=${String(context.rfq._id)}`
-    : context.form
-      ? `/forms/${context.form.slug}`
-      : null;
+    : context.ticket
+      ? `/support/${String(context.ticket._id)}`
+      : context.form
+        ? `/forms/${context.form.slug}`
+        : null;
   const entityId = context.rfq
     ? String(context.rfq._id)
-    : context.submission
-      ? String(context.submission._id)
-      : context.runId;
+    : context.ticket
+      ? String(context.ticket._id)
+      : context.submission
+        ? String(context.submission._id)
+        : context.runId;
 
   await createNotificationForRecipient({
     organizationId: context.organizationId,

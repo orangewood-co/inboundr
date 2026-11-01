@@ -5,6 +5,7 @@ import { Customer } from "../models/customer.model";
 import { Organization } from "../models/organization.model";
 import { OrganizationMember } from "../models/organization-member.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
+import { emitDomainEvent } from "../events/domain-events";
 import {
   TicketMessage,
   type ITicketMessage,
@@ -252,6 +253,11 @@ async function createWhatsAppTicket(input: {
     }
   }
   if (!ticket) throw new Error("Failed to create WhatsApp support ticket");
+  void emitDomainEvent("support.ticket_created", {
+    ticketId: String(ticket._id),
+    organizationId: String(organizationId),
+    channel: ticket.channel,
+  });
   return ticket;
 }
 

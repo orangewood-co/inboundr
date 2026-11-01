@@ -157,8 +157,18 @@ function runContext(run: WorkflowRunRecord): string | null {
     const who = run.rfqId.customer.company || run.rfqId.customer.name
     return run.rfqId.quoteNumber ? `${who} · ${run.rfqId.quoteNumber}` : who
   }
+  if (run.ticketId) {
+    const who = run.ticketId.requester?.name
+    return who ? `${run.ticketId.ticketReference} · ${who}` : run.ticketId.ticketReference
+  }
   if (run.formId) return run.formId.title || "Untitled form"
   return null
+}
+
+function runContextLabel(run: WorkflowRunRecord): string {
+  if (run.rfqId) return "RFQ: "
+  if (run.ticketId) return "Ticket: "
+  return "Form: "
 }
 
 function SearchField({
@@ -471,7 +481,7 @@ function RunDetailSheet({
 
             {runContext(run) && (
               <p className="truncate text-xs text-muted-foreground">
-                {run.rfqId ? "RFQ: " : "Form: "}
+                {runContextLabel(run)}
                 <span className="font-medium text-foreground">{runContext(run)}</span>
               </p>
             )}

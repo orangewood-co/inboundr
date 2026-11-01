@@ -2,11 +2,14 @@ import type { LucideIcon } from "lucide-react"
 import {
   ArchiveIcon,
   BellIcon,
+  CircleCheckBigIcon,
   ClipboardListIcon,
   FileSearchIcon,
   FileTextIcon,
   MailCheckIcon,
   MailIcon,
+  MessageSquarePlusIcon,
+  MessageSquareTextIcon,
   ShieldCheckIcon,
   ShoppingCartIcon,
   TimerIcon,
@@ -70,6 +73,29 @@ export const FORM_TEMPLATE_VARIABLES: TemplateVariable[] = [
   { token: "{{form.link}}", label: "Form link" },
 ]
 
+export const SUPPORT_TEMPLATE_VARIABLES: TemplateVariable[] = [
+  { token: "{{ticket.reference}}", label: "Ticket reference" },
+  { token: "{{ticket.subject}}", label: "Ticket subject" },
+  { token: "{{ticket.issue}}", label: "Initial issue" },
+  { token: "{{ticket.requester.name}}", label: "Requester name" },
+  { token: "{{ticket.requester.email}}", label: "Requester email" },
+  { token: "{{ticket.requester.phone}}", label: "Requester phone" },
+  { token: "{{ticket.channel}}", label: "Channel" },
+  { token: "{{ticket.priority}}", label: "Priority" },
+  { token: "{{ticket.status}}", label: "Status" },
+  { token: "{{ticket.link}}", label: "Ticket link" },
+]
+
+export const SUPPORT_MESSAGE_TEMPLATE_VARIABLES: TemplateVariable[] = [
+  { token: "{{message.text}}", label: "Message text" },
+  { token: "{{message.attachments}}", label: "Message attachments" },
+]
+
+export const SUPPORT_RESOLUTION_TEMPLATE_VARIABLES: TemplateVariable[] = [
+  { token: "{{ticket.resolution.reason}}", label: "Resolution reason" },
+  { token: "{{ticket.resolution.note}}", label: "Resolution note" },
+]
+
 export const GENERIC_TEMPLATE_VARIABLES: TemplateVariable[] = [
   { token: "{{workflow.name}}", label: "Workflow name" },
   { token: "{{organization.name}}", label: "Organization name" },
@@ -79,6 +105,44 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
   ...RFQ_TEMPLATE_VARIABLES,
   ...GENERIC_TEMPLATE_VARIABLES,
 ]
+
+/** Variables available to support-triggered workflows, by trigger type. */
+export function supportTemplateVariables(triggerType: string): TemplateVariable[] {
+  return [
+    ...SUPPORT_TEMPLATE_VARIABLES,
+    ...(triggerType === "trigger.support_message_received"
+      ? SUPPORT_MESSAGE_TEMPLATE_VARIABLES
+      : []),
+    ...(triggerType === "trigger.support_ticket_resolved"
+      ? SUPPORT_RESOLUTION_TEMPLATE_VARIABLES
+      : []),
+    ...GENERIC_TEMPLATE_VARIABLES,
+  ]
+}
+
+export function isRfqTriggerType(type: string | undefined): boolean {
+  return (type ?? "").startsWith("trigger.rfq_")
+}
+
+export function isSupportTriggerType(type: string | undefined): boolean {
+  return (type ?? "").startsWith("trigger.support_")
+}
+
+function supportChannelField(
+  options: WorkflowFieldOption[]
+): WorkflowFieldDefinition {
+  return {
+    key: "channel",
+    label: "Channel",
+    type: "select",
+    defaultValue: "any",
+    options: [{ value: "any", label: "Any Channel" }, ...options],
+  }
+}
+
+const LIVE_CHAT_OPTION = { value: "chat", label: "Live Chat" }
+const WHATSAPP_OPTION = { value: "whatsapp", label: "WhatsApp" }
+const PHONE_OPTION = { value: "phone", label: "Phone" }
 
 export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
   {
@@ -147,6 +211,36 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
         required: true,
       },
     ],
+  },
+  {
+    type: "trigger.support_ticket_created",
+    label: "New Support Chat",
+    description: "Runs when a customer starts a support conversation.",
+    category: "trigger",
+    icon: MessageSquarePlusIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [supportChannelField([LIVE_CHAT_OPTION, WHATSAPP_OPTION, PHONE_OPTION])],
+  },
+  {
+    type: "trigger.support_message_received",
+    label: "Support Message Received",
+    description: "Runs every time a customer sends a message in a support conversation.",
+    category: "trigger",
+    icon: MessageSquareTextIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [supportChannelField([LIVE_CHAT_OPTION, WHATSAPP_OPTION])],
+  },
+  {
+    type: "trigger.support_ticket_resolved",
+    label: "Support Ticket Resolved",
+    description: "Runs when an agent resolves a support conversation.",
+    category: "trigger",
+    icon: CircleCheckBigIcon,
+    hasInput: false,
+    outputs: [{ id: null }],
+    fields: [supportChannelField([LIVE_CHAT_OPTION, WHATSAPP_OPTION, PHONE_OPTION])],
   },
   {
     type: "action.send_email",
@@ -249,7 +343,8 @@ export const NODE_DEFINITIONS: WorkflowNodeDefinition[] = [
   {
     type: "action.notify",
     label: "Notify in App",
-    description: "Sends an in-app notification to the RFQ owner.",
+    description:
+      "Sends an in-app notification to the RFQ owner, or to the workflow owner for form and support runs.",
     category: "action",
     icon: BellIcon,
     hasInput: true,

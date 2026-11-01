@@ -321,6 +321,7 @@ export const listAllWorkflowRuns = async (req: Request, res: Response): Promise<
         .populate("workflowId", "name")
         .populate("rfqId", "customer quoteNumber workflowStatus")
         .populate("formId", "title slug")
+        .populate("ticketId", "ticketReference ticketNumber subject requester channel")
         .lean(),
       WorkflowRun.countDocuments(filter),
     ]);
@@ -354,6 +355,7 @@ export const listWorkflowRuns = async (req: Request, res: Response): Promise<voi
       .limit(limit)
       .populate("rfqId", "customer quoteNumber workflowStatus")
       .populate("formId", "title slug")
+      .populate("ticketId", "ticketReference ticketNumber subject requester channel")
       .lean();
 
     res.json({ runs });

@@ -25,6 +25,8 @@ import {
   NODE_DEFINITION_MAP,
   TEMPLATE_VARIABLES,
   isNodeConfigComplete,
+  isSupportTriggerType,
+  supportTemplateVariables,
   type TemplateVariable,
   type WorkflowFieldDefinition,
 } from "./node-definitions"
@@ -38,8 +40,9 @@ const FILLED_INPUT =
 
 /**
  * Variables available for the current graph: form triggers expose the
- * selected form's fields as `{{submission.<fieldId>}}`; RFQ triggers keep
- * the static RFQ list.
+ * selected form's fields as `{{submission.<fieldId>}}`; support triggers
+ * expose the ticket (plus message/resolution where relevant); RFQ triggers
+ * keep the static RFQ list.
  */
 function useTemplateVariables(): TemplateVariable[] {
   const nodes = useWorkflowBuilderStore((state) => state.nodes)
@@ -47,6 +50,9 @@ function useTemplateVariables(): TemplateVariable[] {
 
   return useMemo(() => {
     const trigger = nodes.find((node) => (node.type ?? "").startsWith("trigger."))
+    if (trigger && isSupportTriggerType(trigger.type)) {
+      return supportTemplateVariables(trigger.type ?? "")
+    }
     if (trigger?.type !== "trigger.form_submitted") return TEMPLATE_VARIABLES
 
     const formId = String(trigger.data.config?.formId ?? "")

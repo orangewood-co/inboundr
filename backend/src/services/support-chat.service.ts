@@ -9,6 +9,7 @@ import { SupportAiDraft, type ISupportAiDraft } from "../models/support-ai-draft
 import { SupportKnowledgeArticle } from "../models/support-knowledge-article.model";
 import { SupportTemplate } from "../models/support-template.model";
 import { Ticket, type ITicket } from "../models/ticket.model";
+import { emitDomainEvent } from "../events/domain-events";
 import {
   TicketMessage,
   type ITicketMessage,
@@ -195,13 +196,15 @@ export async function createSupportSession(
   }
   if (!ticket) throw new Error("Failed to create support session");
 
+  let initialMessageId: string | null = null;
   if (initialIssue) {
-    await TicketMessage.create({
+    const initialMessage = await TicketMessage.create({
       ticketId: ticket._id,
       organizationId,
       authorType: "visitor",
       bodyText: initialIssue,
     });
+    initialMessageId = String(initialMessage._id);
   }
 
   if (organization.supportAiEnabled) {
@@ -212,6 +215,16 @@ export async function createSupportSession(
       authorType: "bot",
       bodyText: `Hi ${firstName}! Welcome to ${organization.name} support. How can we help you today?`,
     });
+  }
+
+  const eventBase = {
+    ticketId: String(ticket._id),
+    organizationId: String(organizationId),
+    channel: ticket.channel,
+  };
+  void emitDomainEvent("support.ticket_created", eventBase);
+  if (initialMessageId) {
+    void emitDomainEvent("support.message_received", { ...eventBase, messageId: initialMessageId });
   }
 
   return ticket;
@@ -628,5 +641,11 @@ export async function appendVisitorMessage(
     update.subject = bodyText.slice(0, 80);
   }
   await Ticket.updateOne({ _id: ticket._id }, update);
+  void emitDomainEvent("support.message_received", {
+    ticketId: String(ticket._id),
+    organizationId: String(ticket.organizationId),
+    channel: ticket.channel,
+    messageId: String(message._id),
+  });
   return message;
 }

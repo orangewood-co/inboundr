@@ -10,6 +10,7 @@ import {
   CATEGORY_STYLES,
   NODE_DEFINITIONS,
   RFQ_ONLY_NODE_TYPES,
+  isRfqTriggerType,
   type WorkflowNodeCategory,
   type WorkflowNodeDefinition,
 } from "./node-definitions"
@@ -86,8 +87,10 @@ export function NodePalette({
   const hasTrigger = useWorkflowBuilderStore((state) =>
     state.nodes.some((node) => (node.type ?? "").startsWith("trigger."))
   )
-  const hasFormTrigger = useWorkflowBuilderStore((state) =>
-    state.nodes.some((node) => node.type === "trigger.form_submitted")
+  const hasNonRfqTrigger = useWorkflowBuilderStore((state) =>
+    state.nodes.some(
+      (node) => (node.type ?? "").startsWith("trigger.") && !isRfqTriggerType(node.type)
+    )
   )
 
   const sections = useMemo(() => {
@@ -162,7 +165,7 @@ export function NodePalette({
               {definitions.map((definition) => {
                 const triggerTaken = category === "trigger" && hasTrigger
                 const rfqOnlyBlocked =
-                  hasFormTrigger && RFQ_ONLY_NODE_TYPES.includes(definition.type)
+                  hasNonRfqTrigger && RFQ_ONLY_NODE_TYPES.includes(definition.type)
                 return (
                   <PaletteRow
                     key={definition.type}
@@ -171,7 +174,7 @@ export function NodePalette({
                     disabledReason={
                       triggerTaken
                         ? "A workflow can only have one trigger"
-                        : "This step needs an RFQ trigger — it can't run for form submissions"
+                        : "This step needs an RFQ trigger — it can't run for form or support workflows"
                     }
                     onAdd={addAtViewportCenter}
                   />

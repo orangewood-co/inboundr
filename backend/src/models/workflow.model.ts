@@ -7,6 +7,9 @@ export const WORKFLOW_TRIGGER_EVENTS = [
   "rfq.quote_sent",
   "rfq.archived",
   "form.submitted",
+  "support.ticket_created",
+  "support.message_received",
+  "support.ticket_resolved",
 ] as const;
 export type WorkflowTriggerEvent = (typeof WORKFLOW_TRIGGER_EVENTS)[number];
 
@@ -17,6 +20,9 @@ export const WORKFLOW_NODE_TYPES = [
   "trigger.rfq_quote_sent",
   "trigger.rfq_archived",
   "trigger.form_submitted",
+  "trigger.support_ticket_created",
+  "trigger.support_message_received",
+  "trigger.support_ticket_resolved",
   "action.send_email",
   "action.request_approval",
   "action.place_order",
@@ -33,9 +39,19 @@ export const TRIGGER_NODE_EVENT_MAP: Record<string, WorkflowTriggerEvent> = {
   "trigger.rfq_quote_sent": "rfq.quote_sent",
   "trigger.rfq_archived": "rfq.archived",
   "trigger.form_submitted": "form.submitted",
+  "trigger.support_ticket_created": "support.ticket_created",
+  "trigger.support_message_received": "support.message_received",
+  "trigger.support_ticket_resolved": "support.ticket_resolved",
 };
 
-/** Actions that operate on the triggering RFQ and make no sense for form runs. */
+/** Values accepted by the `channel` filter on support trigger nodes. */
+export const SUPPORT_TRIGGER_CHANNELS = ["any", "chat", "whatsapp", "phone"] as const;
+
+export function isSupportTriggerNodeType(type: string): boolean {
+  return type.startsWith("trigger.support_");
+}
+
+/** Actions that operate on the triggering RFQ and only work with RFQ triggers. */
 export const RFQ_ONLY_NODE_TYPES: WorkflowNodeType[] = [
   "action.place_order",
   "action.archive_rfq",
@@ -161,13 +177,25 @@ export function validateWorkflowGraph(
     if (typeof formId !== "string" || !formId.trim()) {
       return { valid: false, error: "The Form Submitted trigger needs a form selected" };
     }
-    const rfqOnlyNode = nodes.find((node) =>
-      RFQ_ONLY_NODE_TYPES.includes(node.type)
-    );
+  }
+
+  if (isSupportTriggerNodeType(triggerNode.type)) {
+    const channel = triggerNode.config?.channel;
+    if (
+      channel != null &&
+      channel !== "" &&
+      !(SUPPORT_TRIGGER_CHANNELS as readonly unknown[]).includes(channel)
+    ) {
+      return { valid: false, error: "The support trigger has an unknown channel selected" };
+    }
+  }
+
+  if (!triggerNode.type.startsWith("trigger.rfq_")) {
+    const rfqOnlyNode = nodes.find((node) => RFQ_ONLY_NODE_TYPES.includes(node.type));
     if (rfqOnlyNode) {
       return {
         valid: false,
-        error: "Place Order and Archive RFQ nodes cannot be used with a form trigger",
+        error: "Place Order and Archive RFQ nodes can only be used with an RFQ trigger",
       };
     }
   }

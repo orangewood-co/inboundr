@@ -10,6 +10,15 @@ export interface FormDomainEventPayload {
   organizationId: string;
 }
 
+export interface SupportDomainEventPayload {
+  ticketId: string;
+  organizationId: string;
+  /** Ticket channel ("chat", "whatsapp", "phone", …) so listeners can filter without a lookup. */
+  channel: string;
+  /** Present for `support.message_received`: the visitor message that fired the event. */
+  messageId?: string;
+}
+
 export interface EmailReplySentPayload {
   emailId: string;
   inReplyToEmailId: string | null;
@@ -37,6 +46,9 @@ export interface DomainEventMap {
   "rfq.quote_sent": RFQDomainEventPayload;
   "rfq.archived": RFQDomainEventPayload;
   "form.submitted": FormDomainEventPayload;
+  "support.ticket_created": SupportDomainEventPayload;
+  "support.message_received": SupportDomainEventPayload;
+  "support.ticket_resolved": SupportDomainEventPayload;
   "email.reply_sent": EmailReplySentPayload;
 }
 
