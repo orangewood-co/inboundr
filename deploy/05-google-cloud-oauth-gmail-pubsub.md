@@ -43,7 +43,7 @@ After Step 11: connect a Gmail account in **Settings**, send a test email to it,
 ## Gotchas
 
 - **External + Testing mode**: only listed test users can connect, and **refresh tokens expire after 7 days**. Gmail sync will silently stop. `gmail.readonly` is a *restricted* scope, so publishing an External app requires Google verification (and possibly a security assessment). Use **Internal** if you can.
-- If you are moving from an existing deployment, you can keep the existing OAuth client and topic. Just add the new redirect URIs and point the push subscription at the new API.
+- If you are moving from an existing deployment, **keep the existing OAuth client** and topic. Just add the new redirect URIs and point the push subscription at the new API. Stored Gmail refresh tokens only work with the client that issued them, so a new `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` stops sync and sending for every imported mailbox until each user reconnects Gmail in **Settings**.
 - The webhook endpoint currently doesn't check who is calling it. Optionally, turn on Pub/Sub push authentication later.
 
 ## Role in the bigger picture
