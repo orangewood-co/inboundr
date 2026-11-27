@@ -39,7 +39,7 @@ Useful commands: `journalctl -u inboundr-backend -f`, `journalctl -u inboundr-ba
    #!/usr/bin/env bash
    set -euo pipefail
    ENV_FILE=/home/ubuntu/inboundr/backend/.env
-   env_get() { grep -m1 "^$1=" "$ENV_FILE" | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'; }
+   env_get() { grep -m1 "^$1=" "$ENV_FILE" | cut -d= -f2- | sed -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//'; }
    for k in MONGODB_URI DB_HOST DB_PORT DB_USER DB_NAME DB_PASSWORD; do
      v=$(env_get "$k" || true); [ -n "$v" ] || { echo "missing $k" >&2; exit 1; }; export "$k=$v"
    done
