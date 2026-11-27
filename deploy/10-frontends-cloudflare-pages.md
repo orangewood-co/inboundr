@@ -41,7 +41,7 @@ In each workflow keep the `build` job. In the `deploy` job, keep the `Download d
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy frontend/dist --project-name=inboundr-app --branch=main
 ```
-Use `embed/dist` + `inboundr-embed` in `embed-deploy.yml`, and `landing/dist` + `inboundr-landing` in `landing-deploy.yml`. Rename the jobs from "Deploy ... to S3". Afterwards, the `AWS_*`, `*_S3_BUCKET` and `*_CLOUDFRONT_DISTRIBUTION_ID` secrets and variables are no longer needed.
+Use `embed/dist` + `inboundr-embed` in `embed-deploy.yml`, and `landing/dist` + `inboundr-landing` in `landing-deploy.yml`. Rename the jobs from "Deploy ... to S3". In `embed-deploy.yml`, also add `environment: production` to the `build` job (the frontend and landing build jobs already have it); otherwise `Build embed` can't read the environment variables and the embed Vite config aborts without `VITE_API_URL`. Afterwards, the `AWS_*`, `*_S3_BUCKET` and `*_CLOUDFRONT_DISTRIBUTION_ID` secrets and variables are no longer needed.
 
 ### 3. SPA routing and caching
 
