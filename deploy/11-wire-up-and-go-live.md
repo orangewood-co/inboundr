@@ -36,7 +36,7 @@ Cloudflare DNS, Google Cloud console, the provider dashboards, and a browser.
 1. A day before: lower the TTL of the old DNS records, and do a trial dump/restore (Steps 02–04) to measure how long it takes.
 2. Announce a short maintenance window.
 3. **Stop the old backend** (`sudo systemctl stop inboundr-backend` on EC2) so no more writes or Gmail processing happen there.
-4. Final `mongodump`/`mongorestore` and `pg_dump`/`pg_restore` (skip whichever stays on the same provider), plus a final `rclone sync` of S3 → R2.
+4. Final `mongodump`/`mongorestore --drop` and `pg_dump`/`pg_restore --clean --if-exists` (skip whichever stays on the same provider), plus a final `rclone sync` of S3 → R2. The `--drop`/`--clean` flags replace the trial-restore data, so records changed or deleted since the trial don't survive.
 5. Start or restart the backend on Oracle (`sudo systemctl restart inboundr-backend`). On boot it re-registers Gmail watches and catches up the mailbox history.
 6. Switch DNS and the Pub/Sub endpoint to the new targets (sections 1–2).
 7. Keep the old EC2/S3/CloudFront resources **stopped but not deleted** for a week, then remove them and the old GitHub secrets.

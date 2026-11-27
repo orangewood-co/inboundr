@@ -34,7 +34,7 @@ The **primary database of `backend/`**: Better Auth users, sessions and organiza
   2. Copy the data:
      ```bash
      mongodump   --uri "<OLD_MONGODB_URI>" --archive=inboundr.archive --gzip
-     mongorestore --uri "<NEW_MONGODB_URI>" --archive=inboundr.archive --gzip --nsInclude 'inboundr.*'
+     mongorestore --uri "<NEW_MONGODB_URI>" --archive=inboundr.archive --gzip --nsInclude 'inboundr.*' --drop
      ```
   3. Do the final dump/restore during the cutover in Step 11, after the old backend is stopped, so no writes are lost.
 

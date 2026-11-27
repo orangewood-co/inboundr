@@ -43,7 +43,7 @@ The repo has **no script that creates the base `products` table**. `migrate:cata
   pg_dump "postgresql://<OLD_USER>:<OLD_PASS>@<OLD_HOST>:5432/<OLD_DB>" \
     --no-owner --no-privileges -Fc -f inboundr-pg.dump
 
-  pg_restore --no-owner --no-privileges \
+  pg_restore --no-owner --no-privileges --clean --if-exists \
     -d "postgresql://postgres.<ref>:<PASS>@aws-0-<region>.pooler.supabase.com:5432/postgres" \
     inboundr-pg.dump
   ```
