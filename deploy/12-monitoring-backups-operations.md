@@ -34,11 +34,15 @@ Useful commands: `journalctl -u inboundr-backend -f`, `journalctl -u inboundr-ba
 
 1. Install the tools: `mongodump` (MongoDB Database Tools, **Ubuntu arm64** package from mongodb.com/try/download/database-tools), `postgresql-client` (from Step 07; must be the same or newer major version than Supabase's Postgres, so add the PGDG apt repo if needed), and `rclone` (`sudo apt install -y rclone`).
 2. Create a separate bucket `inboundr-backups` and an R2 token limited to it. Configure `rclone config` → remote `r2` (type `s3`, provider `Cloudflare`, endpoint `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`).
-3. `/home/ubuntu/backup.sh` (chmod 700). It reads the connection details from `backend/.env`:
+3. `/home/ubuntu/backup.sh` (chmod 700). It reads the connection details from `backend/.env` without sourcing it, because unquoted values such as `MONGODB_URI=...?retryWrites=true&w=majority` break when Bash parses them:
    ```bash
    #!/usr/bin/env bash
    set -euo pipefail
-   set -a; source /home/ubuntu/inboundr/backend/.env; set +a
+   ENV_FILE=/home/ubuntu/inboundr/backend/.env
+   env_get() { grep -m1 "^$1=" "$ENV_FILE" | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'; }
+   for k in MONGODB_URI DB_HOST DB_PORT DB_USER DB_NAME DB_PASSWORD; do
+     v=$(env_get "$k" || true); [ -n "$v" ] || { echo "missing $k" >&2; exit 1; }; export "$k=$v"
+   done
    TS=$(date -u +%Y%m%d-%H%M)
    DIR=/home/ubuntu/backups; mkdir -p "$DIR"
    mongodump --uri "$MONGODB_URI" --archive="$DIR/mongo-$TS.archive" --gzip
