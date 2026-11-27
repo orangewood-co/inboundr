@@ -46,7 +46,7 @@ Useful commands: `journalctl -u inboundr-backend -f`, `journalctl -u inboundr-ba
    TS=$(date -u +%Y%m%d-%H%M)
    DIR=/home/ubuntu/backups; mkdir -p "$DIR"
    mongodump --uri "$MONGODB_URI" --archive="$DIR/mongo-$TS.archive" --gzip
-   PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+   PGSSLMODE=require PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
      --no-owner --no-privileges -Fc -f "$DIR/pg-$TS.dump"
    rclone copy "$DIR" r2:inboundr-backups/ --include "*-$TS.*"
    rclone delete r2:inboundr-backups/ --min-age 14d
