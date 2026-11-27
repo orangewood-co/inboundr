@@ -41,7 +41,7 @@ When they are unset, behavior stays exactly as today (AWS S3).
    ```
    `ETag` must be exposed, because multipart upload completion reads it.
 4. **R2 → Manage API tokens → Create API token**: permission **Object Read & Write**, scoped to `inboundr-uploads`. Save the **Access Key ID** and **Secret Access Key**.
-5. (Optional) Public file URLs: bucket **Settings → Custom Domains → Connect** `files.yourdomain.com`. Then set `S3_UPLOAD_PUBLIC_BASE_URL=https://files.yourdomain.com`. If you skip this, the app uses signed URLs and backend redirect routes (`fileUrlForKey` returns `null`).
+5. **Keep the bucket private** (no custom domain, no `r2.dev` URL) and leave `S3_UPLOAD_PUBLIC_BASE_URL` unset. The app then serves files through signed URLs and backend redirect routes (`fileUrlForKey` returns `null`). A public domain on this bucket would expose every object, including private Drive files and résumés, to anyone who has the URL.
 6. Values for Step 08:
    ```env
    AWS_REGION=auto
@@ -49,7 +49,6 @@ When they are unset, behavior stays exactly as today (AWS S3).
    S3_ENDPOINT=https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
    S3_ACCESS_KEY_ID=<r2-access-key-id>
    S3_SECRET_ACCESS_KEY=<r2-secret>
-   # S3_UPLOAD_PUBLIC_BASE_URL=https://files.yourdomain.com
    ```
    `AWS_REGION` is only read by the storage config. SES uses `AWS_SES_REGION`.
 

@@ -45,7 +45,7 @@ cp backend/.env.production.example backend/.env && chmod 600 backend/.env && nan
 | Auth | `BETTER_AUTH_URL=https://api.yourdomain.com`, `BETTER_AUTH_SECRET`, `TOKEN_ENCRYPTION_SECRET`, `OAUTH_STATE_SECRET`, `LINK_ANALYTICS_SECRET`, `RECRUITMENT_UPLOAD_SESSION_SECRET`, `SUPER_ADMIN_EMAILS`, `ORGANIZATION_LIMIT` | Generate each secret with `openssl rand -base64 48` |
 | MongoDB | `MONGODB_URI` | Step 02 |
 | Postgres | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `PGSSLMODE=require` | Step 03 |
-| Storage | `AWS_REGION=auto`, `S3_UPLOAD_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, optional `S3_UPLOAD_PUBLIC_BASE_URL` | Step 04 (needs the code change described there) |
+| Storage | `AWS_REGION=auto`, `S3_UPLOAD_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (leave `S3_UPLOAD_PUBLIC_BASE_URL` unset) | Step 04 (needs the code change described there) |
 | Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_OAUTH_REDIRECT_URI=https://api.yourdomain.com/api/v1/gmail/callback`, `GMAIL_PUBSUB_TOPIC` | Step 05 |
 | Email | `AWS_SES_REGION`, `AWS_SES_FROM_EMAIL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Step 06 |
 | Bot check | `CLOUDFLARE_TURNSTILE_SECRET_KEY` | Step 01 |
