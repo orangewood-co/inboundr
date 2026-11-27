@@ -59,7 +59,7 @@ psql "postgresql://postgres.<ref>:<PASS>@aws-0-<region>.pooler.supabase.com:5432
 
 ## Gotchas
 
-- If the backend logs `self-signed certificate in certificate chain`, either set `NODE_EXTRA_CA_CERTS` to the Supabase CA file (**Database settings → SSL configuration → Download certificate**) or use `PGSSLMODE=no-verify`. That keeps traffic encrypted but skips the CA check.
+- If the backend logs `self-signed certificate in certificate chain`, download the Supabase CA (**Database settings → SSL configuration → Download certificate**) to the VM and set `NODE_EXTRA_CA_CERTS=/home/ubuntu/supabase-ca.crt` in `backend/.env`. Don't use `PGSSLMODE=no-verify`: it skips server verification, so an interceptor could impersonate the pooler and receive the DB password and queries.
 - Supabase **pauses free projects after ~7 days of inactivity**. Normal app use plus the nightly `pg_dump` from Step 12 keeps it active.
 - The session pooler allows a limited number of clients. Don't raise `MAX_CONNECTIONS` (15) in `postgres.ts`.
 
